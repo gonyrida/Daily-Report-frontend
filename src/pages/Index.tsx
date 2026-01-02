@@ -18,9 +18,7 @@ import {
 } from "@/lib/exportUtils";
 import { useToast } from "@/hooks/use-toast";
 import { generatePythonExcel, generateReferenceExcel, generateCombinedExcel } from "@/integrations/reportsApi"
-
-// API Configuration
-const API_BASE_URL = "http://localhost:5000/api/daily-reports";
+import { API_ENDPOINTS } from "@/config/api";
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -33,7 +31,7 @@ const getAuthHeaders = () => {
 
 // API functions
 const saveReportToDB = async (reportData: ReportData) => {
-  const response = await fetch(`${API_BASE_URL}/save`, {
+  const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SAVE, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(reportData),
@@ -49,7 +47,7 @@ const saveReportToDB = async (reportData: ReportData) => {
 
 const submitReportToDB = async (projectName: string, reportDate: Date) => {
   const dateStr = reportDate.toISOString().split("T")[0];
-  const response = await fetch(`${API_BASE_URL}/submit`, {
+  const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SUBMIT, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({ projectName, date: dateStr }),
@@ -73,7 +71,7 @@ const loadReportFromDB = async (reportDate: Date) => {
       throw new Error("No authentication token found. Please log in.");
     }
 
-    const response = await fetch(`${API_BASE_URL}/date/${dateStr}`, {
+    const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

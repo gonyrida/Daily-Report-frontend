@@ -18,6 +18,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { API_ENDPOINTS } from "@/config/api";
 
 const resetPasswordSchema = z
   .object({
@@ -197,7 +198,7 @@ const ResetPassword = () => {
     try {
       console.log("1000000000000000000000000");
       const response = await fetch(
-        "http://localhost:5000/api/auth/reset-password",
+        API_ENDPOINTS.AUTH.RESET_PASSWORD,
         {
           method: "POST",
           headers: {

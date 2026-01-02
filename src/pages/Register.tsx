@@ -18,6 +18,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { API_ENDPOINTS } from "@/config/api";
 
 const registerSchema = z
   .object({
@@ -156,7 +157,7 @@ const Register = () => {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/register", {
+      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,6 +1,7 @@
 // src/integrations/reportsApi.ts
+import { API_ENDPOINTS } from "@/config/api";
 
-const API_BASE_URL = "http://localhost:5000/api/daily-reports";
+const API_BASE_URL = API_ENDPOINTS.DAILY_REPORTS.BASE;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
@@ -11,7 +12,7 @@ const getAuthHeaders = () => {
 };
 
 export const saveReportToDB = async (reportData: any) => {
-  const response = await fetch(`${API_BASE_URL}/save`, {
+  const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SAVE, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(reportData),
@@ -36,7 +37,7 @@ export const submitReportToDB = async (projectName: string, reportDate: Date) =>
   // DEBUG 1: Verify what string we are sending
   console.log("DEBUG FRONTEND: Sending to API ->", { projectName, dateStr });
 
-  const response = await fetch(`${API_BASE_URL}/submit`, {
+  const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SUBMIT, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({ projectName, date: dateStr }),
@@ -68,7 +69,7 @@ export const loadReportFromDB = async (reportDate: Date) => {
     }
 
     // Now this URL will correctly be .../date/2025-12-29
-    const response = await fetch(`${API_BASE_URL}/date/${dateStr}`, {
+    const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr), {
       method: "GET",
       headers: headers
     });

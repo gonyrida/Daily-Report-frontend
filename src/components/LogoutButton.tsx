@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { API_ENDPOINTS } from "@/config/api";
 
 const LogoutButton = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +28,7 @@ const LogoutButton = () => {
     try {
       const token = localStorage.getItem("token");
       if (token) {
-        const response = await fetch("http://localhost:5000/api/auth/logout", {
+        const response = await fetch(API_ENDPOINTS.AUTH.LOGOUT, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
