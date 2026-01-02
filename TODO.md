@@ -1,0 +1,10 @@
+- [x] Modify exportToExcel function to create a single formatted sheet similar to PDF layout
+- [x] Add title "DAILY REPORT" with formatting
+- [x] Embed logos (CACPM and KOICA) at the top using ExcelJS (switched from XLSX to ExcelJS for image support)
+- [x] Add project information section
+- [x] Add activities section with side-by-side columns for "Working Activity Today" and "Work Plan for Next Day"
+- [x] Add resource tables in pairs: Management Team and Working Team side by side, then Materials and Machinery side by side
+- [x] Apply formatting: blue headers, alternating row colors, gray total rows, merged cells to match PDF style
+- [x] Add footer with generation timestamp
+- [x] Install ExcelJS dependency and remove XLSX dependency
+- [x] Test build to ensure no compilation errors
