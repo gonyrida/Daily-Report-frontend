@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      outDir: "dist",
+      outDir: "build",
       sourcemap: false,
       minify: "esbuild",
     },

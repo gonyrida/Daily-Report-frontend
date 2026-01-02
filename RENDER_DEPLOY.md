@@ -14,6 +14,7 @@ Set the following environment variables in your Render dashboard:
 ### Optional Variables (if using Supabase)
 
 2. **VITE_SUPABASE_URL**
+
    - Your Supabase project URL
 
 3. **VITE_SUPABASE_PUBLISHABLE_KEY**
@@ -22,7 +23,7 @@ Set the following environment variables in your Render dashboard:
 ## Build Settings in Render
 
 - **Build Command**: `npm install && npm run build`
-- **Publish Directory**: `dist`
+- **Publish Directory**: `build`
 - **Node Version**: 18.x or higher
 
 ## Setting Environment Variables in Render
@@ -35,8 +36,8 @@ Set the following environment variables in your Render dashboard:
 ## Troubleshooting
 
 If the build fails:
+
 1. Check that all environment variables are set correctly
 2. Ensure `VITE_API_BASE_URL` does NOT have a trailing slash
 3. Check the build logs for specific error messages
 4. Verify Node.js version is 18.x or higher
-
