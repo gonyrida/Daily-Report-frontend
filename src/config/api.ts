@@ -1,8 +1,20 @@
 // API Configuration
-// Use environment variable for API URL, fallback to localhost for development
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://daily-report-backend.onrender.com/api";
+// Determine API base URL based on environment
+const getApiBaseUrl = (): string => {
+  // Always prefer VITE_API_BASE_URL if defined
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  // If not defined, use production URL in production mode, localhost in development
+  if (import.meta.env.MODE === "production") {
+    return "https://daily-report-backend.onrender.com/api";
+  }
+
+  return "http://localhost:5000/api";
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export const API_ENDPOINTS = {
   AUTH: {
