@@ -164,7 +164,7 @@ const ResetPassword = () => {
   //   // Verify token
   //   const verifyToken = async () => {
   //     try {
-  //       const response = await fetch("http://localhost:5000/api/auth/verify", {
+  //       const response = await fetch("https://daily-report-backend.onrender.com/api/auth/verify", {
   //         method: "GET",
   //         headers: {
   //           Authorization: `Bearer ${token}`,
@@ -197,19 +197,16 @@ const ResetPassword = () => {
 
     try {
       console.log("1000000000000000000000000");
-      const response = await fetch(
-        API_ENDPOINTS.AUTH.RESET_PASSWORD,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            token,
-            newPassword: data.password,
-          }),
-        }
-      );
+      const response = await fetch(API_ENDPOINTS.AUTH.RESET_PASSWORD, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token,
+          newPassword: data.password,
+        }),
+      });
 
       const result = await response.json();
 

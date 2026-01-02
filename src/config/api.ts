@@ -1,6 +1,8 @@
 // API Configuration
 // Use environment variable for API URL, fallback to localhost for development
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://daily-report-backend.onrender.com/api";
 
 export const API_ENDPOINTS = {
   AUTH: {
@@ -18,4 +20,3 @@ export const API_ENDPOINTS = {
     GET_BY_DATE: (date: string) => `${API_BASE_URL}/daily-reports/date/${date}`,
   },
 };
-
