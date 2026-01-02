@@ -87,7 +87,7 @@ export const loadReportFromDB = async (reportDate: Date) => {
 
 export const generatePythonExcel = async (payload: any, mode: 'report' | 'reference' | 'combined') => {
   try {
-    const response = await fetch('http://localhost:5001/generate-report', {
+    const response = await fetch('https://dr2-backend.onrender.com/generate-report', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,7 +151,7 @@ export const generateReferenceExcel = async (referenceSections: any[], tableTitl
       reference: referenceEntries,
     };
 
-    const response = await fetch('http://localhost:5001/generate-reference', {
+    const response = await fetch('https://dr2-backend.onrender.com/generate-reference', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -209,7 +209,7 @@ export const generateCombinedExcel = async (
     reference: referenceEntries,
   };
 
-  const response = await fetch("http://localhost:5001/generate-combined", {
+  const response = await fetch("https://dr2-backend.onrender.com/generate-combined", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
