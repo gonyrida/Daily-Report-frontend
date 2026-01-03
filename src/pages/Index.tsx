@@ -6,6 +6,7 @@ import ResourcesSection from "@/components/ResourcesSection";
 import ReportActions from "@/components/ReportActions";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
+import FileNameDialog from "@/components/FileNameDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -145,6 +146,21 @@ function loadDraftLocally(date: Date | undefined): ReportData | null {
   }
 }
 
+interface Slot {
+  image: File | string | null;
+  [key: string]: unknown;
+}
+
+interface Entry {
+  slots: Slot[];
+  [key: string]: unknown;
+}
+
+interface Section {
+  entries: Entry[];
+  [key: string]: unknown;
+}
+
 interface ReportData {
   projectName: string;
   reportDate: string | null;
@@ -164,7 +180,7 @@ interface ReportData {
   materials: ResourceRow[];
   machinery: ResourceRow[];
   // Optional merged-reference data (kept optional so export logic isn't changed yet)
-  referenceSections?: any[];
+  referenceSections?: Section[];
 }
 
 const Index = () => {
@@ -190,7 +206,7 @@ const Index = () => {
   const [machinery, setMachinery] = useState<ResourceRow[]>([]);
 
   // Reference Section state
-  const [referenceSections, setReferenceSections] = useState<any[]>([]);
+  const [referenceSections, setReferenceSections] = useState<Section[]>([]);
   const [tableTitle, setTableTitle] = useState("SITE PHOTO EVIDENCE");
   const [isExportingReference, setIsExportingReference] = useState(false);
 
@@ -205,6 +221,12 @@ const Index = () => {
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  // File name dialog state
+  const [showFileNameDialog, setShowFileNameDialog] = useState(false);
+  const [pendingExportType, setPendingExportType] = useState<
+    "excel" | "combined" | "reference" | null
+  >(null);
 
   // Track previous date to detect changes
   const lastDateRef = useRef<string | null>(null);
@@ -389,7 +411,7 @@ const Index = () => {
     };
 
     loadInitialReport();
-  }, []); // Only run on mount
+  }, [reportDate]); // Include reportDate to satisfy ESLint
 
   // Handle date change: save current, carry forward between dates, load or clear on first selection
   useEffect(() => {
@@ -782,6 +804,17 @@ const Index = () => {
   const handleExportExcel = async () => {
     if (!validateReport()) return;
 
+    // Generate default filename
+    const defaultFileName = `${projectName || "Report"}_${
+      reportDate?.toISOString().split("T")[0] || "export"
+    }`;
+
+    // Show file name dialog
+    setPendingExportType("excel");
+    setShowFileNameDialog(true);
+  };
+
+  const handleExportExcelWithFilename = async (fileName: string) => {
     setIsExporting(true);
     try {
       // Prepare payload for Python backend
@@ -800,8 +833,8 @@ const Index = () => {
         machinery,
       };
 
-      // Call Python API instead of Node.js exportToExcel
-      await generatePythonExcel(payload, "report");
+      // Call Python API with custom filename
+      await generatePythonExcel(payload, "report", fileName);
 
       toast({
         title: "Excel Exported",
@@ -821,18 +854,19 @@ const Index = () => {
   };
 
   const handleExportReference = async () => {
+    // Generate default filename
+    const defaultFileName = `reference_${
+      reportDate?.toISOString().split("T")[0] || "export"
+    }`;
+
+    // Show file name dialog
+    setPendingExportType("reference");
+    setShowFileNameDialog(true);
+  };
+
+  const handleExportReferenceWithFilename = async (fileName: string) => {
     setIsExportingReference(true);
     try {
-      // Check if there are any reference sections
-      if (!referenceSections || referenceSections.length === 0) {
-        toast({
-          title: "No Reference Data",
-          description: "Please add reference sections before exporting.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
@@ -865,13 +899,13 @@ const Index = () => {
         return null;
       };
 
-      const processImages = async (sectionsArr: any[]) => {
+      const processImages = async (sectionsArr: Section[]) => {
         return await Promise.all(
-          sectionsArr.map(async (sec) => {
+          sectionsArr.map(async (sec: Section) => {
             const newEntries = await Promise.all(
-              (sec.entries ?? []).map(async (entry: any) => {
+              (sec.entries ?? []).map(async (entry: Entry) => {
                 const newSlots = await Promise.all(
-                  (entry.slots ?? []).map(async (slot: any) => ({
+                  (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
                     image: await toBase64DataUrl(slot.image),
                   }))
@@ -885,19 +919,20 @@ const Index = () => {
       };
 
       const processedSections = await processImages(referenceSections);
-      await generateReferenceExcel(processedSections, tableTitle);
+
+      await generateReferenceExcel(processedSections, tableTitle, fileName);
 
       toast({
-        title: "Reference Exported",
+        title: "Reference Excel Exported",
         description: "Reference section exported successfully.",
       });
-    } catch (error) {
-      console.error("Reference Export Error:", error);
+    } catch (e) {
+      console.error("Reference Export Error:", e);
       toast({
         variant: "destructive",
         title: "Export Failed",
         description:
-          "Could not generate reference. Ensure Python server is running.",
+          "Could not generate reference Excel. Ensure Python server is running.",
       });
     } finally {
       setIsExportingReference(false);
@@ -907,6 +942,17 @@ const Index = () => {
   const handleExportCombinedExcel = async () => {
     if (!validateReport()) return;
 
+    // Generate default filename
+    const defaultFileName = `combined-${projectName || "Report"}_${
+      reportDate?.toISOString().split("T")[0] || "export"
+    }`;
+
+    // Show file name dialog
+    setPendingExportType("combined");
+    setShowFileNameDialog(true);
+  };
+
+  const handleExportCombinedExcelWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
@@ -941,13 +987,13 @@ const Index = () => {
         return null;
       };
 
-      const processImages = async (sectionsArr: any[]) => {
+      const processImages = async (sectionsArr: Section[]) => {
         return await Promise.all(
-          sectionsArr.map(async (sec) => {
+          sectionsArr.map(async (sec: Section) => {
             const newEntries = await Promise.all(
-              (sec.entries ?? []).map(async (entry: any) => {
+              (sec.entries ?? []).map(async (entry: Entry) => {
                 const newSlots = await Promise.all(
-                  (entry.slots ?? []).map(async (slot: any) => ({
+                  (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
                     image: await toBase64DataUrl(slot.image),
                   }))
@@ -977,7 +1023,12 @@ const Index = () => {
         machinery,
       };
 
-      await generateCombinedExcel(reportPayload, processedSections, tableTitle);
+      await generateCombinedExcel(
+        reportPayload,
+        processedSections,
+        tableTitle,
+        fileName
+      );
 
       toast({
         title: "Combined Excel Exported",
@@ -1338,6 +1389,51 @@ const Index = () => {
             }
           }}
           pdfUrl={previewUrl}
+        />
+
+        <FileNameDialog
+          open={showFileNameDialog}
+          onClose={() => {
+            setShowFileNameDialog(false);
+            setPendingExportType(null);
+          }}
+          onConfirm={(fileName) => {
+            if (pendingExportType === "excel") {
+              handleExportExcelWithFilename(fileName);
+            } else if (pendingExportType === "combined") {
+              handleExportCombinedExcelWithFilename(fileName);
+            } else if (pendingExportType === "reference") {
+              handleExportReferenceWithFilename(fileName);
+            }
+            setPendingExportType(null);
+          }}
+          defaultFileName={
+            pendingExportType === "combined"
+              ? `combined-${projectName || "Report"}_${
+                  reportDate?.toISOString().split("T")[0] || "export"
+                }`
+              : pendingExportType === "reference"
+              ? `reference_${
+                  reportDate?.toISOString().split("T")[0] || "export"
+                }`
+              : `${projectName || "Report"}_${
+                  reportDate?.toISOString().split("T")[0] || "export"
+                }`
+          }
+          title={
+            pendingExportType === "combined"
+              ? "Export Combined Excel File"
+              : pendingExportType === "reference"
+              ? "Export Reference Excel File"
+              : "Export Excel File"
+          }
+          description={
+            pendingExportType === "combined"
+              ? "Enter a name for your combined Excel export file (Report + Reference)."
+              : pendingExportType === "reference"
+              ? "Enter a name for your reference Excel export file."
+              : "Enter a name for your Excel export file."
+          }
         />
       </main>
     </div>
