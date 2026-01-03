@@ -61,6 +61,7 @@ const ReportActions = ({
       </div>
 
       <div className="flex items-center gap-3">
+        {/* DISABLED: Clear button - commented out to disable
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="outline" className="min-w-[120px]">
@@ -84,7 +85,9 @@ const ReportActions = ({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        */}
 
+        {/* DISABLED: Preview button - commented out to disable
         <Button
           variant="outline"
           onClick={onPreview}
@@ -94,6 +97,7 @@ const ReportActions = ({
           <Eye className="w-4 h-4 mr-2" />
           {isPreviewing ? "Loading..." : "Preview"}
         </Button>
+        */}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -106,25 +110,32 @@ const ReportActions = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {/* DISABLED: Export PDF - commented out
             <DropdownMenuItem onClick={onExportPDF}>
               <FileText className="w-4 h-4 mr-2" />
               Export PDF
             </DropdownMenuItem>
+            */}
             <DropdownMenuItem onClick={onExportExcel}>
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               Export Excel
             </DropdownMenuItem>
+            {/* DISABLED: Export Docs - commented out
             <DropdownMenuItem onClick={onExportDocs}>
               <FileType className="w-4 h-4 mr-2" />
               Export Docs (Word)
             </DropdownMenuItem>
+            */}
+            {/* DISABLED: Download All (ZIP) - commented out
             <DropdownMenuItem onClick={onExportAll}>
               <FileDown className="w-4 h-4 mr-2" />
               Download All (ZIP)
             </DropdownMenuItem>
+            */}
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* DISABLED: Submit button - commented out to disable
         <Button
           onClick={onSubmit}
           disabled={isSubmitting}
@@ -133,6 +144,7 @@ const ReportActions = ({
           <Send className="w-4 h-4 mr-2" />
           {isSubmitting ? "Submitting..." : "Submit"}
         </Button>
+        */}
       </div>
     </div>
   );

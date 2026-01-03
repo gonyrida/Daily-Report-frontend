@@ -37,14 +37,16 @@ export default function ReferenceSection({ sections, setSections, onExportRefere
 
         <div className="flex items-center gap-2">
           <div className="hidden md:flex items-center gap-2">
+            {/* DISABLED: Preview button - commented out to disable
             <Button variant="outline" className="min-w-[120px]">
               <Image className="w-4 h-4 mr-2" />
               Preview
             </Button>
+            */}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
+                <Button
                   disabled={isExporting || !onExportReference}
                   className="min-w-[140px] bg-primary hover:bg-primary/90">
                   <FileDown className="w-4 h-4 mr-2" />
@@ -52,22 +54,28 @@ export default function ReferenceSection({ sections, setSections, onExportRefere
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {/* DISABLED: Export PDF - commented out
                 <DropdownMenuItem>
                   <FileText className="w-4 h-4 mr-2" />
                   Export PDF
                 </DropdownMenuItem>
+                */}
                 <DropdownMenuItem onClick={onExportReference} disabled={isExporting || !onExportReference}>
                   <FileSpreadsheet className="w-4 h-4 mr-2" />
                   Export Excel
                 </DropdownMenuItem>
+                {/* DISABLED: Export Docs - commented out
                 <DropdownMenuItem>
                   <FileType className="w-4 h-4 mr-2" />
                   Export Docs (Word)
                 </DropdownMenuItem>
+                */}
+                {/* DISABLED: Download All (ZIP) - commented out
                 <DropdownMenuItem>
                   <FileDown className="w-4 h-4 mr-2" />
                   Download All (ZIP)
                 </DropdownMenuItem>
+                */}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

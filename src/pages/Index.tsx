@@ -7,8 +7,19 @@ import ReportActions from "@/components/ReportActions";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Eye, FileDown, FileSpreadsheet, FileText, FileType } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Eye,
+  FileDown,
+  FileSpreadsheet,
+  FileText,
+  FileType,
+} from "lucide-react";
 import { ResourceRow } from "@/components/ResourceTable";
 import {
   exportToPDF,
@@ -17,7 +28,11 @@ import {
   exportToWord,
 } from "@/lib/exportUtils";
 import { useToast } from "@/hooks/use-toast";
-import { generatePythonExcel, generateReferenceExcel, generateCombinedExcel } from "@/integrations/reportsApi"
+import {
+  generatePythonExcel,
+  generateReferenceExcel,
+  generateCombinedExcel,
+} from "@/integrations/reportsApi";
 import { API_ENDPOINTS } from "@/config/api";
 
 // Helper function to get auth headers
@@ -71,13 +86,16 @@ const loadReportFromDB = async (reportDate: Date) => {
       throw new Error("No authentication token found. Please log in.");
     }
 
-    const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr), {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // send token to backend
-      },
-    });
+    const response = await fetch(
+      API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr),
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // send token to backend
+        },
+      }
+    );
 
     // 404 is expected when no report exists for this date - return null silently
     if (response.status === 404) {
@@ -783,7 +801,7 @@ const Index = () => {
       };
 
       // Call Python API instead of Node.js exportToExcel
-      await generatePythonExcel(payload, 'report');
+      await generatePythonExcel(payload, "report");
 
       toast({
         title: "Excel Exported",
@@ -794,7 +812,8 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Export Failed",
-        description: "Could not connect to Python server. Ensure it's running on port 5001.",
+        description:
+          "Could not connect to Python server. Ensure it's running on port 5001.",
       });
     } finally {
       setIsExporting(false);
@@ -802,7 +821,7 @@ const Index = () => {
   };
 
   const handleExportReference = async () => {
-    setIsExportingReference(true)
+    setIsExportingReference(true);
     try {
       // Check if there are any reference sections
       if (!referenceSections || referenceSections.length === 0) {
@@ -877,10 +896,11 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Export Failed",
-        description: "Could not generate reference. Ensure Python server is running.",
+        description:
+          "Could not generate reference. Ensure Python server is running.",
       });
     } finally {
-      setIsExportingReference(false)
+      setIsExportingReference(false);
     }
   };
 
@@ -968,7 +988,8 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Export Failed",
-        description: "Could not generate combined Excel. Ensure Python server is running.",
+        description:
+          "Could not generate combined Excel. Ensure Python server is running.",
       });
     } finally {
       setIsExportingCombined(false);
@@ -1234,13 +1255,15 @@ const Index = () => {
         {/* Reference section (renders below Report content) */}
         <div className="mt-8 pt-6 border-t border-muted-foreground/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <h2 className="text-sm font-semibold text-foreground/70 mb-4">Reference</h2>
-            <ReferenceSection 
-              sections={referenceSections} 
-              setSections={setReferenceSections} 
-              onExportReference={handleExportReference} 
-              isExporting={isExportingReference} 
-              tableTitle={tableTitle} 
+            <h2 className="text-sm font-semibold text-foreground/70 mb-4">
+              Reference
+            </h2>
+            <ReferenceSection
+              sections={referenceSections}
+              setSections={setReferenceSections}
+              onExportReference={handleExportReference}
+              isExporting={isExportingReference}
+              tableTitle={tableTitle}
               setTableTitle={setTableTitle}
             />
           </div>
@@ -1249,40 +1272,57 @@ const Index = () => {
         <div className="mt-6 pt-6 border-t border-muted-foreground/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              Export combined: <span className="font-medium text-foreground">Report</span> = Sheet 1, <span className="font-medium text-foreground">Reference</span> = Sheet 2
+              Export combined:{" "}
+              <span className="font-medium text-foreground">Report</span> =
+              Sheet 1,{" "}
+              <span className="font-medium text-foreground">Reference</span> =
+              Sheet 2
             </div>
             <div className="flex items-center gap-3">
+              {/* DISABLED: Preview Combined button - commented out to disable
               <Button variant="outline" className="min-w-[140px]">
                 <Eye className="w-4 h-4 mr-2" />
                 Preview Combined
               </Button>
+              */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
+                  <Button
                     className="min-w-[160px] bg-primary hover:bg-primary/90"
                     disabled={isExportingCombined}
                   >
                     <FileDown className="w-4 h-4 mr-2" />
-                    {isExportingCombined ? "Exporting Combined..." : "Export Combined Excel"}
+                    {isExportingCombined
+                      ? "Exporting Combined..."
+                      : "Export Combined Excel"}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {/* DISABLED: Export Combined PDF - commented out
                   <DropdownMenuItem>
                     <FileText className="w-4 h-4 mr-2" />
                     Export Combined PDF
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportCombinedExcel} disabled={isExportingCombined}>
+                  */}
+                  <DropdownMenuItem
+                    onClick={handleExportCombinedExcel}
+                    disabled={isExportingCombined}
+                  >
                     <FileSpreadsheet className="w-4 h-4 mr-2" />
                     Export Combined Excel
                   </DropdownMenuItem>
+                  {/* DISABLED: Export Combined Docs - commented out
                   <DropdownMenuItem>
                     <FileType className="w-4 h-4 mr-2" />
                     Export Combined Docs (Word)
                   </DropdownMenuItem>
+                  */}
+                  {/* DISABLED: Download Combined (ZIP) - commented out
                   <DropdownMenuItem>
                     <FileDown className="w-4 h-4 mr-2" />
                     Download Combined (ZIP)
                   </DropdownMenuItem>
+                  */}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
