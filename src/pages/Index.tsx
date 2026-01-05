@@ -47,18 +47,44 @@ const getAuthHeaders = () => {
 
 // API functions
 const saveReportToDB = async (reportData: ReportData) => {
-  const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SAVE, {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(reportData),
-  });
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Failed to save report" }));
-    throw new Error(error.message || "Failed to save report");
+  console.log(
+    "DEBUG FRONTEND: saveReportToDB called with endpoint:",
+    API_ENDPOINTS.DAILY_REPORTS.SAVE
+  );
+  console.log("DEBUG FRONTEND: saveReportToDB auth headers:", getAuthHeaders());
+
+  try {
+    const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SAVE, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(reportData),
+    });
+
+    console.log(
+      "DEBUG FRONTEND: saveReportToDB response status:",
+      response.status
+    );
+    console.log("DEBUG FRONTEND: saveReportToDB response ok:", response.ok);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        "DEBUG FRONTEND: saveReportToDB error response:",
+        errorText
+      );
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to save report" }));
+      throw new Error(error.message || "Failed to save report");
+    }
+
+    const result = await response.json();
+    console.log("DEBUG FRONTEND: saveReportToDB success:", result);
+    return result;
+  } catch (error) {
+    console.error("DEBUG FRONTEND: saveReportToDB exception:", error);
+    throw error;
   }
-  return response.json();
 };
 
 const submitReportToDB = async (projectName: string, reportDate: Date) => {
@@ -78,7 +104,7 @@ const submitReportToDB = async (projectName: string, reportDate: Date) => {
 };
 
 // FIXED: Removed duplicate "daily-reports" from path
-const loadReportFromDB = async (reportDate: Date) => {
+const loadReportFromDB = async (reportDate: Date, projectName?: string) => {
   try {
     const dateStr = reportDate.toISOString().split("T")[0];
     const token = localStorage.getItem("token"); // get token from login
@@ -87,16 +113,19 @@ const loadReportFromDB = async (reportDate: Date) => {
       throw new Error("No authentication token found. Please log in.");
     }
 
-    const response = await fetch(
-      API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr),
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // send token to backend
-        },
-      }
-    );
+    // Build URL with optional projectName query parameter
+    let url = API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr);
+    if (projectName && projectName.trim()) {
+      url += `?projectName=${encodeURIComponent(projectName)}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`, // send token to backend
+      },
+    });
 
     // 404 is expected when no report exists for this date - return null silently
     if (response.status === 404) {
@@ -286,7 +315,7 @@ const Index = () => {
 
       try {
         // Try to load from database first
-        const dbReport = await loadReportFromDB(reportDate);
+        const dbReport = await loadReportFromDB(reportDate, projectName);
 
         if (dbReport) {
           // Load from database
@@ -426,7 +455,7 @@ const Index = () => {
       const loadTargetDate = async () => {
         try {
           // Try database first
-          const dbReport = await loadReportFromDB(reportDate!);
+          const dbReport = await loadReportFromDB(reportDate!, projectName);
 
           if (dbReport) {
             // Found report in database
@@ -544,7 +573,7 @@ const Index = () => {
       const loadDataForDate = async () => {
         try {
           // Try to load from database first
-          const dbReport = await loadReportFromDB(reportDate!);
+          const dbReport = await loadReportFromDB(reportDate!, projectName);
           if (dbReport) {
             setProjectName(dbReport.projectName || "");
             // Handle backward compatibility: convert old format to new
@@ -955,6 +984,29 @@ const Index = () => {
   const handleExportCombinedExcelWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
+      // DEBUG: Add frontend log before saving
+      console.log(
+        "DEBUG FRONTEND: About to save report to DB before combined export"
+      );
+
+      // Step 1: Save report to database first (same logic as submit)
+      const rawData = getReportData();
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+      };
+
+      // Save to database
+      await saveReportToDB(cleanedData);
+
+      // DEBUG: Confirm save completed
+      console.log(
+        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
+      );
+
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
@@ -1032,7 +1084,7 @@ const Index = () => {
 
       toast({
         title: "Combined Excel Exported",
-        description: "Report + Reference exported successfully.",
+        description: "Report saved to database and exported successfully.",
       });
     } catch (e) {
       console.error("Combined Export Error:", e);
@@ -1040,7 +1092,7 @@ const Index = () => {
         variant: "destructive",
         title: "Export Failed",
         description:
-          "Could not generate combined Excel. Ensure Python server is running.",
+          "Could not save report or generate combined Excel. Please try again.",
       });
     } finally {
       setIsExportingCombined(false);
