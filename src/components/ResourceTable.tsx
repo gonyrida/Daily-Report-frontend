@@ -260,18 +260,9 @@ const ResourceTable = ({
                         </td>
                       )}
                       <td className="px-3 py-2">
-                        <Input
-                          type="number"
-                          value={row.prev || ""}
-                          onChange={(e) =>
-                            updateRow(
-                              row.id,
-                              "prev",
-                              Number(e.target.value) || 0
-                            )
-                          }
-                          className="border-0 bg-transparent text-center focus-visible:ring-1"
-                        />
+                        <div className="text-center text-muted-foreground font-medium">
+                          {row.prev || 0}
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         <Input
