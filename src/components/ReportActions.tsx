@@ -99,41 +99,7 @@ const ReportActions = ({
         </Button>
         */}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              disabled={isExporting}
-              className="min-w-[140px] bg-primary hover:bg-primary/90"
-            >
-              <FileDown className="w-4 h-4 mr-2" />
-              {isExporting ? "Exporting..." : "Export"}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {/* DISABLED: Export PDF - commented out
-            <DropdownMenuItem onClick={onExportPDF}>
-              <FileText className="w-4 h-4 mr-2" />
-              Export PDF
-            </DropdownMenuItem>
-            */}
-            <DropdownMenuItem onClick={onExportExcel}>
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Export Excel
-            </DropdownMenuItem>
-            {/* DISABLED: Export Docs - commented out
-            <DropdownMenuItem onClick={onExportDocs}>
-              <FileType className="w-4 h-4 mr-2" />
-              Export Docs (Word)
-            </DropdownMenuItem>
-            */}
-            {/* DISABLED: Download All (ZIP) - commented out
-            <DropdownMenuItem onClick={onExportAll}>
-              <FileDown className="w-4 h-4 mr-2" />
-              Download All (ZIP)
-            </DropdownMenuItem>
-            */}
-          </DropdownMenuContent>
-        </DropdownMenu>
+      
 
         {/* DISABLED: Submit button - commented out to disable
         <Button
