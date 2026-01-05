@@ -99,7 +99,7 @@ export const generatePythonExcel = async (
 ) => {
   try {
     const response = await fetch(
-      "https://dr2-backend.onrender.com/generate-report",
+      "https://dr2-i74k.onrender.com/generate-report",
       {
         method: "POST",
         headers: {
@@ -188,7 +188,7 @@ export const generateReferenceExcel = async (
     };
 
     const response = await fetch(
-      "https://dr2-backend.onrender.com/generate-reference",
+      "https://dr2-i74k.onrender.com/generate-reference",
       {
         method: "POST",
         headers: {
@@ -266,7 +266,7 @@ export const generateCombinedExcel = async (
   };
 
   const response = await fetch(
-    "https://dr2-backend.onrender.com/generate-combined",
+    "https://dr2-i74k.onrender.com/generate-combined",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -292,6 +292,83 @@ export const generateCombinedExcel = async (
   const filename = fileName
     ? `${fileName}.xlsx`
     : `combined-${new Date().toISOString().split("T")[0]}.xlsx`;
+
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+
+  return { success: true };
+};
+
+export const generateCombinedPDF = async (
+  reportPayload: any,
+  referenceSections: any[],
+  tableTitle: string = "SITE PHOTO EVIDENCE",
+  fileName?: string
+) => {
+  const referenceEntries = referenceSections.flatMap((section: any) =>
+    (section.entries ?? []).map((entry: any) => {
+      const slots = entry.slots ?? [];
+      return {
+        section_title: section.title || "",
+        images: slots
+          .map((s: any) => s.image)
+          .filter(Boolean)
+          .slice(0, 2),
+        footers: slots
+          .map((s: any) => s.caption)
+          .filter(Boolean)
+          .slice(0, 2),
+      };
+    })
+  );
+
+  const payload = {
+    mode: "combined",
+    data: {
+      ...reportPayload,
+      table_title: tableTitle,
+      reference: referenceSections.flatMap((section: any) =>
+        (section.entries ?? []).map((entry: any) => {
+          const slots = entry.slots ?? [];
+          return {
+            section_title: section.title || "",
+            images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+            footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+          };
+        })
+      ),
+    },
+  };
+
+  const response = await fetch(
+    "https://dr2-i74k.onrender.com/generate-combined-pdf",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to generate combined PDF" }));
+    throw new Error(
+      error.message || `HTTP ${response.status}: ${response.statusText}`
+    );
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+
+  const filename = fileName
+    ? `${fileName}.pdf`
+    : `combined-${new Date().toISOString().split("T")[0]}.pdf`;
 
   link.download = filename;
   document.body.appendChild(link);

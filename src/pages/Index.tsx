@@ -33,6 +33,7 @@ import {
   generatePythonExcel,
   generateReferenceExcel,
   generateCombinedExcel,
+  generateCombinedPDF
 } from "@/integrations/reportsApi";
 import { API_ENDPOINTS } from "@/config/api";
 
@@ -224,9 +225,8 @@ const Index = () => {
 
   // File name dialog state
   const [showFileNameDialog, setShowFileNameDialog] = useState(false);
-  const [pendingExportType, setPendingExportType] = useState<
-    "excel" | "combined" | "reference" | null
-  >(null);
+  const [defaultFileName, setDefaultFileName] = useState<string>("");
+  const [pendingExportType, setPendingExportType] = useState<"excel" | "combined" | "reference" | "combined-pdf">(null);
 
   // Track previous date to detect changes
   const lastDateRef = useRef<string | null>(null);
@@ -1081,6 +1081,110 @@ const Index = () => {
     setIsExporting(false);
   };
 
+  const handleExportCombinedPDF = async () => {
+    if (!validateReport()) return;
+
+    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]}`;
+    
+    setPendingExportType("combined-pdf");
+    setDefaultFileName(defaultFileName);
+    setShowFileNameDialog(true);
+  };
+
+  const handleExportCombinedPDFWithFilename = async (fileName: string) => {
+    setIsExportingCombined(true);
+    try {
+      await generateCombinedPDF(
+        {
+          projectName,
+          reportDate,
+          weatherAM,
+          weatherPM,
+          tempAM,
+          tempPM,
+          activityToday,
+          workPlanNextDay,
+          managementTeam,
+          workingTeam,
+          materials,
+          machinery,
+        },
+        referenceSections,
+        "SITE PHOTO EVIDENCE",
+        fileName
+      );
+      
+      toast({
+        title: "Combined PDF Exported",
+        description: "Your combined report has been exported as PDF successfully.",
+      });
+    } catch (error) {
+      console.error("Combined PDF export error:", error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to generate combined PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingCombined(false);
+    }
+  };
+
+  const handlePreviewCombined = async () => {
+    if (!validateReport()) return;
+
+    try {
+      // Use same payload as export
+      const payload = {
+        mode: "combined",
+        data: {
+          projectName,
+          reportDate,
+          weatherAM,
+          weatherPM,
+          tempAM,
+          tempPM,
+          activityToday,
+          workPlanNextDay,
+          managementTeam,
+          workingTeam,
+          materials,
+          machinery,
+          table_title: "SITE PHOTO EVIDENCE",
+          reference: referenceSections.flatMap((section: any) =>
+            (section.entries ?? []).map((entry: any) => {
+              const slots = entry.slots ?? [];
+              return {
+                section_title: section.title || "",
+                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+              };
+            })
+          ),
+        },
+      };
+
+      // Get Excel data as blob
+      const response = await fetch("https://dr2-i74k.onrender.com/generate-combined-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');  // This will show PDF in browser
+      }
+    } catch (error) {
+      toast({
+        title: "Preview Failed",
+        description: "Could not generate preview.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleExportAll = async () => {
     if (!validateReport()) return;
 
@@ -1330,12 +1434,10 @@ const Index = () => {
               Sheet 2
             </div>
             <div className="flex items-center gap-3">
-              {/* DISABLED: Preview Combined button - commented out to disable
-              <Button variant="outline" className="min-w-[140px]">
+              <Button variant="outline" className="min-w-[140px]" onClick={handlePreviewCombined}>
                 <Eye className="w-4 h-4 mr-2" />
                 Preview Combined
               </Button>
-              */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1349,12 +1451,10 @@ const Index = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {/* DISABLED: Export Combined PDF - commented out
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportCombinedPDF} disabled={isExportingCombined}>
                     <FileText className="w-4 h-4 mr-2" />
                     Export Combined PDF
                   </DropdownMenuItem>
-                  */}
                   <DropdownMenuItem
                     onClick={handleExportCombinedExcel}
                     disabled={isExportingCombined}
@@ -1404,6 +1504,8 @@ const Index = () => {
               handleExportCombinedExcelWithFilename(fileName);
             } else if (pendingExportType === "reference") {
               handleExportReferenceWithFilename(fileName);
+            } else if (pendingExportType === "combined-pdf") {
+              handleExportCombinedPDFWithFilename(fileName);
             }
             setPendingExportType(null);
           }}
