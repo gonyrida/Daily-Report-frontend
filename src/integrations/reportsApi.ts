@@ -384,7 +384,7 @@ export const generateCombinedPDF = async (
   };
 
   const response = await fetch(
-    "https://dr2-i74k.onrender.com/generate-combined-pdf",
+    `${PYTHON_API_BASE_URL}/generate-combined-pdf`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

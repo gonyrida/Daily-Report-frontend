@@ -35,7 +35,7 @@ import {
   generateCombinedExcel,
   generateCombinedPDF
 } from "@/integrations/reportsApi";
-import { API_ENDPOINTS } from "@/config/api";
+import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -1147,6 +1147,18 @@ const Index = () => {
   const handleExportCombinedPDFWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
+      // Step 1: Save report to database first (same logic as combined Excel)
+      const rawData = getReportData();
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+      };
+
+      // Save to database
+      await saveReportToDB(cleanedData);
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         // console.log("DEBUG: Processing image:", typeof img, img);
         
@@ -1365,7 +1377,7 @@ const Index = () => {
       };
 
       // Get Excel data as blob
-      const response = await fetch("https://dr2-i74k.onrender.com/generate-combined-pdf", {
+      const response = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1400,6 +1412,18 @@ const Index = () => {
   const handleExportCombinedZIPWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
+      // Step 1: Save report to database first (same logic as combined Excel)
+      const rawData = getReportData();
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+      };
+
+      // Save to database
+      await saveReportToDB(cleanedData);
       // Process images for both exports
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
@@ -1471,7 +1495,7 @@ const Index = () => {
       };
 
       // Generate PDF
-      const pdfResponse = await fetch("https://dr2-i74k.onrender.com/generate-combined-pdf", {
+      const pdfResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1494,7 +1518,7 @@ const Index = () => {
       });
 
       // Generate Excel
-      const excelResponse = await fetch("https://dr2-i74k.onrender.com/generate-combined", {
+      const excelResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
