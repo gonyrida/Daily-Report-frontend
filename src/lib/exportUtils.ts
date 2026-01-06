@@ -70,7 +70,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
   const margin = 15;
   const contentWidth = pageWidth - margin * 2;
   let y = 20;
-  
+
   // Load logos (public root)
   let leftLogo: string | null = null;
   let rightLogo: string | null = null;
@@ -122,7 +122,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
   doc.setFont("helvetica", "bold");
   doc.text(`Project Name : ${data.projectName || ""}`, margin, y);
   y += 6;
-  
+
   // Weather Summary in the format: Weather: AM Cloudy | PM Cloudy (row 8)
   const weatherAMDisplay = data.weatherAM || "";
   const weatherPMDisplay = data.weatherPM || "";
@@ -132,12 +132,12 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
     y
   );
   y += 6;
-  
+
   // Temperature and Date on same line (row 9) - Date on right side like Excel I9
   const tempAMDisplay = data.tempAM ? `${data.tempAM}°C` : "";
   const tempPMDisplay = data.tempPM ? `${data.tempPM}°C` : "";
-  const dateStr = data.reportDate 
-    ? data.reportDate.toISOString().split('T')[0] // yyyy-mm-dd format
+  const dateStr = data.reportDate
+    ? data.reportDate.toISOString().split("T")[0] // yyyy-mm-dd format
     : "";
   doc.text(
     `Temperature  : AM ${tempAMDisplay}    |  PM ${tempPMDisplay}`,
@@ -194,7 +194,10 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
     return Array.from({ length: maxRows }, (_, i) => lines[i] || "");
   };
 
-  const activityLines = splitIntoRows(data.activityToday || "", activityRowCount);
+  const activityLines = splitIntoRows(
+    data.activityToday || "",
+    activityRowCount
+  );
   const planLines = splitIntoRows(data.workPlanNextDay || "", activityRowCount);
 
   // Content - exactly 10 rows with borders
@@ -209,7 +212,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
 
   // Draw each line
   for (let i = 0; i < activityRowCount; i++) {
-    const lineY = y + (i * lineHeight);
+    const lineY = y + i * lineHeight;
     if (activityLines[i]) {
       doc.text(activityLines[i], margin + 2, lineY);
     }
@@ -296,7 +299,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
     doc.setFont("helvetica", "bold");
     doc.setFillColor(217, 225, 242); // Light blue background like Excel headers
     doc.setTextColor(0, 0, 0);
-    
+
     // Draw header backgrounds
     const headerHeight = 5;
     doc.rect(leftX, y - 3, tableColWidth, headerHeight, "F");
@@ -376,7 +379,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
         doc.rect(leftX, y - 3, tableColWidth, rowHeight, "F");
         doc.rect(rightX, y - 3, tableColWidth, rowHeight, "F");
       }
-      
+
       // Draw vertical lines between columns (matching Excel structure)
       if (hasUnit) {
         // Left table: Description|Unit|Prev|Today|Accum
@@ -390,7 +393,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
         doc.line(colX, y - 3, colX, y + rowHeight - 3);
         colX += colWidths[3]; // After Today
         doc.line(colX, y - 3, colX, y + rowHeight - 3);
-        
+
         // Right table: Description|Unit|Prev|Today|Accum
         colX = rightX;
         colX += colWidths[0]; // After Description
@@ -411,7 +414,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
         doc.line(colX, y - 3, colX, y + rowHeight - 3);
         colX += colWidths[2]; // After Today
         doc.line(colX, y - 3, colX, y + rowHeight - 3);
-        
+
         // Right table: Description|Prev|Today|Accum
         colX = rightX;
         colX += colWidths[0]; // After Description
@@ -421,11 +424,21 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
         colX += colWidths[2]; // After Today
         doc.line(colX, y - 3, colX, y + rowHeight - 3);
       }
-      
+
       // Draw horizontal line between rows
       doc.setDrawColor(200, 200, 200);
-      doc.line(leftX, y + rowHeight - 3, leftX + tableColWidth, y + rowHeight - 3);
-      doc.line(rightX, y + rowHeight - 3, rightX + tableColWidth, y + rowHeight - 3);
+      doc.line(
+        leftX,
+        y + rowHeight - 3,
+        leftX + tableColWidth,
+        y + rowHeight - 3
+      );
+      doc.line(
+        rightX,
+        y + rowHeight - 3,
+        rightX + tableColWidth,
+        y + rowHeight - 3
+      );
 
       // Left table
       if (i < rows1.length) {
@@ -485,7 +498,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
     doc.setFillColor(217, 225, 242); // Light blue background like Excel total rows
     doc.rect(leftX, y - 3, tableColWidth, rowHeight, "F");
     doc.rect(rightX, y - 3, tableColWidth, rowHeight, "F");
-    
+
     // Draw border for total row
     doc.setDrawColor(0, 0, 0);
     doc.rect(leftX, y - 3, tableColWidth, rowHeight);
@@ -604,6 +617,53 @@ export const exportToExcel = async (data: ReportData) => {
 
   const worksheet = workbook.getWorksheet("REPORT") || workbook.worksheets[0];
 
+  // Get custom logos from localStorage
+  const cacpmLogo = localStorage.getItem("customCacpmLogo");
+  const koicaLogo = localStorage.getItem("customKoicaLogo");
+
+  // Add logos to the worksheet if available
+  if (cacpmLogo) {
+    try {
+      // Convert base64 data URL to buffer
+      const base64Data = cacpmLogo.split(",")[1];
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const imageBuffer = bytes.buffer;
+      const imageId = workbook.addImage({
+        buffer: imageBuffer,
+        extension: "png",
+      });
+      // Add CACPM logo at position (assuming row 1-3, column A-B based on template)
+      worksheet.addImage(imageId, 'A1:B3');
+    } catch (e) {
+      console.warn("Failed to add CACPM logo to Excel:", e);
+    }
+  }
+
+  if (koicaLogo) {
+    try {
+      // Convert base64 data URL to buffer
+      const base64Data = koicaLogo.split(",")[1];
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const imageBuffer = bytes.buffer;
+      const imageId = workbook.addImage({
+        buffer: imageBuffer,
+        extension: "png",
+      });
+      // Add KOICA logo at position (assuming row 1-3, column H-I based on template)
+      worksheet.addImage(imageId, 'H1:I3');
+    } catch (e) {
+      console.warn("Failed to add KOICA logo to Excel:", e);
+    }
+  }
+
   const safeNumber = (value: number | string | undefined) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -655,11 +715,15 @@ export const exportToExcel = async (data: ReportData) => {
   // Weather Summary in the format: Weather: AM Cloudy | PM Cloudy
   const weatherAMDisplay = data.weatherAM || "";
   const weatherPMDisplay = data.weatherPM || "";
-  worksheet.getCell("B8").value = `Weather          : AM ${weatherAMDisplay}  |  PM ${weatherPMDisplay}`;
+  worksheet.getCell(
+    "B8"
+  ).value = `Weather          : AM ${weatherAMDisplay}  |  PM ${weatherPMDisplay}`;
   // Temperature Summary in the format: Temperature: AM 28°C | PM 32°C
   const tempAMDisplay = data.tempAM ? `${data.tempAM}°C` : "";
   const tempPMDisplay = data.tempPM ? `${data.tempPM}°C` : "";
-  worksheet.getCell("B9").value = `Temperature  : AM ${tempAMDisplay}    |  PM ${tempPMDisplay}`;
+  worksheet.getCell(
+    "B9"
+  ).value = `Temperature  : AM ${tempAMDisplay}    |  PM ${tempPMDisplay}`;
   const dateCell = worksheet.getCell("I9");
   dateCell.value = dateValue || null;
   if (!dateCell.numFmt) {
@@ -695,7 +759,11 @@ export const exportToExcel = async (data: ReportData) => {
   // Insert extra rows if more data than template rows
   if (teamRowsNeeded > baseTeamRows) {
     const rowsToInsert = teamRowsNeeded - baseTeamRows;
-    worksheet.spliceRows(startTeamRow + baseTeamRows, 0, ...new Array(rowsToInsert).fill([]));
+    worksheet.spliceRows(
+      startTeamRow + baseTeamRows,
+      0,
+      ...new Array(rowsToInsert).fill([])
+    );
   }
 
   const totalRowIndex = startTeamRow + teamRowsNeeded;
@@ -758,7 +826,9 @@ export const exportToExcel = async (data: ReportData) => {
   totalRow.getCell("J").value = {
     formula: `SUM(J${startTeamRow}:J${totalRowIndex - 1})`,
   };
-  totalRow.getCell("K").value = { formula: `SUM(I${totalRowIndex}:J${totalRowIndex})` };
+  totalRow.getCell("K").value = {
+    formula: `SUM(I${totalRowIndex}:J${totalRowIndex})`,
+  };
 
   // Materials & Machinery table
   const materialStartRow = 34; // first row below column headers
@@ -772,7 +842,11 @@ export const exportToExcel = async (data: ReportData) => {
   const availableMaterialRows = worksheet.rowCount - materialStartRow + 1;
   if (materialRowsNeeded > availableMaterialRows) {
     const rowsToInsert = materialRowsNeeded - availableMaterialRows;
-    worksheet.spliceRows(materialStartRow + availableMaterialRows, 0, ...new Array(rowsToInsert).fill([]));
+    worksheet.spliceRows(
+      materialStartRow + availableMaterialRows,
+      0,
+      ...new Array(rowsToInsert).fill([])
+    );
   }
 
   for (let i = 0; i < materialRowsNeeded; i++) {
@@ -786,7 +860,9 @@ export const exportToExcel = async (data: ReportData) => {
       styleCol: string
     ) => {
       const cell = worksheet.getCell(`${col}${rowIndex}`);
-      cell.style = cloneStyle(worksheet.getCell(`${styleCol}${materialStartRow}`));
+      cell.style = cloneStyle(
+        worksheet.getCell(`${styleCol}${materialStartRow}`)
+      );
       cell.value = value ?? "";
     };
 
@@ -899,11 +975,15 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
   // Weather Summary in the format: Weather: AM Cloudy | PM Cloudy
   const weatherAMDisplay = data.weatherAM || "";
   const weatherPMDisplay = data.weatherPM || "";
-  worksheet.getCell("B8").value = `Weather          : AM ${weatherAMDisplay}  |  PM ${weatherPMDisplay}`;
+  worksheet.getCell(
+    "B8"
+  ).value = `Weather          : AM ${weatherAMDisplay}  |  PM ${weatherPMDisplay}`;
   // Temperature Summary in the format: Temperature: AM 28°C | PM 32°C
   const tempAMDisplay = data.tempAM ? `${data.tempAM}°C` : "";
   const tempPMDisplay = data.tempPM ? `${data.tempPM}°C` : "";
-  worksheet.getCell("B9").value = `Temperature  : AM ${tempAMDisplay}    |  PM ${tempPMDisplay}`;
+  worksheet.getCell(
+    "B9"
+  ).value = `Temperature  : AM ${tempAMDisplay}    |  PM ${tempPMDisplay}`;
   const dateCell = worksheet.getCell("I9");
   dateCell.value = dateValue || null;
   if (!dateCell.numFmt) {
@@ -939,7 +1019,11 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
   // Insert extra rows if more data than template rows
   if (teamRowsNeeded > baseTeamRows) {
     const rowsToInsert = teamRowsNeeded - baseTeamRows;
-    worksheet.spliceRows(startTeamRow + baseTeamRows, 0, ...new Array(rowsToInsert).fill([]));
+    worksheet.spliceRows(
+      startTeamRow + baseTeamRows,
+      0,
+      ...new Array(rowsToInsert).fill([])
+    );
   }
 
   const totalRowIndex = startTeamRow + teamRowsNeeded;
@@ -1002,7 +1086,9 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
   totalRow.getCell("J").value = {
     formula: `SUM(J${startTeamRow}:J${totalRowIndex - 1})`,
   };
-  totalRow.getCell("K").value = { formula: `SUM(I${totalRowIndex}:J${totalRowIndex})` };
+  totalRow.getCell("K").value = {
+    formula: `SUM(I${totalRowIndex}:J${totalRowIndex})`,
+  };
 
   // Materials & Machinery table
   const materialStartRow = 34; // first row below column headers
@@ -1016,7 +1102,11 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
   const availableMaterialRows = worksheet.rowCount - materialStartRow + 1;
   if (materialRowsNeeded > availableMaterialRows) {
     const rowsToInsert = materialRowsNeeded - availableMaterialRows;
-    worksheet.spliceRows(materialStartRow + availableMaterialRows, 0, ...new Array(rowsToInsert).fill([]));
+    worksheet.spliceRows(
+      materialStartRow + availableMaterialRows,
+      0,
+      ...new Array(rowsToInsert).fill([])
+    );
   }
 
   for (let i = 0; i < materialRowsNeeded; i++) {
@@ -1030,7 +1120,9 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
       styleCol: string
     ) => {
       const cell = worksheet.getCell(`${col}${rowIndex}`);
-      cell.style = cloneStyle(worksheet.getCell(`${styleCol}${materialStartRow}`));
+      cell.style = cloneStyle(
+        worksheet.getCell(`${styleCol}${materialStartRow}`)
+      );
       cell.value = value ?? "";
     };
 
@@ -1064,7 +1156,7 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
   const zipFileName = `Daily_Report_${
     data.projectName?.replace(/\s+/g, "_") || "Report"
   }_${formatDate(data.reportDate).replace(/\s+/g, "_")}.zip`;
-  
+
   const url = window.URL.createObjectURL(zipBlob);
   const a = document.createElement("a");
   a.href = url;
@@ -1147,11 +1239,7 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
     });
 
     // Determine max rows (minimum 6 for teams, 1 for materials)
-    const maxRows = Math.max(
-      rows1.length,
-      rows2.length,
-      hasUnit ? 1 : 6
-    );
+    const maxRows = Math.max(rows1.length, rows2.length, hasUnit ? 1 : 6);
 
     // Create a combined table with side-by-side layout
     // Each row will have cells for both left and right tables
@@ -1273,7 +1361,7 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
         })
       );
     }
-    
+
     // Sub-header row with table titles
     const subHeaderCells: TableCell[] = [];
     if (hasUnit) {
@@ -1281,7 +1369,9 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
         new TableCell({
           children: [
             new Paragraph({
-              children: [new TextRun({ text: title1, bold: true, color: "FFFFFF" })],
+              children: [
+                new TextRun({ text: title1, bold: true, color: "FFFFFF" }),
+              ],
               alignment: AlignmentType.LEFT,
             }),
           ],
@@ -1291,7 +1381,9 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
         new TableCell({
           children: [
             new Paragraph({
-              children: [new TextRun({ text: title2, bold: true, color: "FFFFFF" })],
+              children: [
+                new TextRun({ text: title2, bold: true, color: "FFFFFF" }),
+              ],
               alignment: AlignmentType.LEFT,
             }),
           ],
@@ -1304,7 +1396,9 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
         new TableCell({
           children: [
             new Paragraph({
-              children: [new TextRun({ text: title1, bold: true, color: "FFFFFF" })],
+              children: [
+                new TextRun({ text: title1, bold: true, color: "FFFFFF" }),
+              ],
               alignment: AlignmentType.LEFT,
             }),
           ],
@@ -1314,7 +1408,9 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
         new TableCell({
           children: [
             new Paragraph({
-              children: [new TextRun({ text: title2, bold: true, color: "FFFFFF" })],
+              children: [
+                new TextRun({ text: title2, bold: true, color: "FFFFFF" }),
+              ],
               alignment: AlignmentType.LEFT,
             }),
           ],
@@ -1324,7 +1420,9 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
       );
     }
     tableRows.push(new TableRow({ children: subHeaderCells }));
-    tableRows.push(new TableRow({ children: [...headerCells, ...headerCells] }));
+    tableRows.push(
+      new TableRow({ children: [...headerCells, ...headerCells] })
+    );
 
     // Data rows - side by side
     for (let i = 0; i < maxRows; i++) {
@@ -1338,9 +1436,7 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
           new TableCell({
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: row1?.description || "" }),
-                ],
+                children: [new TextRun({ text: row1?.description || "" })],
                 alignment: AlignmentType.LEFT,
               }),
             ],
@@ -1399,9 +1495,7 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
           new TableCell({
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: row1?.description || "" }),
-                ],
+                children: [new TextRun({ text: row1?.description || "" })],
                 alignment: AlignmentType.LEFT,
               }),
             ],
@@ -1454,9 +1548,7 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
           new TableCell({
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: row2?.description || "" }),
-                ],
+                children: [new TextRun({ text: row2?.description || "" })],
                 alignment: AlignmentType.LEFT,
               }),
             ],
@@ -1515,9 +1607,7 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
           new TableCell({
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: row2?.description || "" }),
-                ],
+                children: [new TextRun({ text: row2?.description || "" })],
                 alignment: AlignmentType.LEFT,
               }),
             ],

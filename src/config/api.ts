@@ -14,7 +14,23 @@ const getApiBaseUrl = (): string => {
   return "http://localhost:5000/api";
 };
 
+// Determine Python API base URL based on environment
+const getPythonApiBaseUrl = (): string => {
+  // Always prefer VITE_PYTHON_API_BASE_URL if defined
+  if (import.meta.env.VITE_PYTHON_API_BASE_URL) {
+    return import.meta.env.VITE_PYTHON_API_BASE_URL;
+  }
+
+  // If not defined, use production URL in production mode, localhost in development
+  if (import.meta.env.MODE === "production") {
+    return "https://dr2-backend.onrender.com";
+  }
+
+  return "http://localhost:5001";
+};
+
 export const API_BASE_URL = getApiBaseUrl();
+export const PYTHON_API_BASE_URL = getPythonApiBaseUrl();
 
 export const API_ENDPOINTS = {
   AUTH: {
