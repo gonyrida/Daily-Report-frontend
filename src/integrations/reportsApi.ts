@@ -12,20 +12,27 @@ const getAuthHeaders = () => {
 };
 
 export const saveReportToDB = async (reportData: any) => {
+  console.log("DEBUG FRONTEND: Attempting to save report:", reportData);
+  
   const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SAVE, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(reportData),
   });
 
+  console.log("DEBUG FRONTEND: Save response status:", response.status);
+  
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to save report" }));
+    console.error("DEBUG FRONTEND: Save failed:", error);
     throw new Error(error.message || "Failed to save report");
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log("DEBUG FRONTEND: Save success:", result);
+  return result;
 };
 
 export const submitReportToDB = async (
@@ -65,27 +72,40 @@ export const loadReportFromDB = async (reportDate: Date) => {
     const day = String(reportDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
 
+    console.log("DEBUG FRONTEND: Loading report for date:", dateStr);
+
     const headers = getAuthHeaders();
+    console.log("DEBUG FRONTEND: Auth headers:", headers);
 
     if (!headers.Authorization) {
+      console.error("DEBUG FRONTEND: No auth token found");
       throw new Error("No authentication token found. Please log in.");
     }
 
     // Now this URL will correctly be .../date/2025-12-29
-    const response = await fetch(
-      API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr),
-      {
-        method: "GET",
-        headers: headers,
-      }
-    );
+    const url = API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr);
+    console.log("DEBUG FRONTEND: Making request to:", url);
 
-    if (response.status === 404) return null;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: headers,
+    });
+
+    console.log("DEBUG FRONTEND: Load response status:", response.status);
+
+    if (response.status === 404) {
+      console.log("DEBUG FRONTEND: Report not found (404), returning null");
+      return null;
+    }
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("DEBUG FRONTEND: Load failed:", response.status, errorText);
       throw new Error(`Failed to load report: ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log("DEBUG FRONTEND: Load success:", result);
+    return result;
   } catch (err) {
     console.error("Error loading report:", err);
     throw err;

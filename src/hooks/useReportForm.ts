@@ -3,10 +3,15 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { ResourceRow } from "@/components/ResourceTable";
 import { ReportData } from "@/types/report";
 import { loadReportFromDB } from "@/integrations/reportsApi";
-import { loadDraftLocally, saveDraftLocally, dateKey } from "@/lib/storageUtils";
+import {
+  loadDraftLocally,
+  saveDraftLocally,
+  dateKey,
+} from "@/lib/storageUtils";
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF, exportToExcel, exportToZIP } from "@/lib/exportUtils";
 import { saveReportToDB, submitReportToDB } from "@/integrations/reportsApi";
+import { generateCombinedExcel } from "@/integrations/reportsApi";
 
 export const useReportForm = () => {
   // Project Info
@@ -34,34 +39,36 @@ export const useReportForm = () => {
 
   // Helper to package all state into the ReportData format
   const getReportData = useCallback(
-      (): ReportData => ({
-        projectName,
-        // Fixed logic: ensures we return a string or null as per your Interface
-        reportDate: reportDate ? reportDate.toISOString() : new Date().toISOString(),
-        weather,
-        weatherPeriod,
-        temperature,
-        activityToday,
-        workPlanNextDay,
-        managementTeam,
-        workingTeam,
-        materials,
-        machinery,
-      }),
-      [
-        projectName,
-        reportDate,
-        weather,
-        weatherPeriod,
-        temperature,
-        activityToday,
-        workPlanNextDay,
-        managementTeam,
-        workingTeam,
-        materials,
-        machinery,
-      ]
-    );
+    (): ReportData => ({
+      projectName,
+      // Fixed logic: ensures we return a string or null as per your Interface
+      reportDate: reportDate
+        ? reportDate.toISOString()
+        : new Date().toISOString(),
+      weather,
+      weatherPeriod,
+      temperature,
+      activityToday,
+      workPlanNextDay,
+      managementTeam,
+      workingTeam,
+      materials,
+      machinery,
+    }),
+    [
+      projectName,
+      reportDate,
+      weather,
+      weatherPeriod,
+      temperature,
+      activityToday,
+      workPlanNextDay,
+      managementTeam,
+      workingTeam,
+      materials,
+      machinery,
+    ]
+  );
 
   const initialLoadDoneRef = useRef(false);
 
@@ -126,18 +133,18 @@ export const useReportForm = () => {
 
       // Carry forward logic
       const prevReport = getReportData();
-      const carryForward = (items: any[]) => items.map(r => ({
-        ...r,
-        prev: r.accumulated,
-        today: 0,
-        accumulated: r.accumulated,
-      }));
+      const carryForward = (items: any[]) =>
+        items.map((r) => ({
+          ...r,
+          prev: r.accumulated,
+          today: 0,
+          accumulated: r.accumulated,
+        }));
 
       setManagementTeam(carryForward(prevReport.managementTeam));
       setWorkingTeam(carryForward(prevReport.workingTeam));
       setMaterials(carryForward(prevReport.materials));
       setMachinery(carryForward(prevReport.machinery));
-
     } else if (newDateStr && !prevDateStr) {
       // First selection logic
       const loadDataForDate = async () => {
@@ -198,13 +205,29 @@ export const useReportForm = () => {
     [reportDate, getReportData, toast]
   );
 
-// 1. Auto-save logic (Now hidden from Index.tsx)
+  // 1. Auto-save logic (Now hidden from Index.tsx)
   useEffect(() => {
     const interval = setInterval(() => {
       saveDraft(true); // Silent save
     }, 30000);
     return () => clearInterval(interval);
   }, [saveDraft]);
+
+  // Debounced auto-save on resource changes
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const debouncedSaveDraft = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      saveDraft(true); // silent save
+    }, 2000); // 2 seconds debounce
+  }, [saveDraft]);
+
+  useEffect(() => {
+    debouncedSaveDraft();
+  }, [managementTeam, workingTeam, materials, machinery, debouncedSaveDraft]);
 
   // 2. Validation logic
   const validateReport = useCallback((): boolean => {
@@ -245,10 +268,12 @@ export const useReportForm = () => {
       // Transform the string date into a Date object for the PDF utility
       const dataForExport = {
         ...rawData,
-        reportDate: rawData.reportDate ? new Date(rawData.reportDate) : new Date(),
+        reportDate: rawData.reportDate
+          ? new Date(rawData.reportDate)
+          : new Date(),
       };
 
-      // Use "as any" here if the exportToPDF still complains about 
+      // Use "as any" here if the exportToPDF still complains about
       // internal ResourceRow types, or just pass the transformed object
       await exportToPDF(dataForExport as any, false);
 
@@ -274,11 +299,13 @@ export const useReportForm = () => {
     setIsPreviewing(true);
     try {
       const rawData = getReportData();
-      
+
       // Convert date to Date object for the utility, same as export
       const dataForPreview = {
         ...rawData,
-        reportDate: rawData.reportDate ? new Date(rawData.reportDate) : new Date(),
+        reportDate: rawData.reportDate
+          ? new Date(rawData.reportDate)
+          : new Date(),
       };
 
       // Call utility with 'true' for the preview argument
@@ -295,42 +322,6 @@ export const useReportForm = () => {
       });
     } finally {
       setIsPreviewing(false);
-    }
-  }, [validateReport, getReportData, toast]);
-
-// Reuse the PDF logic for the download button in the preview modal
-  const handleDownloadFromPreview = useCallback(async () => {
-    // We can literally just call the function we already wrote!
-    await handleExportPDF();
-  }, [handleExportPDF]);
-
-  const handleExportExcel = useCallback(() => {
-    if (!validateReport()) return;
-
-    setIsExporting(true);
-    try {
-      const rawData = getReportData();
-      
-      // Transform date for Excel utility
-      const dataForExcel = {
-        ...rawData,
-        reportDate: rawData.reportDate ? new Date(rawData.reportDate) : new Date(),
-      };
-
-      exportToExcel(dataForExcel as any);
-
-      toast({
-        title: "Excel Exported",
-        description: "Your report has been exported as Excel successfully.",
-      });
-    } catch (e) {
-      toast({
-        title: "Export Failed",
-        description: "Could not export Excel. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
     }
   }, [validateReport, getReportData, toast]);
 
@@ -354,35 +345,226 @@ export const useReportForm = () => {
       }));
   };
 
-  // 2. Add the Export All logic
+  // Reuse the PDF logic for the download button in the preview modal
+  const handleDownloadFromPreview = useCallback(async () => {
+    // We can literally just call the function we already wrote!
+    await handleExportPDF();
+  }, [handleExportPDF]);
+
+  // Helper function for save → export flow
+  const saveAndExport = useCallback(
+    async (exportFunction: (data: any) => void | Promise<void>) => {
+      if (!validateReport()) return;
+
+      setIsExporting(true);
+      try {
+        // 1. Prepare and clean data for saving
+        const rawData = getReportData();
+
+        // FIX: Create the perfect UTC date string (YYYY-MM-DD)
+        const d = new Date(rawData.reportDate!);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const perfectDateStr = `${year}-${month}-${day}`;
+
+        const cleanedData = {
+          ...rawData,
+          reportDate: perfectDateStr, // Use the clean string here!
+          managementTeam: cleanResourceRows(rawData.managementTeam),
+          workingTeam: cleanResourceRows(rawData.workingTeam),
+          materials: cleanResourceRows(rawData.materials),
+          machinery: cleanResourceRows(rawData.machinery),
+        };
+
+        // 2. Save to database first
+        console.log("DEBUG FRONTEND: About to save report to DB:", cleanedData);
+        await saveReportToDB(cleanedData);
+        console.log("DEBUG FRONTEND: Save to DB completed successfully");
+
+        // 3. If save succeeds, proceed with export
+        // Map weather and temperature based on weatherPeriod for export utilities
+        const dataForExport = {
+          ...rawData,
+          reportDate: rawData.reportDate
+            ? new Date(rawData.reportDate)
+            : new Date(),
+          weatherAM: rawData.weatherPeriod === "AM" ? rawData.weather : "",
+          weatherPM: rawData.weatherPeriod === "PM" ? rawData.weather : "",
+          tempAM: rawData.weatherPeriod === "AM" ? rawData.temperature : "",
+          tempPM: rawData.weatherPeriod === "PM" ? rawData.temperature : "",
+        };
+
+        await exportFunction(dataForExport as any);
+
+        toast({
+          title: "Export Completed",
+          description: "Your report has been saved and exported successfully.",
+        });
+      } catch (e: any) {
+        console.error("Export Error:", e);
+        toast({
+          title: "Export Failed",
+          description:
+            e.message || "Could not save and export. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [validateReport, getReportData, toast, cleanResourceRows]
+  );
+
+  const handleExportExcel = useCallback(async () => {
+    await saveAndExport(exportToExcel);
+  }, [saveAndExport]);
+
   const handleExportAll = useCallback(async () => {
-    if (!validateReport()) return;
+    await saveAndExport(exportToZIP);
+  }, [saveAndExport]);
 
-    setIsExporting(true);
-    try {
-      const rawData = getReportData();
-      const dataForExport = {
-        ...rawData,
-        reportDate: rawData.reportDate ? new Date(rawData.reportDate) : new Date(),
-      };
+  // Helper function for combined Excel export with save → export flow
+  const saveAndExportCombinedExcel = useCallback(
+    async (referenceSections: any[], tableTitle: string, fileName: string) => {
+      if (!validateReport()) return;
 
-      // Export as ZIP containing both PDF and Excel
-      await exportToZIP(dataForExport as any);
+      setIsExporting(true);
+      try {
+        // 1. Prepare and clean data for saving
+        const rawData = getReportData();
 
-      toast({
-        title: "Export Completed",
-        description: "Your report has been exported as a ZIP file containing both PDF and Excel files.",
-      });
-    } catch (e) {
-      toast({
-        title: "Export Failed",
-        description: "Could not export ZIP file. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  }, [validateReport, getReportData, toast]);
+        // FIX: Create the perfect UTC date string (YYYY-MM-DD)
+        const d = new Date(rawData.reportDate!);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const perfectDateStr = `${year}-${month}-${day}`;
+
+        const cleanedData = {
+          ...rawData,
+          reportDate: perfectDateStr, // Use the clean string here!
+          managementTeam: cleanResourceRows(rawData.managementTeam),
+          workingTeam: cleanResourceRows(rawData.workingTeam),
+          materials: cleanResourceRows(rawData.materials),
+          machinery: cleanResourceRows(rawData.machinery),
+        };
+
+        // 2. Save to database first
+        await saveReportToDB(cleanedData);
+
+        // 3. If save succeeds, proceed with export
+        // Map weather and temperature based on weatherPeriod for export utilities
+        const dataForExport = {
+          projectName: rawData.projectName,
+          reportDate: rawData.reportDate
+            ? new Date(rawData.reportDate)
+            : new Date(),
+          weatherAM: rawData.weatherPeriod === "AM" ? rawData.weather : "",
+          weatherPM: rawData.weatherPeriod === "PM" ? rawData.weather : "",
+          tempAM: rawData.weatherPeriod === "AM" ? rawData.temperature : "",
+          tempPM: rawData.weatherPeriod === "PM" ? rawData.temperature : "",
+          activityToday: rawData.activityToday,
+          workPlanNextDay: rawData.workPlanNextDay,
+          managementTeam: rawData.managementTeam,
+          workingTeam: rawData.workingTeam,
+          materials: rawData.materials,
+          machinery: rawData.machinery,
+        };
+
+        // 4. Process images for reference sections
+        const toBase64DataUrl = async (
+          img: unknown
+        ): Promise<string | null> => {
+          if (!img) return null;
+
+          // Case 1: already a string (blob URL, data URL, http URL, etc.)
+          if (typeof img === "string") {
+            if (!img.startsWith("blob:")) return img;
+
+            const resp = await fetch(img);
+            const blob = await resp.blob();
+
+            return await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(String(reader.result));
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          }
+
+          // Case 2: File object (common)
+          if (img instanceof File) {
+            return await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(String(reader.result));
+              reader.onerror = reject;
+              reader.readAsDataURL(img);
+            });
+          }
+
+          // Case 3: unknown object shape (skip it safely)
+          return null;
+        };
+
+        const processImages = async (sectionsArr: any[]) => {
+          return await Promise.all(
+            sectionsArr.map(async (sec: any) => {
+              const newEntries = await Promise.all(
+                (sec.entries ?? []).map(async (entry: any) => {
+                  const newSlots = await Promise.all(
+                    (entry.slots ?? []).map(async (slot: any) => ({
+                      ...slot,
+                      image: await toBase64DataUrl(slot.image),
+                    }))
+                  );
+                  return { ...entry, slots: newSlots };
+                })
+              );
+              return { ...sec, entries: newEntries };
+            })
+          );
+        };
+
+        const processedSections = await processImages(referenceSections);
+
+        // 5. Generate combined Excel
+        await generateCombinedExcel(
+          dataForExport,
+          processedSections,
+          tableTitle,
+          fileName
+        );
+
+        toast({
+          title: "Combined Excel Exported",
+          description: "Your report has been saved and exported successfully.",
+        });
+      } catch (e: any) {
+        console.error("Combined Export Error:", e);
+        toast({
+          title: "Export Failed",
+          description:
+            e.message || "Could not save and export. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [validateReport, getReportData, toast, cleanResourceRows]
+  );
+
+  const handleExportCombinedExcel = useCallback(
+    async (
+      referenceSections: any[],
+      tableTitle: string = "SITE PHOTO EVIDENCE",
+      fileName: string
+    ) => {
+      await saveAndExportCombinedExcel(referenceSections, tableTitle, fileName);
+    },
+    [saveAndExportCombinedExcel]
+  );
 
   // 3. Add the Clear logic
   const handleClear = useCallback(() => {
@@ -417,13 +599,13 @@ export const useReportForm = () => {
     try {
       // 1. Prepare and clean data
       const rawData = getReportData();
-      
+
       // FIX: Create the perfect UTC date string (YYYY-MM-DD)
       const d = new Date(rawData.reportDate!);
       const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const perfectDateStr = `${year}-${month}-${day}`; 
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const perfectDateStr = `${year}-${month}-${day}`;
 
       const cleanedData = {
         ...rawData,
@@ -489,7 +671,8 @@ export const useReportForm = () => {
 
       toast({
         title: "Report Submitted",
-        description: "Your report has been submitted successfully. Tomorrow's report is ready with carried-forward totals.",
+        description:
+          "Your report has been submitted successfully. Tomorrow's report is ready with carried-forward totals.",
         duration: 5000,
       });
     } catch (e: any) {
@@ -505,36 +688,59 @@ export const useReportForm = () => {
 
   return {
     // Data State
-    projectName, setProjectName,
-    reportDate, setReportDate,
-    weather, setWeather,
-    weatherPeriod, setWeatherPeriod,
-    temperature, setTemperature,
-    activityToday, setActivityToday,
-    workPlanNextDay, setWorkPlanNextDay,
-    managementTeam, setManagementTeam,
-    workingTeam, setWorkingTeam,
-    materials, setMaterials,
-    machinery, setMachinery,
-    
+    projectName,
+    setProjectName,
+    reportDate,
+    setReportDate,
+    weather,
+    setWeather,
+    weatherPeriod,
+    setWeatherPeriod,
+    temperature,
+    setTemperature,
+    activityToday,
+    setActivityToday,
+    workPlanNextDay,
+    setWorkPlanNextDay,
+    managementTeam,
+    setManagementTeam,
+    workingTeam,
+    setWorkingTeam,
+    materials,
+    setMaterials,
+    machinery,
+    setMachinery,
+
     // UI State
-    isSaving, setIsSaving,
-    isExporting, setIsExporting,
-    isPreviewing, setIsPreviewing,
-    isSubmitting, setIsSubmitting,
-    
+    isSaving,
+    setIsSaving,
+    isExporting,
+    setIsExporting,
+    isPreviewing,
+    setIsPreviewing,
+    isSubmitting,
+    setIsSubmitting,
+
     // Helper
     getReportData,
 
     loadInitialReport,
     fillForm,
     clearForm,
-    previewUrl, setPreviewUrl,
-    showPreview, setShowPreview,
-    saveDraft, validateReport,
-    handleExportPDF, handlePreview,
-    handleDownloadFromPreview, handleExportExcel,
-    cleanResourceRows, handleExportAll,
-    handleClear, handleSubmit
+    previewUrl,
+    setPreviewUrl,
+    showPreview,
+    setShowPreview,
+    saveDraft,
+    validateReport,
+    handleExportPDF,
+    handlePreview,
+    handleDownloadFromPreview,
+    handleExportExcel,
+    cleanResourceRows,
+    handleExportAll,
+    handleExportCombinedExcel,
+    handleClear,
+    handleSubmit,
   };
 };
