@@ -242,6 +242,7 @@ const Index = () => {
 
   // Combined Export state
   const [isExportingCombined, setIsExportingCombined] = useState(false);
+  const [isPreviewingCombined, setIsPreviewingCombined] = useState(false);
 
   // UI State
   const [isSaving, setIsSaving] = useState(false);
@@ -255,7 +256,7 @@ const Index = () => {
   // File name dialog state
   const [showFileNameDialog, setShowFileNameDialog] = useState(false);
   const [defaultFileName, setDefaultFileName] = useState<string>("");
-  const [pendingExportType, setPendingExportType] = useState<"excel" | "combined" | "reference" | "combined-pdf">(null);
+  const [pendingExportType, setPendingExportType] = useState<"excel" | "combined" | "reference" | "combined-pdf" | "combined-zip" >(null);
 
   // Track previous date to detect changes
   const lastDateRef = useRef<string | null>(null);
@@ -1146,6 +1147,97 @@ const Index = () => {
   const handleExportCombinedPDFWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
+      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+        // console.log("DEBUG: Processing image:", typeof img, img);
+        
+        if (!img) {
+          // console.log("DEBUG: No image provided");
+          return null;
+        }
+
+        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        if (typeof img === "string") {
+          // console.log("DEBUG: Image is string, starts with:", img.substring(0, 20));
+          
+          if (img.startsWith("data:")) {
+            // console.log("DEBUG: Already data URL, length:", img.length);
+            return img;
+          }
+          
+          if (img.startsWith("blob:")) {
+            // console.log("DEBUG: Converting blob URL to data URL");
+            // Convert blob URL to data URL
+            try {
+              const response = await fetch(img);
+              const blob = await response.blob();
+              // console.log("DEBUG: Blob fetched, size:", blob.size);
+              return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const result = reader.result as string;
+                  // console.log("DEBUG: Converted to data URL, length:", result.length);
+                  resolve(result);
+                };
+                reader.readAsDataURL(blob);
+              });
+            } catch (error) {
+              // console.log("DEBUG: Failed to convert blob URL:", error);
+              return null;
+            }
+          }
+          return img; // Return as-is for http URLs etc.
+        }
+
+        // Case 2: File object
+        if (img instanceof File) {
+          // console.log("DEBUG: Image is File object, size:", img.size, "type:", img.type);
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              // console.log("DEBUG: File converted to data URL, length:", result.length);
+              resolve(result);
+            };
+            reader.readAsDataURL(img);
+          });
+        }
+
+        // console.log("DEBUG: Unknown image type");
+        return null;
+      };
+      const processImages = async (sectionsArr: Section[]) => {
+        return await Promise.all(
+          sectionsArr.map(async (sec: Section) => {
+            const newEntries = await Promise.all(
+              (sec.entries ?? []).map(async (entry: any) => {
+                const newSlots = await Promise.all(
+                  (entry.slots ?? []).map(async (slot: Slot) => ({
+                    ...slot,
+                    image: await toBase64DataUrl(slot.image),
+                  }))
+                );
+                return { ...entry, slots: newSlots };
+              })
+            );
+            return { ...sec, entries: newEntries };
+          })
+        );
+      };
+      const processedSections = await processImages(referenceSections);
+      // DEBUG: Check processed sections
+      // console.log("DEBUG: Processed sections:", processedSections);
+      // console.log("DEBUG: Number of sections:", processedSections.length);
+      processedSections.forEach((section, idx) => {
+        // console.log(`DEBUG: Section ${idx}:`, section.title);
+        section.entries?.forEach((entry, entryIdx) => {
+          // console.log(`DEBUG: Entry ${entryIdx}:`, entry.slots?.length, "slots");
+          entry.slots?.forEach((slot, slotIdx) => {
+            // console.log(`DEBUG: Slot ${slotIdx} image type:`, typeof slot.image);
+            // console.log(`DEBUG: Slot ${slotIdx} image length:`, slot.image?.length);
+            // console.log(`DEBUG: Slot ${slotIdx} image preview:`, slot.image?.substring(0, 50) + "...");
+          });
+        });
+      });
       await generateCombinedPDF(
         {
           projectName,
@@ -1161,8 +1253,8 @@ const Index = () => {
           materials,
           machinery,
         },
-        referenceSections,
-        "SITE PHOTO EVIDENCE",
+        processedSections,
+        tableTitle,
         fileName
       );
       
@@ -1184,8 +1276,64 @@ const Index = () => {
 
   const handlePreviewCombined = async () => {
     if (!validateReport()) return;
-
+    setIsPreviewingCombined(true);  // Start loading
     try {
+      // Process images to base64 data URLs (same as export)
+      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+        if (!img) return null;
+
+        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        if (typeof img === "string") {
+          if (img.startsWith("data:")) return img; // Already a data URL
+          if (img.startsWith("blob:")) {
+            // Convert blob URL to data URL
+            try {
+              const response = await fetch(img);
+              const blob = await response.blob();
+              return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+              });
+            } catch {
+              return null;
+            }
+          }
+          return img; // Return as-is for http URLs etc.
+        }
+
+        // Case 2: File object
+        if (img instanceof File) {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(img);
+          });
+        }
+
+        return null;
+      };
+
+      const processImages = async (sectionsArr: Section[]) => {
+        return await Promise.all(
+          sectionsArr.map(async (sec: Section) => {
+            const newEntries = await Promise.all(
+              (sec.entries ?? []).map(async (entry: any) => {
+                const newSlots = await Promise.all(
+                  (entry.slots ?? []).map(async (slot: Slot) => ({
+                    ...slot,
+                    image: await toBase64DataUrl(slot.image),
+                  }))
+                );
+                return { ...entry, slots: newSlots };
+              })
+            );
+            return { ...sec, entries: newEntries };
+          })
+        );
+      };
+
+      const processedSections = await processImages(referenceSections);
       // Use same payload as export
       const payload = {
         mode: "combined",
@@ -1202,8 +1350,8 @@ const Index = () => {
           workingTeam,
           materials,
           machinery,
-          table_title: "SITE PHOTO EVIDENCE",
-          reference: referenceSections.flatMap((section: any) =>
+          table_title: tableTitle,
+          reference: processedSections.flatMap((section: any) =>
             (section.entries ?? []).map((entry: any) => {
               const slots = entry.slots ?? [];
               return {
@@ -1234,6 +1382,176 @@ const Index = () => {
         description: "Could not generate preview.",
         variant: "destructive",
       });
+    } finally {
+      setIsPreviewingCombined(false);  // End loading
+    }
+  };
+
+  const handleExportCombinedZIP = async () => {
+    if (!validateReport()) return;
+
+    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]}`;
+    
+    setPendingExportType("combined-zip");
+    setDefaultFileName(defaultFileName);
+    setShowFileNameDialog(true);
+  };
+
+  const handleExportCombinedZIPWithFilename = async (fileName: string) => {
+    setIsExportingCombined(true);
+    try {
+      // Process images for both exports
+      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+        if (!img) return null;
+
+        if (typeof img === "string") {
+          if (img.startsWith("data:")) return img;
+          if (img.startsWith("blob:")) {
+            try {
+              const response = await fetch(img);
+              const blob = await response.blob();
+              return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+              });
+            } catch {
+              return null;
+            }
+          }
+          return img;
+        }
+
+        if (img instanceof File) {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(img);
+          });
+        }
+
+        return null;
+      };
+
+      const processImages = async (sectionsArr: Section[]) => {
+        return await Promise.all(
+          sectionsArr.map(async (sec: Section) => {
+            const newEntries = await Promise.all(
+              (sec.entries ?? []).map(async (entry: any) => {
+                const newSlots = await Promise.all(
+                  (entry.slots ?? []).map(async (slot: Slot) => ({
+                    ...slot,
+                    image: await toBase64DataUrl(slot.image),
+                  }))
+                );
+                return { ...entry, slots: newSlots };
+              })
+            );
+            return { ...sec, entries: newEntries };
+          })
+        );
+      };
+
+      const processedSections = await processImages(referenceSections);
+
+      // Generate both files
+      const reportPayload = {
+        projectName,
+        reportDate,
+        weatherAM,
+        weatherPM,
+        tempAM,
+        tempPM,
+        activityToday,
+        workPlanNextDay,
+        managementTeam,
+        workingTeam,
+        materials,
+        machinery,
+      };
+
+      // Generate PDF
+      const pdfResponse = await fetch("https://dr2-i74k.onrender.com/generate-combined-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "combined",
+          data: {
+            ...reportPayload,
+            table_title: tableTitle,
+            reference: processedSections.flatMap((section: any) =>
+              (section.entries ?? []).map((entry: any) => {
+                const slots = entry.slots ?? [];
+                return {
+                  section_title: section.title || "",
+                  images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+                  footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+                };
+              })
+            ),
+          },
+        }),
+      });
+
+      // Generate Excel
+      const excelResponse = await fetch("https://dr2-i74k.onrender.com/generate-combined", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...reportPayload,
+          table_title: tableTitle,
+          reference: processedSections.flatMap((section: any) =>
+            (section.entries ?? []).map((entry: any) => {
+              const slots = entry.slots ?? [];
+              return {
+                section_title: section.title || "",
+                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+              };
+            })
+          ),
+        }),
+      });
+
+      if (!pdfResponse.ok || !excelResponse.ok) {
+        throw new Error("Failed to generate files");
+      }
+
+      // Create ZIP file
+      const JSZip = await import('jszip');
+      const zip = new JSZip.default();
+
+      const pdfBlob = await pdfResponse.blob();
+      const excelBlob = await excelResponse.blob();
+
+      zip.file(`${fileName}.pdf`, pdfBlob);
+      zip.file(`${fileName}.xlsx`, excelBlob);
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      
+      // Download ZIP
+      const url = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${fileName}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Combined ZIP Exported",
+        description: "Both PDF and Excel files have been exported as ZIP.",
+      });
+    } catch (error) {
+      console.error("Combined ZIP export error:", error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to generate combined ZIP.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingCombined(false);
     }
   };
 
@@ -1486,9 +1804,9 @@ const Index = () => {
               Sheet 2
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" className="min-w-[140px]" onClick={handlePreviewCombined}>
+              <Button variant="outline" className="min-w-[140px]" onClick={handlePreviewCombined} disabled={isPreviewingCombined}>
                 <Eye className="w-4 h-4 mr-2" />
-                Preview Combined
+                {isPreviewingCombined ? "Previewing Combined..." : "Preview Combined"}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1520,12 +1838,10 @@ const Index = () => {
                     Export Combined Docs (Word)
                   </DropdownMenuItem>
                   */}
-                  {/* DISABLED: Download Combined (ZIP) - commented out
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportCombinedZIP} disabled={isExportingCombined}>
                     <FileDown className="w-4 h-4 mr-2" />
-                    Download Combined (ZIP)
+                    Export Combined (ZIP)
                   </DropdownMenuItem>
-                  */}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -1558,6 +1874,8 @@ const Index = () => {
               handleExportReferenceWithFilename(fileName);
             } else if (pendingExportType === "combined-pdf") {
               handleExportCombinedPDFWithFilename(fileName);
+            } else if (pendingExportType === "combined-zip") {
+              handleExportCombinedZIPWithFilename(fileName);
             }
             setPendingExportType(null);
           }}

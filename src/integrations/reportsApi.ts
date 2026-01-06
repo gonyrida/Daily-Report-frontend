@@ -328,9 +328,14 @@ export const generateCombinedPDF = async (
   tableTitle: string = "SITE PHOTO EVIDENCE",
   fileName?: string
 ) => {
+  // console.log("DEBUG API: Received referenceSections:", referenceSections);
   const referenceEntries = referenceSections.flatMap((section: any) =>
     (section.entries ?? []).map((entry: any) => {
       const slots = entry.slots ?? [];
+
+      // DEBUG: Log what's in slots
+      // console.log("DEBUG API: Entry slots:", slots);
+      // console.log("DEBUG API: First slot image:", slots[0]?.image?.substring(0, 50));
       return {
         section_title: section.title || "",
         images: slots
@@ -344,6 +349,9 @@ export const generateCombinedPDF = async (
       };
     })
   );
+
+  // console.log("DEBUG API: Processed referenceEntries:", referenceEntries);
+  // console.log("DEBUG API: Total images being sent:", referenceEntries.reduce((acc, entry) => acc + entry.images.length, 0));
 
   const payload = {
     mode: "combined",
