@@ -1,5 +1,5 @@
 // src/integrations/reportsApi.ts
-import { API_ENDPOINTS } from "@/config/api";
+import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "../config/api";
 
 const API_BASE_URL = API_ENDPOINTS.DAILY_REPORTS.BASE;
 
@@ -13,7 +13,7 @@ const getAuthHeaders = () => {
 
 export const saveReportToDB = async (reportData: any) => {
   console.log("DEBUG FRONTEND: Attempting to save report:", reportData);
-  
+
   const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SAVE, {
     method: "POST",
     headers: getAuthHeaders(),
@@ -21,7 +21,7 @@ export const saveReportToDB = async (reportData: any) => {
   });
 
   console.log("DEBUG FRONTEND: Save response status:", response.status);
-  
+
   if (!response.ok) {
     const error = await response
       .json()
@@ -118,19 +118,28 @@ export const generatePythonExcel = async (
   fileName?: string
 ) => {
   try {
-    const response = await fetch(
-      "https://dr2-backend.onrender.com/generate-report",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          mode,
-          data: payload,
-        }),
-      }
-    );
+    // Get custom logos from localStorage for report mode
+    let enhancedPayload = payload;
+    if (mode === "report" || mode === "combined") {
+      const cacpmLogo = localStorage.getItem("customCacpmLogo");
+      const koicaLogo = localStorage.getItem("customKoicaLogo");
+      enhancedPayload = {
+        ...payload,
+        cacpm_logo: cacpmLogo,
+        koica_logo: koicaLogo,
+      };
+    }
+
+    const response = await fetch(`${PYTHON_API_BASE_URL}/generate-report`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mode,
+        data: enhancedPayload,
+      }),
+    });
 
     if (!response.ok) {
       const error = await response
@@ -207,16 +216,13 @@ export const generateReferenceExcel = async (
       reference: referenceEntries,
     };
 
-    const response = await fetch(
-      "https://dr2-backend.onrender.com/generate-reference",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload), // Send the wrapped payload
-      }
-    );
+    const response = await fetch(`${PYTHON_API_BASE_URL}/generate-reference`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload), // Send the wrapped payload
+    });
 
     if (!response.ok) {
       const error = await response
@@ -262,6 +268,15 @@ export const generateCombinedExcel = async (
   tableTitle: string = "SITE PHOTO EVIDENCE",
   fileName?: string
 ) => {
+  // Get custom logos from localStorage for combined mode
+  const cacpmLogo = localStorage.getItem("customCacpmLogo");
+  const koicaLogo = localStorage.getItem("customKoicaLogo");
+  const enhancedPayload = {
+    ...reportPayload,
+    cacpm_logo: cacpmLogo,
+    koica_logo: koicaLogo,
+  };
+
   const referenceEntries = referenceSections.flatMap((section: any) =>
     (section.entries ?? []).map((entry: any) => {
       const slots = entry.slots ?? [];
@@ -280,19 +295,16 @@ export const generateCombinedExcel = async (
   );
 
   const payload = {
-    ...reportPayload,
+    ...enhancedPayload,
     table_title: tableTitle,
     reference: referenceEntries,
   };
 
-  const response = await fetch(
-    "https://dr2-backend.onrender.com/generate-combined",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }
-  );
+  const response = await fetch(`${PYTHON_API_BASE_URL}/generate-combined`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
   if (!response.ok) {
     const error = await response

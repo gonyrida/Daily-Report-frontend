@@ -44,40 +44,7 @@ export default function ReferenceSection({ sections, setSections, onExportRefere
             </Button>
             */}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  disabled={isExporting || !onExportReference}
-                  className="min-w-[140px] bg-primary hover:bg-primary/90">
-                  <FileDown className="w-4 h-4 mr-2" />
-                  {isExporting ? "Exporting..." : "Export"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {/* DISABLED: Export PDF - commented out
-                <DropdownMenuItem>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Export PDF
-                </DropdownMenuItem>
-                */}
-                <DropdownMenuItem onClick={onExportReference} disabled={isExporting || !onExportReference}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Export Excel
-                </DropdownMenuItem>
-                {/* DISABLED: Export Docs - commented out
-                <DropdownMenuItem>
-                  <FileType className="w-4 h-4 mr-2" />
-                  Export Docs (Word)
-                </DropdownMenuItem>
-                */}
-                {/* DISABLED: Download All (ZIP) - commented out
-                <DropdownMenuItem>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Download All (ZIP)
-                </DropdownMenuItem>
-                */}
-              </DropdownMenuContent>
-            </DropdownMenu>
+           
           </div>
 
           <Button onClick={addSection} className="bg-primary hover:bg-primary/90 inline-flex items-center gap-2"><PlusCircle className="w-4 h-4" />Add Section</Button>
