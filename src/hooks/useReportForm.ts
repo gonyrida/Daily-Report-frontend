@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { exportToPDF, exportToExcel, exportToZIP } from "@/lib/exportUtils";
 import { saveReportToDB, submitReportToDB } from "@/integrations/reportsApi";
 import { generateCombinedExcel } from "@/integrations/reportsApi";
+import { apiGet } from "@/lib/apiFetch";
 
 export const useReportForm = () => {
   // Project Info
@@ -88,21 +89,37 @@ export const useReportForm = () => {
   }, []);
 
   const loadInitialReport = useCallback(async () => {
-    if (!reportDate || initialLoadDoneRef.current) return;
+    if (!reportDate || initialLoadDoneRef.current) {
+      console.log("🔒 LOAD INITIAL: Skipping - no date or already loaded");
+      return;
+    }
+    
+    // CRITICAL: Only load after authentication is confirmed
+    console.log("🔒 LOAD INITIAL: Starting report load for date:", reportDate);
     initialLoadDoneRef.current = true;
 
     try {
       const dbReport = await loadReportFromDB(reportDate);
       if (dbReport) {
+        console.log("🔒 LOAD INITIAL: Found DB report, filling form");
         fillForm(dbReport);
       } else {
+        console.log("🔒 LOAD INITIAL: No DB report, checking local draft");
         const localDraft = loadDraftLocally(reportDate);
-        if (localDraft) fillForm(localDraft);
+        if (localDraft) {
+          console.log("🔒 LOAD INITIAL: Found local draft, filling form");
+          fillForm(localDraft);
+        } else {
+          console.log("🔒 LOAD INITIAL: No draft found, using defaults");
+        }
       }
     } catch (e) {
-      console.error("Failed to load report:", e);
+      console.error("🔒 LOAD INITIAL: Failed to load report:", e);
       const localDraft = loadDraftLocally(reportDate);
-      if (localDraft) fillForm(localDraft);
+      if (localDraft) {
+        console.log("🔒 LOAD INITIAL: Fallback to local draft");
+        fillForm(localDraft);
+      }
     }
   }, [reportDate, fillForm]);
 
@@ -170,8 +187,11 @@ export const useReportForm = () => {
     lastDateRef.current = newDateStr;
   }, [reportDate, getReportData, fillForm, clearForm]);
 
-  // Move the "On Mount" trigger inside the hook!
+  // CRITICAL: Only load data after auth success
   useEffect(() => {
+    console.log("🔒 USE FORM: Component mounted, waiting for auth confirmation");
+    // Note: This will only execute if component is wrapped in ProtectedRoute
+    // which ensures authentication is confirmed before rendering
     loadInitialReport();
   }, [loadInitialReport]);
 
@@ -482,7 +502,7 @@ export const useReportForm = () => {
           if (typeof img === "string") {
             if (!img.startsWith("blob:")) return img;
 
-            const resp = await fetch(img);
+            const resp = await apiGet(img);
             const blob = await resp.blob();
 
             return await new Promise<string>((resolve, reject) => {

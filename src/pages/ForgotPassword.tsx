@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { apiPost } from "@/lib/apiFetch";
 import { API_ENDPOINTS } from "@/config/api";
 
 const forgotPasswordSchema = z.object({
@@ -45,18 +46,9 @@ const ForgotPassword = () => {
     setError(null);
 
     try {
-      const response = await fetch(
-        API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: data.email,
-          }),
-        }
-      );
+      const response = await apiPost(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, {
+        email: data.email,
+      });
 
       const result = await response.json();
 

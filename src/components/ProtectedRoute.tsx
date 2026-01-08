@@ -1,60 +1,94 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { API_ENDPOINTS } from "@/config/api";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { verifyAuth } from "@/integrations/authApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  fallbackPath?: string;
 }
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  children, 
+  fallbackPath = "/login" 
+}) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkAuth = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setIsAuthenticated(false);
-        return;
-      }
-
       try {
-        // Verify token with backend
-        const response = await fetch(API_ENDPOINTS.AUTH.VERIFY, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        setIsAuthenticated(response.ok);
-      } catch (err) {
-        console.error("Auth verification failed:", err);
+        console.log("🔒 PROTECTED ROUTE: Checking authentication");
+        
+        const result = await verifyAuth();
+        
+        if (!isMounted) return;
+        
+        if (result.success) {
+          console.log("🔒 PROTECTED ROUTE: Auth confirmed, allowing access");
+          setIsAuthenticated(true);
+        } else {
+          console.log("🔒 PROTECTED ROUTE: Auth failed, redirecting");
+          setIsAuthenticated(false);
+          toast({
+            title: "Authentication Required",
+            description: "Please login to access this page",
+            variant: "destructive",
+          });
+          navigate(fallbackPath);
+        }
+      } catch (error) {
+        console.error("🔒 PROTECTED ROUTE: Auth error:", error);
+        if (!isMounted) return;
+        
         setIsAuthenticated(false);
+        toast({
+          title: "Authentication Error",
+          description: "Failed to verify authentication",
+          variant: "destructive",
+        });
+        navigate(fallbackPath);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     checkAuth();
-  }, []);
 
-  // Show loading while checking authentication
-  if (isAuthenticated === null) {
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, toast, fallbackPath]);
+
+  // CRITICAL: Show loading until auth is confirmed
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Loading...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  // Only render children if auth is confirmed
+  if (isAuthenticated) {
+    return <>{children}</>;
   }
 
-  // Render protected content
-  return <>{children}</>;
+  // Fallback (should redirect, but just in case)
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <h2 className="text-2xl font-semibold mb-4">Authentication Required</h2>
+        <p className="text-gray-600">Please login to access this page.</p>
+      </div>
+    </div>
+  );
 };
 
 export default ProtectedRoute;
