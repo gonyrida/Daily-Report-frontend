@@ -61,8 +61,8 @@ const Login = () => {
         throw new Error(result.message || "Login failed");
       }
 
-      // Store token for Python API authentication
-      localStorage.setItem("token", result.token);
+      // Store user info for Python API authentication (token is now in HTTP-only cookie)
+      localStorage.setItem("user", JSON.stringify(result.user));
       if (data.rememberMe) {
         localStorage.setItem("rememberMe", "true");
       }
@@ -72,7 +72,7 @@ const Login = () => {
         description: "Welcome back!",
       });
 
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

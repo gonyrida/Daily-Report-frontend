@@ -34,10 +34,12 @@ interface ReportActionsProps {
   onExportAll: () => void;
   onClear: () => void;
   onSubmit: () => void;
+  onDelete?: () => void;
   onExportReference?: () => void;
   isPreviewing?: boolean;
   isExporting?: boolean;
   isSubmitting?: boolean;
+  reportId?: string;
 }
 
 const ReportActions = ({
@@ -49,9 +51,11 @@ const ReportActions = ({
   onExportAll,
   onClear,
   onSubmit,
+  onDelete,
   isPreviewing,
   isExporting,
   isSubmitting,
+  reportId,
 }: ReportActionsProps) => {
   return (
     <div className="flex items-center justify-between py-6 border-t border-border mt-6">
@@ -61,6 +65,32 @@ const ReportActions = ({
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Delete Report Button - Only show if reportId exists */}
+        {reportId && onDelete && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" className="min-w-[120px]">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Are you sure you want to delete this report?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action will permanently delete the report and all its data. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onDelete}>Delete Report</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
         {/* DISABLED: Clear button - commented out to disable
         <AlertDialog>
           <AlertDialogTrigger asChild>
