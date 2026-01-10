@@ -262,6 +262,58 @@ export const generateReferenceExcel = async (
   }
 };
 
+export const generateCarExcel = async (
+  carData: any,
+  fileName?: string
+) => {
+  try {
+    const payload = {
+      data: carData,
+    };
+
+    const response = await fetch(`${PYTHON_API_BASE_URL}/generate-car`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to generate CAR" }));
+      throw new Error(
+        error.message || `HTTP ${response.status}: ${response.statusText}`
+      );
+    }
+
+    // Handle file download
+    const blob = await response.blob();
+
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Use provided filename or fallback to default
+    const filename = fileName ? `${fileName}.xlsx` : `car-${new Date().toISOString().split("T")[0]}.xlsx`;
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Clean up
+    window.URL.revokeObjectURL(url);
+
+    return { success: true };
+  } catch (error) {
+    console.error("CAR Excel generation error:", error);
+    throw error;
+  }
+};
+
 export const generateCombinedExcel = async (
   reportPayload: any,
   referenceSections: any[],

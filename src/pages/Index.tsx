@@ -6,6 +6,8 @@ import ResourcesSection from "@/components/ResourcesSection";
 import ReportActions from "@/components/ReportActions";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
+import CARSection from "@/components/CARSection";
+import { createEmptyCarSheet } from "@/utils/carHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -239,6 +241,9 @@ const Index = () => {
   const [referenceSections, setReferenceSections] = useState<Section[]>([]);
   const [tableTitle, setTableTitle] = useState("SITE PHOTO EVIDENCE");
   const [isExportingReference, setIsExportingReference] = useState(false);
+
+  // CAR Sheet state
+  const [carSheet, setCarSheet] = useState<any>(createEmptyCarSheet());
 
   // Combined Export state
   const [isExportingCombined, setIsExportingCombined] = useState(false);
@@ -1346,6 +1351,20 @@ const Index = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+
+      // Process CAR sheet images into base64 data URLs and ensure fixed lengths
+      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
+        const imgs = await Promise.all((g.images || []).map(async (img: any) => {
+          const res = await toBase64DataUrl(img);
+          return res || "";
+        }));
+        return {
+          date: g.date || "",
+          images: [imgs[0] || "", imgs[1] || ""],
+          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")],
+        };
+      }));
+
       // Use same payload as export
       const payload = {
         mode: "combined",
@@ -1373,6 +1392,7 @@ const Index = () => {
               };
             })
           ),
+          car: processedCar,
         },
       };
 
@@ -1800,6 +1820,14 @@ const Index = () => {
           isExporting={isExporting}
           isSubmitting={isSubmitting}
         />
+
+        {/* CAR section (Sheet 3) */}
+        <div className="mt-8 pt-6 border-t border-muted-foreground/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">CAR (Site Photo Evidence - Sheet 3)</h2>
+            <CARSection car={carSheet} setCar={setCarSheet} />
+          </div>
+        </div>
 
         {/* Reference section (renders below Report content) */}
         <div className="mt-8 pt-6 border-t border-muted-foreground/20">
