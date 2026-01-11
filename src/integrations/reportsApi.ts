@@ -374,8 +374,8 @@ export const generateCombinedExcel = async (
 
   // Use provided filename or fallback to default
   const filename = fileName
-    ? `${fileName}.xlsx`
-    : `combined-${new Date().toISOString().split("T")[0]}.xlsx`;
+    ? `${fileName}.xlsm`
+    : `combined-${new Date().toISOString().split("T")[0]}.xlsm`;
 
   link.download = filename;
   document.body.appendChild(link);

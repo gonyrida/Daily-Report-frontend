@@ -11,7 +11,7 @@ export function createCarGroup() {
 export function createEmptyCarSheet() {
   return {
     description: "",
-    photo_groups: [createCarGroup()],
+    photo_groups: [],
   };
 }
 

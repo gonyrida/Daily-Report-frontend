@@ -1066,6 +1066,18 @@ const Index = () => {
 
       const processedSections = await processImages(referenceSections);
 
+      // Process CAR data
+      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
+        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
+          (await toBase64DataUrl(img)) || ""
+        ));
+        return { 
+          date: g.date || "", 
+          images: [imgs[0] || "", imgs[1] || ""], 
+          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
+        };
+      }));
+
       const reportPayload = {
         projectName,
         reportDate: reportDate?.toISOString(),
@@ -1079,6 +1091,8 @@ const Index = () => {
         workingTeam,
         materials,
         machinery,
+        description: carSheet.description || "",
+        photo_groups: processedCar
       };
 
       await generateCombinedExcel(
@@ -1821,14 +1835,6 @@ const Index = () => {
           isSubmitting={isSubmitting}
         />
 
-        {/* CAR section (Sheet 3) */}
-        <div className="mt-8 pt-6 border-t border-muted-foreground/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">CAR (Site Photo Evidence - Sheet 3)</h2>
-            <CARSection car={carSheet} setCar={setCarSheet} />
-          </div>
-        </div>
-
         {/* Reference section (renders below Report content) */}
         <div className="mt-8 pt-6 border-t border-muted-foreground/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -1846,6 +1852,14 @@ const Index = () => {
           </div>
         </div>
 
+        {/* CAR section (Sheet 3) */}
+        <div className="mt-8 pt-6 border-t border-muted-foreground/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <h2 className="text-sm font-semibold text-foreground mb-4">Corrective Action Request</h2>
+            <CARSection car={carSheet} setCar={setCarSheet} />
+          </div>
+        </div>
+
         <div className="mt-6 pt-6 border-t border-muted-foreground/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
@@ -1853,7 +1867,9 @@ const Index = () => {
               <span className="font-medium text-foreground">Report</span> =
               Sheet 1,{" "}
               <span className="font-medium text-foreground">Reference</span> =
-              Sheet 2
+              Sheet 2,{" "}
+              <span className="font-medium text-foreground">Corrective Action Request</span> =
+              Sheet 3
             </div>
             <div className="flex items-center gap-3">
               <Button variant="outline" className="min-w-[140px]" onClick={handlePreviewCombined} disabled={isPreviewingCombined}>

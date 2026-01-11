@@ -82,7 +82,7 @@ export default function CARSection({ car, setCar }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">CAR Description</label>
+        <label className="block text-sm font-medium text-foreground mb-1">Description of Required Condition:</label>
         <textarea value={car.description} onChange={(e) => setCar({ ...car, description: e.target.value })} className="w-full p-3 border rounded-md" rows={4} placeholder="Enter global description for CAR sheet" />
       </div>
 
@@ -116,7 +116,7 @@ export default function CARSection({ car, setCar }: Props) {
 
       <div className="flex items-center justify-end gap-3">
         <button onClick={addGroup} className="px-4 py-2 bg-primary text-white rounded-md">Add Group</button>
-        <button onClick={async () => {
+        {/* <button onClick={async () => {
           // Prepare payload and call API
           const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
             if (!img) return null;
@@ -145,7 +145,7 @@ export default function CARSection({ car, setCar }: Props) {
           } catch (e) {
             console.error("CAR export failed", e);
           }
-        }} className="px-4 py-2 border rounded-md">Export CAR</button>
+        }} className="px-4 py-2 border rounded-md">Export CAR</button> */}
       </div>
     </div>
   );
