@@ -29,9 +29,8 @@ const LogoutButton = () => {
       // Use proper cookie-based logout
       await logoutUser();
 
-      // Clear all authentication data
-      localStorage.removeItem("token");
-      localStorage.removeItem("rememberMe");
+      // JWT is stored in HttpOnly cookies - no localStorage cleanup needed
+      console.log("🔒 LOGOUT: JWT cookies cleared by backend");
 
       toast({
         title: "Logged out successfully",
@@ -41,9 +40,7 @@ const LogoutButton = () => {
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
-      // Still clear all authentication data even if API call fails
-      localStorage.removeItem("token");
-      localStorage.removeItem("rememberMe");
+      // Still redirect to login even if API call fails
       navigate("/login");
     } finally {
       setIsLoading(false);

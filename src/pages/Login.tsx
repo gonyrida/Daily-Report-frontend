@@ -61,11 +61,8 @@ const Login = () => {
         throw new Error(result.message || "Login failed");
       }
 
-      // Store token for Python API authentication
-      localStorage.setItem("token", result.token);
-      if (data.rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-      }
+      // JWT is stored in HttpOnly cookies by the backend
+      // No localStorage storage needed for security
 
       toast({
         title: "Login successful",

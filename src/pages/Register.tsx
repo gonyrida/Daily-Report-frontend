@@ -170,8 +170,8 @@ const Register = () => {
         throw new Error(result.message || "Registration failed");
       }
 
-      // Store token for Python API authentication
-      localStorage.setItem("token", result.token);
+      // JWT is stored in HttpOnly cookies by the backend
+      // No localStorage storage needed for security
 
       toast({
         title: "Registration successful",

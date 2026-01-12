@@ -102,30 +102,15 @@ export const generatePythonExcel = async (
       const cacpmLogo = localStorage.getItem("customCacpmLogo");
       const koicaLogo = localStorage.getItem("customKoicaLogo");
       
-      // Get user ID from token (stored during login)
-      const token = localStorage.getItem("token");
-      let userId = null;
-      if (token) {
-        try {
-          // Decode JWT to get userId (this is safe since we're not validating, just extracting)
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          userId = payload.userId;
-          console.log("🔑 PYTHON EXCEL: Extracted userId from token:", userId);
-        } catch (e) {
-          console.warn("⚠️ PYTHON EXCEL: Could not extract userId from token");
-        }
-      }
-      
       enhancedPayload = {
         ...payload,
         cacpm_logo: cacpmLogo,
         koica_logo: koicaLogo,
-        // Include userId for ownership validation
-        userId: userId,
+        // userId will be extracted from JWT cookie by Python backend
       };
     }
 
-    console.log("🔑 PYTHON EXCEL: Sending payload with userId:", enhancedPayload.userId);
+    console.log("🔑 PYTHON EXCEL: Sending payload - userId will be validated by backend");
 
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-report`, {
       mode,
@@ -185,20 +170,6 @@ export const generateReferenceExcel = async (
   fileName?: string
 ) => {
   try {
-    // Get user ID from token (stored during login)
-    const token = localStorage.getItem("token");
-    let userId = null;
-    if (token) {
-      try {
-        // Decode JWT to get userId (this is safe since we're not validating, just extracting)
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        userId = payload.userId;
-        console.log("🔑 REFERENCE EXCEL: Extracted userId from token:", userId);
-      } catch (e) {
-        console.warn("⚠️ REFERENCE EXCEL: Could not extract userId from token");
-      }
-    }
-
     const referenceEntries = referenceSections.flatMap((section: any) =>
       (section.entries ?? []).map((entry: any) => {
         const slots = entry.slots ?? [];
@@ -216,14 +187,13 @@ export const generateReferenceExcel = async (
       })
     );
 
+    // userId will be extracted from JWT cookie by Python backend
     const payload = {
       table_title: tableTitle,
       reference: referenceEntries,
-      // Include userId for ownership validation
-      userId: userId,
     };
 
-    console.log("🔑 REFERENCE EXCEL: Sending payload with userId:", userId);
+    console.log("🔑 REFERENCE EXCEL: Sending payload - userId will be validated by backend");
 
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-reference`, payload);
 
@@ -276,26 +246,11 @@ export const generateCombinedExcel = async (
     const cacpmLogo = localStorage.getItem("customCacpmLogo");
     const koicaLogo = localStorage.getItem("customKoicaLogo");
     
-    // Get user ID from token (stored during login)
-    const token = localStorage.getItem("token");
-    let userId = null;
-    if (token) {
-      try {
-        // Decode JWT to get userId (this is safe since we're not validating, just extracting)
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        userId = payload.userId;
-        console.log("🔑 COMBINED EXPORT: Extracted userId from token:", userId);
-      } catch (e) {
-        console.warn("⚠️ COMBINED EXPORT: Could not extract userId from token");
-      }
-    }
-    
     const enhancedPayload = {
       ...reportPayload,
       cacpm_logo: cacpmLogo,
       koica_logo: koicaLogo,
-      // Include userId for ownership validation
-      userId: userId,
+      // userId will be extracted from JWT cookie by Python backend
     };
 
     const referenceEntries = referenceSections.flatMap((section: any) =>
@@ -321,7 +276,7 @@ export const generateCombinedExcel = async (
       reference: referenceEntries,
     };
 
-    console.log("🔑 COMBINED EXPORT: Sending payload with userId:", userId);
+    console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
 
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, payload);
 
@@ -341,8 +296,8 @@ export const generateCombinedExcel = async (
 
     // Use provided filename or fallback to default
     const filename = fileName
-      ? `${fileName}.xlsx`
-      : `combined-${new Date().toISOString().split("T")[0]}.xlsx`;
+      ? `${fileName}.xlsm`
+      : `combined-${new Date().toISOString().split("T")[0]}.xlsm`;
 
     link.download = filename;
     document.body.appendChild(link);
