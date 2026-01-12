@@ -12,8 +12,8 @@ interface PythonApiFetchOptions {
 }
 
 /**
- * Python API fetch helper that sends both Authorization header AND credentials
- * This ensures compatibility with Python auth middleware that supports both
+ * Python API fetch helper that prioritizes cookies for authentication
+ * Python backend expects cookies, not Authorization headers
  */
 export const pythonApiFetch = async (url: string, options: PythonApiFetchOptions = {}): Promise<Response> => {
   const {
@@ -28,22 +28,15 @@ export const pythonApiFetch = async (url: string, options: PythonApiFetchOptions
     headers: Object.keys(headers) 
   });
 
-  // Get token from localStorage (set during login)
-  const token = localStorage.getItem("token");
-  
-  // Prepare headers with Authorization if token exists
+  // Prepare headers - NO Authorization header for Python API
+  // Python backend expects cookies, not Authorization headers
   const requestHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     ...headers,
   };
 
-  // Add Authorization header for Python API authentication
-  if (token) {
-    requestHeaders.Authorization = `Bearer ${token}`;
-    console.log("🔒 PYTHON API: Adding Authorization header");
-  } else {
-    console.warn("⚠️ PYTHON API: No token found in localStorage");
-  }
+  // DO NOT add Authorization header - Python backend uses cookies
+  console.log("🔒 PYTHON API: Using cookie-based authentication (no Authorization header)");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
