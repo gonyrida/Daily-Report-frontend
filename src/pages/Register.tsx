@@ -18,6 +18,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { apiPost } from "@/lib/apiFetch";
 import { API_ENDPOINTS } from "@/config/api";
 
 const registerSchema = z
@@ -157,16 +158,10 @@ const Register = () => {
     setError(null);
 
     try {
-      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName: data.fullName,
-          email: data.email,
-          password: data.password,
-        }),
+      const response = await apiPost(API_ENDPOINTS.AUTH.REGISTER, {
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password,
       });
 
       const result = await response.json();
@@ -174,6 +169,9 @@ const Register = () => {
       if (!response.ok) {
         throw new Error(result.message || "Registration failed");
       }
+
+      // JWT is stored in HttpOnly cookies by the backend
+      // No localStorage storage needed for security
 
       toast({
         title: "Registration successful",

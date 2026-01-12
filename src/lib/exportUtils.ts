@@ -606,7 +606,7 @@ export const exportToPDF = async (
 
 export const exportToExcel = async (data: ReportData) => {
   // Load the provided Excel template so the export matches the exact layout
-  const response = await fetch("/template.xlsx");
+  const response = await apiGet("/template.xlsx");
   if (!response.ok) {
     throw new Error("Unable to load Excel template");
   }
@@ -901,7 +901,8 @@ export const exportToExcel = async (data: ReportData) => {
   window.URL.revokeObjectURL(url);
 };
 
-// Export both PDF and Excel as a ZIP file
+// Export both PDF and Excel as a ZIP
+import { apiGet, apiPost } from "./apiFetch";
 export const exportToZIP = async (data: ReportData): Promise<void> => {
   const zip = new JSZip();
 
@@ -913,7 +914,7 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
   zip.file(pdfFileName, pdfBlob);
 
   // Generate Excel blob
-  const response = await fetch("/template.xlsx");
+  const response = await apiGet("/template.xlsx");
   if (!response.ok) {
     throw new Error("Unable to load Excel template");
   }

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { API_ENDPOINTS } from "@/config/api";
+import { loginUser } from "@/integrations/authApi";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -55,29 +55,14 @@ const Login = () => {
     setError(null);
 
     try {
-      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          rememberMe: data.rememberMe,
-        }),
-      });
+      const result = await loginUser(data.email, data.password);
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (!result.success) {
         throw new Error(result.message || "Login failed");
       }
 
-      // Store token securely
-      localStorage.setItem("token", result.token);
-      if (data.rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-      }
+      // JWT is stored in HttpOnly cookies by the backend
+      // No localStorage storage needed for security
 
       toast({
         title: "Login successful",
