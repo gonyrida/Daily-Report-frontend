@@ -107,6 +107,8 @@ export default function CARSection({ car, setCar }: Props) {
                   moveDown={moveDown}
                   isTopLinked={isTopLinked}
                   isBottomLinked={isBottomLinked}
+                  car={car}
+                  setCar={setCar}
                 />
               </motion.div>
             );

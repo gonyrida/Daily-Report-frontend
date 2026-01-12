@@ -1269,6 +1269,18 @@ const Index = () => {
           });
         });
       });
+      // Process CAR data
+      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
+        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
+          (await toBase64DataUrl(img)) || ""
+        ));
+        return { 
+          date: g.date || "", 
+          images: [imgs[0] || "", imgs[1] || ""], 
+          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
+        };
+      }));
+
       await generateCombinedPDF(
         {
           projectName,
@@ -1283,6 +1295,8 @@ const Index = () => {
           workingTeam,
           materials,
           machinery,
+          description: carSheet.description || "",
+          photo_groups: processedCar,
         },
         processedSections,
         tableTitle,
@@ -1366,16 +1380,15 @@ const Index = () => {
 
       const processedSections = await processImages(referenceSections);
 
-      // Process CAR sheet images into base64 data URLs and ensure fixed lengths
+      // Process CAR data
       const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => {
-          const res = await toBase64DataUrl(img);
-          return res || "";
-        }));
-        return {
-          date: g.date || "",
-          images: [imgs[0] || "", imgs[1] || ""],
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")],
+        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
+          (await toBase64DataUrl(img)) || ""
+        ));
+        return { 
+          date: g.date || "", 
+          images: [imgs[0] || "", imgs[1] || ""], 
+          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
         };
       }));
 
@@ -1406,7 +1419,8 @@ const Index = () => {
               };
             })
           ),
-          car: processedCar,
+          description: carSheet.description || "",
+          photo_groups: processedCar,
         },
       };
 
@@ -1512,6 +1526,18 @@ const Index = () => {
 
       const processedSections = await processImages(referenceSections);
 
+      // Process CAR data
+      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
+        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
+          (await toBase64DataUrl(img)) || ""
+        ));
+        return { 
+          date: g.date || "", 
+          images: [imgs[0] || "", imgs[1] || ""], 
+          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
+        };
+      }));
+
       // Generate both files
       const reportPayload = {
         projectName,
@@ -1526,6 +1552,8 @@ const Index = () => {
         workingTeam,
         materials,
         machinery,
+        description: carSheet.description || "",
+        photo_groups: processedCar,
       };
 
       // Generate PDF
@@ -1583,7 +1611,7 @@ const Index = () => {
       const excelBlob = await excelResponse.blob();
 
       zip.file(`${fileName}.pdf`, pdfBlob);
-      zip.file(`${fileName}.xlsx`, excelBlob);
+      zip.file(`${fileName}.xlsm`, excelBlob);
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
       

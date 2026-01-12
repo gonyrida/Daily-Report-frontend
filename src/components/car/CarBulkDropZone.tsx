@@ -18,10 +18,28 @@ export default function CarBulkDropZone({ onFiles }: Props) {
     e.currentTarget.value = "";
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    
+    // Get files from clipboard
+    const items = Array.from(e.clipboardData?.items || []);
+    const files: File[] = [];
+    
+    items.forEach((item) => {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    });
+    
+    if (files.length) onFiles(files);
+  };
+
   return (
     <div
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
+      onPaste={handlePaste}
       className="w-full border-2 border-dashed border-border rounded-lg py-10 flex flex-col items-center justify-center bg-card text-center"
       role="region"
       aria-label="CAR bulk upload"
@@ -32,10 +50,10 @@ export default function CarBulkDropZone({ onFiles }: Props) {
         </div>
       </div>
       <div>
-        <p className="font-medium">Drop images here to create groups</p>
+        <p className="font-medium">Drop or Paste images here to create groups</p>
         <p className="text-sm text-muted-foreground">They will be chunked into pairs (2 per group)</p>
         <div className="mt-4">
-          <label className="btn">
+          <label className="px-4 py-2 bg-primary text-white rounded-md cursor-pointer inline-block hover:bg-primary/90">
             <input type="file" accept="image/*" multiple onChange={handleChange} className="hidden" />
             Upload files
           </label>

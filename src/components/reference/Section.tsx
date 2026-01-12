@@ -177,7 +177,7 @@ export default function Section({ section, onUpdate, onDelete }: any) {
         ) : (
           <div className="text-center py-8 text-gray-500">
             <Image className="w-12 h-12 mb-2 opacity-50 text-muted-foreground mx-auto" aria-hidden="true" />
-            <p className="text-sm">No entries yet. Add your first entry below.</p>
+            <p className="text-sm">No entries yet. Add your entry below first.</p>
           </div>
         )}
 
