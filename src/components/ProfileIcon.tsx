@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, User } from 'lucide-react';
 import ProfileDropdown from './ProfileDropdown';
 import ProfilePage from './ProfilePage';
+import { saveProfileLocally, loadProfileLocally } from '@/lib/storageUtils';
 
 interface UserProfile {
   id: string;
@@ -39,7 +40,18 @@ const ProfileIcon = () => {
   const fetchUserForAvatar = async () => {
     setIsLoading(true);
     setError(null);
+    
     try {
+      // First try to load from cache
+      const cachedProfile = loadProfileLocally();
+      if (cachedProfile) {
+        console.log('Using cached profile for avatar');
+        setUser(cachedProfile);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If no cache, fetch from API
       const response = await fetch('/api/auth/profile', {
         method: 'GET',
         credentials: 'include',
@@ -53,7 +65,12 @@ const ProfileIcon = () => {
       }
       
       const data = await response.json();
-      setUser(data.data); // Backend returns data.data
+      const userData = data.data; // Backend returns data.data
+      
+      // Save to cache
+      saveProfileLocally(userData);
+      
+      setUser(userData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load user');
       console.error('Profile fetch error:', err);
@@ -120,7 +137,14 @@ const ProfileIcon = () => {
           title="Open profile"
         >
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.profilePicture} alt={user.fullName} />
+            <AvatarImage 
+              src={user.profilePicture} 
+              alt={user.fullName}
+              onError={(e) => {
+                console.error('Avatar image failed to load:', user.profilePicture);
+                e.currentTarget.style.display = 'none';
+              }}
+            />
             <AvatarFallback>{getInitials(user.fullName)}</AvatarFallback>
           </Avatar>
         </Button>

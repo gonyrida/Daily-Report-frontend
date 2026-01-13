@@ -44,32 +44,19 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
     isEditing,
     isSaving,
     isUploading,
+    tempProfile, // Use hook's tempProfile instead of local state
     startEditing,
     cancelEditing,
     saveChanges,
     uploadPicture,
     clearError,
     fetchProfile,
+    updateTempProfile, // Add the new method
   } = useUserProfile();
-  
-  // Local state for temp profile data
-  const [tempProfile, setTempProfile] = useState<Partial<UserProfile>>({});
   
   const { toast } = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Reset temp profile when editing starts
-  useEffect(() => {
-    if (isEditing && profile) {
-      setTempProfile({
-        fullName: profile.fullName,
-        profilePicture: profile.profilePicture,
-      });
-    } else if (!isEditing) {
-      setTempProfile({});
-    }
-  }, [isEditing, profile]);
 
   // Fetch profile when page opens
   useEffect(() => {
@@ -113,6 +100,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
       localStorage.removeItem("rememberMe");
       localStorage.removeItem("user");
       
+      // Clear profile cache on logout
+      const { clearProfileCache } = await import("@/lib/storageUtils");
+      clearProfileCache();
+      
       toast({
         title: "Logged out successfully",
         description: "You have been signed out of your account.",
@@ -125,6 +116,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
       localStorage.removeItem("token");
       localStorage.removeItem("rememberMe");
       localStorage.removeItem("user");
+      
+      // Clear profile cache even on error
+      const { clearProfileCache } = await import("@/lib/storageUtils");
+      clearProfileCache();
+      
       navigate("/login");
       onClose();
     }
@@ -161,24 +157,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
   };
 
   const handleSaveChanges = async () => {
-    if (!profile) return;
+    console.log('DEBUG: Calling hook saveChanges directly');
     
-    const changes: { fullName?: string; profilePicture?: string } = {};
-    
-    if (tempProfile.fullName !== undefined && tempProfile.fullName !== profile.fullName) {
-      changes.fullName = tempProfile.fullName;
-    }
-    
-    if (tempProfile.profilePicture !== undefined && tempProfile.profilePicture !== profile.profilePicture) {
-      changes.profilePicture = tempProfile.profilePicture;
-    }
-    
-    if (Object.keys(changes).length > 0) {
-      await saveChanges();
-    } else {
-      // No changes to save
-      cancelEditing();
-    }
+    // Just call the hook's saveChanges which already has all the logic
+    await saveChanges();
   };
 
   if (!isOpen) return null;
@@ -238,7 +220,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
                     <Avatar className="h-24 w-24">
                       <AvatarImage 
                         src={isEditing ? (tempProfile.profilePicture || profile.profilePicture) : profile.profilePicture} 
-                        alt={isEditing ? (tempProfile.fullName || profile.fullName) : profile.fullName} 
+                        alt={isEditing ? (tempProfile.fullName || profile.fullName) : profile.fullName}
+                        onError={(e) => {
+                          console.error('Profile image failed to load:', isEditing ? (tempProfile.profilePicture || profile.profilePicture) : profile.profilePicture);
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                       <AvatarFallback className="text-lg">
                         {getInitials(isEditing ? (tempProfile.fullName || profile.fullName) : profile.fullName)}
@@ -270,7 +256,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
                       <Input
                         id="fullName"
                         value={tempProfile.fullName || ''}
-                        onChange={(e) => setTempProfile(prev => ({ ...prev, fullName: e.target.value }))}
+                        onChange={(e) => {
+                          updateTempProfile({ fullName: e.target.value });
+                          console.log('Name changed:', e.target.value);
+                        }}
                         placeholder="Enter your name"
                         className="text-base"
                         aria-label="Full name"

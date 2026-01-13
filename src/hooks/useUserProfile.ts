@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { UserProfile, getUserProfile, updateUserProfile, uploadProfilePicture } from "@/integrations/userProfileApi";
 import { useToast } from "@/hooks/use-toast";
+import { saveProfileLocally, loadProfileLocally, clearProfileCache } from "@/lib/storageUtils";
 
 interface ProfileState {
   profile: UserProfile | null;
@@ -23,6 +24,7 @@ interface ProfileActions {
   cancelEditing: () => void;
   saveChanges: () => Promise<void>;
   clearError: () => void;
+  updateTempProfile: (updates: Partial<UserProfile>) => void; // Add method to update temp profile
 }
 
 export const useUserProfile = (): ProfileState & ProfileActions => {
@@ -41,7 +43,15 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     setError(null);
     
     try {
-      // First verify authentication
+      // First try to load from cache
+      const cachedProfile = loadProfileLocally();
+      if (cachedProfile) {
+        console.log('Using cached profile for useUserProfile');
+        setProfile(cachedProfile);
+        setTempProfile({});
+      }
+      
+      // Always fetch fresh data from API to ensure consistency
       const { verifyAuth } = await import("@/integrations/authApi");
       const authResult = await verifyAuth();
       
@@ -53,6 +63,9 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       if (result.success && result.data) {
         setProfile(result.data);
         setTempProfile({});
+        
+        // Update cache with fresh data
+        saveProfileLocally(result.data);
       } else {
         throw new Error("Failed to load profile data");
       }
@@ -73,12 +86,19 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     setIsSaving(true);
     setError(null);
     
+    console.log('DEBUG UPDATE: Data received:', data);
+    
     try {
       const result = await updateUserProfile(data);
+      console.log('DEBUG UPDATE: API result:', result);
+      
       if (result.success && result.data) {
         setProfile(result.data);
         setTempProfile({});
         setIsEditing(false);
+        
+        // Update cache with new data
+        saveProfileLocally(result.data);
         
         toast({
           title: "Profile Updated",
@@ -104,11 +124,19 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     setIsUploading(true);
     setError(null);
     
+    console.log('DEBUG UPLOAD: File received:', file.name);
+    
     try {
       const result = await uploadProfilePicture(file);
+      console.log('DEBUG UPLOAD: Upload result:', result);
+      
       if (result.success && result.data) {
         // Update temp profile with new picture URL
-        setTempProfile(prev => ({ ...prev, profilePicture: result.data.url }));
+        setTempProfile(prev => {
+          const updated = { ...prev, profilePicture: result.data.url };
+          console.log('DEBUG UPLOAD: Updating temp profile:', updated);
+          return updated;
+        });
         
         toast({
           title: "Picture Uploaded",
@@ -152,13 +180,22 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     
     const changes: { fullName?: string; profilePicture?: string } = {};
     
+    console.log('DEBUG HOOK: Current profile:', profile);
+    console.log('DEBUG HOOK: Temp profile:', tempProfile);
+    
     if (tempProfile.fullName !== undefined && tempProfile.fullName !== profile.fullName) {
       changes.fullName = tempProfile.fullName;
+      console.log('DEBUG HOOK: Adding fullName to changes:', changes.fullName);
     }
     
-    if (tempProfile.profilePicture !== undefined && tempProfile.profilePicture !== profile.profilePicture) {
+    // Always include profilePicture if it exists in tempProfile, even if it's the same URL
+    // This handles the case where user uploads a picture but the URL hasn't changed
+    if (tempProfile.profilePicture !== undefined) {
       changes.profilePicture = tempProfile.profilePicture;
+      console.log('DEBUG HOOK: Adding profilePicture to changes (always include if in temp):', changes.profilePicture);
     }
+    
+    console.log('DEBUG HOOK: Final changes object:', changes);
     
     if (Object.keys(changes).length > 0) {
       await updateProfile(changes);
@@ -171,6 +208,11 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  // Add method to update temp profile from components
+  const updateTempProfile = useCallback((updates: Partial<UserProfile>) => {
+    setTempProfile(prev => ({ ...prev, ...updates }));
   }, []);
 
   // Auto-fetch profile on mount
@@ -196,5 +238,6 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     cancelEditing,
     saveChanges,
     clearError,
+    updateTempProfile, // Add the new method to return object
   };
 };
