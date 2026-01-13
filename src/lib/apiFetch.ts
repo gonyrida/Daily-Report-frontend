@@ -88,3 +88,9 @@ export const apiPut = (url: string, body: any, headers?: Record<string, string>)
  */
 export const apiDelete = (url: string, headers?: Record<string, string>) => 
   apiFetch(url, { method: "DELETE", headers });
+
+/**
+ * PATCH request helper for partial updates (auto-save)
+ */
+export const apiPatch = (url: string, body: any, headers?: Record<string, string>) => 
+  apiFetch(url, { method: "PATCH", body, headers });

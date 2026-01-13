@@ -61,15 +61,18 @@ const Login = () => {
         throw new Error(result.message || "Login failed");
       }
 
-      // JWT is stored in HttpOnly cookies by the backend
-      // No localStorage storage needed for security
+      // Store user info for Python API authentication (token is now in HTTP-only cookie)
+      localStorage.setItem("user", JSON.stringify(result.user));
+      if (data.rememberMe) {
+        localStorage.setItem("rememberMe", "true");
+      }
 
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
 
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

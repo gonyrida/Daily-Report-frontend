@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import LogoutButton from "./LogoutButton";
 
-const ReportHeader = () => {
+interface ReportHeaderProps {
+  isAutoSaving?: boolean;
+  lastSavedAt?: Date | null;
+}
+
+const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeaderProps) => {
   const [cacpmLogo, setCacpmLogo] = useState<string>("/cacpm_logo.png");
   const [koicaLogo, setKoicaLogo] = useState<string>("/koica_logo.png");
   const cacpmInputRef = useRef<HTMLInputElement>(null);
@@ -77,13 +81,30 @@ const ReportHeader = () => {
 
         <div className="flex-1 flex flex-col items-center justify-center">
           <h1 className="text-2xl font-bold tracking-tight">DAILY REPORT</h1>
-          {/* <p className="text-primary-foreground/80 text-sm font-medium">
-            Construction Project Management
-          </p> */}
+          {/* Auto-save status indicator */}
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            {isAutoSaving && (
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span>Saving...</span>
+              </div>
+            )}
+            {!isAutoSaving && lastSavedAt && (
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>Saved {lastSavedAt.toLocaleTimeString()}</span>
+              </div>
+            )}
+            {!isAutoSaving && !lastSavedAt && (
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <span>Unsaved changes</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center space-x-4">
-          <LogoutButton />
           <div
             className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
             style={{ width: 140, height: 48 }}
