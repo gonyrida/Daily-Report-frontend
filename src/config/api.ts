@@ -23,7 +23,7 @@ const getPythonApiBaseUrl = (): string => {
 
   // If not defined, use production URL in production mode, localhost in development
   if (import.meta.env.MODE === "production") {
-    return "https://dr2-backend.onrender.com";
+    return "https://daily-report-python.onrender.com";
   }
 
   return "http://localhost:5001";

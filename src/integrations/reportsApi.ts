@@ -235,6 +235,58 @@ export const generateReferenceExcel = async (
   }
 };
 
+export const generateCarExcel = async (
+  carData: any,
+  fileName?: string
+) => {
+  try {
+    const payload = {
+      data: carData,
+    };
+
+    const response = await fetch(`${PYTHON_API_BASE_URL}/generate-car`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to generate CAR" }));
+      throw new Error(
+        error.message || `HTTP ${response.status}: ${response.statusText}`
+      );
+    }
+
+    // Handle file download
+    const blob = await response.blob();
+
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Use provided filename or fallback to default
+    const filename = fileName ? `${fileName}.xlsx` : `car-${new Date().toISOString().split("T")[0]}.xlsx`;
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Clean up
+    window.URL.revokeObjectURL(url);
+
+    return { success: true };
+  } catch (error) {
+    console.error("CAR Excel generation error:", error);
+    throw error;
+  }
+};
+
 export const generateCombinedExcel = async (
   reportPayload: any,
   referenceSections: any[],
@@ -466,4 +518,89 @@ export const getRecentReports = async (limit: number = 20, status?: string) => {
   const result = await response.json();
   console.log("🔒 GET RECENT REPORTS: Success:", result);
   return result;
+};
+
+export const generateCombinedPDF = async (
+  reportPayload: any,
+  referenceSections: any[],
+  tableTitle: string = "SITE PHOTO EVIDENCE",
+  fileName?: string
+) => {
+  // console.log("DEBUG API: Received referenceSections:", referenceSections);
+  const referenceEntries = referenceSections.flatMap((section: any) =>
+    (section.entries ?? []).map((entry: any) => {
+      const slots = entry.slots ?? [];
+
+      // DEBUG: Log what's in slots
+      // console.log("DEBUG API: Entry slots:", slots);
+      // console.log("DEBUG API: First slot image:", slots[0]?.image?.substring(0, 50));
+      return {
+        section_title: section.title || "",
+        images: slots
+          .map((s: any) => s.image)
+          .filter(Boolean)
+          .slice(0, 2),
+        footers: slots
+          .map((s: any) => s.caption)
+          .filter(Boolean)
+          .slice(0, 2),
+      };
+    })
+  );
+
+  // console.log("DEBUG API: Processed referenceEntries:", referenceEntries);
+  // console.log("DEBUG API: Total images being sent:", referenceEntries.reduce((acc, entry) => acc + entry.images.length, 0));
+
+  const payload = {
+    mode: "combined",
+    data: {
+      ...reportPayload,
+      table_title: tableTitle,
+      reference: referenceSections.flatMap((section: any) =>
+        (section.entries ?? []).map((entry: any) => {
+          const slots = entry.slots ?? [];
+          return {
+            section_title: section.title || "",
+            images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+            footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+          };
+        })
+      ),
+    },
+  };
+
+  const response = await fetch(
+    `${PYTHON_API_BASE_URL}/generate-combined-pdf`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to generate combined PDF" }));
+    throw new Error(
+      error.message || `HTTP ${response.status}: ${response.statusText}`
+    );
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+
+  const filename = fileName
+    ? `${fileName}.pdf`
+    : `combined-${new Date().toISOString().split("T")[0]}.pdf`;
+
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+
+  return { success: true };
 };

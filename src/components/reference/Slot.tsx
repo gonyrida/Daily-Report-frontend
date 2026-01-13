@@ -13,6 +13,25 @@ interface Props {
 }
 
 export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteSlot, onBulkUpload }: Props) {
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    
+    const items = Array.from(e.clipboardData?.items || []);
+    const files: File[] = [];
+    
+    items.forEach((item) => {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    });
+    
+    if (files.length > 0) {
+      // Use existing bulk upload logic
+      onBulkUpload?.(files, entryId, slot.id);
+    }
+  };
+
   const logic = useSlotLogic(slot, entryId, onUpdateSlot, onBulkUpload);
 
   return (
@@ -22,6 +41,7 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
         onDragLeave={logic.handleDrag}
         onDragOver={logic.handleDrag}
         onDrop={logic.handleDrop}
+        onPaste={handlePaste}
         className={`relative w-full aspect-[4/3] overflow-hidden rounded-lg border border-border bg-card transition-all duration-150 ${logic.dragActive ? "scale-[1.02] shadow-md" : "shadow-sm"} cursor-pointer`}
         role="button"
         tabIndex={0}
@@ -42,7 +62,7 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
               <Image className={`text-4xl transition-colors ${logic.dragActive ? "text-indigo-600" : "text-gray-400"}`} />
             </div>
             <p className="text-sm font-medium text-muted-foreground">Upload Image</p>
-            <p className="text-xs text-muted-foreground mt-1">Click or drag file</p>
+            <p className="text-xs text-muted-foreground mt-1">Click, drag, or paste files</p>
           </div>
         )}
 
