@@ -569,14 +569,9 @@ export const generateCombinedPDF = async (
     },
   };
 
-  const response = await fetch(
-    `${PYTHON_API_BASE_URL}/generate-combined-pdf`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }
-  );
+  console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
+
+  const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
 
   if (!response.ok) {
     const error = await response

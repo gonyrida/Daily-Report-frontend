@@ -51,6 +51,7 @@ import {
   API_ENDPOINTS,
   PYTHON_API_BASE_URL 
 } from "@/config/api";
+import { pythonApiPost } from "../lib/pythonApiFetch";
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -1382,11 +1383,7 @@ const DailyReport = () => {
       };
 
       // Get Excel data as blob
-      const response = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
 
       if (response.ok) {
         const blob = await response.blob();
@@ -1514,33 +1511,9 @@ const DailyReport = () => {
       };
 
       // Generate PDF
-      const pdfResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "combined",
-          data: {
-            ...reportPayload,
-            table_title: tableTitle,
-            reference: processedSections.flatMap((section: any) =>
-              (section.entries ?? []).map((entry: any) => {
-                const slots = entry.slots ?? [];
-                return {
-                  section_title: section.title || "",
-                  images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                  footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-                };
-              })
-            ),
-          },
-        }),
-      });
-
-      // Generate Excel
-      const excelResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const pdfResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
+        mode: "combined",
+        data: {
           ...reportPayload,
           table_title: tableTitle,
           reference: processedSections.flatMap((section: any) =>
@@ -1553,7 +1526,23 @@ const DailyReport = () => {
               };
             })
           ),
-        }),
+        },
+      });
+
+      // Generate Excel
+      const excelResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, {
+        ...reportPayload,
+        table_title: tableTitle,
+        reference: processedSections.flatMap((section: any) =>
+          (section.entries ?? []).map((entry: any) => {
+            const slots = entry.slots ?? [];
+            return {
+              section_title: section.title || "",
+              images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+              footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+            };
+          })
+        ),
       });
 
       if (!pdfResponse.ok || !excelResponse.ok) {
