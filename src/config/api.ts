@@ -40,6 +40,12 @@ export const API_ENDPOINTS = {
     VERIFY: `${API_BASE_URL}/auth/verify`,
     FORGOT_PASSWORD: `${API_BASE_URL}/auth/forgot-password`,
     RESET_PASSWORD: `${API_BASE_URL}/auth/reset-password`,
+    PROFILE: `${API_BASE_URL}/auth/profile`,
+    CHANGE_PASSWORD: `${API_BASE_URL}/auth/change-password`,
+  },
+  USER: {
+    PROFILE: `${API_BASE_URL}/auth/profile`,
+    UPLOAD_PICTURE: `${API_BASE_URL}/images/upload-profile`,
   },
   DAILY_REPORTS: {
     BASE: `${API_BASE_URL}/daily-reports`,

@@ -10,6 +10,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import DailyReport from "./pages/DailyReport";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecureTokenInitializer from "./components/SecureTokenInitializer";
@@ -49,6 +50,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <DailyReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

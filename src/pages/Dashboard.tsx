@@ -31,8 +31,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Bell,
-  Settings,
   LayoutDashboard,
   FileText,
   LogOut,
@@ -48,7 +46,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
-import NotificationsDropdown from "@/components/NotificationsDropdown";
+import ProfileIcon from "@/components/ProfileIcon";
 import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport } from "@/integrations/reportsApi";
 
 interface Report {
@@ -63,21 +61,12 @@ interface Report {
   isRecentlyEdited?: boolean;
 }
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-}
-
 const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [reports, setReports] = useState<Report[]>([]);
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
 
@@ -224,42 +213,6 @@ const Dashboard = () => {
     }
   };
 
-  // Notification handlers
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-  };
-
-  const handleDeleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-
-  const handleClearAllNotifications = () => {
-    setNotifications([]);
-  };
-
-  // Initialize some sample notifications
-  useEffect(() => {
-    const sampleNotifications: Notification[] = [
-      {
-        id: '1',
-        title: 'Report Reminder',
-        message: 'Don\'t forget to submit your daily report for today',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-        read: false,
-      },
-      {
-        id: '2',
-        title: 'Report Submitted',
-        message: 'Your report for yesterday has been successfully submitted',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-        read: true,
-      },
-    ];
-    setNotifications(sampleNotifications);
-  }, []);
-
   if (isLoading) {
     return (
       <SidebarProvider>
@@ -364,18 +317,7 @@ const Dashboard = () => {
                 />
               </div>
               
-              <NotificationsDropdown
-                notifications={notifications}
-                onMarkAsRead={handleMarkAsRead}
-                onDelete={handleDeleteNotification}
-                onClearAll={handleClearAllNotifications}
-              />
-              <Button variant="ghost" size="icon">
-                <Settings className="h-4 w-4" />
-              </Button>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                <span className="text-sm font-medium">U</span>
-              </div>
+              <ProfileIcon />
             </div>
           </header>
 
@@ -404,9 +346,10 @@ const Dashboard = () => {
                       <div className="text-2xl font-bold">
                         {new Date().toLocaleDateString()}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Status: {getStatusBadge("not-started")}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground">Status:</span>
+                        {getStatusBadge("not-started")}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
