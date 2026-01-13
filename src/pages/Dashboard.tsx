@@ -20,6 +20,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Bell,
   Settings,
   LayoutDashboard,
@@ -31,11 +42,14 @@ import {
   Clock,
   Loader2,
   Search,
+  ArrowLeft,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
-import { getAllUserReports, createNewReport, createBlankReport, getRecentReports } from "@/integrations/reportsApi";
+import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport } from "@/integrations/reportsApi";
 
 interface Report {
   _id: string;
@@ -140,6 +154,31 @@ const Dashboard = () => {
 
   const handleOpenReport = (reportId: string) => {
     navigate(`/daily-report?reportId=${reportId}`);
+  };
+
+  const handleDeleteReport = async (reportId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent row click
+    
+    try {
+      await deleteReport(reportId);
+      
+      toast({
+        title: "Report Deleted",
+        description: "The report has been deleted successfully",
+      });
+      
+      // Refresh the reports list
+      const userReports = await getRecentReports(50, filterStatus === "all" ? undefined : filterStatus);
+      setReports(userReports.data || []);
+      setFilteredReports(userReports.data || []);
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Deletion Failed",
+        description: error instanceof Error ? error.message : "Failed to delete report",
+        variant: "destructive",
+      });
+    }
   };
 
   const getWeeklyTotal = () => {
@@ -470,9 +509,54 @@ const Dashboard = () => {
                             </span>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm">
-                          Open
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {/* Edit/Open Button */}
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenReport(report._id);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          
+                          {/* Delete Button */}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Are you sure you want to delete this report?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action will permanently delete the report "{report.projectName}" and all its data. This cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={(e) => handleDeleteReport(report._id, e)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Delete Report
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                     ))}
                   </div>

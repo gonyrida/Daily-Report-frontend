@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   FileText,
   FileType,
+  ArrowLeft,
 } from "lucide-react";
 import { ResourceRow } from "@/components/ResourceTable";
 import {
@@ -1319,6 +1320,18 @@ const DailyReport = () => {
         isAutoSaving={isAutoSaving}
         lastSavedAt={lastSavedAt}
       />
+
+      {/* Back Button */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <Button
+          variant="ghost"
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
+      </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <ProjectInfo

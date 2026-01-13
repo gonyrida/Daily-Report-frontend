@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import LogoutButton from "./LogoutButton";
 
 interface ReportHeaderProps {
   isAutoSaving?: boolean;
@@ -106,7 +105,6 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
         </div>
 
         <div className="flex items-center space-x-4">
-          <LogoutButton />
           <div
             className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
             style={{ width: 140, height: 48 }}
