@@ -73,8 +73,8 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        // Use new getRecentReports API - sorted by updatedAt automatically
-        const userReports = await getRecentReports(50, filterStatus === "all" ? undefined : filterStatus);
+        // Use new getRecentReports API - fetch ALL reports without status filter
+        const userReports = await getRecentReports(50);
         setReports(userReports.data || []);
         setFilteredReports(userReports.data || []);
       } catch (error) {
@@ -90,15 +90,15 @@ const Dashboard = () => {
     };
 
     fetchReports();
-  }, [toast, filterStatus]);
+  }, [toast]);
 
   // Filter reports based on search query and status
   useEffect(() => {
     let filtered = reports;
 
-    // Filter by status
+    // Filter by status (case-insensitive)
     if (filterStatus !== "all") {
-      filtered = filtered.filter(report => report.status === filterStatus);
+      filtered = filtered.filter(report => report.status.toLowerCase() === filterStatus.toLowerCase());
     }
 
     // Filter by search query
@@ -157,7 +157,7 @@ const Dashboard = () => {
       });
       
       // Refresh the reports list
-      const userReports = await getRecentReports(50, filterStatus === "all" ? undefined : filterStatus);
+      const userReports = await getRecentReports(50);
       setReports(userReports.data || []);
       setFilteredReports(userReports.data || []);
     } catch (error) {
@@ -389,41 +389,41 @@ const Dashboard = () => {
             </div>
 
             {/* Recent Documents */}
-            {filteredReports.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Recent Documents ({filteredReports.length})
-                    </div>
-                    {/* Filter Buttons */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant={filterStatus === "all" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFilterStatus("all")}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        variant={filterStatus === "draft" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFilterStatus("draft")}
-                      >
-                        Draft
-                      </Button>
-                      <Button
-                        variant={filterStatus === "submitted" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFilterStatus("submitted")}
-                      >
-                        Submitted
-                      </Button>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Recent Documents ({filteredReports.length})
+                  </div>
+                  {/* Filter Buttons */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={filterStatus === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterStatus("all")}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={filterStatus === "draft" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterStatus("draft")}
+                    >
+                      Draft
+                    </Button>
+                    <Button
+                      variant={filterStatus === "submitted" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterStatus("submitted")}
+                    >
+                      Submitted
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredReports.length > 0 ? (
                   <div className="space-y-3">
                     {filteredReports.map((report) => (
                       <div
@@ -503,9 +503,18 @@ const Dashboard = () => {
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {filterStatus === "submitted" 
+                      ? "No submitted reports found" 
+                      : filterStatus === "draft" 
+                      ? "No draft reports found"
+                      : "No reports found"
+                    }
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </main>
         </SidebarInset>
       </div>
