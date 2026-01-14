@@ -60,7 +60,7 @@ export const updateUserProfile = async (profileData: UpdateProfileData): Promise
   }
 };
 
-export const uploadProfilePicture = async (file: File): Promise<{ success: boolean; data: { url: string } }> => {
+export const uploadProfilePicture = async (file: File): Promise<{ success: boolean; data: { path: string } }> => {
   try {
     console.log("DEBUG FRONTEND: Uploading profile picture");
     

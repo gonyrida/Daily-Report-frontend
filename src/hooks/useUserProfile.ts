@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { UserProfile, getUserProfile, updateUserProfile, uploadProfilePicture } from "@/integrations/userProfileApi";
 import { useToast } from "@/hooks/use-toast";
 import { saveProfileLocally, loadProfileLocally, clearProfileCache } from "@/lib/storageUtils";
+import { constructImageUrl, getCacheBustingTimestamp } from "@/utils/imageUtils";
 
 interface ProfileState {
   profile: UserProfile | null;
@@ -13,7 +14,7 @@ interface ProfileState {
   isEditing: boolean;
   isSaving: boolean;
   isUploading: boolean;
-  tempProfile: Partial<UserProfile>;
+  tempProfile: Partial<UserProfile> & { _profilePicturePath?: string }; // Add internal path tracking
 }
 
 interface ProfileActions {
@@ -24,7 +25,7 @@ interface ProfileActions {
   cancelEditing: () => void;
   saveChanges: () => Promise<void>;
   clearError: () => void;
-  updateTempProfile: (updates: Partial<UserProfile>) => void; // Add method to update temp profile
+  updateTempProfile: (updates: Partial<UserProfile> & { _profilePicturePath?: string }) => void; // Add method to update temp profile
 }
 
 export const useUserProfile = (): ProfileState & ProfileActions => {
@@ -34,7 +35,7 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [tempProfile, setTempProfile] = useState<Partial<UserProfile>>({});
+  const [tempProfile, setTempProfile] = useState<Partial<UserProfile> & { _profilePicturePath?: string }>({});
   
   const { toast } = useToast();
 
@@ -47,6 +48,7 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       const cachedProfile = loadProfileLocally();
       if (cachedProfile) {
         console.log('Using cached profile for useUserProfile');
+        // Store relative path directly, construct URL only at render time
         setProfile(cachedProfile);
         setTempProfile({});
       }
@@ -61,10 +63,11 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       
       const result = await getUserProfile();
       if (result.success && result.data) {
+        // Store relative path directly, construct URL only at render time
         setProfile(result.data);
         setTempProfile({});
         
-        // Update cache with fresh data
+        // Update cache with fresh data (use relative path for cache)
         saveProfileLocally(result.data);
       } else {
         throw new Error("Failed to load profile data");
@@ -93,11 +96,12 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       console.log('DEBUG UPDATE: API result:', result);
       
       if (result.success && result.data) {
+        // Store relative path in state, construct URL only at render time
         setProfile(result.data);
         setTempProfile({});
         setIsEditing(false);
         
-        // Update cache with new data
+        // Update cache with new data (use relative path for cache)
         saveProfileLocally(result.data);
         
         toast({
@@ -131,12 +135,15 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       console.log('DEBUG UPLOAD: Upload result:', result);
       
       if (result.success && result.data) {
-        // Update temp profile with new picture URL
+        // Store relative path for preview, construct URL only at render time
         setTempProfile(prev => {
-          const updated = { ...prev, profilePicture: result.data.url };
-          console.log('DEBUG UPLOAD: Updating temp profile:', updated);
+          const updated = { ...prev, profilePicture: result.data.path };
+          console.log('DEBUG UPLOAD: Updating temp profile with relative path:', updated);
           return updated;
         });
+        
+        // Also store raw path for saving to database
+        setTempProfile(prev => ({ ...prev, _profilePicturePath: result.data.path }));
         
         toast({
           title: "Picture Uploaded",
@@ -162,7 +169,7 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     if (profile) {
       setTempProfile({
         fullName: profile.fullName,
-        profilePicture: profile.profilePicture,
+        profilePicture: profile.profilePicture, // Store relative path
       });
       setIsEditing(true);
       setError(null);
@@ -188,11 +195,10 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       console.log('DEBUG HOOK: Adding fullName to changes:', changes.fullName);
     }
     
-    // Always include profilePicture if it exists in tempProfile, even if it's the same URL
-    // This handles the case where user uploads a picture but the URL hasn't changed
-    if (tempProfile.profilePicture !== undefined) {
-      changes.profilePicture = tempProfile.profilePicture;
-      console.log('DEBUG HOOK: Adding profilePicture to changes (always include if in temp):', changes.profilePicture);
+    // Use the stored path for database, not the constructed URL
+    if (tempProfile._profilePicturePath !== undefined) {
+      changes.profilePicture = tempProfile._profilePicturePath;
+      console.log('DEBUG HOOK: Adding profilePicture path to changes:', changes.profilePicture);
     }
     
     console.log('DEBUG HOOK: Final changes object:', changes);

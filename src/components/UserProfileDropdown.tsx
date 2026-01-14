@@ -13,75 +13,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, User, Settings, Key, LogOut, Camera, Save, X, Shield, Bell } from "lucide-react";
+import { User, Settings, LogOut, Loader2 } from "lucide-react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/integrations/userProfileApi";
 import AccountSettings from "./AccountSettings";
+import EditProfileModal from "./EditProfileModal";
+import { handleImageError, constructImageUrl, getCacheBustingTimestamp } from "@/utils/imageUtils";
 
 const UserProfileDropdown = () => {
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
   
   const {
     profile,
     isLoading,
     error,
-    isEditing,
     isSaving,
-    isUploading,
-    startEditing,
-    cancelEditing,
-    saveChanges,
-    uploadPicture,
+    updateProfile,
     clearError,
   } = useUserProfile();
   
-  // Local state for temp profile data
-  const [tempProfile, setTempProfile] = useState<Partial<UserProfile>>({});
-  
   const { toast } = useToast();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Reset temp profile when editing starts
-  useEffect(() => {
-    if (isEditing && profile) {
-      setTempProfile({
-        fullName: profile.fullName,
-        profilePicture: profile.profilePicture,
-      });
-    } else if (!isEditing) {
-      setTempProfile({});
-    }
-  }, [isEditing, profile]);
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type and size
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid File",
-          description: "Please select an image file.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({
-          title: "File Too Large",
-          description: "Profile picture must be less than 5MB.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      await uploadPicture(file);
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -129,25 +83,9 @@ const UserProfileDropdown = () => {
     }
   };
 
-  const handleSaveChanges = async () => {
-    if (!profile) return;
-    
-    const changes: { fullName?: string; profilePicture?: string } = {};
-    
-    if (tempProfile.fullName !== undefined && tempProfile.fullName !== profile.fullName) {
-      changes.fullName = tempProfile.fullName;
-    }
-    
-    if (tempProfile.profilePicture !== undefined && tempProfile.profilePicture !== profile.profilePicture) {
-      changes.profilePicture = tempProfile.profilePicture;
-    }
-    
-    if (Object.keys(changes).length > 0) {
-      await saveChanges();
-    } else {
-      // No changes to save
-      cancelEditing();
-    }
+  const handleSaveProfile = async (data: { fullName?: string; profilePicture?: string }) => {
+    await updateProfile(data);
+    setShowEditProfile(false);
   };
 
   if (isLoading) {
@@ -174,9 +112,6 @@ const UserProfileDropdown = () => {
     );
   }
 
-  const currentName = isEditing ? tempProfile.fullName || profile.fullName : profile.fullName;
-  const currentPicture = isEditing ? tempProfile.profilePicture || profile.profilePicture : profile.profilePicture;
-
   return (
     <>
       <DropdownMenu>
@@ -187,8 +122,12 @@ const UserProfileDropdown = () => {
             aria-label="User profile menu"
           >
             <Avatar className="h-8 w-8">
-              <AvatarImage src={currentPicture} alt={currentName} />
-              <AvatarFallback>{getInitials(currentName)}</AvatarFallback>
+              <AvatarImage 
+                src={profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : ''} 
+                alt={profile.fullName}
+                onError={(e) => handleImageError(e, profile.fullName)}
+              />
+              <AvatarFallback>{getInitials(profile.fullName)}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
@@ -197,56 +136,28 @@ const UserProfileDropdown = () => {
           {/* Profile Header */}
           <div className="p-4">
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={currentPicture} alt={currentName} />
-                  <AvatarFallback>{getInitials(currentName)}</AvatarFallback>
-                </Avatar>
-                
-                {isEditing && (
-                  <Button
-                    size="sm"
-                    className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full p-0"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    aria-label="Upload profile picture"
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Camera className="h-3 w-3" />
-                    )}
-                  </Button>
-                )}
-              </div>
+              <Avatar className="h-12 w-12">
+                <AvatarImage 
+                  src={profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : ''} 
+                  alt={profile.fullName}
+                  onError={(e) => handleImageError(e, profile.fullName)}
+                />
+                <AvatarFallback>{getInitials(profile.fullName)}</AvatarFallback>
+              </Avatar>
               
               <div className="flex-1">
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <Input
-                      value={tempProfile.fullName || ""}
-                      onChange={(e) => setTempProfile(prev => ({ ...prev, fullName: e.target.value }))}
-                      placeholder="Full name"
-                      className="text-sm"
-                      aria-label="Full name"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <h3 className="font-medium">{currentName}</h3>
-                    <p className="text-sm text-muted-foreground">{profile?.email}</p>
-                  </div>
-                )}
+                <h3 className="font-medium">{profile.fullName}</h3>
+                <p className="text-sm text-muted-foreground">{profile.email}</p>
               </div>
             </div>
             
             {/* Status and Role */}
             <div className="flex items-center gap-2 mt-3">
-              <Badge variant={profile?.accountStatus === "active" ? "default" : "secondary"}>
-                {profile?.accountStatus}
+              <Badge variant={profile.accountStatus === "active" ? "default" : "secondary"}>
+                {profile.accountStatus}
               </Badge>
               <span className="text-sm text-muted-foreground capitalize">
-                {profile?.role}
+                {profile.role}
               </span>
             </div>
           </div>
@@ -255,70 +166,23 @@ const UserProfileDropdown = () => {
           
           {/* Menu Items */}
           <div className="p-2">
-            {!isEditing && (
-              <>
-                <DropdownMenuItem asChild>
-                  <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
-                    <User className="h-4 w-4" />
-                    View Profile
-                  </Link>
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem 
-                  onClick={() => setShowAccountSettings(true)}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <Shield className="h-4 w-4" />
-                  Account Settings
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem asChild>
-                  <Link to="/change-password" className="flex items-center gap-2 cursor-pointer">
-                    <Key className="h-4 w-4" />
-                    Change Password
-                  </Link>
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-                
-                <DropdownMenuItem
-                  onClick={startEditing}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <Camera className="h-4 w-4" />
-                  Edit Profile
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-              </>
-            )}
+            <DropdownMenuItem
+              onClick={() => setShowEditProfile(true)}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <User className="h-4 w-4" />
+              Edit Profile
+            </DropdownMenuItem>
             
-            {isEditing && (
-              <>
-                <DropdownMenuItem
-                  onClick={handleSaveChanges}
-                  disabled={isSaving}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Save Changes
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem
-                  onClick={cancelEditing}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-              </>
-            )}
+            <DropdownMenuItem 
+              onClick={() => setShowAccountSettings(true)}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Settings className="h-4 w-4" />
+              Account Settings
+            </DropdownMenuItem>
+            
+            <DropdownMenuSeparator />
             
             <DropdownMenuItem
               onClick={handleLogout}
@@ -328,18 +192,17 @@ const UserProfileDropdown = () => {
               Logout
             </DropdownMenuItem>
           </div>
-          
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-            aria-label="Profile picture upload"
-          />
         </DropdownMenuContent>
       </DropdownMenu>
+      
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={showEditProfile}
+        onClose={() => setShowEditProfile(false)}
+        profile={profile}
+        onSave={handleSaveProfile}
+        isSaving={isSaving}
+      />
       
       {/* Account Settings Modal */}
       {showAccountSettings && (

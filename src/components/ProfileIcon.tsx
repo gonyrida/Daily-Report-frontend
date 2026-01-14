@@ -5,9 +5,10 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, User } from 'lucide-react';
-import ProfileDropdown from './ProfileDropdown';
+import UserProfileDropdown from './UserProfileDropdown';
 import ProfilePage from './ProfilePage';
 import { saveProfileLocally, loadProfileLocally } from '@/lib/storageUtils';
+import { handleImageError, constructImageUrl, getCacheBustingTimestamp } from '@/utils/imageUtils';
 
 interface UserProfile {
   id: string;
@@ -138,12 +139,9 @@ const ProfileIcon = () => {
         >
           <Avatar className="h-8 w-8">
             <AvatarImage 
-              src={user.profilePicture} 
+              src={user.profilePicture ? constructImageUrl(user.profilePicture, getCacheBustingTimestamp()) : ''} 
               alt={user.fullName}
-              onError={(e) => {
-                console.error('Avatar image failed to load:', user.profilePicture);
-                e.currentTarget.style.display = 'none';
-              }}
+              onError={(e) => handleImageError(e, user.fullName)}
             />
             <AvatarFallback>{getInitials(user.fullName)}</AvatarFallback>
           </Avatar>
@@ -158,7 +156,7 @@ const ProfileIcon = () => {
   }
 
   // Desktop - use dropdown
-  return <ProfileDropdown />;
+  return <UserProfileDropdown />;
 };
 
 export default ProfileIcon;
