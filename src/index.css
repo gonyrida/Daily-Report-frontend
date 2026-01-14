@@ -83,6 +83,16 @@
     --border: 217 33% 17%;
     --input: 217 33% 17%;
     --ring: 212 27% 84%;
+
+    /* Custom tokens - dark mode */
+    --header-bg: 215 70% 55%;
+    --header-foreground: 0 0% 100%;
+    --table-header: 217 33% 17%;
+    --table-border: 217 33% 17%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 200 85% 50%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;

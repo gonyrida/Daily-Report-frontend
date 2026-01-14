@@ -19,6 +19,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { loginUser } from "@/integrations/authApi";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -81,7 +82,12 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-background relative">
+      {/* Theme Toggle in top-right corner */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
@@ -176,19 +182,19 @@ const Login = () => {
           <div className="mt-6 text-center">
             <Link
               to="/forgot-password"
-              className="text-sm text-blue-600 hover:text-blue-500"
+              className="text-sm text-primary hover:underline"
             >
               Forgot your password?
             </Link>
           </div>
 
           <div className="mt-4 text-center">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-muted-foreground">
               Don't have an account?{" "}
             </span>
             <Link
               to="/register"
-              className="text-sm text-blue-600 hover:text-blue-500"
+              className="text-sm text-primary hover:underline"
             >
               Sign up
             </Link>

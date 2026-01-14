@@ -47,6 +47,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport } from "@/integrations/reportsApi";
 
 interface Report {
@@ -316,6 +317,9 @@ const Dashboard = () => {
                   className="pl-8 w-64"
                 />
               </div>
+              
+              {/* Theme Toggle */}
+              <ThemeToggle />
               
               <ProfileIcon />
             </div>
