@@ -300,8 +300,10 @@ export const generateCombinedExcel = async (
     
     const enhancedPayload = {
       ...reportPayload,
-      cacpm_logo: cacpmLogo,
-      koica_logo: koicaLogo,
+      logos: {
+        cacpm: cacpmLogo,
+        koica: koicaLogo,
+      },
       // userId will be extracted from JWT cookie by Python backend
     };
 

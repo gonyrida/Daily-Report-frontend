@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import PanoramicCropModal from "./PanoramicCropModal";
 
 interface ReportHeaderProps {
   isAutoSaving?: boolean;
@@ -10,6 +11,10 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
   const [koicaLogo, setKoicaLogo] = useState<string>("/koica_logo.png");
   const cacpmInputRef = useRef<HTMLInputElement>(null);
   const koicaInputRef = useRef<HTMLInputElement>(null);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalSrc, setModalSrc] = useState<string | null>(null);
+  const [modalTarget, setModalTarget] = useState<"cacpm" | "koica" | null>(null);
 
   // Load custom logos from localStorage on mount
   useEffect(() => {
@@ -50,15 +55,31 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
-      if (logoType === "cacpm") {
-        setCacpmLogo(result);
-        localStorage.setItem("customCacpmLogo", result);
-      } else {
-        setKoicaLogo(result);
-        localStorage.setItem("customKoicaLogo", result);
-      }
+      // Open the crop modal to enforce the 2.68:1 cropping workflow
+      setModalSrc(result);
+      setModalTarget(logoType);
+      setIsModalOpen(true);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleModalSave = (dataUrl: string) => {
+    if (modalTarget === "cacpm") {
+      setCacpmLogo(dataUrl);
+      localStorage.setItem("customCacpmLogo", dataUrl);
+    } else if (modalTarget === "koica") {
+      setKoicaLogo(dataUrl);
+      localStorage.setItem("customKoicaLogo", dataUrl);
+    }
+    setIsModalOpen(false);
+    setModalSrc(null);
+    setModalTarget(null);
+  };
+
+  const handleModalCancel = () => {
+    setIsModalOpen(false);
+    setModalSrc(null);
+    setModalTarget(null);
   };
 
   return (
@@ -121,6 +142,10 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
           </div>
         </div>
       </div>
+
+      {isModalOpen && modalSrc && (
+        <PanoramicCropModal src={modalSrc} onCancel={handleModalCancel} onSave={handleModalSave} />
+      )}
 
       {/* Hidden file inputs */}
       <input
