@@ -54,9 +54,9 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
   };
 
   const handleLogoClick = (logoType: "cacpm" | "koica") => {
-    if (logoType === "cacpm") {
-      cacpmInputRef.current?.click();
-    } else {
+    if (logoType === "koica") {
+    //   cacpmInputRef.current?.click();
+    // } else {
       koicaInputRef.current?.click();
     }
   };
@@ -105,10 +105,10 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
     <header className="report-header py-4 px-6 shadow-lg">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div
-          className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative border-2 border-dashed border-gray-300 hover:border-gray-400"
+          className="p-0 rounded-lg overflow-hidden relative"
           style={{ width: 140, height: 48 }}
-          onClick={() => handleLogoClick("cacpm")}
-          title="Click to replace CACPM logo"
+          // onClick={() => handleLogoClick("cacpm")}
+          // title="Click to replace CACPM logo"
         >
           <img
             src={cacpmLogo}
@@ -167,13 +167,13 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
       )} */}
 
       {/* Hidden file inputs */}
-      <input
+      {/* <input
         ref={cacpmInputRef}
         type="file"
         accept="image/*"
         onChange={(e) => handleFileChange(e, "cacpm")}
         style={{ display: "none" }}
-      />
+      /> */}
       <input
         ref={koicaInputRef}
         type="file"
