@@ -65,7 +65,7 @@ const ResourceTable = ({
         if (row.id === id) {
           // Handle custom entry selection
           if (field === "description" && value === "__custom__") {
-            return { ...row, description: "" }; // Clear to allow typing
+            return { ...row, description: "__custom_input__" }; // Special marker for custom input
           }
 
           const updatedRow = { ...row, [field]: value };
@@ -172,40 +172,8 @@ const ResourceTable = ({
                     >
                       <td className="px-3 py-2">
                         {useDropdown && dropdownOptions.length > 0 ? (
-                          !row.description ||
-                          !dropdownOptions.includes(row.description) ? (
-                            // If empty or custom value, show input field with back button
-                            <div className="flex items-center gap-1">
-                              <Input
-                                value={row.description}
-                                onChange={(e) =>
-                                  updateRow(
-                                    row.id,
-                                    "description",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Enter custom position..."
-                                className="border-0 bg-transparent focus-visible:ring-1"
-                                autoFocus
-                              />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  updateRow(
-                                    row.id,
-                                    "description",
-                                    dropdownOptions[0] || ""
-                                  )
-                                }
-                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            // Otherwise show dropdown
+                          (row.description === "" || dropdownOptions.includes(row.description)) && row.description !== "__custom_input__" ? (
+                            // Show dropdown if description is empty or exists in options (but not custom input)
                             <Select
                               value={row.description}
                               onValueChange={(value) =>
@@ -234,6 +202,37 @@ const ResourceTable = ({
                                 </SelectItem>
                               </SelectContent>
                             </Select>
+                          ) : (
+                            // If empty or custom value, show input field with back button
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={row.description === "__custom_input__" ? "" : row.description}
+                                onChange={(e) =>
+                                  updateRow(
+                                    row.id,
+                                    "description",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Enter custom position..."
+                                className="border-0 bg-transparent focus-visible:ring-1"
+                                autoFocus
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  updateRow(
+                                    row.id,
+                                    "description",
+                                    dropdownOptions[0] || ""
+                                  )
+                                }
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
                           )
                         ) : (
                           // Regular input for materials and machinery
@@ -285,6 +284,7 @@ const ResourceTable = ({
                               Number(e.target.value) || 0
                             )
                           }
+                          placeholder="0"
                           className="border-0 bg-transparent text-center focus-visible:ring-1"
                         />
                       </td>
