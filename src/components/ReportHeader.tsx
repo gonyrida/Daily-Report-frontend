@@ -32,15 +32,12 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       
-      // Calculate width to maintain aspect ratio with fixed height
-      const aspectRatio = img.width / img.height;
-      const newWidth = Math.round(fixedHeight * aspectRatio);  // Calculate width for 94px height
+      // Force fixed dimensions: 252x94
+      canvas.width = 252;  // Fixed width
+      canvas.height = 94;  // Fixed height
       
-      canvas.width = newWidth;  // Width calculated to maintain aspect ratio
-      canvas.height = fixedHeight; // Fixed at 94px
-      
-      // Draw image with correct aspect ratio
-      ctx.drawImage(img, 0, 0, newWidth, fixedHeight);
+      // Draw image with fixed dimensions
+      ctx.drawImage(img, 0, 0, 252, 94);
       
       // Save to localStorage
       const resizedDataUrl = canvas.toDataURL('image/png');
