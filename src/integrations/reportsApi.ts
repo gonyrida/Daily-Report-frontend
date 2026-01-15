@@ -528,6 +528,9 @@ export const generateCombinedPDF = async (
   tableTitle: string = "SITE PHOTO EVIDENCE",
   fileName?: string
 ) => {
+  // Get custom logos from localStorage for combined mode
+  const cacpmLogo = localStorage.getItem("customCacpmLogo");
+  const koicaLogo = localStorage.getItem("customKoicaLogo");
   // console.log("DEBUG API: Received referenceSections:", referenceSections);
   const referenceEntries = referenceSections.flatMap((section: any) =>
     (section.entries ?? []).map((entry: any) => {
@@ -568,6 +571,10 @@ export const generateCombinedPDF = async (
           };
         })
       ),
+      logos: {
+        cacpm: cacpmLogo,
+        koica: koicaLogo,
+      }
     },
   };
 

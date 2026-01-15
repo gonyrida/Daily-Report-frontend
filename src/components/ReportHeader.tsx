@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import PanoramicCropModal from "./PanoramicCropModal";
+// import PanoramicCropModal from "./PanoramicCropModal";
 
 interface ReportHeaderProps {
   isAutoSaving?: boolean;
@@ -12,9 +12,9 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
   const cacpmInputRef = useRef<HTMLInputElement>(null);
   const koicaInputRef = useRef<HTMLInputElement>(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalSrc, setModalSrc] = useState<string | null>(null);
-  const [modalTarget, setModalTarget] = useState<"cacpm" | "koica" | null>(null);
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [modalSrc, setModalSrc] = useState<string | null>(null);
+  // const [modalTarget, setModalTarget] = useState<"cacpm" | "koica" | null>(null);
 
   // Load custom logos from localStorage on mount
   useEffect(() => {
@@ -24,6 +24,37 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
     if (savedCacpm) setCacpmLogo(savedCacpm);
     if (savedKoica) setKoicaLogo(savedKoica);
   }, []);
+
+  const resizeImageWithFixedHeight = (dataUrl: string, fixedHeight: number, logoType: "cacpm" | "koica") => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Calculate width to maintain aspect ratio with fixed height
+      const aspectRatio = img.width / img.height;
+      const newWidth = Math.round(fixedHeight * aspectRatio);  // Calculate width for 94px height
+      
+      canvas.width = newWidth;  // Width calculated to maintain aspect ratio
+      canvas.height = fixedHeight; // Fixed at 94px
+      
+      // Draw image with correct aspect ratio
+      ctx.drawImage(img, 0, 0, newWidth, fixedHeight);
+      
+      // Save to localStorage
+      const resizedDataUrl = canvas.toDataURL('image/png');
+      
+      if (logoType === "cacpm") {
+        setCacpmLogo(resizedDataUrl);
+        localStorage.setItem("customCacpmLogo", resizedDataUrl);
+      } else {
+        setKoicaLogo(resizedDataUrl);
+        localStorage.setItem("customKoicaLogo", resizedDataUrl);
+      }
+    };
+    img.src = dataUrl;
+  };
 
   const handleLogoClick = (logoType: "cacpm" | "koica") => {
     if (logoType === "cacpm") {
@@ -40,53 +71,44 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       alert("Please select a valid image file.");
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5MB.");
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
-      // Open the crop modal to enforce the 2.68:1 cropping workflow
-      setModalSrc(result);
-      setModalTarget(logoType);
-      setIsModalOpen(true);
+      // Use the resize function with original width + fixed height
+      resizeImageWithFixedHeight(result, 94, logoType);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleModalSave = (dataUrl: string) => {
-    if (modalTarget === "cacpm") {
-      setCacpmLogo(dataUrl);
-      localStorage.setItem("customCacpmLogo", dataUrl);
-    } else if (modalTarget === "koica") {
-      setKoicaLogo(dataUrl);
-      localStorage.setItem("customKoicaLogo", dataUrl);
-    }
-    setIsModalOpen(false);
-    setModalSrc(null);
-    setModalTarget(null);
-  };
+  // const handleModalSave = (dataUrl: string) => {
+  //   if (modalTarget === "cacpm") {
+  //     setCacpmLogo(dataUrl);
+  //     localStorage.setItem("customCacpmLogo", dataUrl);
+  //   } else if (modalTarget === "koica") {
+  //     setKoicaLogo(dataUrl);
+  //     localStorage.setItem("customKoicaLogo", dataUrl);
+  //   }
+  //   setIsModalOpen(false);
+  //   setModalSrc(null);
+  //   setModalTarget(null);
+  // };
 
-  const handleModalCancel = () => {
-    setIsModalOpen(false);
-    setModalSrc(null);
-    setModalTarget(null);
-  };
+  // const handleModalCancel = () => {
+  //   setIsModalOpen(false);
+  //   setModalSrc(null);
+  //   setModalTarget(null);
+  // };
 
   return (
     <header className="report-header py-4 px-6 shadow-lg">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div
-          className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+          className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative border-2 border-dashed border-gray-300 hover:border-gray-400"
           style={{ width: 140, height: 48 }}
           onClick={() => handleLogoClick("cacpm")}
           title="Click to replace CACPM logo"
@@ -127,7 +149,7 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
 
         <div className="flex items-center space-x-4">
           <div
-            className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+            className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative border-2 border-dashed border-gray-300 hover:border-gray-400"
             style={{ width: 140, height: 48 }}
             onClick={() => handleLogoClick("koica")}
             title="Click to replace KOICA logo"
@@ -143,9 +165,9 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
         </div>
       </div>
 
-      {isModalOpen && modalSrc && (
+      {/* {isModalOpen && modalSrc && (
         <PanoramicCropModal src={modalSrc} onCancel={handleModalCancel} onSave={handleModalSave} />
-      )}
+      )} */}
 
       {/* Hidden file inputs */}
       <input

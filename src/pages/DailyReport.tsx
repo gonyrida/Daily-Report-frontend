@@ -1350,6 +1350,10 @@ const DailyReport = () => {
         };
       }));
 
+      // Get custom logos from localStorage for combined mode
+      const cacpmLogo = localStorage.getItem("customCacpmLogo");
+      const koicaLogo = localStorage.getItem("customKoicaLogo");
+
       // Use same payload as export
       const payload = {
         mode: "combined",
@@ -1379,6 +1383,10 @@ const DailyReport = () => {
           ),
           description: carSheet.description || "",
           photo_groups: processedCar,
+          logos: {
+            cacpm: cacpmLogo,
+            koica: koicaLogo,
+          }
         },
       };
 
@@ -1510,6 +1518,10 @@ const DailyReport = () => {
         photo_groups: processedCar,
       };
 
+      // Get custom logos from localStorage for combined mode
+      const cacpmLogo = localStorage.getItem("customCacpmLogo");
+      const koicaLogo = localStorage.getItem("customKoicaLogo");
+
       // Generate PDF
       const pdfResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
         mode: "combined",
@@ -1526,6 +1538,10 @@ const DailyReport = () => {
               };
             })
           ),
+          logos: {
+            cacpm: cacpmLogo,
+            koica: koicaLogo,
+          },
         },
       });
 
@@ -1543,6 +1559,10 @@ const DailyReport = () => {
             };
           })
         ),
+        logos: {
+          cacpm: cacpmLogo,
+          koica: koicaLogo,
+        }
       });
 
       if (!pdfResponse.ok || !excelResponse.ok) {

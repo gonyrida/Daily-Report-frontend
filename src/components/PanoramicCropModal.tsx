@@ -58,12 +58,29 @@ const PanoramicCropModal: React.FC<Props> = ({ src, onCancel, onSave }) => {
 
   const handleSave = async () => {
     try {
+      // Get the original image dimensions
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.crossOrigin = "anonymous";
+        i.onload = () => resolve(i);
+        i.onerror = (e) => reject(e);
+        i.src = src;
+      });
+
+      // Calculate width to maintain original aspect ratio with fixed height
+      const originalAspectRatio = img.width / img.height;
+      const fixedHeight = 94;
+      const calculatedWidth = Math.round(fixedHeight * originalAspectRatio);
+
       const result = await exportCroppedImage(src, {
         rotation,
         scale,
         offset,
         viewport: { width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT },
-        output: { width: Math.round(94 * 2.68), height: 94 },
+        output: { 
+          width: calculatedWidth,  // Dynamic based on original aspect ratio
+          height: fixedHeight      // Fixed at 94
+        },
         fillWhite: bgWhite,
       });
       onSave(result);
