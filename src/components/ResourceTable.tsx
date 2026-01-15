@@ -70,8 +70,8 @@ const ResourceTable = ({
 
           const updatedRow = { ...row, [field]: value };
           if (field === "prev" || field === "today") {
-            const prev = field === "prev" ? Number(value) : row.prev;
-            const today = field === "today" ? Number(value) : row.today;
+            const prev = field === "prev" ? Number(value) || 0 : row.prev;
+            const today = field === "today" ? Number(value) || 0 : row.today;
             updatedRow.accumulated = prev + today;
           }
           return updatedRow;
@@ -260,9 +260,19 @@ const ResourceTable = ({
                         </td>
                       )}
                       <td className="px-3 py-2">
-                        <div className="text-center text-muted-foreground font-medium">
-                          {row.prev || 0}
-                        </div>
+                        <Input
+                          type="number"
+                          value={row.prev || ""}
+                          onChange={(e) =>
+                            updateRow(
+                              row.id,
+                              "prev",
+                              Number(e.target.value) || 0
+                            )
+                          }
+                          placeholder="0"
+                          className="border-0 bg-transparent text-center focus-visible:ring-1"
+                        />
                       </td>
                       <td className="px-3 py-2">
                         <Input
