@@ -11,6 +11,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import DailyReport from "./pages/DailyReport";
+import WeeklyReport from "./pages/WeeklyReport";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -52,6 +53,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DailyReport />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/weekly-report"
+              element={
+                <ProtectedRoute>
+                  <WeeklyReport />
                 </ProtectedRoute>
               }
             />

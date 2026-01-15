@@ -43,6 +43,7 @@ import {
   ArrowLeft,
   Edit,
   Trash2,
+  BarChart3,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
@@ -279,6 +280,15 @@ const Dashboard = () => {
                       <Link to="/daily-report">
                         <FileText className="h-4 w-4" />
                         <span>Daily Report</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/weekly-report">
+                        <BarChart3 className="h-4 w-4" />
+                        <span>Weekly Report</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
