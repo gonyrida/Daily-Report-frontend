@@ -14,7 +14,7 @@ import DailyReport from "./pages/DailyReport";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
-import SecureTokenInitializer from "./components/SecureTokenInitializer";
+// import SecureTokenInitializer from "./components/SecureTokenInitializer";
 
 const queryClient = new QueryClient();
 
@@ -22,7 +22,7 @@ const App = () => (
   <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SecureTokenInitializer />
+        {/* <SecureTokenInitializer /> */}
         <Toaster />
         <Sonner />
         <BrowserRouter>

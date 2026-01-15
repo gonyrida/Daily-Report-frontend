@@ -28,15 +28,25 @@ export const pythonApiFetch = async (url: string, options: PythonApiFetchOptions
     headers: Object.keys(headers) 
   });
 
-  // Prepare headers - NO Authorization header for Python API
-  // Python backend expects cookies, not Authorization headers
+  // Prepare headers - Authorization header for Python API <Temporary>
+  // Python backend expects either cookies or Authorization headers
   const requestHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     ...headers,
   };
 
-  // DO NOT add Authorization header - Python backend uses cookies
-  console.log("🔒 PYTHON API: Using cookie-based authentication (no Authorization header)");
+  // ADD Authorization header for cross-domain requests
+  const token = localStorage.getItem("authToken");
+  if (token) {
+    requestHeaders["Authorization"] = `Bearer ${token}`;
+    console.log("🔒 PYTHON API: Using Authorization header for authentication");
+  } else {
+    console.log("🔒 PYTHON API: No token found, will rely on cookies");
+  }
+  console.log("🔒 PYTHON API: Request headers:", requestHeaders);
+
+  // Add Authorization header - Python backend uses cookies or Authorization header
+  // console.log("🔒 PYTHON API: Using cookie-based authentication (no Authorization header)");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);

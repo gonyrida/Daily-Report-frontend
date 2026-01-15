@@ -62,6 +62,12 @@ const Login = () => {
         throw new Error(result.message || "Login failed");
       }
 
+      // Store token for Authorization header
+      if (result.token) {
+        localStorage.setItem("authToken", result.token);
+        console.log("🔑 Stored auth token in localStorage");
+      }
+
       // Store user info for Python API authentication (token is now in HTTP-only cookie)
       localStorage.setItem("user", JSON.stringify(result.user));
       if (data.rememberMe) {
