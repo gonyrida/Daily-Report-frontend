@@ -83,7 +83,7 @@ export default function CARSection({ car, setCar }: Props) {
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Description of Required Condition:</label>
-        <textarea value={car.description} onChange={(e) => setCar({ ...car, description: e.target.value })} className="w-full p-3 border rounded-md" rows={4} placeholder="Enter global description for CAR sheet" />
+        <textarea value={car.description} onChange={(e) => setCar({ ...car, description: e.target.value })} className="w-full p-3 border rounded-md bg-background text-foreground" rows={4} placeholder="Enter global description for CAR sheet" />
       </div>
 
       <CarBulkDropZone onFiles={onFiles} />

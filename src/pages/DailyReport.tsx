@@ -52,6 +52,7 @@ import {
   PYTHON_API_BASE_URL 
 } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -1844,14 +1845,20 @@ const DailyReport = () => {
 
       {/* Back Button */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/dashboard")}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Button>
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+
+          <div className="flex items-center">
+            <ThemeToggle />
+          </div>
+        </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
