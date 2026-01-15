@@ -31,8 +31,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Bell,
-  Settings,
   LayoutDashboard,
   FileText,
   LogOut,
@@ -48,7 +46,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
-import NotificationsDropdown from "@/components/NotificationsDropdown";
+import ProfileIcon from "@/components/ProfileIcon";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport } from "@/integrations/reportsApi";
 
 interface Report {
@@ -63,29 +62,20 @@ interface Report {
   isRecentlyEdited?: boolean;
 }
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-}
-
 const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [reports, setReports] = useState<Report[]>([]);
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
 
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        // Use new getRecentReports API - sorted by updatedAt automatically
-        const userReports = await getRecentReports(50, filterStatus === "all" ? undefined : filterStatus);
+        // Use new getRecentReports API - fetch ALL reports without status filter
+        const userReports = await getRecentReports(50);
         setReports(userReports.data || []);
         setFilteredReports(userReports.data || []);
       } catch (error) {
@@ -101,15 +91,15 @@ const Dashboard = () => {
     };
 
     fetchReports();
-  }, [toast, filterStatus]);
+  }, [toast]);
 
   // Filter reports based on search query and status
   useEffect(() => {
     let filtered = reports;
 
-    // Filter by status
+    // Filter by status (case-insensitive)
     if (filterStatus !== "all") {
-      filtered = filtered.filter(report => report.status === filterStatus);
+      filtered = filtered.filter(report => report.status.toLowerCase() === filterStatus.toLowerCase());
     }
 
     // Filter by search query
@@ -168,7 +158,7 @@ const Dashboard = () => {
       });
       
       // Refresh the reports list
-      const userReports = await getRecentReports(50, filterStatus === "all" ? undefined : filterStatus);
+      const userReports = await getRecentReports(50);
       setReports(userReports.data || []);
       setFilteredReports(userReports.data || []);
     } catch (error) {
@@ -223,42 +213,6 @@ const Dashboard = () => {
         return <Badge variant="outline">Not Started</Badge>;
     }
   };
-
-  // Notification handlers
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-  };
-
-  const handleDeleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-
-  const handleClearAllNotifications = () => {
-    setNotifications([]);
-  };
-
-  // Initialize some sample notifications
-  useEffect(() => {
-    const sampleNotifications: Notification[] = [
-      {
-        id: '1',
-        title: 'Report Reminder',
-        message: 'Don\'t forget to submit your daily report for today',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-        read: false,
-      },
-      {
-        id: '2',
-        title: 'Report Submitted',
-        message: 'Your report for yesterday has been successfully submitted',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-        read: true,
-      },
-    ];
-    setNotifications(sampleNotifications);
-  }, []);
 
   if (isLoading) {
     return (
@@ -364,18 +318,10 @@ const Dashboard = () => {
                 />
               </div>
               
-              <NotificationsDropdown
-                notifications={notifications}
-                onMarkAsRead={handleMarkAsRead}
-                onDelete={handleDeleteNotification}
-                onClearAll={handleClearAllNotifications}
-              />
-              <Button variant="ghost" size="icon">
-                <Settings className="h-4 w-4" />
-              </Button>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                <span className="text-sm font-medium">U</span>
-              </div>
+              {/* Theme Toggle */}
+              <ThemeToggle />
+              
+              <ProfileIcon />
             </div>
           </header>
 
@@ -404,9 +350,10 @@ const Dashboard = () => {
                       <div className="text-2xl font-bold">
                         {new Date().toLocaleDateString()}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Status: {getStatusBadge("not-started")}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground">Status:</span>
+                        {getStatusBadge("not-started")}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -446,41 +393,41 @@ const Dashboard = () => {
             </div>
 
             {/* Recent Documents */}
-            {filteredReports.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Recent Documents ({filteredReports.length})
-                    </div>
-                    {/* Filter Buttons */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant={filterStatus === "all" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFilterStatus("all")}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        variant={filterStatus === "draft" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFilterStatus("draft")}
-                      >
-                        Draft
-                      </Button>
-                      <Button
-                        variant={filterStatus === "submitted" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFilterStatus("submitted")}
-                      >
-                        Submitted
-                      </Button>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Recent Documents ({filteredReports.length})
+                  </div>
+                  {/* Filter Buttons */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={filterStatus === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterStatus("all")}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={filterStatus === "draft" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterStatus("draft")}
+                    >
+                      Draft
+                    </Button>
+                    <Button
+                      variant={filterStatus === "submitted" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterStatus("submitted")}
+                    >
+                      Submitted
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredReports.length > 0 ? (
                   <div className="space-y-3">
                     {filteredReports.map((report) => (
                       <div
@@ -560,9 +507,18 @@ const Dashboard = () => {
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {filterStatus === "submitted" 
+                      ? "No submitted reports found" 
+                      : filterStatus === "draft" 
+                      ? "No draft reports found"
+                      : "No reports found"
+                    }
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </main>
         </SidebarInset>
       </div>

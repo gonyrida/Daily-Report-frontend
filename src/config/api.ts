@@ -14,6 +14,21 @@ const getApiBaseUrl = (): string => {
   return "http://localhost:5000/api";
 };
 
+// Determine static files base URL based on environment (without /api)
+const getStaticBaseUrl = (): string => {
+  // Always prefer VITE_API_BASE_URL if defined, but remove /api
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+  }
+
+  // If not defined, use production URL in production mode, localhost in development
+  if (import.meta.env.MODE === "production") {
+    return "https://daily-report-backend.onrender.com";
+  }
+
+  return "http://localhost:5000";
+};
+
 // Determine Python API base URL based on environment
 const getPythonApiBaseUrl = (): string => {
   // Always prefer VITE_PYTHON_API_BASE_URL if defined
@@ -30,6 +45,7 @@ const getPythonApiBaseUrl = (): string => {
 };
 
 export const API_BASE_URL = getApiBaseUrl();
+export const STATIC_BASE_URL = getStaticBaseUrl();
 export const PYTHON_API_BASE_URL = getPythonApiBaseUrl();
 
 export const API_ENDPOINTS = {
@@ -40,6 +56,12 @@ export const API_ENDPOINTS = {
     VERIFY: `${API_BASE_URL}/auth/verify`,
     FORGOT_PASSWORD: `${API_BASE_URL}/auth/forgot-password`,
     RESET_PASSWORD: `${API_BASE_URL}/auth/reset-password`,
+    PROFILE: `${API_BASE_URL}/auth/profile`,
+    CHANGE_PASSWORD: `${API_BASE_URL}/auth/change-password`,
+  },
+  USER: {
+    PROFILE: `${API_BASE_URL}/auth/profile`,
+    UPLOAD_PICTURE: `${API_BASE_URL}/images/upload-profile`,
   },
   DAILY_REPORTS: {
     BASE: `${API_BASE_URL}/daily-reports`,
