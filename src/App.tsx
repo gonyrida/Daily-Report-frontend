@@ -14,6 +14,7 @@ import DailyReport from "./pages/DailyReport";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
+import FloatingScrollButton from './components/FloatingScrollButton';
 // import SecureTokenInitializer from "./components/SecureTokenInitializer";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DailyReport />
+                  <FloatingScrollButton />
                 </ProtectedRoute>
               }
             />
