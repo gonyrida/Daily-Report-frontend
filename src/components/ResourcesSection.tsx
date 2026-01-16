@@ -13,15 +13,41 @@ interface ResourcesSectionProps {
 }
 // add more options as needed
 const MANAGEMENT_OPTIONS = [
+  "Architecture",
+  "Site Manager",
+  "Architect Manager",
   "Project Manager",
   "Construction Manager",
   "QS Engineer",
-  "Architect Engineer",
   "MEP Engineer",
   "Site Engineer",
 ];
 
-const WORKING_TEAM_OPTIONS = ["Foreman", "Skill Workers", "General Workers"];
+const WORKING_TEAM_OPTIONS = ["Site Manager", "Site Engineer","Foreman", "Skill Workers", "General Workers"];
+
+const MACHINERY_OPTIONS = [
+  "Truck",
+  "Excavator",
+  "Bulldozer",
+  "Generator",
+  "Cargo Crane",
+  "Container",
+  "Concrete Finished",
+  "Pump Car",
+  "Concrete Mixer Car",
+  "Concrete Cutting Machine",
+  "Auto Level Machine",
+];
+
+const MATERIAL_OPTIONS = [
+  "Cement",
+  "Sand",
+  "Brick",
+  "Scaffolding",
+  "Electricity Tape",
+  "Rebar DB16",
+  "Rebar DB10",
+];
 const ResourcesSection = ({
   managementTeam,
   setManagementTeam,
@@ -63,6 +89,8 @@ const ResourcesSection = ({
           icon={<Package className="w-5 h-5 text-warning" />}
           rows={materials}
           setRows={setMaterials}
+          useDropdown={true}
+          dropdownOptions={MATERIAL_OPTIONS}
           showUnit
         />
 
@@ -71,6 +99,8 @@ const ResourcesSection = ({
           icon={<Truck className="w-5 h-5 text-success" />}
           rows={machinery}
           setRows={setMachinery}
+          useDropdown={true}
+          dropdownOptions={MACHINERY_OPTIONS}
           showUnit
         />
       </div>
