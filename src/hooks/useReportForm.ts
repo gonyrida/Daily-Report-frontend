@@ -10,8 +10,9 @@ import {
 } from "@/lib/storageUtils";
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF, exportToExcel, exportToZIP } from "@/lib/exportUtils";
-import { saveReportToDB, submitReportToDB } from "@/integrations/reportsApi";
+import { saveReportToDB, submitReportToDB, createBlankReport, autoSaveReport } from "@/integrations/reportsApi";
 import { generateCombinedExcel } from "@/integrations/reportsApi";
+import { apiGet } from "@/lib/apiFetch";
 
 export const useReportForm = () => {
   // Project Info
@@ -36,6 +37,11 @@ export const useReportForm = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Google Docs-style state
+  const [reportId, setReportId] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
 
   // Helper to package all state into the ReportData format
   const getReportData = useCallback(
@@ -88,21 +94,37 @@ export const useReportForm = () => {
   }, []);
 
   const loadInitialReport = useCallback(async () => {
-    if (!reportDate || initialLoadDoneRef.current) return;
+    if (!reportDate || initialLoadDoneRef.current) {
+      console.log("🔒 LOAD INITIAL: Skipping - no date or already loaded");
+      return;
+    }
+    
+    // CRITICAL: Only load after authentication is confirmed
+    console.log("🔒 LOAD INITIAL: Starting report load for date:", reportDate);
     initialLoadDoneRef.current = true;
 
     try {
       const dbReport = await loadReportFromDB(reportDate);
       if (dbReport) {
+        console.log("🔒 LOAD INITIAL: Found DB report, filling form");
         fillForm(dbReport);
       } else {
+        console.log("🔒 LOAD INITIAL: No DB report, checking local draft");
         const localDraft = loadDraftLocally(reportDate);
-        if (localDraft) fillForm(localDraft);
+        if (localDraft) {
+          console.log("🔒 LOAD INITIAL: Found local draft, filling form");
+          fillForm(localDraft);
+        } else {
+          console.log("🔒 LOAD INITIAL: No draft found, using defaults");
+        }
       }
     } catch (e) {
-      console.error("Failed to load report:", e);
+      console.error("🔒 LOAD INITIAL: Failed to load report:", e);
       const localDraft = loadDraftLocally(reportDate);
-      if (localDraft) fillForm(localDraft);
+      if (localDraft) {
+        console.log("🔒 LOAD INITIAL: Fallback to local draft");
+        fillForm(localDraft);
+      }
     }
   }, [reportDate, fillForm]);
 
@@ -120,7 +142,111 @@ export const useReportForm = () => {
     setWorkingTeam([]);
     setMaterials([]);
     setMachinery([]);
+    setReportId(null);
+    setLastSavedAt(null);
   }, []);
+
+  // Google Docs-style: Create blank report immediately
+  const createNewBlankReport = useCallback(async (projectName?: string) => {
+    try {
+      setIsSaving(true);
+      console.log("🔒 CREATE BLANK: Creating new blank report");
+      
+      const result = await createBlankReport(projectName);
+      
+      if (result.success && result.data) {
+        setReportId(result.data._id);
+        setProjectName(result.data.projectName);
+        setReportDate(new Date(result.data.reportDate));
+        setLastSavedAt(new Date(result.data.updatedAt));
+        
+        console.log("🔒 CREATE BLANK: Success, reportId:", result.data._id);
+        
+        toast({
+          title: "New Report Created",
+          description: "Your blank report is ready. Start typing to begin!",
+        });
+        
+        return result.data;
+      }
+    } catch (error: any) {
+      console.error("🔒 CREATE BLANK: Error:", error);
+      toast({
+        title: "Failed to Create Report",
+        description: error.message || "Could not create new report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [toast]);
+
+  // Google Docs-style: Auto-save with debounce
+  const debouncedAutoSave = useRef<NodeJS.Timeout | null>(null);
+  
+  const triggerAutoSave = useCallback((partialData: Partial<ReportData>) => {
+    if (!reportId) {
+      console.log("🔒 AUTO-SAVE: No reportId, skipping auto-save");
+      return;
+    }
+
+    if (debouncedAutoSave.current) {
+      clearTimeout(debouncedAutoSave.current);
+    }
+
+    debouncedAutoSave.current = setTimeout(async () => {
+      try {
+        setIsAutoSaving(true);
+        console.log("🔒 AUTO-SAVE: Triggering auto-save for reportId:", reportId);
+        
+        const result = await autoSaveReport(reportId, partialData);
+        
+        if (result.success) {
+          setLastSavedAt(new Date());
+          console.log("🔒 AUTO-SAVE: Success");
+        }
+      } catch (error: any) {
+        console.error("🔒 AUTO-SAVE: Error:", error);
+        // Silent fail for auto-save to not interrupt user
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, 1000); // 1 second debounce
+  }, [reportId]);
+
+  // Watch for changes and trigger auto-save
+  useEffect(() => {
+    if (!reportId) return;
+
+    const currentData = {
+      projectName,
+      reportDate: reportDate?.toISOString(),
+      weather,
+      weatherPeriod,
+      temperature,
+      activityToday,
+      workPlanNextDay,
+      managementTeam,
+      workingTeam,
+      materials,
+      machinery,
+    };
+
+    triggerAutoSave(currentData);
+  }, [
+    projectName,
+    reportDate,
+    weather,
+    weatherPeriod,
+    temperature,
+    activityToday,
+    workPlanNextDay,
+    managementTeam,
+    workingTeam,
+    materials,
+    machinery,
+    triggerAutoSave,
+  ]);
 
   // Your logic moved into the hook
   useEffect(() => {
@@ -170,8 +296,11 @@ export const useReportForm = () => {
     lastDateRef.current = newDateStr;
   }, [reportDate, getReportData, fillForm, clearForm]);
 
-  // Move the "On Mount" trigger inside the hook!
+  // CRITICAL: Only load data after auth success
   useEffect(() => {
+    console.log("🔒 USE FORM: Component mounted, waiting for auth confirmation");
+    // Note: This will only execute if component is wrapped in ProtectedRoute
+    // which ensures authentication is confirmed before rendering
     loadInitialReport();
   }, [loadInitialReport]);
 
@@ -482,7 +611,7 @@ export const useReportForm = () => {
           if (typeof img === "string") {
             if (!img.startsWith("blob:")) return img;
 
-            const resp = await fetch(img);
+            const resp = await apiGet(img);
             const blob = await resp.blob();
 
             return await new Promise<string>((resolve, reject) => {
@@ -721,6 +850,12 @@ export const useReportForm = () => {
     isSubmitting,
     setIsSubmitting,
 
+    // Google Docs-style State
+    reportId,
+    setReportId,
+    lastSavedAt,
+    isAutoSaving,
+
     // Helper
     getReportData,
 
@@ -742,5 +877,9 @@ export const useReportForm = () => {
     handleExportCombinedExcel,
     handleClear,
     handleSubmit,
+
+    // Google Docs-style Functions
+    createNewBlankReport,
+    triggerAutoSave,
   };
 };

@@ -52,7 +52,6 @@ export default function ReferenceSection({ sections, setSections, onExportRefere
       </div>
 
       <div className="mt-4">
-        {/* Visual-only Table Title (UI placeholder only; no state/wiring) */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-muted-foreground mb-2">Table Title</label>
           <Input 

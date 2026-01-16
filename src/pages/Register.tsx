@@ -18,7 +18,9 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { apiPost } from "@/lib/apiFetch";
 import { API_ENDPOINTS } from "@/config/api";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const registerSchema = z
   .object({
@@ -157,16 +159,10 @@ const Register = () => {
     setError(null);
 
     try {
-      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName: data.fullName,
-          email: data.email,
-          password: data.password,
-        }),
+      const response = await apiPost(API_ENDPOINTS.AUTH.REGISTER, {
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password,
       });
 
       const result = await response.json();
@@ -174,6 +170,9 @@ const Register = () => {
       if (!response.ok) {
         throw new Error(result.message || "Registration failed");
       }
+
+      // JWT is stored in HttpOnly cookies by the backend
+      // No localStorage storage needed for security
 
       toast({
         title: "Registration successful",
@@ -189,7 +188,12 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-background relative">
+      {/* Theme Toggle in top-right corner */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
@@ -322,13 +326,13 @@ const Register = () => {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <span className="text-sm text-gray-600">
+          <div className="mt-4 text-center">
+            <span className="text-sm text-muted-foreground">
               Already have an account?{" "}
             </span>
             <Link
               to="/login"
-              className="text-sm text-blue-600 hover:text-blue-500"
+              className="text-sm text-primary hover:underline"
             >
               Sign in
             </Link>

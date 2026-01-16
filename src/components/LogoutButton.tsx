@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { API_ENDPOINTS } from "@/config/api";
+import { logoutUser } from "@/integrations/authApi";
 
 const LogoutButton = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -26,25 +26,11 @@ const LogoutButton = () => {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
-      if (token) {
-        const response = await fetch(API_ENDPOINTS.AUTH.LOGOUT, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      // Use proper cookie-based logout
+      await logoutUser();
 
-        if (!response.ok) {
-          console.warn(
-            "Logout API call failed, but proceeding with local logout"
-          );
-        }
-      }
-
-      // Clear local storage
-      localStorage.removeItem("token");
-      localStorage.removeItem("rememberMe");
+      // JWT is stored in HttpOnly cookies - no localStorage cleanup needed
+      console.log("🔒 LOGOUT: JWT cookies cleared by backend");
 
       toast({
         title: "Logged out successfully",
@@ -54,9 +40,7 @@ const LogoutButton = () => {
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
-      // Still clear local storage and redirect even if API call fails
-      localStorage.removeItem("token");
-      localStorage.removeItem("rememberMe");
+      // Still redirect to login even if API call fails
       navigate("/login");
     } finally {
       setIsLoading(false);

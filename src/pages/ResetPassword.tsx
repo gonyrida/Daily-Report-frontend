@@ -18,6 +18,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { apiPost } from "@/lib/apiFetch";
 import { API_ENDPOINTS } from "@/config/api";
 
 const resetPasswordSchema = z
@@ -196,16 +197,9 @@ const ResetPassword = () => {
     setError(null);
 
     try {
-      console.log("1000000000000000000000000");
-      const response = await fetch(API_ENDPOINTS.AUTH.RESET_PASSWORD, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          newPassword: data.password,
-        }),
+      const response = await apiPost(API_ENDPOINTS.AUTH.RESET_PASSWORD, {
+        token,
+        newPassword: data.password,
       });
 
       const result = await response.json();

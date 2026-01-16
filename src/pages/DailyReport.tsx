@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import ReportHeader from "@/components/ReportHeader";
 import ProjectInfo from "@/components/ProjectInfo";
 import ActivitySection from "@/components/ActivitySection";
@@ -22,6 +23,7 @@ import {
   FileSpreadsheet,
   FileText,
   FileType,
+  ArrowLeft,
 } from "lucide-react";
 import { ResourceRow } from "@/components/ResourceTable";
 import {
@@ -37,122 +39,20 @@ import {
   generateCombinedExcel,
   generateCombinedPDF
 } from "@/integrations/reportsApi";
-import { saveReportToDB, loadReportFromDB, submitReportToDB } from "@/integrations/reportsApi";
-import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
-
-// // Helper function to get auth headers
-// const getAuthHeaders = () => {
-//   const token = localStorage.getItem("token");
-//   return {
-//     "Content-Type": "application/json",
-//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//   };
-// };
-
-// // API functions
-// const saveReportToDB = async (reportData: ReportData) => {
-//   console.log(
-//     "DEBUG FRONTEND: saveReportToDB called with endpoint:",
-//     API_ENDPOINTS.DAILY_REPORTS.SAVE
-//   );
-//   console.log("DEBUG FRONTEND: saveReportToDB auth headers:", getAuthHeaders());
-
-//   try {
-//     const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SAVE, {
-//       method: "POST",
-//       headers: getAuthHeaders(),
-//       body: JSON.stringify(reportData),
-//     });
-
-//     console.log(
-//       "DEBUG FRONTEND: saveReportToDB response status:",
-//       response.status
-//     );
-//     console.log("DEBUG FRONTEND: saveReportToDB response ok:", response.ok);
-
-//     if (!response.ok) {
-//       const errorText = await response.text();
-//       console.error(
-//         "DEBUG FRONTEND: saveReportToDB error response:",
-//         errorText
-//       );
-//       const error = await response
-//         .json()
-//         .catch(() => ({ message: "Failed to save report" }));
-//       throw new Error(error.message || "Failed to save report");
-//     }
-
-//     const result = await response.json();
-//     console.log("DEBUG FRONTEND: saveReportToDB success:", result);
-//     return result;
-//   } catch (error) {
-//     console.error("DEBUG FRONTEND: saveReportToDB exception:", error);
-//     throw error;
-//   }
-// };
-
-// const submitReportToDB = async (projectName: string, reportDate: Date) => {
-//   const dateStr = reportDate.toISOString().split("T")[0];
-//   const response = await fetch(API_ENDPOINTS.DAILY_REPORTS.SUBMIT, {
-//     method: "POST",
-//     headers: getAuthHeaders(),
-//     body: JSON.stringify({ projectName, date: dateStr }),
-//   });
-//   if (!response.ok) {
-//     const error = await response
-//       .json()
-//       .catch(() => ({ message: "Failed to submit report" }));
-//     throw new Error(error.message || "Failed to submit report");
-//   }
-//   return response.json();
-// };
-
-// // FIXED: Removed duplicate "daily-reports" from path
-// const loadReportFromDB = async (reportDate: Date, projectName?: string) => {
-//   try {
-//     const dateStr = reportDate.toISOString().split("T")[0];
-//     const token = localStorage.getItem("token"); // get token from login
-
-//     if (!token) {
-//       throw new Error("No authentication token found. Please log in.");
-//     }
-
-//     // Build URL with optional projectName query parameter
-//     let url = API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr);
-//     if (projectName && projectName.trim()) {
-//       url += `?projectName=${encodeURIComponent(projectName)}`;
-//     }
-
-//     const response = await fetch(url, {
-//       method: "GET",
-//       headers: {
-//         "Content-Type": "application/json",
-//         Authorization: `Bearer ${token}`, // send token to backend
-//       },
-//     });
-
-//     // 404 is expected when no report exists for this date - return null silently
-//     if (response.status === 404) {
-//       return null; // report not found - this is normal for new dates
-//     }
-
-//     if (!response.ok) {
-//       throw new Error(`Failed to load report: ${response.statusText}`);
-//     }
-
-//     return response.json(); // return report data
-//   } catch (err) {
-//     // Only log errors that are not 404 (which is expected)
-//     if (err instanceof Error && !err.message.includes("404")) {
-//       console.error("Error loading report:", err);
-//     }
-//     // Re-throw only if it's not a handled 404
-//     if (err instanceof Error && err.message.includes("404")) {
-//       return null;
-//     }
-//     throw err;
-//   }
-// };
+import {
+  saveReportToDB,
+  loadReportFromDB,
+  loadReportById,
+  submitReportToDB,
+  deleteReport,
+  autoSaveReport,
+} from "@/integrations/reportsApi";
+import { 
+  API_ENDPOINTS,
+  PYTHON_API_BASE_URL 
+} from "@/config/api";
+import { pythonApiPost } from "../lib/pythonApiFetch";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -216,8 +116,11 @@ interface ReportData {
   referenceSections?: Section[];
 }
 
-const Index = () => {
+const DailyReport = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reportIdFromUrl = searchParams.get('reportId');
 
   // Project Info
   const [projectName, setProjectName] = useState("");
@@ -255,6 +158,11 @@ const Index = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Google Docs-style auto-save state
+  const [reportId, setReportId] = useState<string | null>(reportIdFromUrl);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -313,19 +221,32 @@ const Index = () => {
     ]
   );
 
-  // Load report on mount - Try DB first, fallback to localStorage (only on first mount)
+  // Load report on mount - Try ID first, then DB by date, fallback to localStorage (only on first mount)
   useEffect(() => {
     const loadInitialReport = async () => {
-      if (!reportDate || initialLoadDoneRef.current) return; // Only load on first mount
+      if (initialLoadDoneRef.current) return; // Only load on first mount
 
       initialLoadDoneRef.current = true;
 
       try {
-        // Try to load from database first
-        const dbReport = await loadReportFromDB(reportDate);
+        let dbReport = null;
+
+        // First, try to load by reportId if provided in URL
+        if (reportIdFromUrl) {
+          console.log("🔍 DAILY REPORT: Loading report by ID:", reportIdFromUrl);
+          dbReport = await loadReportById(reportIdFromUrl);
+          console.log("🔍 DAILY REPORT: Report by ID result:", dbReport ? "FOUND" : "NOT FOUND");
+        }
+
+        // If no report by ID, try loading by date
+        if (!dbReport && reportDate) {
+          console.log("Loading report by date:", reportDate);
+          dbReport = await loadReportFromDB(reportDate);
+        }
 
         if (dbReport) {
           // Load from database
+          setReportId(dbReport._id || reportIdFromUrl);
           setProjectName(dbReport.projectName || "");
           setReportDate(
             dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
@@ -447,7 +368,7 @@ const Index = () => {
     };
 
     loadInitialReport();
-  }, [reportDate]); // Include reportDate to satisfy ESLint
+  }, [reportDate, reportIdFromUrl]); // Include reportDate and reportIdFromUrl to satisfy ESLint
 
   // Handle date change: save current, carry forward between dates, load or clear on first selection
   useEffect(() => {
@@ -711,6 +632,77 @@ const Index = () => {
     }, 30000);
     return () => clearInterval(interval);
   }, [saveDraft]);
+
+  // Google Docs-style: Auto-save with debounce
+  const debouncedAutoSave = useRef<NodeJS.Timeout | null>(null);
+  
+  const triggerAutoSave = useCallback((partialData: Partial<ReportData>) => {
+    if (!reportId) {
+      console.log("🔒 AUTO-SAVE: No reportId, skipping auto-save");
+      return;
+    }
+
+    if (debouncedAutoSave.current) {
+      clearTimeout(debouncedAutoSave.current);
+    }
+
+    debouncedAutoSave.current = setTimeout(async () => {
+      try {
+        setIsAutoSaving(true);
+        console.log("🔒 AUTO-SAVE: Triggering auto-save for reportId:", reportId);
+        
+        const result = await autoSaveReport(reportId, partialData);
+        
+        if (result.success) {
+          setLastSavedAt(new Date());
+          console.log("🔒 AUTO-SAVE: Success");
+        }
+      } catch (error: any) {
+        console.error("🔒 AUTO-SAVE: Error:", error);
+        // Silent fail for auto-save to not interrupt user
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, 1000); // 1 second debounce
+  }, [reportId]);
+
+  // Watch for changes and trigger auto-save
+  useEffect(() => {
+    if (!reportId) return;
+
+    const currentData = {
+      projectName,
+      reportDate: reportDate?.toISOString(),
+      weatherAM,
+      weatherPM,
+      tempAM,
+      tempPM,
+      currentPeriod,
+      activityToday,
+      workPlanNextDay,
+      managementTeam,
+      workingTeam,
+      materials,
+      machinery,
+    };
+
+    triggerAutoSave(currentData);
+  }, [
+    projectName,
+    reportDate,
+    weatherAM,
+    weatherPM,
+    tempAM,
+    tempPM,
+    currentPeriod,
+    activityToday,
+    workPlanNextDay,
+    managementTeam,
+    workingTeam,
+    materials,
+    machinery,
+    triggerAutoSave,
+  ]);
 
   const validateReport = (): boolean => {
     if (!projectName.trim()) {
@@ -1120,40 +1112,6 @@ const Index = () => {
     }
   };
 
-  const handleExportDocs = async () => {
-    if (!validateReport()) return;
-
-    setIsExporting(true);
-    try {
-      await exportToWord({
-        projectName,
-        reportDate,
-        weatherAM,
-        weatherPM,
-        tempAM,
-        tempPM,
-        activityToday,
-        workPlanNextDay,
-        managementTeam,
-        workingTeam,
-        materials,
-        machinery,
-      });
-      toast({
-        title: "Word Document Exported",
-        description:
-          "Your report has been exported as Word document successfully.",
-      });
-    } catch (e) {
-      toast({
-        title: "Export Failed",
-        description: "Could not export Word document. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setIsExporting(false);
-  };
-
   const handleExportCombinedPDF = async () => {
     if (!validateReport()) return;
 
@@ -1393,6 +1351,10 @@ const Index = () => {
         };
       }));
 
+      // Get custom logos from localStorage for combined mode
+      const cacpmLogo = localStorage.getItem("customCacpmLogo");
+      const koicaLogo = localStorage.getItem("customKoicaLogo");
+
       // Use same payload as export
       const payload = {
         mode: "combined",
@@ -1422,15 +1384,15 @@ const Index = () => {
           ),
           description: carSheet.description || "",
           photo_groups: processedCar,
+          logos: {
+            cacpm: cacpmLogo,
+            koica: koicaLogo,
+          }
         },
       };
 
       // Get Excel data as blob
-      const response = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
 
       if (response.ok) {
         const blob = await response.blob();
@@ -1557,34 +1519,14 @@ const Index = () => {
         photo_groups: processedCar,
       };
 
-      // Generate PDF
-      const pdfResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "combined",
-          data: {
-            ...reportPayload,
-            table_title: tableTitle,
-            reference: processedSections.flatMap((section: any) =>
-              (section.entries ?? []).map((entry: any) => {
-                const slots = entry.slots ?? [];
-                return {
-                  section_title: section.title || "",
-                  images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                  footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-                };
-              })
-            ),
-          },
-        }),
-      });
+      // Get custom logos from localStorage for combined mode
+      const cacpmLogo = localStorage.getItem("customCacpmLogo");
+      const koicaLogo = localStorage.getItem("customKoicaLogo");
 
-      // Generate Excel
-      const excelResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // Generate PDF
+      const pdfResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
+        mode: "combined",
+        data: {
           ...reportPayload,
           table_title: tableTitle,
           reference: processedSections.flatMap((section: any) =>
@@ -1597,7 +1539,31 @@ const Index = () => {
               };
             })
           ),
-        }),
+          logos: {
+            cacpm: cacpmLogo,
+            koica: koicaLogo,
+          },
+        },
+      });
+
+      // Generate Excel
+      const excelResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, {
+        ...reportPayload,
+        table_title: tableTitle,
+        reference: processedSections.flatMap((section: any) =>
+          (section.entries ?? []).map((entry: any) => {
+            const slots = entry.slots ?? [];
+            return {
+              section_title: section.title || "",
+              images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+              footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+            };
+          })
+        ),
+        logos: {
+          cacpm: cacpmLogo,
+          koica: koicaLogo,
+        }
       });
 
       if (!pdfResponse.ok || !excelResponse.ok) {
@@ -1640,6 +1606,40 @@ const Index = () => {
     } finally {
       setIsExportingCombined(false);
     }
+  };
+
+  const handleExportDocs = async () => {
+    if (!validateReport()) return;
+
+    setIsExporting(true);
+    try {
+      await exportToWord({
+        projectName,
+        reportDate,
+        weatherAM,
+        weatherPM,
+        tempAM,
+        tempPM,
+        activityToday,
+        workPlanNextDay,
+        managementTeam,
+        workingTeam,
+        materials,
+        machinery,
+      });
+      toast({
+        title: "Word Document Exported",
+        description:
+          "Your report has been exported as Word document successfully.",
+      });
+    } catch (e) {
+      toast({
+        title: "Export Failed",
+        description: "Could not export Word document. Please try again.",
+        variant: "destructive",
+      });
+    }
+    setIsExporting(false);
   };
 
   const handleExportAll = async () => {
@@ -1806,9 +1806,60 @@ const Index = () => {
     setIsSubmitting(false);
   };
 
+  const handleDelete = async () => {
+    if (!reportIdFromUrl) {
+      toast({
+        title: "Error",
+        description: "Cannot delete: No report ID found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await deleteReport(reportIdFromUrl);
+      
+      toast({
+        title: "Report Deleted",
+        description: "The report has been deleted successfully",
+      });
+      
+      // Navigate back to dashboard after deletion
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Deletion Failed",
+        description: error instanceof Error ? error.message : "Failed to delete report",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <ReportHeader />
+      <ReportHeader 
+        isAutoSaving={isAutoSaving}
+        lastSavedAt={lastSavedAt}
+      />
+
+      {/* Back Button */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+
+          <div className="flex items-center">
+            <ThemeToggle />
+          </div>
+        </div>
+      </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <ProjectInfo
@@ -1859,6 +1910,8 @@ const Index = () => {
           onExportAll={handleExportAll}
           onClear={handleClear}
           onSubmit={handleSubmit}
+          onDelete={handleDelete}
+          reportId={reportIdFromUrl}
           isPreviewing={isPreviewing}
           isExporting={isExporting}
           isSubmitting={isSubmitting}
@@ -2009,4 +2062,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default DailyReport;
