@@ -20,7 +20,7 @@ export const pythonApiFetch = async (url: string, options: PythonApiFetchOptions
     method = "POST",
     body,
     headers = {},
-    timeout = 30000, // Longer timeout for Excel generation
+    timeout = 300000, // Longer timeout for Excel generation
   } = options;
 
   console.log(`🔒 PYTHON API FETCH: ${method} ${url}`, { 
