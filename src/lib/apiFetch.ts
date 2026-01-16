@@ -25,11 +25,18 @@ export const apiFetch = async (url: string, options: ApiFetchOptions = {}): Prom
     headers: Object.keys(headers) 
   });
 
-  // SECURITY: NEVER allow Authorization headers
-  if (headers.authorization || headers.Authorization) {
-    console.error('🚨 SECURITY: Authorization header detected - removing for cookie-based auth');
-    delete headers.authorization;
-    delete headers.Authorization;
+  // // SECURITY: NEVER allow Authorization headers
+  // if (headers.authorization || headers.Authorization) {
+  //   console.error('🚨 SECURITY: Authorization header detected - removing for cookie-based auth');
+  //   delete headers.authorization;
+  //   delete headers.Authorization;
+  // }
+
+  // Add localStorage token as fallback
+  const token = localStorage.getItem('authToken');
+  if (token && !headers['X-Auth-Token']) {
+    headers['X-Auth-Token'] = token;
+    console.log('🔑 Adding localStorage token to X-Auth-Token header');
   }
 
   const controller = new AbortController();
