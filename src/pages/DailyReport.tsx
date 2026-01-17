@@ -977,138 +977,6 @@ const DailyReport = () => {
     setShowFileNameDialog(true);
   };
 
-  // const handleExportCombinedExcelWithFilename = async (fileName: string) => {
-  //   setIsExportingCombined(true);
-  //   try {
-  //     // DEBUG: Add frontend log before saving
-  //     console.log(
-  //       "DEBUG FRONTEND: About to save report to DB before combined export"
-  //     );
-
-  //     // Step 1: Save report to database first (same logic as submit)
-  //     const rawData = getReportData();
-  //     const cleanedData = {
-  //       ...rawData,
-  //       managementTeam: cleanResourceRows(rawData.managementTeam),
-  //       workingTeam: cleanResourceRows(rawData.workingTeam),
-  //       materials: cleanResourceRows(rawData.materials),
-  //       machinery: cleanResourceRows(rawData.machinery),
-  //     };
-
-  //     // Save to database
-  //     await saveReportToDB(cleanedData);
-
-  //     // DEBUG: Confirm save completed
-  //     console.log(
-  //       "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
-  //     );
-
-  //     const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
-  //       if (!img) return null;
-
-  //       // Case 1: already a string (blob URL, data URL, http URL, etc.)
-  //       if (typeof img === "string") {
-  //         if (!img.startsWith("blob:")) return img;
-
-  //         const resp = await fetch(img);
-  //         const blob = await resp.blob();
-
-  //         return await new Promise<string>((resolve, reject) => {
-  //           const reader = new FileReader();
-  //           reader.onloadend = () => resolve(String(reader.result));
-  //           reader.onerror = reject;
-  //           reader.readAsDataURL(blob);
-  //         });
-  //       }
-
-  //       // Case 2: File object (common)
-  //       if (img instanceof File) {
-  //         return await new Promise<string>((resolve, reject) => {
-  //           const reader = new FileReader();
-  //           reader.onloadend = () => resolve(String(reader.result));
-  //           reader.onerror = reject;
-  //           reader.readAsDataURL(img);
-  //         });
-  //       }
-
-  //       // Case 3: unknown object shape (skip it safely)
-  //       return null;
-  //     };
-
-  //     const processImages = async (sectionsArr: Section[]) => {
-  //       return await Promise.all(
-  //         sectionsArr.map(async (sec: Section) => {
-  //           const newEntries = await Promise.all(
-  //             (sec.entries ?? []).map(async (entry: Entry) => {
-  //               const newSlots = await Promise.all(
-  //                 (entry.slots ?? []).map(async (slot: Slot) => ({
-  //                   ...slot,
-  //                   image: await toBase64DataUrl(slot.image),
-  //                 }))
-  //               );
-  //               return { ...entry, slots: newSlots };
-  //             })
-  //           );
-  //           return { ...sec, entries: newEntries };
-  //         })
-  //       );
-  //     };
-
-  //     const processedSections = await processImages(referenceSections);
-
-  //     // Process CAR data
-  //     const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-  //       const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-  //         (await toBase64DataUrl(img)) || ""
-  //       ));
-  //       return { 
-  //         date: g.date || "", 
-  //         images: [imgs[0] || "", imgs[1] || ""], 
-  //         footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-  //       };
-  //     }));
-
-  //     const reportPayload = {
-  //       projectName,
-  //       reportDate: reportDate?.toISOString(),
-  //       weatherAM,
-  //       weatherPM,
-  //       tempAM,
-  //       tempPM,
-  //       activityToday,
-  //       workPlanNextDay,
-  //       managementTeam,
-  //       workingTeam,
-  //       materials,
-  //       machinery,
-  //       description: carSheet.description || "",
-  //       photo_groups: processedCar
-  //     };
-
-  //     await generateCombinedExcel(
-  //       reportPayload,
-  //       processedSections,
-  //       tableTitle,
-  //       fileName
-  //     );
-
-  //     toast({
-  //       title: "Combined Excel Exported",
-  //       description: "Report saved to database and exported successfully.",
-  //     });
-  //   } catch (e) {
-  //     console.error("Combined Export Error:", e);
-  //     toast({
-  //       variant: "destructive",
-  //       title: "Export Failed",
-  //       description:
-  //         "Could not save report or generate combined Excel. Please try again.",
-  //     });
-  //   } finally {
-  //     setIsExportingCombined(false);
-  //   }
-  // };
-
   const handleExportCombinedExcelWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
@@ -1218,15 +1086,19 @@ const DailyReport = () => {
 
           if (statusData.status === 'SUCCESS') {
             isDone = true;
-            
+            const finalFileId = statusData.file_id || statusData.info || result.file_id;
             // 3. Final Step: Trigger the download
             // We use the file_id returned by the status or the initial request
-            const downloadUrl = `${PYTHON_API_BASE_URL}/download/${result.file_id}/excel`;
+            const downloadUrl = `${PYTHON_API_BASE_URL}/download/${finalFileId}/excel?name=${encodeURIComponent(fileName)}`;
             
             // Create a hidden link to trigger download
             const link = document.createElement("a");
             link.href = downloadUrl;
-            link.setAttribute("download", fileName || "report.xlsm");
+            const extension = ".xlsm";
+            const finalFileName = fileName.toLowerCase().endsWith(extension) 
+              ? fileName 
+              : `${fileName}${extension}`;
+            link.setAttribute("download", finalFileName);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1374,15 +1246,19 @@ const DailyReport = () => {
 
           if (statusData.status === 'SUCCESS') {
             isDone = true;
-            
+            const finalFileId = statusData.file_id || statusData.info || result.file_id;
             // 3. Final Step: Trigger the download
             // We use the file_id returned by the status or the initial request
-            const downloadUrl = `${PYTHON_API_BASE_URL}/download/${result.file_id}/pdf`;
+            const downloadUrl = `${PYTHON_API_BASE_URL}/download/${finalFileId}/pdf?name=${encodeURIComponent(fileName)}`;
             
             // Create a hidden link to trigger download
             const link = document.createElement("a");
             link.href = downloadUrl;
-            link.setAttribute("download", fileName || "report.pdf");
+            const extension = ".pdf";
+            const finalFileName = fileName.toLowerCase().endsWith(extension) 
+              ? fileName 
+              : `${fileName}${extension}`;
+            link.setAttribute("download", finalFileName);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1411,43 +1287,181 @@ const DailyReport = () => {
     }
   };
 
+  // const handlePreviewCombined = async () => {
+  //   if (!validateReport()) return;
+  //   setIsPreviewingCombined(true);  // Start loading
+  //   try {
+  //     // Process images to base64 data URLs (same as export)
+  //     const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+  //       if (!img) return null;
+
+  //       // Case 1: already a string (blob URL, data URL, http URL, etc.)
+  //       if (typeof img === "string") {
+  //         if (img.startsWith("data:")) return img; // Already a data URL
+  //         if (img.startsWith("blob:")) {
+  //           // Convert blob URL to data URL
+  //           try {
+  //             const response = await fetch(img);
+  //             const blob = await response.blob();
+  //             return new Promise((resolve) => {
+  //               const reader = new FileReader();
+  //               reader.onload = () => resolve(reader.result as string);
+  //               reader.readAsDataURL(blob);
+  //             });
+  //           } catch {
+  //             return null;
+  //           }
+  //         }
+  //         return img; // Return as-is for http URLs etc.
+  //       }
+
+  //       // Case 2: File object
+  //       if (img instanceof File) {
+  //         return new Promise((resolve) => {
+  //           const reader = new FileReader();
+  //           reader.onload = () => resolve(reader.result as string);
+  //           reader.readAsDataURL(img);
+  //         });
+  //       }
+
+  //       return null;
+  //     };
+
+  //     const processImages = async (sectionsArr: Section[]) => {
+  //       return await Promise.all(
+  //         sectionsArr.map(async (sec: Section) => {
+  //           const newEntries = await Promise.all(
+  //             (sec.entries ?? []).map(async (entry: any) => {
+  //               const newSlots = await Promise.all(
+  //                 (entry.slots ?? []).map(async (slot: Slot) => ({
+  //                   ...slot,
+  //                   image: await toBase64DataUrl(slot.image),
+  //                 }))
+  //               );
+  //               return { ...entry, slots: newSlots };
+  //             })
+  //           );
+  //           return { ...sec, entries: newEntries };
+  //         })
+  //       );
+  //     };
+
+  //     const processedSections = await processImages(referenceSections);
+
+  //     // Process CAR data
+  //     const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
+  //       const imgs = await Promise.all((g.images || []).map(async (img: any) => 
+  //         (await toBase64DataUrl(img)) || ""
+  //       ));
+  //       return { 
+  //         date: g.date || "", 
+  //         images: [imgs[0] || "", imgs[1] || ""], 
+  //         footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
+  //       };
+  //     }));
+
+  //     // Get custom logos from localStorage for combined mode
+  //     const cacpmLogo = localStorage.getItem("customCacpmLogo");
+  //     const koicaLogo = localStorage.getItem("customKoicaLogo");
+
+  //     // Use same payload as export
+  //     const payload = {
+  //       mode: "combined",
+  //       data: {
+  //         projectName,
+  //         reportDate,
+  //         weatherAM,
+  //         weatherPM,
+  //         tempAM,
+  //         tempPM,
+  //         activityToday,
+  //         workPlanNextDay,
+  //         managementTeam,
+  //         workingTeam,
+  //         materials,
+  //         machinery,
+  //         table_title: tableTitle,
+  //         reference: processedSections.flatMap((section: any) =>
+  //           (section.entries ?? []).map((entry: any) => {
+  //             const slots = entry.slots ?? [];
+  //             return {
+  //               section_title: section.title || "",
+  //               images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+  //               footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+  //             };
+  //           })
+  //         ),
+  //         description: carSheet.description || "",
+  //         photo_groups: processedCar,
+  //         logos: {
+  //           cacpm: cacpmLogo,
+  //           koica: koicaLogo,
+  //         }
+  //       },
+  //     };
+
+  //     // Get Excel data as blob
+  //     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
+
+  //     if (response.ok) {
+  //       const blob = await response.blob();
+  //       const url = URL.createObjectURL(blob);
+  //       window.open(url, '_blank');  // This will show PDF in browser
+  //     }
+  //   } catch (error) {
+  //     toast({
+  //       title: "Preview Failed",
+  //       description: "Could not generate preview.",
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setIsPreviewingCombined(false);  // End loading
+  //   }
+  // };
+
   const handlePreviewCombined = async () => {
-    if (!validateReport()) return;
-    setIsPreviewingCombined(true);  // Start loading
+    setIsPreviewingCombined(true);
     try {
-      // Process images to base64 data URLs (same as export)
+      // Generate default filename if not provided
+      const finalFileName = `Combined_Preview_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]}`;
+
+      console.log("DEBUG FRONTEND: About to save report to DB before combined export");
+
+      // Step 1: Save report to database first
+      const rawData = getReportData();
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+      };
+
+      await saveReportToDB(cleanedData);
+      console.log("DEBUG FRONTEND: Save to DB completed successfully");
+
+      // --- [IMAGE PROCESSING LOGIC REMAINS THE SAME] ---
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
-
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
         if (typeof img === "string") {
-          if (img.startsWith("data:")) return img; // Already a data URL
-          if (img.startsWith("blob:")) {
-            // Convert blob URL to data URL
-            try {
-              const response = await fetch(img);
-              const blob = await response.blob();
-              return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-              });
-            } catch {
-              return null;
-            }
-          }
-          return img; // Return as-is for http URLs etc.
-        }
-
-        // Case 2: File object
-        if (img instanceof File) {
-          return new Promise((resolve) => {
+          if (!img.startsWith("blob:")) return img;
+          const resp = await fetch(img);
+          const blob = await resp.blob();
+          return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+        if (img instanceof File) {
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
             reader.readAsDataURL(img);
           });
         }
-
         return null;
       };
 
@@ -1455,7 +1469,7 @@ const DailyReport = () => {
         return await Promise.all(
           sectionsArr.map(async (sec: Section) => {
             const newEntries = await Promise.all(
-              (sec.entries ?? []).map(async (entry: any) => {
+              (sec.entries ?? []).map(async (entry: Entry) => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
@@ -1472,7 +1486,6 @@ const DailyReport = () => {
 
       const processedSections = await processImages(referenceSections);
 
-      // Process CAR data
       const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
         const imgs = await Promise.all((g.images || []).map(async (img: any) => 
           (await toBase64DataUrl(img)) || ""
@@ -1484,62 +1497,64 @@ const DailyReport = () => {
         };
       }));
 
-      // Get custom logos from localStorage for combined mode
-      const cacpmLogo = localStorage.getItem("customCacpmLogo");
-      const koicaLogo = localStorage.getItem("customKoicaLogo");
-
-      // Use same payload as export
-      const payload = {
-        mode: "combined",
-        data: {
-          projectName,
-          reportDate,
-          weatherAM,
-          weatherPM,
-          tempAM,
-          tempPM,
-          activityToday,
-          workPlanNextDay,
-          managementTeam,
-          workingTeam,
-          materials,
-          machinery,
-          table_title: tableTitle,
-          reference: processedSections.flatMap((section: any) =>
-            (section.entries ?? []).map((entry: any) => {
-              const slots = entry.slots ?? [];
-              return {
-                section_title: section.title || "",
-                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-              };
-            })
-          ),
-          description: carSheet.description || "",
-          photo_groups: processedCar,
-          logos: {
-            cacpm: cacpmLogo,
-            koica: koicaLogo,
-          }
-        },
+      const reportPayload = {
+        projectName,
+        reportDate: reportDate?.toISOString(),
+        weatherAM, weatherPM, tempAM, tempPM,
+        activityToday, workPlanNextDay,
+        managementTeam, workingTeam, materials, machinery,
+        description: carSheet.description || "",
+        photo_groups: processedCar
       };
 
-      // Get Excel data as blob
-      const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
+      // --- [THE NEW ASYNC POLLING LOGIC] ---
+      
+      // 1. Trigger the job (using the new unified function)
+      const result = await generateCombinedReport(
+        reportPayload,
+        processedSections,
+        'pdf', // format
+        tableTitle,
+        finalFileName
+      );
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');  // This will show PDF in browser
+      if (result.success && result.job_id) {
+        let isDone = false;
+        
+        // 2. Poll the status until finished
+        while (!isDone) {
+          // Wait 3 seconds between checks
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
+          const statusData = await statusResponse.json();
+
+          if (statusData.status === 'SUCCESS') {
+            isDone = true;
+            const finalFileId = statusData.file_id || statusData.info || result.file_id;
+            // 3. Final Step: Trigger the download
+            // We use the file_id returned by the status or the initial request
+            const previewUrl = `${PYTHON_API_BASE_URL}/download/${finalFileId}/pdf?name=${encodeURIComponent(finalFileName)}&preview=true`;
+            
+            // Open PDF in new tab instead of downloading
+            window.open(previewUrl, '_blank');
+          } 
+          else if (statusData.status === 'FAILURE') {
+            throw new Error(statusData.info || "Python backend failed to generate file.");
+          }
+          // If status is 'PENDING' or 'PROCESSING', the loop continues...
+        }
       }
-    } catch (error) {
+
+    } catch (e) {
+      console.error("Combined Export Error:", e);
       toast({
+        variant: "destructive",
         title: "Preview Failed",
         description: "Could not generate preview.",
-        variant: "destructive",
       });
     } finally {
-      setIsPreviewingCombined(false);  // End loading
+      setIsPreviewingCombined(false);
     }
   };
 
@@ -1556,7 +1571,9 @@ const DailyReport = () => {
   const handleExportCombinedZIPWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
-      // Step 1: Save report to database first (same logic as combined Excel)
+      console.log("DEBUG FRONTEND: About to save report to DB before combined export");
+
+      // Step 1: Save report to database first
       const rawData = getReportData();
       const cleanedData = {
         ...rawData,
@@ -1566,38 +1583,31 @@ const DailyReport = () => {
         machinery: cleanResourceRows(rawData.machinery),
       };
 
-      // Save to database
       await saveReportToDB(cleanedData);
-      // Process images for both exports
+      console.log("DEBUG FRONTEND: Save to DB completed successfully");
+
+      // --- [IMAGE PROCESSING LOGIC REMAINS THE SAME] ---
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
-
         if (typeof img === "string") {
-          if (img.startsWith("data:")) return img;
-          if (img.startsWith("blob:")) {
-            try {
-              const response = await fetch(img);
-              const blob = await response.blob();
-              return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-              });
-            } catch {
-              return null;
-            }
-          }
-          return img;
-        }
-
-        if (img instanceof File) {
-          return new Promise((resolve) => {
+          if (!img.startsWith("blob:")) return img;
+          const resp = await fetch(img);
+          const blob = await resp.blob();
+          return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+        if (img instanceof File) {
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
             reader.readAsDataURL(img);
           });
         }
-
         return null;
       };
 
@@ -1605,7 +1615,7 @@ const DailyReport = () => {
         return await Promise.all(
           sectionsArr.map(async (sec: Section) => {
             const newEntries = await Promise.all(
-              (sec.entries ?? []).map(async (entry: any) => {
+              (sec.entries ?? []).map(async (entry: Entry) => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
@@ -1622,7 +1632,6 @@ const DailyReport = () => {
 
       const processedSections = await processImages(referenceSections);
 
-      // Process CAR data
       const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
         const imgs = await Promise.all((g.images || []).map(async (img: any) => 
           (await toBase64DataUrl(img)) || ""
@@ -1634,107 +1643,75 @@ const DailyReport = () => {
         };
       }));
 
-      // Generate both files
       const reportPayload = {
         projectName,
-        reportDate,
-        weatherAM,
-        weatherPM,
-        tempAM,
-        tempPM,
-        activityToday,
-        workPlanNextDay,
-        managementTeam,
-        workingTeam,
-        materials,
-        machinery,
+        reportDate: reportDate?.toISOString(),
+        weatherAM, weatherPM, tempAM, tempPM,
+        activityToday, workPlanNextDay,
+        managementTeam, workingTeam, materials, machinery,
         description: carSheet.description || "",
-        photo_groups: processedCar,
+        photo_groups: processedCar
       };
 
-      // Get custom logos from localStorage for combined mode
-      const cacpmLogo = localStorage.getItem("customCacpmLogo");
-      const koicaLogo = localStorage.getItem("customKoicaLogo");
+      // --- [THE NEW ASYNC POLLING LOGIC] ---
+      
+      // 1. Trigger the job (using the new unified function)
+      const result = await generateCombinedReport(
+        reportPayload,
+        processedSections,
+        'zip', // format
+        tableTitle,
+        fileName
+      );
 
-      // Generate PDF
-      const pdfResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        mode: "combined",
-        data: {
-          ...reportPayload,
-          table_title: tableTitle,
-          reference: processedSections.flatMap((section: any) =>
-            (section.entries ?? []).map((entry: any) => {
-              const slots = entry.slots ?? [];
-              return {
-                section_title: section.title || "",
-                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-              };
-            })
-          ),
-          logos: {
-            cacpm: cacpmLogo,
-            koica: koicaLogo,
-          },
-        },
-      });
+      if (result.success && result.job_id) {
+        let isDone = false;
+        
+        // 2. Poll the status until finished
+        while (!isDone) {
+          // Wait 3 seconds between checks
+          await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Generate Excel
-      const excelResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, {
-        ...reportPayload,
-        table_title: tableTitle,
-        reference: processedSections.flatMap((section: any) =>
-          (section.entries ?? []).map((entry: any) => {
-            const slots = entry.slots ?? [];
-            return {
-              section_title: section.title || "",
-              images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-              footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-            };
-          })
-        ),
-        logos: {
-          cacpm: cacpmLogo,
-          koica: koicaLogo,
+          const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
+          const statusData = await statusResponse.json();
+
+          if (statusData.status === 'SUCCESS') {
+            isDone = true;
+            const finalFileId = statusData.file_id || statusData.info || result.file_id;
+            // 3. Final Step: Trigger the download
+            // We use the file_id returned by the status or the initial request
+            const downloadUrl = `${PYTHON_API_BASE_URL}/download/${finalFileId}/zip?name=${encodeURIComponent(fileName)}`;
+            
+            // Create a hidden link to trigger download
+            const link = document.createElement("a");
+            link.href = downloadUrl;
+            const extension = ".zip";
+            const finalFileName = fileName.toLowerCase().endsWith(extension) 
+              ? fileName 
+              : `${fileName}${extension}`;
+            link.setAttribute("download", finalFileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast({
+              title: "Export Ready",
+              description: "The combined report has been generated and downloaded.",
+            });
+          } 
+          else if (statusData.status === 'FAILURE') {
+            throw new Error(statusData.info || "Python backend failed to generate file.");
+          }
+          // If status is 'PENDING' or 'PROCESSING', the loop continues...
         }
-      });
-
-      if (!pdfResponse.ok || !excelResponse.ok) {
-        throw new Error("Failed to generate files");
       }
 
-      // Create ZIP file
-      const JSZip = await import('jszip');
-      const zip = new JSZip.default();
-
-      const pdfBlob = await pdfResponse.blob();
-      const excelBlob = await excelResponse.blob();
-
-      zip.file(`${fileName}.pdf`, pdfBlob);
-      zip.file(`${fileName}.xlsm`, excelBlob);
-
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      
-      // Download ZIP
-      const url = window.URL.createObjectURL(zipBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${fileName}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
+    } catch (e) {
+      console.error("Combined Export Error:", e);
       toast({
-        title: "Combined ZIP Exported",
-        description: "Both PDF and Excel files have been exported as ZIP.",
-      });
-    } catch (error) {
-      console.error("Combined ZIP export error:", error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to generate combined ZIP.",
         variant: "destructive",
+        title: "Export Failed",
+        description: e instanceof Error ? e.message : "Could not generate report. Please try again.",
       });
     } finally {
       setIsExportingCombined(false);
