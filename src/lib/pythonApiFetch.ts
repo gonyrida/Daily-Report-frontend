@@ -95,3 +95,15 @@ export const pythonApiPost = (url: string, body: any, headers?: Record<string, s
  */
 export const pythonApiGet = (url: string, headers?: Record<string, string>) => 
   pythonApiFetch(url, { method: "GET", headers });
+
+/**
+ * Helper to specifically handle JSON responses from the Python API
+ */
+export const pythonApiFetchJson = async (url: string, options: PythonApiFetchOptions = {}) => {
+  const response = await pythonApiFetch(url, options);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API Error (${response.status}): ${errorText}`);
+  }
+  return response.json();
+};

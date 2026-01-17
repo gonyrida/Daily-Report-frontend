@@ -34,10 +34,7 @@ import {
 } from "@/lib/exportUtils";
 import { useToast } from "@/hooks/use-toast";
 import {
-  generatePythonExcel,
-  generateReferenceExcel,
-  generateCombinedExcel,
-  generateCombinedPDF
+  generateCombinedReport
 } from "@/integrations/reportsApi";
 import {
   saveReportToDB,
@@ -51,7 +48,7 @@ import {
   API_ENDPOINTS,
   PYTHON_API_BASE_URL 
 } from "@/config/api";
-import { pythonApiPost } from "../lib/pythonApiFetch";
+import { pythonApiPost, pythonApiGet } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Local Storage helpers (for offline drafts)
@@ -800,34 +797,34 @@ const DailyReport = () => {
     setIsPreviewing(false);
   };
 
-  const handleDownloadFromPreview = async () => {
-    try {
-      await exportToPDF({
-        projectName,
-        reportDate,
-        weatherAM,
-        weatherPM,
-        tempAM,
-        tempPM,
-        activityToday,
-        workPlanNextDay,
-        managementTeam,
-        workingTeam,
-        materials,
-        machinery,
-      });
-      toast({
-        title: "PDF Exported",
-        description: "Your report has been exported as PDF successfully.",
-      });
-    } catch (e) {
-      toast({
-        title: "Export Failed",
-        description: "Could not export PDF. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+  // const handleDownloadFromPreview = async () => {
+  //   try {
+  //     await exportToPDF({
+  //       projectName,
+  //       reportDate,
+  //       weatherAM,
+  //       weatherPM,
+  //       tempAM,
+  //       tempPM,
+  //       activityToday,
+  //       workPlanNextDay,
+  //       managementTeam,
+  //       workingTeam,
+  //       materials,
+  //       machinery,
+  //     });
+  //     toast({
+  //       title: "PDF Exported",
+  //       description: "Your report has been exported as PDF successfully.",
+  //     });
+  //   } catch (e) {
+  //     toast({
+  //       title: "Export Failed",
+  //       description: "Could not export PDF. Please try again.",
+  //       variant: "destructive",
+  //     });
+  //   }
+  // };
 
   const handleExportExcel = async () => {
     if (!validateReport()) return;
@@ -842,130 +839,130 @@ const DailyReport = () => {
     setShowFileNameDialog(true);
   };
 
-  const handleExportExcelWithFilename = async (fileName: string) => {
-    setIsExporting(true);
-    try {
-      // Prepare payload for Python backend
-      const payload = {
-        projectName,
-        reportDate: reportDate?.toISOString(),
-        weatherAM,
-        weatherPM,
-        tempAM,
-        tempPM,
-        activityToday,
-        workPlanNextDay,
-        managementTeam,
-        workingTeam,
-        materials,
-        machinery,
-      };
+  // const handleExportExcelWithFilename = async (fileName: string) => {
+  //   setIsExporting(true);
+  //   try {
+  //     // Prepare payload for Python backend
+  //     const payload = {
+  //       projectName,
+  //       reportDate: reportDate?.toISOString(),
+  //       weatherAM,
+  //       weatherPM,
+  //       tempAM,
+  //       tempPM,
+  //       activityToday,
+  //       workPlanNextDay,
+  //       managementTeam,
+  //       workingTeam,
+  //       materials,
+  //       machinery,
+  //     };
 
-      // Call Python API with custom filename
-      await generatePythonExcel(payload, "report", fileName);
+  //     // Call Python API with custom filename
+  //     await generatePythonExcel(payload, "report", fileName);
 
-      toast({
-        title: "Excel Exported",
-        description: "Your report has been exported successfully.",
-      });
-    } catch (error) {
-      console.error("Export Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Export Failed",
-        description:
-          "Could not connect to Python server. Ensure it's running on port 5001.",
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  //     toast({
+  //       title: "Excel Exported",
+  //       description: "Your report has been exported successfully.",
+  //     });
+  //   } catch (error) {
+  //     console.error("Export Error:", error);
+  //     toast({
+  //       variant: "destructive",
+  //       title: "Export Failed",
+  //       description:
+  //         "Could not connect to Python server. Ensure it's running on port 5001.",
+  //     });
+  //   } finally {
+  //     setIsExporting(false);
+  //   }
+  // };
 
-  const handleExportReference = async () => {
-    // Generate default filename
-    const defaultFileName = `reference_${
-      reportDate?.toISOString().split("T")[0] || "export"
-    }`;
+  // const handleExportReference = async () => {
+  //   // Generate default filename
+  //   const defaultFileName = `reference_${
+  //     reportDate?.toISOString().split("T")[0] || "export"
+  //   }`;
 
-    // Show file name dialog
-    setPendingExportType("reference");
-    setShowFileNameDialog(true);
-  };
+  //   // Show file name dialog
+  //   setPendingExportType("reference");
+  //   setShowFileNameDialog(true);
+  // };
 
-  const handleExportReferenceWithFilename = async (fileName: string) => {
-    setIsExportingReference(true);
-    try {
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
-        if (!img) return null;
+  // const handleExportReferenceWithFilename = async (fileName: string) => {
+  //   setIsExportingReference(true);
+  //   try {
+  //     const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+  //       if (!img) return null;
 
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
-        if (typeof img === "string") {
-          if (!img.startsWith("blob:")) return img;
+  //       // Case 1: already a string (blob URL, data URL, http URL, etc.)
+  //       if (typeof img === "string") {
+  //         if (!img.startsWith("blob:")) return img;
 
-          const resp = await fetch(img);
-          const blob = await resp.blob();
+  //         const resp = await fetch(img);
+  //         const blob = await resp.blob();
 
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-        }
+  //         return await new Promise<string>((resolve, reject) => {
+  //           const reader = new FileReader();
+  //           reader.onloadend = () => resolve(String(reader.result));
+  //           reader.onerror = reject;
+  //           reader.readAsDataURL(blob);
+  //         });
+  //       }
 
-        // Case 2: File object (common)
-        if (img instanceof File) {
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(img);
-          });
-        }
+  //       // Case 2: File object (common)
+  //       if (img instanceof File) {
+  //         return await new Promise<string>((resolve, reject) => {
+  //           const reader = new FileReader();
+  //           reader.onloadend = () => resolve(String(reader.result));
+  //           reader.onerror = reject;
+  //           reader.readAsDataURL(img);
+  //         });
+  //       }
 
-        // Case 3: unknown object shape (skip it safely)
-        return null;
-      };
+  //       // Case 3: unknown object shape (skip it safely)
+  //       return null;
+  //     };
 
-      const processImages = async (sectionsArr: Section[]) => {
-        return await Promise.all(
-          sectionsArr.map(async (sec: Section) => {
-            const newEntries = await Promise.all(
-              (sec.entries ?? []).map(async (entry: Entry) => {
-                const newSlots = await Promise.all(
-                  (entry.slots ?? []).map(async (slot: Slot) => ({
-                    ...slot,
-                    image: await toBase64DataUrl(slot.image),
-                  }))
-                );
-                return { ...entry, slots: newSlots };
-              })
-            );
-            return { ...sec, entries: newEntries };
-          })
-        );
-      };
+  //     const processImages = async (sectionsArr: Section[]) => {
+  //       return await Promise.all(
+  //         sectionsArr.map(async (sec: Section) => {
+  //           const newEntries = await Promise.all(
+  //             (sec.entries ?? []).map(async (entry: Entry) => {
+  //               const newSlots = await Promise.all(
+  //                 (entry.slots ?? []).map(async (slot: Slot) => ({
+  //                   ...slot,
+  //                   image: await toBase64DataUrl(slot.image),
+  //                 }))
+  //               );
+  //               return { ...entry, slots: newSlots };
+  //             })
+  //           );
+  //           return { ...sec, entries: newEntries };
+  //         })
+  //       );
+  //     };
 
-      const processedSections = await processImages(referenceSections);
+  //     const processedSections = await processImages(referenceSections);
 
-      await generateReferenceExcel(processedSections, tableTitle, fileName);
+  //     await generateReferenceExcel(processedSections, tableTitle, fileName);
 
-      toast({
-        title: "Reference Excel Exported",
-        description: "Reference section exported successfully.",
-      });
-    } catch (e) {
-      console.error("Reference Export Error:", e);
-      toast({
-        variant: "destructive",
-        title: "Export Failed",
-        description:
-          "Could not generate reference Excel. Ensure Python server is running.",
-      });
-    } finally {
-      setIsExportingReference(false);
-    }
-  };
+  //     toast({
+  //       title: "Reference Excel Exported",
+  //       description: "Reference section exported successfully.",
+  //     });
+  //   } catch (e) {
+  //     console.error("Reference Export Error:", e);
+  //     toast({
+  //       variant: "destructive",
+  //       title: "Export Failed",
+  //       description:
+  //         "Could not generate reference Excel. Ensure Python server is running.",
+  //     });
+  //   } finally {
+  //     setIsExportingReference(false);
+  //   }
+  // };
 
   const handleExportCombinedExcel = async () => {
     if (!validateReport()) return;
@@ -980,15 +977,144 @@ const DailyReport = () => {
     setShowFileNameDialog(true);
   };
 
+  // const handleExportCombinedExcelWithFilename = async (fileName: string) => {
+  //   setIsExportingCombined(true);
+  //   try {
+  //     // DEBUG: Add frontend log before saving
+  //     console.log(
+  //       "DEBUG FRONTEND: About to save report to DB before combined export"
+  //     );
+
+  //     // Step 1: Save report to database first (same logic as submit)
+  //     const rawData = getReportData();
+  //     const cleanedData = {
+  //       ...rawData,
+  //       managementTeam: cleanResourceRows(rawData.managementTeam),
+  //       workingTeam: cleanResourceRows(rawData.workingTeam),
+  //       materials: cleanResourceRows(rawData.materials),
+  //       machinery: cleanResourceRows(rawData.machinery),
+  //     };
+
+  //     // Save to database
+  //     await saveReportToDB(cleanedData);
+
+  //     // DEBUG: Confirm save completed
+  //     console.log(
+  //       "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
+  //     );
+
+  //     const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+  //       if (!img) return null;
+
+  //       // Case 1: already a string (blob URL, data URL, http URL, etc.)
+  //       if (typeof img === "string") {
+  //         if (!img.startsWith("blob:")) return img;
+
+  //         const resp = await fetch(img);
+  //         const blob = await resp.blob();
+
+  //         return await new Promise<string>((resolve, reject) => {
+  //           const reader = new FileReader();
+  //           reader.onloadend = () => resolve(String(reader.result));
+  //           reader.onerror = reject;
+  //           reader.readAsDataURL(blob);
+  //         });
+  //       }
+
+  //       // Case 2: File object (common)
+  //       if (img instanceof File) {
+  //         return await new Promise<string>((resolve, reject) => {
+  //           const reader = new FileReader();
+  //           reader.onloadend = () => resolve(String(reader.result));
+  //           reader.onerror = reject;
+  //           reader.readAsDataURL(img);
+  //         });
+  //       }
+
+  //       // Case 3: unknown object shape (skip it safely)
+  //       return null;
+  //     };
+
+  //     const processImages = async (sectionsArr: Section[]) => {
+  //       return await Promise.all(
+  //         sectionsArr.map(async (sec: Section) => {
+  //           const newEntries = await Promise.all(
+  //             (sec.entries ?? []).map(async (entry: Entry) => {
+  //               const newSlots = await Promise.all(
+  //                 (entry.slots ?? []).map(async (slot: Slot) => ({
+  //                   ...slot,
+  //                   image: await toBase64DataUrl(slot.image),
+  //                 }))
+  //               );
+  //               return { ...entry, slots: newSlots };
+  //             })
+  //           );
+  //           return { ...sec, entries: newEntries };
+  //         })
+  //       );
+  //     };
+
+  //     const processedSections = await processImages(referenceSections);
+
+  //     // Process CAR data
+  //     const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
+  //       const imgs = await Promise.all((g.images || []).map(async (img: any) => 
+  //         (await toBase64DataUrl(img)) || ""
+  //       ));
+  //       return { 
+  //         date: g.date || "", 
+  //         images: [imgs[0] || "", imgs[1] || ""], 
+  //         footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
+  //       };
+  //     }));
+
+  //     const reportPayload = {
+  //       projectName,
+  //       reportDate: reportDate?.toISOString(),
+  //       weatherAM,
+  //       weatherPM,
+  //       tempAM,
+  //       tempPM,
+  //       activityToday,
+  //       workPlanNextDay,
+  //       managementTeam,
+  //       workingTeam,
+  //       materials,
+  //       machinery,
+  //       description: carSheet.description || "",
+  //       photo_groups: processedCar
+  //     };
+
+  //     await generateCombinedExcel(
+  //       reportPayload,
+  //       processedSections,
+  //       tableTitle,
+  //       fileName
+  //     );
+
+  //     toast({
+  //       title: "Combined Excel Exported",
+  //       description: "Report saved to database and exported successfully.",
+  //     });
+  //   } catch (e) {
+  //     console.error("Combined Export Error:", e);
+  //     toast({
+  //       variant: "destructive",
+  //       title: "Export Failed",
+  //       description:
+  //         "Could not save report or generate combined Excel. Please try again.",
+  //     });
+  //   } finally {
+  //     setIsExportingCombined(false);
+  //   }
+  // };
+
   const handleExportCombinedExcelWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
-      // DEBUG: Add frontend log before saving
-      console.log(
-        "DEBUG FRONTEND: About to save report to DB before combined export"
-      );
+      console.log("DEBUG FRONTEND: About to save report to DB before combined export");
 
-      // Step 1: Save report to database first (same logic as submit)
+      // Step 1: Save report to database first
       const rawData = getReportData();
       const cleanedData = {
         ...rawData,
@@ -998,24 +1124,16 @@ const DailyReport = () => {
         machinery: cleanResourceRows(rawData.machinery),
       };
 
-      // Save to database
       await saveReportToDB(cleanedData);
+      console.log("DEBUG FRONTEND: Save to DB completed successfully");
 
-      // DEBUG: Confirm save completed
-      console.log(
-        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
-      );
-
+      // --- [IMAGE PROCESSING LOGIC REMAINS THE SAME] ---
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
-
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
         if (typeof img === "string") {
           if (!img.startsWith("blob:")) return img;
-
           const resp = await fetch(img);
           const blob = await resp.blob();
-
           return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(String(reader.result));
@@ -1023,8 +1141,6 @@ const DailyReport = () => {
             reader.readAsDataURL(blob);
           });
         }
-
-        // Case 2: File object (common)
         if (img instanceof File) {
           return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -1033,8 +1149,6 @@ const DailyReport = () => {
             reader.readAsDataURL(img);
           });
         }
-
-        // Case 3: unknown object shape (skip it safely)
         return null;
       };
 
@@ -1059,7 +1173,6 @@ const DailyReport = () => {
 
       const processedSections = await processImages(referenceSections);
 
-      // Process CAR data
       const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
         const imgs = await Promise.all((g.images || []).map(async (img: any) => 
           (await toBase64DataUrl(img)) || ""
@@ -1074,38 +1187,68 @@ const DailyReport = () => {
       const reportPayload = {
         projectName,
         reportDate: reportDate?.toISOString(),
-        weatherAM,
-        weatherPM,
-        tempAM,
-        tempPM,
-        activityToday,
-        workPlanNextDay,
-        managementTeam,
-        workingTeam,
-        materials,
-        machinery,
+        weatherAM, weatherPM, tempAM, tempPM,
+        activityToday, workPlanNextDay,
+        managementTeam, workingTeam, materials, machinery,
         description: carSheet.description || "",
         photo_groups: processedCar
       };
 
-      await generateCombinedExcel(
+      // --- [THE NEW ASYNC POLLING LOGIC] ---
+      
+      // 1. Trigger the job (using the new unified function)
+      const result = await generateCombinedReport(
         reportPayload,
         processedSections,
+        'excel', // format
         tableTitle,
         fileName
       );
 
-      toast({
-        title: "Combined Excel Exported",
-        description: "Report saved to database and exported successfully.",
-      });
+      if (result.success && result.job_id) {
+        let isDone = false;
+        
+        // 2. Poll the status until finished
+        while (!isDone) {
+          // Wait 3 seconds between checks
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
+          const statusData = await statusResponse.json();
+
+          if (statusData.status === 'SUCCESS') {
+            isDone = true;
+            
+            // 3. Final Step: Trigger the download
+            // We use the file_id returned by the status or the initial request
+            const downloadUrl = `${PYTHON_API_BASE_URL}/download/${result.file_id}/excel`;
+            
+            // Create a hidden link to trigger download
+            const link = document.createElement("a");
+            link.href = downloadUrl;
+            link.setAttribute("download", fileName || "report.xlsm");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast({
+              title: "Export Ready",
+              description: "The combined report has been generated and downloaded.",
+            });
+          } 
+          else if (statusData.status === 'FAILURE') {
+            throw new Error(statusData.info || "Python backend failed to generate file.");
+          }
+          // If status is 'PENDING' or 'PROCESSING', the loop continues...
+        }
+      }
+
     } catch (e) {
       console.error("Combined Export Error:", e);
       toast({
         variant: "destructive",
         title: "Export Failed",
-        description:
-          "Could not save report or generate combined Excel. Please try again.",
+        description: e instanceof Error ? e.message : "Could not generate report. Please try again.",
       });
     } finally {
       setIsExportingCombined(false);
@@ -1125,7 +1268,9 @@ const DailyReport = () => {
   const handleExportCombinedPDFWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
-      // Step 1: Save report to database first (same logic as combined Excel)
+      console.log("DEBUG FRONTEND: About to save report to DB before combined export");
+
+      // Step 1: Save report to database first
       const rawData = getReportData();
       const cleanedData = {
         ...rawData,
@@ -1135,71 +1280,39 @@ const DailyReport = () => {
         machinery: cleanResourceRows(rawData.machinery),
       };
 
-      // Save to database
       await saveReportToDB(cleanedData);
+      console.log("DEBUG FRONTEND: Save to DB completed successfully");
+
+      // --- [IMAGE PROCESSING LOGIC REMAINS THE SAME] ---
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
-        // console.log("DEBUG: Processing image:", typeof img, img);
-        
-        if (!img) {
-          // console.log("DEBUG: No image provided");
-          return null;
-        }
-
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        if (!img) return null;
         if (typeof img === "string") {
-          // console.log("DEBUG: Image is string, starts with:", img.substring(0, 20));
-          
-          if (img.startsWith("data:")) {
-            // console.log("DEBUG: Already data URL, length:", img.length);
-            return img;
-          }
-          
-          if (img.startsWith("blob:")) {
-            // console.log("DEBUG: Converting blob URL to data URL");
-            // Convert blob URL to data URL
-            try {
-              const response = await fetch(img);
-              const blob = await response.blob();
-              // console.log("DEBUG: Blob fetched, size:", blob.size);
-              return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  const result = reader.result as string;
-                  // console.log("DEBUG: Converted to data URL, length:", result.length);
-                  resolve(result);
-                };
-                reader.readAsDataURL(blob);
-              });
-            } catch (error) {
-              // console.log("DEBUG: Failed to convert blob URL:", error);
-              return null;
-            }
-          }
-          return img; // Return as-is for http URLs etc.
-        }
-
-        // Case 2: File object
-        if (img instanceof File) {
-          // console.log("DEBUG: Image is File object, size:", img.size, "type:", img.type);
-          return new Promise((resolve) => {
+          if (!img.startsWith("blob:")) return img;
+          const resp = await fetch(img);
+          const blob = await resp.blob();
+          return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              // console.log("DEBUG: File converted to data URL, length:", result.length);
-              resolve(result);
-            };
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+        if (img instanceof File) {
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
             reader.readAsDataURL(img);
           });
         }
-
-        // console.log("DEBUG: Unknown image type");
         return null;
       };
+
       const processImages = async (sectionsArr: Section[]) => {
         return await Promise.all(
           sectionsArr.map(async (sec: Section) => {
             const newEntries = await Promise.all(
-              (sec.entries ?? []).map(async (entry: any) => {
+              (sec.entries ?? []).map(async (entry: Entry) => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
@@ -1213,22 +1326,9 @@ const DailyReport = () => {
           })
         );
       };
+
       const processedSections = await processImages(referenceSections);
-      // DEBUG: Check processed sections
-      // console.log("DEBUG: Processed sections:", processedSections);
-      // console.log("DEBUG: Number of sections:", processedSections.length);
-      processedSections.forEach((section, idx) => {
-        // console.log(`DEBUG: Section ${idx}:`, section.title);
-        section.entries?.forEach((entry, entryIdx) => {
-          // console.log(`DEBUG: Entry ${entryIdx}:`, entry.slots?.length, "slots");
-          entry.slots?.forEach((slot, slotIdx) => {
-            // console.log(`DEBUG: Slot ${slotIdx} image type:`, typeof slot.image);
-            // console.log(`DEBUG: Slot ${slotIdx} image length:`, slot.image?.length);
-            // console.log(`DEBUG: Slot ${slotIdx} image preview:`, slot.image?.substring(0, 50) + "...");
-          });
-        });
-      });
-      // Process CAR data
+
       const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
         const imgs = await Promise.all((g.images || []).map(async (img: any) => 
           (await toBase64DataUrl(img)) || ""
@@ -1240,38 +1340,71 @@ const DailyReport = () => {
         };
       }));
 
-      await generateCombinedPDF(
-        {
-          projectName,
-          reportDate,
-          weatherAM,
-          weatherPM,
-          tempAM,
-          tempPM,
-          activityToday,
-          workPlanNextDay,
-          managementTeam,
-          workingTeam,
-          materials,
-          machinery,
-          description: carSheet.description || "",
-          photo_groups: processedCar,
-        },
+      const reportPayload = {
+        projectName,
+        reportDate: reportDate?.toISOString(),
+        weatherAM, weatherPM, tempAM, tempPM,
+        activityToday, workPlanNextDay,
+        managementTeam, workingTeam, materials, machinery,
+        description: carSheet.description || "",
+        photo_groups: processedCar
+      };
+
+      // --- [THE NEW ASYNC POLLING LOGIC] ---
+      
+      // 1. Trigger the job (using the new unified function)
+      const result = await generateCombinedReport(
+        reportPayload,
         processedSections,
+        'pdf', // format
         tableTitle,
         fileName
       );
-      
+
+      if (result.success && result.job_id) {
+        let isDone = false;
+        
+        // 2. Poll the status until finished
+        while (!isDone) {
+          // Wait 3 seconds between checks
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
+          const statusData = await statusResponse.json();
+
+          if (statusData.status === 'SUCCESS') {
+            isDone = true;
+            
+            // 3. Final Step: Trigger the download
+            // We use the file_id returned by the status or the initial request
+            const downloadUrl = `${PYTHON_API_BASE_URL}/download/${result.file_id}/pdf`;
+            
+            // Create a hidden link to trigger download
+            const link = document.createElement("a");
+            link.href = downloadUrl;
+            link.setAttribute("download", fileName || "report.pdf");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast({
+              title: "Export Ready",
+              description: "The combined report has been generated and downloaded.",
+            });
+          } 
+          else if (statusData.status === 'FAILURE') {
+            throw new Error(statusData.info || "Python backend failed to generate file.");
+          }
+          // If status is 'PENDING' or 'PROCESSING', the loop continues...
+        }
+      }
+
+    } catch (e) {
+      console.error("Combined Export Error:", e);
       toast({
-        title: "Combined PDF Exported",
-        description: "Your combined report has been exported as PDF successfully.",
-      });
-    } catch (error) {
-      console.error("Combined PDF export error:", error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to generate combined PDF.",
         variant: "destructive",
+        title: "Export Failed",
+        description: e instanceof Error ? e.message : "Could not generate report. Please try again.",
       });
     } finally {
       setIsExportingCombined(false);
@@ -1926,7 +2059,7 @@ const DailyReport = () => {
             <ReferenceSection
               sections={referenceSections}
               setSections={setReferenceSections}
-              onExportReference={handleExportReference}
+              // onExportReference={handleExportReference}
               isExporting={isExportingReference}
               tableTitle={tableTitle}
               setTableTitle={setTableTitle}
@@ -2016,12 +2149,12 @@ const DailyReport = () => {
             setPendingExportType(null);
           }}
           onConfirm={(fileName) => {
-            if (pendingExportType === "excel") {
-              handleExportExcelWithFilename(fileName);
-            } else if (pendingExportType === "combined") {
+            if (pendingExportType === "combined") {
+            //   handleExportExcelWithFilename(fileName);
+            // } else if (pendingExportType === "combined") {
               handleExportCombinedExcelWithFilename(fileName);
-            } else if (pendingExportType === "reference") {
-              handleExportReferenceWithFilename(fileName);
+            // } else if (pendingExportType === "reference") {
+            //   handleExportReferenceWithFilename(fileName);
             } else if (pendingExportType === "combined-pdf") {
               handleExportCombinedPDFWithFilename(fileName);
             } else if (pendingExportType === "combined-zip") {

@@ -90,281 +90,84 @@ export const loadReportFromDB = async (reportDate: Date) => {
   }
 };
 
-export const generatePythonExcel = async (
-  payload: any,
-  mode: "report" | "reference" | "combined",
-  fileName?: string
-) => {
-  try {
-    // Get custom logos from localStorage for report mode
-    let enhancedPayload = payload;
-    if (mode === "report" || mode === "combined") {
-      const cacpmLogo = localStorage.getItem("customCacpmLogo");
-      const koicaLogo = localStorage.getItem("customKoicaLogo");
-      
-      enhancedPayload = {
-        ...payload,
-        cacpm_logo: cacpmLogo,
-        koica_logo: koicaLogo,
-        // userId will be extracted from JWT cookie by Python backend
-      };
-    }
-
-    console.log("🔑 PYTHON EXCEL: Sending payload - userId will be validated by backend");
-
-    const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-report`, {
-      mode,
-      data: enhancedPayload,
-    });
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to generate report" }));
-      throw new Error(
-        error.message || `HTTP ${response.status}: ${response.statusText}`
-      );
-    }
-
-    // Handle file download
-    const blob = await response.blob();
-
-    // Create download link
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-
-    // Use provided filename or fallback to default
-    const filename = fileName
-      ? `${fileName}.xlsx`
-      : mode === "report"
-      ? `report-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`
-      : mode === "reference"
-      ? `reference-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`
-      : `combined-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`;
-
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Clean up
-    window.URL.revokeObjectURL(url);
-
-    return { success: true };
-  } catch (error) {
-    console.error("Python Excel generation error:", error);
-    throw error;
-  }
-};
-
-export const generateReferenceExcel = async (
-  referenceSections: any[],
-  tableTitle: string = "SITE PHOTO EVIDENCE",
-  fileName?: string
-) => {
-  try {
-    const referenceEntries = referenceSections.flatMap((section: any) =>
-      (section.entries ?? []).map((entry: any) => {
-        const slots = entry.slots ?? [];
-        return {
-          section_title: section.title || "",
-          images: slots
-            .map((s: any) => s.image)
-            .filter(Boolean)
-            .slice(0, 2),
-          footers: slots
-            .map((s: any) => s.caption)
-            .filter(Boolean)
-            .slice(0, 2),
-        };
-      })
-    );
-
-    // userId will be extracted from JWT cookie by Python backend
-    const payload = {
-      table_title: tableTitle,
-      reference: referenceEntries,
-    };
-
-    console.log("🔑 REFERENCE EXCEL: Sending payload - userId will be validated by backend");
-
-    const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-reference`, payload);
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to generate reference" }));
-      throw new Error(
-        error.message || `HTTP ${response.status}: ${response.statusText}`
-      );
-    }
-
-    // Handle file download
-    const blob = await response.blob();
-
-    // Create download link
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-
-    // Use provided filename or fallback to default
-    const filename = fileName
-      ? `${fileName}.xlsx`
-      : `reference-${new Date().toISOString().split("T")[0]}.xlsx`;
-
-    link.download = filename;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Clean up
-    window.URL.revokeObjectURL(url);
-
-    return { success: true };
-  } catch (error) {
-    console.error("Reference Excel generation error:", error);
-    throw error;
-  }
-};
-
-export const generateCarExcel = async (
-  carData: any,
-  fileName?: string
-) => {
-  try {
-    const payload = {
-      data: carData,
-    };
-
-    const response = await fetch(`${PYTHON_API_BASE_URL}/generate-car`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to generate CAR" }));
-      throw new Error(
-        error.message || `HTTP ${response.status}: ${response.statusText}`
-      );
-    }
-
-    // Handle file download
-    const blob = await response.blob();
-
-    // Create download link
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-
-    // Use provided filename or fallback to default
-    const filename = fileName ? `${fileName}.xlsx` : `car-${new Date().toISOString().split("T")[0]}.xlsx`;
-
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Clean up
-    window.URL.revokeObjectURL(url);
-
-    return { success: true };
-  } catch (error) {
-    console.error("CAR Excel generation error:", error);
-    throw error;
-  }
-};
-
-export const generateCombinedExcel = async (
-  reportPayload: any,
-  referenceSections: any[],
-  tableTitle: string = "SITE PHOTO EVIDENCE",
-  fileName?: string
-) => {
-  try {
-    // Get custom logos from localStorage for combined mode
-    const cacpmLogo = localStorage.getItem("customCacpmLogo");
-    const koicaLogo = localStorage.getItem("customKoicaLogo");
+// export const generateCombinedExcel = async (
+//   reportPayload: any,
+//   referenceSections: any[],
+//   tableTitle: string = "SITE PHOTO EVIDENCE",
+//   fileName?: string
+// ) => {
+//   try {
+//     // Get custom logos from localStorage for combined mode
+//     const cacpmLogo = localStorage.getItem("customCacpmLogo");
+//     const koicaLogo = localStorage.getItem("customKoicaLogo");
     
-    const enhancedPayload = {
-      ...reportPayload,
-      logos: {
-        cacpm: cacpmLogo,
-        koica: koicaLogo,
-      },
-      // userId will be extracted from JWT cookie by Python backend
-    };
+//     const enhancedPayload = {
+//       ...reportPayload,
+//       logos: {
+//         cacpm: cacpmLogo,
+//         koica: koicaLogo,
+//       },
+//       // userId will be extracted from JWT cookie by Python backend
+//     };
 
-    const referenceEntries = referenceSections.flatMap((section: any) =>
-      (section.entries ?? []).map((entry: any) => {
-        const slots = entry.slots ?? [];
-        return {
-          section_title: section.title || "",
-          images: slots
-            .map((s: any) => s.image)
-            .filter(Boolean)
-            .slice(0, 2),
-          footers: slots
-            .map((s: any) => s.caption)
-            .filter(Boolean)
-            .slice(0, 2),
-        };
-      })
-    );
+//     const referenceEntries = referenceSections.flatMap((section: any) =>
+//       (section.entries ?? []).map((entry: any) => {
+//         const slots = entry.slots ?? [];
+//         return {
+//           section_title: section.title || "",
+//           images: slots
+//             .map((s: any) => s.image)
+//             .filter(Boolean)
+//             .slice(0, 2),
+//           footers: slots
+//             .map((s: any) => s.caption)
+//             .filter(Boolean)
+//             .slice(0, 2),
+//         };
+//       })
+//     );
 
-    const payload = {
-      ...enhancedPayload,
-      table_title: tableTitle,
-      reference: referenceEntries,
-    };
+//     const payload = {
+//       ...enhancedPayload,
+//       table_title: tableTitle,
+//       reference: referenceEntries,
+//     };
 
-    console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
+//     console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
 
-    const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, payload);
+//     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, payload);
 
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to generate combined report" }));
-      throw new Error(
-        error.message || `HTTP ${response.status}: ${response.statusText}`
-      );
-    }
+//     if (!response.ok) {
+//       const error = await response
+//         .json()
+//         .catch(() => ({ message: "Failed to generate combined report" }));
+//       throw new Error(
+//         error.message || `HTTP ${response.status}: ${response.statusText}`
+//       );
+//     }
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
+//     const blob = await response.blob();
+//     const url = window.URL.createObjectURL(blob);
+//     const link = document.createElement("a");
+//     link.href = url;
 
-    // Use provided filename or fallback to default
-    const filename = fileName
-      ? `${fileName}.xlsm`
-      : `combined-${new Date().toISOString().split("T")[0]}.xlsm`;
+//     // Use provided filename or fallback to default
+//     const filename = fileName
+//       ? `${fileName}.xlsm`
+//       : `combined-${new Date().toISOString().split("T")[0]}.xlsm`;
 
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+//     link.download = filename;
+//     document.body.appendChild(link);
+//     link.click();
+//     document.body.removeChild(link);
+//     window.URL.revokeObjectURL(url);
 
-    return { success: true };
-  } catch (error) {
-    console.error("Combined Excel generation error:", error);
-    throw error;
-  }
-};
+//     return { success: true };
+//   } catch (error) {
+//     console.error("Combined Excel generation error:", error);
+//     throw error;
+//   }
+// };
 
 export const getAllUserReports = async () => {
   console.log("🔒 GET ALL REPORTS: Fetching all user reports");
@@ -522,89 +325,149 @@ export const getRecentReports = async (limit: number = 20, status?: string) => {
   return result;
 };
 
-export const generateCombinedPDF = async (
+// export const generateCombinedPDF = async (
+//   reportPayload: any,
+//   referenceSections: any[],
+//   tableTitle: string = "SITE PHOTO EVIDENCE",
+//   fileName?: string
+// ) => {
+//   // Get custom logos from localStorage for combined mode
+//   const cacpmLogo = localStorage.getItem("customCacpmLogo");
+//   const koicaLogo = localStorage.getItem("customKoicaLogo");
+//   // console.log("DEBUG API: Received referenceSections:", referenceSections);
+//   const referenceEntries = referenceSections.flatMap((section: any) =>
+//     (section.entries ?? []).map((entry: any) => {
+//       const slots = entry.slots ?? [];
+
+//       // DEBUG: Log what's in slots
+//       // console.log("DEBUG API: Entry slots:", slots);
+//       // console.log("DEBUG API: First slot image:", slots[0]?.image?.substring(0, 50));
+//       return {
+//         section_title: section.title || "",
+//         images: slots
+//           .map((s: any) => s.image)
+//           .filter(Boolean)
+//           .slice(0, 2),
+//         footers: slots
+//           .map((s: any) => s.caption)
+//           .filter(Boolean)
+//           .slice(0, 2),
+//       };
+//     })
+//   );
+
+//   // console.log("DEBUG API: Processed referenceEntries:", referenceEntries);
+//   // console.log("DEBUG API: Total images being sent:", referenceEntries.reduce((acc, entry) => acc + entry.images.length, 0));
+
+//   const payload = {
+//     mode: "combined",
+//     data: {
+//       ...reportPayload,
+//       table_title: tableTitle,
+//       reference: referenceSections.flatMap((section: any) =>
+//         (section.entries ?? []).map((entry: any) => {
+//           const slots = entry.slots ?? [];
+//           return {
+//             section_title: section.title || "",
+//             images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+//             footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+//           };
+//         })
+//       ),
+//       logos: {
+//         cacpm: cacpmLogo,
+//         koica: koicaLogo,
+//       }
+//     },
+//   };
+
+//   console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
+
+//   const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
+
+//   if (!response.ok) {
+//     const error = await response
+//       .json()
+//       .catch(() => ({ message: "Failed to generate combined PDF" }));
+//     throw new Error(
+//       error.message || `HTTP ${response.status}: ${response.statusText}`
+//     );
+//   }
+
+//   const blob = await response.blob();
+//   const url = window.URL.createObjectURL(blob);
+//   const link = document.createElement("a");
+//   link.href = url;
+
+//   const filename = fileName
+//     ? `${fileName}.pdf`
+//     : `combined-${new Date().toISOString().split("T")[0]}.pdf`;
+
+//   link.download = filename;
+//   document.body.appendChild(link);
+//   link.click();
+//   document.body.removeChild(link);
+//   window.URL.revokeObjectURL(url);
+
+//   return { success: true };
+// };
+
+export const generateCombinedReport = async (
   reportPayload: any,
   referenceSections: any[],
+  format: 'excel' | 'pdf' | 'zip' = 'excel',
   tableTitle: string = "SITE PHOTO EVIDENCE",
   fileName?: string
 ) => {
-  // Get custom logos from localStorage for combined mode
-  const cacpmLogo = localStorage.getItem("customCacpmLogo");
-  const koicaLogo = localStorage.getItem("customKoicaLogo");
-  // console.log("DEBUG API: Received referenceSections:", referenceSections);
-  const referenceEntries = referenceSections.flatMap((section: any) =>
-    (section.entries ?? []).map((entry: any) => {
-      const slots = entry.slots ?? [];
+  try {
+    const cacpmLogo = localStorage.getItem("customCacpmLogo");
+    const koicaLogo = localStorage.getItem("customKoicaLogo");
 
-      // DEBUG: Log what's in slots
-      // console.log("DEBUG API: Entry slots:", slots);
-      // console.log("DEBUG API: First slot image:", slots[0]?.image?.substring(0, 50));
-      return {
-        section_title: section.title || "",
-        images: slots
-          .map((s: any) => s.image)
-          .filter(Boolean)
-          .slice(0, 2),
-        footers: slots
-          .map((s: any) => s.caption)
-          .filter(Boolean)
-          .slice(0, 2),
-      };
-    })
-  );
+    // Unified mapping for reference entries
+    const referenceEntries = referenceSections.flatMap((section: any) =>
+      (section.entries ?? []).map((entry: any) => {
+        const slots = entry.slots ?? [];
+        return {
+          section_title: section.title || "",
+          images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
+          footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+        };
+      })
+    );
 
-  // console.log("DEBUG API: Processed referenceEntries:", referenceEntries);
-  // console.log("DEBUG API: Total images being sent:", referenceEntries.reduce((acc, entry) => acc + entry.images.length, 0));
-
-  const payload = {
-    mode: "combined",
-    data: {
+    // Build the payload once
+    const payload = {
       ...reportPayload,
+      format, // excel, pdf, or zip
       table_title: tableTitle,
-      reference: referenceSections.flatMap((section: any) =>
-        (section.entries ?? []).map((entry: any) => {
-          const slots = entry.slots ?? [];
-          return {
-            section_title: section.title || "",
-            images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-            footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-          };
-        })
-      ),
+      reference: referenceEntries,
       logos: {
         cacpm: cacpmLogo,
         koica: koicaLogo,
       }
-    },
-  };
+    };
 
-  console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
+    console.log(`🚀 Starting ASYNC ${format.toUpperCase()} export...`);
 
-  const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
+    // Use your unified endpoint
+    const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, payload);
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Failed to generate combined PDF" }));
-    throw new Error(
-      error.message || `HTTP ${response.status}: ${response.statusText}`
-    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Generation failed to start" }));
+      throw new Error(error.message || `Error ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // We return the "Ticket" (Job ID) for the frontend to track
+    return { 
+      success: true, 
+      job_id: data.job_id, 
+      file_id: data.file_id, 
+      format 
+    };
+  } catch (error) {
+    console.error("Export Error:", error);
+    throw error;
   }
-
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-
-  const filename = fileName
-    ? `${fileName}.pdf`
-    : `combined-${new Date().toISOString().split("T")[0]}.pdf`;
-
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
-
-  return { success: true };
 };

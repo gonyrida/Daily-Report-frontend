@@ -32,10 +32,10 @@ import {
 } from "@/lib/exportUtils";
 import { useToast } from "@/hooks/use-toast";
 import {
-  generatePythonExcel,
-  generateReferenceExcel,
-  generateCombinedExcel,
-  generateCombinedPDF
+  // generatePythonExcel,
+  // generateReferenceExcel,
+  // generateCombinedExcel,
+  // generateCombinedPDF
 } from "@/integrations/reportsApi";
 import { saveReportToDB, loadReportFromDB, submitReportToDB } from "@/integrations/reportsApi";
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
@@ -870,7 +870,7 @@ const Index = () => {
       };
 
       // Call Python API with custom filename
-      await generatePythonExcel(payload, "report", fileName);
+      // await generatePythonExcel(payload, "report", fileName);
 
       toast({
         title: "Excel Exported",
@@ -956,7 +956,7 @@ const Index = () => {
 
       const processedSections = await processImages(referenceSections);
 
-      await generateReferenceExcel(processedSections, tableTitle, fileName);
+      // await generateReferenceExcel(processedSections, tableTitle, fileName);
 
       toast({
         title: "Reference Excel Exported",
@@ -1096,12 +1096,12 @@ const Index = () => {
         photo_groups: processedCar
       };
 
-      await generateCombinedExcel(
-        reportPayload,
-        processedSections,
-        tableTitle,
-        fileName
-      );
+      // await generateCombinedExcel(
+      //   reportPayload,
+      //   processedSections,
+      //   tableTitle,
+      //   fileName
+      // );
 
       toast({
         title: "Combined Excel Exported",
@@ -1282,27 +1282,27 @@ const Index = () => {
         };
       }));
 
-      await generateCombinedPDF(
-        {
-          projectName,
-          reportDate,
-          weatherAM,
-          weatherPM,
-          tempAM,
-          tempPM,
-          activityToday,
-          workPlanNextDay,
-          managementTeam,
-          workingTeam,
-          materials,
-          machinery,
-          description: carSheet.description || "",
-          photo_groups: processedCar,
-        },
-        processedSections,
-        tableTitle,
-        fileName
-      );
+      // await generateCombinedPDF(
+      //   {
+      //     projectName,
+      //     reportDate,
+      //     weatherAM,
+      //     weatherPM,
+      //     tempAM,
+      //     tempPM,
+      //     activityToday,
+      //     workPlanNextDay,
+      //     managementTeam,
+      //     workingTeam,
+      //     materials,
+      //     machinery,
+      //     description: carSheet.description || "",
+      //     photo_groups: processedCar,
+      //   },
+      //   processedSections,
+      //   tableTitle,
+      //   fileName
+      // );
       
       toast({
         title: "Combined PDF Exported",
