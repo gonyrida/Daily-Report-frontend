@@ -1397,7 +1397,9 @@ const DailyReport = () => {
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');  // This will show PDF in browser
+        // This will show PDF in browser
+        setPreviewUrl(url);
+        setShowPreview(true);
       }
     } catch (error) {
       toast({
