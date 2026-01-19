@@ -10,7 +10,7 @@ interface PDFPreviewModalProps {
 const PDFPreviewModal = ({ open, onClose, pdfUrl }: PDFPreviewModalProps) => {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[95vh] w-[95vw] h-[95vh] flex flex-col p-0">
+      <DialogContent className="max-w-7xl max-h-[95vh] w-[95vw] h-[95vh] flex flex-col p-0 [&>button]:hidden">
         <div className="flex justify-end p-2">
           <DialogClose className="text-gray-500 hover:text-gray-700">
             <X className="w-6 h-6" />

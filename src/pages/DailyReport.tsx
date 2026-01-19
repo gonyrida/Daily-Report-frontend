@@ -1077,15 +1077,14 @@ const DailyReport = () => {
         let isDone = false;
         
         // 2. Poll the status until finished
+        let attempts = 0;
         while (!isDone) {
-          // Wait 3 seconds between checks
-          await new Promise(resolve => setTimeout(resolve, 3000));
-
           const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
           const statusData = await statusResponse.json();
 
           if (statusData.status === 'SUCCESS') {
             isDone = true;
+            console.log("Task Finished! Data received:", statusData);
             const finalFileId = statusData.file_id || statusData.info || result.file_id;
             // 3. Final Step: Trigger the download
             // We use the file_id returned by the status or the initial request
@@ -1110,6 +1109,10 @@ const DailyReport = () => {
           } 
           else if (statusData.status === 'FAILURE') {
             throw new Error(statusData.info || "Python backend failed to generate file.");
+          } else {
+            const delay = attempts < 5 ? 250 : 1500;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempts++;
           }
           // If status is 'PENDING' or 'PROCESSING', the loop continues...
         }
@@ -1237,15 +1240,14 @@ const DailyReport = () => {
         let isDone = false;
         
         // 2. Poll the status until finished
+        let attempts = 0;
         while (!isDone) {
-          // Wait 3 seconds between checks
-          await new Promise(resolve => setTimeout(resolve, 3000));
-
           const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
           const statusData = await statusResponse.json();
 
           if (statusData.status === 'SUCCESS') {
             isDone = true;
+            console.log("Task Finished! Data received:", statusData);
             const finalFileId = statusData.file_id || statusData.info || result.file_id;
             // 3. Final Step: Trigger the download
             // We use the file_id returned by the status or the initial request
@@ -1270,6 +1272,10 @@ const DailyReport = () => {
           } 
           else if (statusData.status === 'FAILURE') {
             throw new Error(statusData.info || "Python backend failed to generate file.");
+          } else {
+            const delay = attempts < 5 ? 250 : 1500;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempts++;
           }
           // If status is 'PENDING' or 'PROCESSING', the loop continues...
         }
@@ -1522,9 +1528,8 @@ const DailyReport = () => {
         let isDone = false;
         
         // 2. Poll the status until finished
+        let attempts = 0;
         while (!isDone) {
-          // Wait 3 seconds between checks
-          await new Promise(resolve => setTimeout(resolve, 3000));
 
           const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
           const statusData = await statusResponse.json();
@@ -1532,15 +1537,19 @@ const DailyReport = () => {
           if (statusData.status === 'SUCCESS') {
             isDone = true;
             const finalFileId = statusData.file_id || statusData.info || result.file_id;
-            // 3. Final Step: Trigger the download
+            // 3. Set the preview URL and show the modal (instead of opening new tab)
             // We use the file_id returned by the status or the initial request
             const previewUrl = `${PYTHON_API_BASE_URL}/download/${finalFileId}/pdf?name=${encodeURIComponent(finalFileName)}&preview=true`;
             
-            // Open PDF in new tab instead of downloading
-            window.open(previewUrl, '_blank');
+            setPreviewUrl(previewUrl);
+            setShowPreview(true);
           } 
           else if (statusData.status === 'FAILURE') {
             throw new Error(statusData.info || "Python backend failed to generate file.");
+          } else {
+            const delay = attempts < 5 ? 250 : 1500;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempts++;
           }
           // If status is 'PENDING' or 'PROCESSING', the loop continues...
         }
@@ -1668,15 +1677,14 @@ const DailyReport = () => {
         let isDone = false;
         
         // 2. Poll the status until finished
+        let attempts = 0;
         while (!isDone) {
-          // Wait 3 seconds between checks
-          await new Promise(resolve => setTimeout(resolve, 3000));
-
           const statusResponse = await pythonApiGet(`${PYTHON_API_BASE_URL}/status/${result.job_id}`);
           const statusData = await statusResponse.json();
 
           if (statusData.status === 'SUCCESS') {
             isDone = true;
+            console.log("Task Finished! Data received:", statusData);
             const finalFileId = statusData.file_id || statusData.info || result.file_id;
             // 3. Final Step: Trigger the download
             // We use the file_id returned by the status or the initial request
@@ -1701,6 +1709,10 @@ const DailyReport = () => {
           } 
           else if (statusData.status === 'FAILURE') {
             throw new Error(statusData.info || "Python backend failed to generate file.");
+          } else {
+            const delay = attempts < 5 ? 250 : 1500;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempts++;
           }
           // If status is 'PENDING' or 'PROCESSING', the loop continues...
         }
