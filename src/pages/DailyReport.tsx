@@ -983,12 +983,12 @@ const DailyReport = () => {
   const handleExportCombinedExcelWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
-      // DEBUG: Add frontend log before saving
+      // DEBUG: Add frontend log before export (NO DB SAVE)
       console.log(
-        "DEBUG FRONTEND: About to save report to DB before combined export"
+        "DEBUG FRONTEND: About to export combined Excel (no DB save)"
       );
 
-      // Step 1: Save report to database first (same logic as submit)
+      // Step 1: Get report data (NO DB SAVE - export only)
       const rawData = getReportData();
       const cleanedData = {
         ...rawData,
@@ -998,12 +998,11 @@ const DailyReport = () => {
         machinery: cleanResourceRows(rawData.machinery),
       };
 
-      // Save to database
-      await saveReportToDB(cleanedData);
+      // Skip database save - export directly from frontend state
 
-      // DEBUG: Confirm save completed
+      // DEBUG: Confirm export proceeding
       console.log(
-        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
+        "DEBUG FRONTEND: Proceeding with combined Excel export (no DB save)"
       );
 
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
@@ -1125,7 +1124,7 @@ const DailyReport = () => {
   const handleExportCombinedPDFWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
-      // Step 1: Save report to database first (same logic as combined Excel)
+      // Step 1: Get report data (NO DB SAVE - export only)
       const rawData = getReportData();
       const cleanedData = {
         ...rawData,
@@ -1135,8 +1134,7 @@ const DailyReport = () => {
         machinery: cleanResourceRows(rawData.machinery),
       };
 
-      // Save to database
-      await saveReportToDB(cleanedData);
+      // Skip database save - export directly from frontend state
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         // console.log("DEBUG: Processing image:", typeof img, img);
         
@@ -1423,7 +1421,7 @@ const DailyReport = () => {
   const handleExportCombinedZIPWithFilename = async (fileName: string) => {
     setIsExportingCombined(true);
     try {
-      // Step 1: Save report to database first (same logic as combined Excel)
+      // Step 1: Get report data (NO DB SAVE - export only)
       const rawData = getReportData();
       const cleanedData = {
         ...rawData,
@@ -1433,8 +1431,7 @@ const DailyReport = () => {
         machinery: cleanResourceRows(rawData.machinery),
       };
 
-      // Save to database
-      await saveReportToDB(cleanedData);
+      // Skip database save - export directly from frontend state
       // Process images for both exports
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;

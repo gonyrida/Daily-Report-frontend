@@ -10,22 +10,26 @@ const API_BASE_URL = API_ENDPOINTS.DAILY_REPORTS.BASE;
 // SECURITY: NO token handling, NO localStorage, NO Authorization headers
 
 export const saveReportToDB = async (reportData: any) => {
-  console.log("🔒 SAVE REPORT: Attempting to save report");
+  console.log(" SAVE REPORT: Attempting to save report");
+  
+  // DEBUG: Log image sections before save
+  console.log("DEBUG FRONTEND: Saving carSection:", reportData.carSection);
+  console.log("DEBUG FRONTEND: Saving referenceSection:", reportData.referenceSection);
 
   const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.SAVE, reportData);
 
-  console.log(`🔒 SAVE REPORT: Response ${response.status}`);
+  console.log(` SAVE REPORT: Response ${response.status}`);
 
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to save report" }));
-    console.error("🔒 SAVE REPORT: Failed:", error);
+    console.error(" SAVE REPORT: Failed:", error);
     throw new Error(error.message || "Failed to save report");
   }
 
   const result = await response.json();
-  console.log("🔒 SAVE REPORT: Success:", result);
+  console.log(" SAVE REPORT: Success:", result);
   return result;
 };
 
