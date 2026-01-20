@@ -114,6 +114,16 @@ interface ReportData {
   machinery: ResourceRow[];
   // Optional merged-reference data (kept optional so export logic isn't changed yet)
   referenceSections?: Section[];
+  tableTitle?: string;
+  carSheet?: {
+    description: string;
+    photo_groups: Array<{
+      date: string;
+      images: string[];
+      footers: string[];
+    }>;
+  };
+  projectLogo?: string;
 }
 
 const DailyReport = () => {
@@ -123,6 +133,7 @@ const DailyReport = () => {
   const reportIdFromUrl = searchParams.get('reportId');
 
   // Project Info
+  const [projectLogo, setProjectLogo] = useState<string>("");
   const [projectName, setProjectName] = useState("");
   const [reportDate, setReportDate] = useState<Date | undefined>(new Date());
   const [weatherAM, setWeatherAM] = useState("");
@@ -203,6 +214,9 @@ const DailyReport = () => {
       machinery,
       // Keep reference sections in the object for future export mapping (no export logic changed yet)
       referenceSections,
+      tableTitle,
+      carSheet,
+      projectLogo,
     }),
     [
       projectName,
@@ -218,6 +232,9 @@ const DailyReport = () => {
       materials,
       machinery,
       referenceSections,
+      tableTitle,
+      carSheet,
+      projectLogo,
     ]
   );
 
@@ -535,6 +552,10 @@ const DailyReport = () => {
             setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
             setMaterials(ensureRowIds(dbReport.materials || []));
             setMachinery(ensureRowIds(dbReport.machinery || []));
+            setReferenceSections(dbReport.referenceSections || []);
+            setTableTitle(dbReport.tableTitle || "SITE PHOTO EVIDENCE");
+            setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
+            setProjectLogo(dbReport.projectLogo || "");
             return;
           }
 
@@ -636,35 +657,35 @@ const DailyReport = () => {
   // Google Docs-style: Auto-save with debounce
   const debouncedAutoSave = useRef<NodeJS.Timeout | null>(null);
   
-  const triggerAutoSave = useCallback((partialData: Partial<ReportData>) => {
-    if (!reportId) {
-      console.log("🔒 AUTO-SAVE: No reportId, skipping auto-save");
-      return;
-    }
+  // const triggerAutoSave = useCallback((partialData: Partial<ReportData>) => {
+  //   if (!reportId) {
+  //     console.log("🔒 AUTO-SAVE: No reportId, skipping auto-save");
+  //     return;
+  //   }
 
-    if (debouncedAutoSave.current) {
-      clearTimeout(debouncedAutoSave.current);
-    }
+  //   if (debouncedAutoSave.current) {
+  //     clearTimeout(debouncedAutoSave.current);
+  //   }
 
-    debouncedAutoSave.current = setTimeout(async () => {
-      try {
-        setIsAutoSaving(true);
-        console.log("🔒 AUTO-SAVE: Triggering auto-save for reportId:", reportId);
+  //   debouncedAutoSave.current = setTimeout(async () => {
+  //     try {
+  //       setIsAutoSaving(true);
+  //       console.log("🔒 AUTO-SAVE: Triggering auto-save for reportId:", reportId);
         
-        const result = await autoSaveReport(reportId, partialData);
+  //       const result = await autoSaveReport(reportId, partialData);
         
-        if (result.success) {
-          setLastSavedAt(new Date());
-          console.log("🔒 AUTO-SAVE: Success");
-        }
-      } catch (error: any) {
-        console.error("🔒 AUTO-SAVE: Error:", error);
-        // Silent fail for auto-save to not interrupt user
-      } finally {
-        setIsAutoSaving(false);
-      }
-    }, 1000); // 1 second debounce
-  }, [reportId]);
+  //       if (result.success) {
+  //         setLastSavedAt(new Date());
+  //         console.log("🔒 AUTO-SAVE: Success");
+  //       }
+  //     } catch (error: any) {
+  //       console.error("🔒 AUTO-SAVE: Error:", error);
+  //       // Silent fail for auto-save to not interrupt user
+  //     } finally {
+  //       setIsAutoSaving(false);
+  //     }
+  //   }, 1000); // 1 second debounce
+  // }, [reportId]);
 
   // Watch for changes and trigger auto-save
   useEffect(() => {
@@ -686,7 +707,7 @@ const DailyReport = () => {
       machinery,
     };
 
-    triggerAutoSave(currentData);
+    // triggerAutoSave(currentData);
   }, [
     projectName,
     reportDate,
@@ -701,7 +722,7 @@ const DailyReport = () => {
     workingTeam,
     materials,
     machinery,
-    triggerAutoSave,
+    // triggerAutoSave,
   ]);
 
   const validateReport = (): boolean => {
@@ -990,21 +1011,6 @@ const DailyReport = () => {
 
       // Step 1: Save report to database first (same logic as submit)
       const rawData = getReportData();
-      const cleanedData = {
-        ...rawData,
-        managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        materials: cleanResourceRows(rawData.materials),
-        machinery: cleanResourceRows(rawData.machinery),
-      };
-
-      // Save to database
-      await saveReportToDB(cleanedData);
-
-      // DEBUG: Confirm save completed
-      console.log(
-        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
-      );
 
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
@@ -1071,6 +1077,40 @@ const DailyReport = () => {
         };
       }));
 
+      const processedLogo = await toBase64DataUrl(projectLogo);
+      
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+        referenceSections: processedSections,
+        carSheet: {
+          ...carSheet,
+          photo_groups: processedCar,
+        },
+        projectLogo: processedLogo,
+      };
+
+      console.log("🔍 FRONTEND: About to save data with referenceSections:", cleanedData.referenceSections ? "YES (" + cleanedData.referenceSections.length + " sections)" : "NO");
+
+      // Save to database
+      try {
+        console.log("🔍 FRONTEND: About to save to DB");
+        await saveReportToDB(cleanedData);
+        console.log("🔍 FRONTEND: Save completed successfully");
+      } catch (error) {
+        console.error("🔍 FRONTEND: Save failed:", error);
+        // Don't proceed with export if save failed
+        throw new Error("Database save failed");
+      }
+
+      // DEBUG: Confirm save completed
+      console.log(
+        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
+      );
+
       const reportPayload = {
         projectName,
         reportDate: reportDate?.toISOString(),
@@ -1127,79 +1167,44 @@ const DailyReport = () => {
     try {
       // Step 1: Save report to database first (same logic as combined Excel)
       const rawData = getReportData();
-      const cleanedData = {
-        ...rawData,
-        managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        materials: cleanResourceRows(rawData.materials),
-        machinery: cleanResourceRows(rawData.machinery),
-      };
 
-      // Save to database
-      await saveReportToDB(cleanedData);
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
-        // console.log("DEBUG: Processing image:", typeof img, img);
-        
-        if (!img) {
-          // console.log("DEBUG: No image provided");
-          return null;
-        }
+        if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
         if (typeof img === "string") {
-          // console.log("DEBUG: Image is string, starts with:", img.substring(0, 20));
-          
-          if (img.startsWith("data:")) {
-            // console.log("DEBUG: Already data URL, length:", img.length);
-            return img;
-          }
-          
-          if (img.startsWith("blob:")) {
-            // console.log("DEBUG: Converting blob URL to data URL");
-            // Convert blob URL to data URL
-            try {
-              const response = await fetch(img);
-              const blob = await response.blob();
-              // console.log("DEBUG: Blob fetched, size:", blob.size);
-              return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  const result = reader.result as string;
-                  // console.log("DEBUG: Converted to data URL, length:", result.length);
-                  resolve(result);
-                };
-                reader.readAsDataURL(blob);
-              });
-            } catch (error) {
-              // console.log("DEBUG: Failed to convert blob URL:", error);
-              return null;
-            }
-          }
-          return img; // Return as-is for http URLs etc.
+          if (!img.startsWith("blob:")) return img;
+
+          const resp = await fetch(img);
+          const blob = await resp.blob();
+
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
         }
 
-        // Case 2: File object
+        // Case 2: File object (common)
         if (img instanceof File) {
-          // console.log("DEBUG: Image is File object, size:", img.size, "type:", img.type);
-          return new Promise((resolve) => {
+          return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              // console.log("DEBUG: File converted to data URL, length:", result.length);
-              resolve(result);
-            };
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
             reader.readAsDataURL(img);
           });
         }
 
-        // console.log("DEBUG: Unknown image type");
+        // Case 3: unknown object shape (skip it safely)
         return null;
       };
+
       const processImages = async (sectionsArr: Section[]) => {
         return await Promise.all(
           sectionsArr.map(async (sec: Section) => {
             const newEntries = await Promise.all(
-              (sec.entries ?? []).map(async (entry: any) => {
+              (sec.entries ?? []).map(async (entry: Entry) => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
@@ -1213,21 +1218,9 @@ const DailyReport = () => {
           })
         );
       };
+
       const processedSections = await processImages(referenceSections);
-      // DEBUG: Check processed sections
-      // console.log("DEBUG: Processed sections:", processedSections);
-      // console.log("DEBUG: Number of sections:", processedSections.length);
-      processedSections.forEach((section, idx) => {
-        // console.log(`DEBUG: Section ${idx}:`, section.title);
-        section.entries?.forEach((entry, entryIdx) => {
-          // console.log(`DEBUG: Entry ${entryIdx}:`, entry.slots?.length, "slots");
-          entry.slots?.forEach((slot, slotIdx) => {
-            // console.log(`DEBUG: Slot ${slotIdx} image type:`, typeof slot.image);
-            // console.log(`DEBUG: Slot ${slotIdx} image length:`, slot.image?.length);
-            // console.log(`DEBUG: Slot ${slotIdx} image preview:`, slot.image?.substring(0, 50) + "...");
-          });
-        });
-      });
+
       // Process CAR data
       const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
         const imgs = await Promise.all((g.images || []).map(async (img: any) => 
@@ -1239,6 +1232,22 @@ const DailyReport = () => {
           footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
         };
       }));
+      
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+        referenceSections: processedSections,
+        carSheet: {
+          ...carSheet,
+          photo_groups: processedCar,
+        },
+      };
+
+      // Save to database
+      await saveReportToDB(cleanedData);
 
       await generateCombinedPDF(
         {
@@ -1843,6 +1852,8 @@ const DailyReport = () => {
       <ReportHeader 
         isAutoSaving={isAutoSaving}
         lastSavedAt={lastSavedAt}
+        projectLogo={projectLogo}
+        setProjectLogo={setProjectLogo}
       />
 
       {/* Back Button */}

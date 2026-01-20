@@ -4,9 +4,12 @@ import { useState, useEffect, useRef } from "react";
 interface ReportHeaderProps {
   isAutoSaving?: boolean;
   lastSavedAt?: Date | null;
+  projectLogo?: string;
+  setProjectLogo?: (logo: string) => void;
 }
 
-const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeaderProps) => {
+const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null, projectLogo, setProjectLogo }: ReportHeaderProps) => {
+  const projectLogoInputRef = useRef<HTMLInputElement>(null);
   const [cacpmLogo, setCacpmLogo] = useState<string>("/cacpm_logo.png");
   const [koicaLogo, setKoicaLogo] = useState<string>("/koica_logo.png");
   const cacpmInputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +28,7 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
     if (savedKoica) setKoicaLogo(savedKoica);
   }, []);
 
-  const resizeImageWithFixedHeight = (dataUrl: string, fixedHeight: number, logoType: "cacpm" | "koica") => {
+  const resizeImageWithFixedHeight = (dataUrl: string, fixedHeight: number) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -41,14 +44,15 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
       
       // Save to localStorage
       const resizedDataUrl = canvas.toDataURL('image/png');
+      setProjectLogo(resizedDataUrl);
       
-      if (logoType === "cacpm") {
-        setCacpmLogo(resizedDataUrl);
-        localStorage.setItem("customCacpmLogo", resizedDataUrl);
-      } else {
-        setKoicaLogo(resizedDataUrl);
-        localStorage.setItem("customKoicaLogo", resizedDataUrl);
-      }
+      // if (logoType === "cacpm") {
+      //   setCacpmLogo(resizedDataUrl);
+      //   localStorage.setItem("customCacpmLogo", resizedDataUrl);
+      // } else {
+      //   setKoicaLogo(resizedDataUrl);
+      //   localStorage.setItem("customKoicaLogo", resizedDataUrl);
+      // }
     };
     img.src = dataUrl;
   };
@@ -77,7 +81,7 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
     reader.onload = (e) => {
       const result = e.target?.result as string;
       // Use the resize function with original width + fixed height
-      resizeImageWithFixedHeight(result, 94, logoType);
+      resizeImageWithFixedHeight(result, 94);
     };
     reader.readAsDataURL(file);
   };
@@ -148,12 +152,12 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
           <div
             className="p-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative border-2 border-dashed border-gray-300 hover:border-gray-400"
             style={{ width: 140, height: 48 }}
-            onClick={() => handleLogoClick("koica")}
-            title="Click to replace KOICA logo"
+            onClick={() => projectLogoInputRef.current?.click()}
+            title="Click to upload project logo"
           >
             <img
-              src={koicaLogo}
-              alt="KOICA"
+              src={projectLogo || "/koica_logo.png"}
+              alt="Project Logo"
               className="object-contain w-full h-full"
               crossOrigin="anonymous"
               referrerPolicy="no-referrer"
@@ -174,12 +178,30 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null }: ReportHeader
         onChange={(e) => handleFileChange(e, "cacpm")}
         style={{ display: "none" }}
       /> */}
-      <input
+      {/* <input
         ref={koicaInputRef}
         type="file"
         accept="image/*"
         onChange={(e) => handleFileChange(e, "koica")}
         style={{ display: "none" }}
+      /> */}
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const result = e.target?.result as string;
+              // Use the resize function
+              resizeImageWithFixedHeight(result, 94);  // ← CHANGE THIS
+            };
+            reader.readAsDataURL(file);
+          }
+        }}
+        style={{ display: "none" }}
+        ref={projectLogoInputRef}
       />
     </header>
   );

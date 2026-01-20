@@ -7,7 +7,15 @@ export function useSlotLogic(slot: any, entryId: string, onUpdateSlot: (s: any) 
 
   useEffect(() => {
     let url: string | null = null;
-    if (slot?.image) url = URL.createObjectURL(slot.image);
+    if (slot?.image) {
+      if (typeof slot.image === 'string') {
+        // Base64 string from database
+        url = slot.image;
+      } else {
+        // File object from new upload
+        url = URL.createObjectURL(slot.image);
+      }
+    }
     setImageUrl(url);
     return () => {
       if (url) URL.revokeObjectURL(url);
