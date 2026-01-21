@@ -28,6 +28,7 @@ interface ResourceTableProps {
   showUnit?: boolean;
   useDropdown?: boolean; // New prop to enable dropdown
   dropdownOptions?: string[]; // Options for dropdown
+  unitOptions?: string[]; // Options for unit dropdown
 }
 
 const ResourceTable = ({
@@ -38,6 +39,7 @@ const ResourceTable = ({
   showUnit = false,
   useDropdown = false,
   dropdownOptions = [],
+  unitOptions = [],
 }: ResourceTableProps) => {
   const addRow = () => {
     const newRow: ResourceRow = {
@@ -66,6 +68,11 @@ const ResourceTable = ({
           // Handle custom entry selection
           if (field === "description" && value === "__custom__") {
             return { ...row, description: "__custom_input__" }; // Special marker for custom input
+          }
+          
+          // Handle custom unit selection
+          if (field === "unit" && value === "__custom_unit__") {
+            return { ...row, unit: "__custom_unit_input__" }; // Special marker for custom unit input
           }
 
           const updatedRow = { ...row, [field]: value };
@@ -248,14 +255,77 @@ const ResourceTable = ({
                       </td>
                       {showUnit && (
                         <td className="px-3 py-2">
-                          <Input
-                            value={row.unit || ""}
-                            onChange={(e) =>
-                              updateRow(row.id, "unit", e.target.value)
-                            }
-                            placeholder="Unit"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
-                          />
+                          {unitOptions.length > 0 ? (
+                            (row.unit === "" || unitOptions.includes(row.unit)) && row.unit !== "__custom_unit_input__" ? (
+                              <Select
+                                value={row.unit}
+                                onValueChange={(value) =>
+                                  updateRow(row.id, "unit", value)
+                                }
+                              >
+                                <SelectTrigger className="border-0 bg-transparent focus:ring-1">
+                                  <SelectValue placeholder="Select unit..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {unitOptions.map((unit, index) => (
+                                    <SelectItem
+                                      key={`${title}-unit-${unit}-${index}`}
+                                      value={unit}
+                                    >
+                                      {unit}
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem
+                                    key="custom-unit"
+                                    value="__custom_unit__"
+                                  >
+                                    <span className="text-primary">
+                                      + Custom Unit
+                                    </span>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  value={row.unit === "__custom_unit_input__" ? "" : row.unit}
+                                  onChange={(e) =>
+                                    updateRow(
+                                      row.id,
+                                      "unit",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter custom unit..."
+                                  className="border-0 bg-transparent focus-visible:ring-1"
+                                  autoFocus
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    updateRow(
+                                      row.id,
+                                      "unit",
+                                      unitOptions[0] || ""
+                                    )
+                                  }
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            )
+                          ) : (
+                            <Input
+                              value={row.unit || ""}
+                              onChange={(e) =>
+                                updateRow(row.id, "unit", e.target.value)
+                              }
+                              placeholder="Unit"
+                              className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            />
+                          )}
                         </td>
                       )}
                       <td className="px-3 py-2">
