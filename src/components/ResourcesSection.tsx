@@ -13,41 +13,79 @@ interface ResourcesSectionProps {
 }
 // add more options as needed
 const MANAGEMENT_OPTIONS = [
-  "Architecture",
-  "Site Manager",
-  "Architect Manager",
   "Project Manager",
   "Construction Manager",
+  "Site Engineer",
+  "Architecture",
   "QS Engineer",
   "MEP Engineer",
-  "Site Engineer",
+ 
 ];
 
-const WORKING_TEAM_OPTIONS = ["Site Manager", "Site Engineer","Foreman", "Skill Workers", "General Workers"];
+const WORKING_TEAM_OPTIONS = ["Site Manager", "Site Engineer","MEP Engineer","Foreman", "Skill Workers","MEP Workers", "General Workers"];
 
 const MACHINERY_OPTIONS = [
-  "Truck",
-  "Excavator",
-  "Bulldozer",
-  "Generator",
-  "Cargo Crane",
-  "Container",
-  "Concrete Finished",
-  "Pump Car",
-  "Concrete Mixer Car",
-  "Concrete Cutting Machine",
+  "Air compressor",
   "Auto Level Machine",
+  "Bar bending machine",
+  "Bulldozer",
+  "Cargo Crane",
+  "Concrete Cutting Machine",
+  "Concrete Finished",
+  "Concrete mixer",
+  "Concrete Mixer Car",
+  "Concrete pump",
+  "Concrete vibrator",
+  "Container",
+  "Excavator",
+  "Generator",
+  "Jackhammer",
+  "Material hoist",
+  "Mobile crane",
+  "Plate compactor",
+  "Power trowel",
+  "Pump Car",
+  "Rammer",
+  "Rebar cutting machine",
+  "Roller",
+  "Total level",
+  "Total station",
+  "Truck",
+  "Water pump",
+  "Welding machine",
 ];
 
 const MATERIAL_OPTIONS = [
-  "Cement",
-  "Sand",
+  "Aggregates",
   "Brick",
-  "Scaffolding",
+  "Cement",
   "Electricity Tape",
-  "Rebar DB16",
+  "Electrical wire",
+  "HDPE pipe",
+  "Paint",
+  "PVC pipe",
+  "Rebar D14",
   "Rebar DB10",
+  "Rebar DB16",
+  "Rebar R6",
+  "Rebar R8",
+  "Sand",
+  "Scaffolding",
+  "Tile",
 ];
+
+const Units = [
+  "Pack",
+  "PCS",
+  "EA",
+  "Box",
+  "m",
+  "m2",
+  "m3",
+  "kg",
+  "ton",
+];
+
 const ResourcesSection = ({
   managementTeam,
   setManagementTeam,
@@ -92,6 +130,7 @@ const ResourcesSection = ({
           useDropdown={true}
           dropdownOptions={MATERIAL_OPTIONS}
           showUnit
+          unitOptions={Units}
         />
 
         <ResourceTable
@@ -102,6 +141,7 @@ const ResourcesSection = ({
           useDropdown={true}
           dropdownOptions={MACHINERY_OPTIONS}
           showUnit
+          unitOptions={Units}
         />
       </div>
     </div>
