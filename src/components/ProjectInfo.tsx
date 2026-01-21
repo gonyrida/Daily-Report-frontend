@@ -129,7 +129,7 @@ const ProjectInfo = ({
                   selected={reportDate}
                   onSelect={(date) => {
                     setReportDate(date);
-                    setIsOpen(false);
+                    setIsOpen(false);  // ✅ Close the picker
                   }}
                   initialFocus
                   defaultMonth={new Date()}

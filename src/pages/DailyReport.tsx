@@ -24,6 +24,7 @@ import {
   FileText,
   FileType,
   ArrowLeft,
+  Save
 } from "lucide-react";
 import { ResourceRow } from "@/components/ResourceTable";
 import {
@@ -238,6 +239,12 @@ const DailyReport = () => {
     ]
   );
 
+  // Simple date change notification
+  const handleDateChange = (newDate: Date | null) => {
+    setReportDate(newDate);
+    // Just set the date - no automatic loading/saving
+  };
+
   // Load report on mount - Try ID first, then DB by date, fallback to localStorage (only on first mount)
   useEffect(() => {
     const loadInitialReport = async () => {
@@ -299,6 +306,10 @@ const DailyReport = () => {
           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
           setMaterials(ensureRowIds(dbReport.materials || []));
           setMachinery(ensureRowIds(dbReport.machinery || []));
+          setReferenceSections(dbReport.referenceSections || []);
+          setTableTitle(dbReport.tableTitle || "SITE PHOTO EVIDENCE");
+          setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
+          setProjectLogo(dbReport.projectLogo || "");
         } else {
           // Fallback to localStorage
           const localDraft = loadDraftLocally(reportDate);
@@ -387,238 +398,397 @@ const DailyReport = () => {
     loadInitialReport();
   }, [reportDate, reportIdFromUrl]); // Include reportDate and reportIdFromUrl to satisfy ESLint
 
+  // // Load report on mount - Try ID first, then DB by date, fallback to localStorage (only on first mount)
+  // useEffect(() => {
+  //   const loadInitialReport = async () => {
+  //     if (initialLoadDoneRef.current) return; // Only load on first mount
+
+  //     initialLoadDoneRef.current = true;
+
+  //     try {
+  //       let dbReport = null;
+
+  //       // First, try to load by reportId if provided in URL
+  //       if (reportIdFromUrl) {
+  //         console.log("🔍 DAILY REPORT: Loading report by ID:", reportIdFromUrl);
+  //         dbReport = await loadReportById(reportIdFromUrl);
+  //         console.log("🔍 DAILY REPORT: Report by ID result:", dbReport ? "FOUND" : "NOT FOUND");
+  //         originalReportDataRef.current = dbReport;
+  //       }
+
+  //       // If no report by ID, try loading by date
+  //       if (!dbReport && reportDate) {
+  //         console.log("Loading report by date:", reportDate);
+  //         dbReport = await loadReportFromDB(reportDate);
+  //       }
+
+  //       if (dbReport) {
+  //         // Load from database
+  //         setReportId(dbReport._id || reportIdFromUrl);
+  //         setProjectName(dbReport.projectName || "");
+  //         setReportDate(
+  //           dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
+  //         );
+  //         // Handle backward compatibility: convert old format to new
+  //         if (dbReport.weatherAM !== undefined) {
+  //           setWeatherAM(dbReport.weatherAM || "");
+  //           setWeatherPM(dbReport.weatherPM || "");
+  //           setTempAM(dbReport.tempAM || "");
+  //           setTempPM(dbReport.tempPM || "");
+  //           setCurrentPeriod(dbReport.currentPeriod || "AM");
+  //         } else {
+  //           // Old format: migrate to new format
+  //           const oldWeather = dbReport.weather || "Sunny";
+  //           const oldPeriod = dbReport.weatherPeriod || "AM";
+  //           const oldTemp = dbReport.temperature || "";
+  //           if (oldPeriod === "AM") {
+  //             setWeatherAM(oldWeather);
+  //             setWeatherPM("");
+  //             setTempAM(oldTemp);
+  //             setTempPM("");
+  //           } else {
+  //             setWeatherAM("");
+  //             setWeatherPM(oldWeather);
+  //             setTempAM("");
+  //             setTempPM(oldTemp);
+  //           }
+  //           setCurrentPeriod("AM");
+  //         }
+  //         setActivityToday(dbReport.activityToday || "");
+  //         setWorkPlanNextDay(dbReport.workPlanNextDay || "");
+  //         setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
+  //         setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //         setMaterials(ensureRowIds(dbReport.materials || []));
+  //         setMachinery(ensureRowIds(dbReport.machinery || []));
+  //       } else {
+  //         // Fallback to localStorage
+  //         const localDraft = loadDraftLocally(reportDate);
+  //         if (localDraft) {
+  //           setProjectName(localDraft.projectName || "");
+  //           setReportDate(
+  //             localDraft.reportDate
+  //               ? new Date(localDraft.reportDate)
+  //               : new Date()
+  //           );
+  //           // Handle backward compatibility
+  //           if (localDraft.weatherAM !== undefined) {
+  //             setWeatherAM(localDraft.weatherAM || "");
+  //             setWeatherPM(localDraft.weatherPM || "");
+  //             setTempAM(localDraft.tempAM || "");
+  //             setTempPM(localDraft.tempPM || "");
+  //             setCurrentPeriod(localDraft.currentPeriod || "AM");
+  //           } else {
+  //             const oldWeather = localDraft.weather || "Sunny";
+  //             const oldPeriod = localDraft.weatherPeriod || "AM";
+  //             const oldTemp = localDraft.temperature || "";
+  //             if (oldPeriod === "AM") {
+  //               setWeatherAM(oldWeather);
+  //               setWeatherPM("");
+  //               setTempAM(oldTemp);
+  //               setTempPM("");
+  //             } else {
+  //               setWeatherAM("");
+  //               setWeatherPM(oldWeather);
+  //               setTempAM("");
+  //               setTempPM(oldTemp);
+  //             }
+  //             setCurrentPeriod("AM");
+  //           }
+  //           setActivityToday(localDraft.activityToday || "");
+  //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
+  //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
+  //           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //           setMaterials(ensureRowIds(localDraft.materials || []));
+  //           setMachinery(ensureRowIds(localDraft.machinery || []));
+  //         }
+  //       }
+  //     } catch (e) {
+  //       console.error("Failed to load report:", e);
+  //       // Fallback to localStorage if DB fails
+  //       const localDraft = loadDraftLocally(reportDate);
+  //       if (localDraft) {
+  //         setProjectName(localDraft.projectName || "");
+  //         setReportDate(
+  //           localDraft.reportDate ? new Date(localDraft.reportDate) : new Date()
+  //         );
+  //         // Handle backward compatibility
+  //         if (localDraft.weatherAM !== undefined) {
+  //           setWeatherAM(localDraft.weatherAM || "");
+  //           setWeatherPM(localDraft.weatherPM || "");
+  //           setTempAM(localDraft.tempAM || "");
+  //           setTempPM(localDraft.tempPM || "");
+  //           setCurrentPeriod(localDraft.currentPeriod || "AM");
+  //         } else {
+  //           const oldWeather = localDraft.weather || "Sunny";
+  //           const oldPeriod = localDraft.weatherPeriod || "AM";
+  //           const oldTemp = localDraft.temperature || "";
+  //           if (oldPeriod === "AM") {
+  //             setWeatherAM(oldWeather);
+  //             setWeatherPM("");
+  //             setTempAM(oldTemp);
+  //             setTempPM("");
+  //           } else {
+  //             setWeatherAM("");
+  //             setWeatherPM(oldWeather);
+  //             setTempAM("");
+  //             setTempPM(oldTemp);
+  //           }
+  //           setCurrentPeriod("AM");
+  //         }
+  //         setActivityToday(localDraft.activityToday || "");
+  //         setWorkPlanNextDay(localDraft.workPlanNextDay || "");
+  //         setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
+  //         setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //         setMaterials(ensureRowIds(localDraft.materials || []));
+  //         setMachinery(ensureRowIds(localDraft.machinery || []));
+  //       }
+  //     }
+  //   };
+
+  //   loadInitialReport();
+  // }, [reportDate, reportIdFromUrl]); // Include reportDate and reportIdFromUrl to satisfy ESLint
+
   // Handle date change: save current, carry forward between dates, load or clear on first selection
-  useEffect(() => {
-    const newDateStr = reportDate?.toISOString().slice(0, 10) || null;
-    const prevDateStr = lastDateRef.current;
+  // useEffect(() => {
+  //   const newDateStr = reportDate?.toISOString().slice(0, 10) || null;
+  //   const prevDateStr = lastDateRef.current;
 
-    if (prevDateStr && newDateStr && prevDateStr !== newDateStr) {
-      // Date changed: save current date draft locally and carry forward
-      saveDraftLocally(new Date(prevDateStr), getReportData());
+  //   if (!reportIdFromUrl && reportDate && prevDateStr && newDateStr && prevDateStr !== newDateStr) {
+  //     // Date changed: save current date draft locally and carry forward
+  //     saveDraftLocally(new Date(prevDateStr), getReportData());
 
-      // Load the target date
-      const loadTargetDate = async () => {
-        try {
-          // Try database first
-          const dbReport = await loadReportFromDB(reportDate!);
+  //     // Load the target date
+  //     const loadTargetDate = async () => {
+  //       try {
+  //         // Try database first
+  //         const dbReport = await loadReportFromDB(reportDate!);
 
-          if (dbReport) {
-            // Found report in database
-            setProjectName(dbReport.projectName || "");
-            // Handle backward compatibility: convert old format to new
-            if (dbReport.weatherAM !== undefined) {
-              setWeatherAM(dbReport.weatherAM || "");
-              setWeatherPM(dbReport.weatherPM || "");
-              setTempAM(dbReport.tempAM || "");
-              setTempPM(dbReport.tempPM || "");
-              setCurrentPeriod(dbReport.currentPeriod || "AM");
-            } else {
-              // Old format: migrate to new format
-              const oldWeather = dbReport.weather || "Sunny";
-              const oldPeriod = dbReport.weatherPeriod || "AM";
-              const oldTemp = dbReport.temperature || "";
-              if (oldPeriod === "AM") {
-                setWeatherAM(oldWeather);
-                setWeatherPM("");
-                setTempAM(oldTemp);
-                setTempPM("");
-              } else {
-                setWeatherAM("");
-                setWeatherPM(oldWeather);
-                setTempAM("");
-                setTempPM(oldTemp);
-              }
-              setCurrentPeriod("AM");
-            }
-            setActivityToday(dbReport.activityToday || "");
-            setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-            setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-            setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-            setMaterials(ensureRowIds(dbReport.materials || []));
-            setMachinery(ensureRowIds(dbReport.machinery || []));
-          } else {
-            // No DB report, try localStorage
-            const localDraft = loadDraftLocally(reportDate);
+  //         if (dbReport) {
+  //           // Found report in database
+  //           setProjectName(dbReport.projectName || "");
+  //           // Handle backward compatibility: convert old format to new
+  //           if (dbReport.weatherAM !== undefined) {
+  //             setWeatherAM(dbReport.weatherAM || "");
+  //             setWeatherPM(dbReport.weatherPM || "");
+  //             setTempAM(dbReport.tempAM || "");
+  //             setTempPM(dbReport.tempPM || "");
+  //             setCurrentPeriod(dbReport.currentPeriod || "AM");
+  //           } else {
+  //             // Old format: migrate to new format
+  //             const oldWeather = dbReport.weather || "Sunny";
+  //             const oldPeriod = dbReport.weatherPeriod || "AM";
+  //             const oldTemp = dbReport.temperature || "";
+  //             if (oldPeriod === "AM") {
+  //               setWeatherAM(oldWeather);
+  //               setWeatherPM("");
+  //               setTempAM(oldTemp);
+  //               setTempPM("");
+  //             } else {
+  //               setWeatherAM("");
+  //               setWeatherPM(oldWeather);
+  //               setTempAM("");
+  //               setTempPM(oldTemp);
+  //             }
+  //             setCurrentPeriod("AM");
+  //           }
+  //           setActivityToday(dbReport.activityToday || "");
+  //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
+  //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
+  //           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //           setMaterials(ensureRowIds(dbReport.materials || []));
+  //           setMachinery(ensureRowIds(dbReport.machinery || []));
+  //         } else {
+  //           // No DB report, try localStorage
+  //           const localDraft = loadDraftLocally(reportDate);
 
-            if (localDraft) {
-              // Found local draft
-              setProjectName(localDraft.projectName || "");
-              // Handle backward compatibility
-              if (localDraft.weatherAM !== undefined) {
-                setWeatherAM(localDraft.weatherAM || "");
-                setWeatherPM(localDraft.weatherPM || "");
-                setTempAM(localDraft.tempAM || "");
-                setTempPM(localDraft.tempPM || "");
-                setCurrentPeriod(localDraft.currentPeriod || "AM");
-              } else {
-                const oldWeather = localDraft.weather || "Sunny";
-                const oldPeriod = localDraft.weatherPeriod || "AM";
-                const oldTemp = localDraft.temperature || "";
-                if (oldPeriod === "AM") {
-                  setWeatherAM(oldWeather);
-                  setWeatherPM("");
-                  setTempAM(oldTemp);
-                  setTempPM("");
-                } else {
-                  setWeatherAM("");
-                  setWeatherPM(oldWeather);
-                  setTempAM("");
-                  setTempPM(oldTemp);
-                }
-                setCurrentPeriod("AM");
-              }
-              setActivityToday(localDraft.activityToday || "");
-              setWorkPlanNextDay(localDraft.workPlanNextDay || "");
-              setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-              setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
-              setMaterials(ensureRowIds(localDraft.materials || []));
-              setMachinery(ensureRowIds(localDraft.machinery || []));
-            } else {
-              // No saved report: prefill from yesterday
-              const yesterday = new Date(reportDate!.getTime() - 86400000);
-              const prevData = loadDraftLocally(yesterday);
+  //           if (localDraft) {
+  //             // Found local draft
+  //             setProjectName(localDraft.projectName || "");
+  //             // Handle backward compatibility
+  //             if (localDraft.weatherAM !== undefined) {
+  //               setWeatherAM(localDraft.weatherAM || "");
+  //               setWeatherPM(localDraft.weatherPM || "");
+  //               setTempAM(localDraft.tempAM || "");
+  //               setTempPM(localDraft.tempPM || "");
+  //               setCurrentPeriod(localDraft.currentPeriod || "AM");
+  //             } else {
+  //               const oldWeather = localDraft.weather || "Sunny";
+  //               const oldPeriod = localDraft.weatherPeriod || "AM";
+  //               const oldTemp = localDraft.temperature || "";
+  //               if (oldPeriod === "AM") {
+  //                 setWeatherAM(oldWeather);
+  //                 setWeatherPM("");
+  //                 setTempAM(oldTemp);
+  //                 setTempPM("");
+  //               } else {
+  //                 setWeatherAM("");
+  //                 setWeatherPM(oldWeather);
+  //                 setTempAM("");
+  //                 setTempPM(oldTemp);
+  //               }
+  //               setCurrentPeriod("AM");
+  //             }
+  //             setActivityToday(localDraft.activityToday || "");
+  //             setWorkPlanNextDay(localDraft.workPlanNextDay || "");
+  //             setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
+  //             setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //             setMaterials(ensureRowIds(localDraft.materials || []));
+  //             setMachinery(ensureRowIds(localDraft.machinery || []));
+  //           } else {
+  //             // No saved report: prefill from yesterday
+  //             const yesterday = new Date(reportDate!.getTime() - 86400000);
+  //             const prevData = loadDraftLocally(yesterday);
 
-              if (prevData) {
-                // Copy prev-day accumulated -> today's prev
-                const mapPrevFromAccum = (rows: ResourceRow[]) =>
-                  ensureRowIds(rows).map((r) => ({
-                    ...r,
-                    prev: r.accumulated,
-                    today: 0,
-                    accumulated: r.accumulated,
-                  }));
+  //             if (prevData) {
+  //               // Copy prev-day accumulated -> today's prev
+  //               const mapPrevFromAccum = (rows: ResourceRow[]) =>
+  //                 ensureRowIds(rows).map((r) => ({
+  //                   ...r,
+  //                   prev: r.accumulated,
+  //                   today: 0,
+  //                   accumulated: r.accumulated,
+  //                 }));
 
-                setManagementTeam(
-                  mapPrevFromAccum(prevData.managementTeam || [])
-                );
-                setWorkingTeam(mapPrevFromAccum(prevData.workingTeam || []));
-                setMaterials(mapPrevFromAccum(prevData.materials || []));
-                setMachinery(mapPrevFromAccum(prevData.machinery || []));
+  //               setManagementTeam(
+  //                 mapPrevFromAccum(prevData.managementTeam || [])
+  //               );
+  //               setWorkingTeam(mapPrevFromAccum(prevData.workingTeam || []));
+  //               setMaterials(mapPrevFromAccum(prevData.materials || []));
+  //               setMachinery(mapPrevFromAccum(prevData.machinery || []));
 
-                // Reset other fields for new day
-                setProjectName("");
-                setWeatherAM("");
-                setWeatherPM("");
-                setTempAM("");
-                setTempPM("");
-                setCurrentPeriod("AM");
-                setActivityToday("");
-                setWorkPlanNextDay("");
-              }
-            }
-          }
-        } catch (e) {
-          console.error("Failed to load report for new date:", e);
-        }
-      };
+  //               // Reset other fields for new day
+  //               setProjectName("");
+  //               setWeatherAM("");
+  //               setWeatherPM("");
+  //               setTempAM("");
+  //               setTempPM("");
+  //               setCurrentPeriod("AM");
+  //               setActivityToday("");
+  //               setWorkPlanNextDay("");
+  //             }
+  //           }
+  //         }
+  //       } catch (e) {
+  //         console.error("Failed to load report for new date:", e);
+  //       }
+  //     };
 
-      loadTargetDate();
-    } else if (newDateStr && !prevDateStr) {
-      // First date selection: try to load existing data for this date, otherwise clear
-      const loadDataForDate = async () => {
-        try {
-          // Try to load from database first
-          const dbReport = await loadReportFromDB(reportDate!);
-          if (dbReport) {
-            setProjectName(dbReport.projectName || "");
-            // Handle backward compatibility: convert old format to new
-            if (dbReport.weatherAM !== undefined) {
-              setWeatherAM(dbReport.weatherAM || "");
-              setWeatherPM(dbReport.weatherPM || "");
-              setTempAM(dbReport.tempAM || "");
-              setTempPM(dbReport.tempPM || "");
-              setCurrentPeriod(dbReport.currentPeriod || "AM");
-            } else {
-              // Old format: migrate to new format
-              const oldWeather = dbReport.weather || "Sunny";
-              const oldPeriod = dbReport.weatherPeriod || "AM";
-              const oldTemp = dbReport.temperature || "";
-              if (oldPeriod === "AM") {
-                setWeatherAM(oldWeather);
-                setWeatherPM("");
-                setTempAM(oldTemp);
-                setTempPM("");
-              } else {
-                setWeatherAM("");
-                setWeatherPM(oldWeather);
-                setTempAM("");
-                setTempPM(oldTemp);
-              }
-              setCurrentPeriod("AM");
-            }
-            setActivityToday(dbReport.activityToday || "");
-            setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-            setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-            setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-            setMaterials(ensureRowIds(dbReport.materials || []));
-            setMachinery(ensureRowIds(dbReport.machinery || []));
-            setReferenceSections(dbReport.referenceSections || []);
-            setTableTitle(dbReport.tableTitle || "SITE PHOTO EVIDENCE");
-            setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
-            setProjectLogo(dbReport.projectLogo || "");
-            return;
-          }
+  //     loadTargetDate();
+  //   } else if (newDateStr && !prevDateStr) {
+  //     console.log("🐛 DEBUG: First date selection");
+  //     console.log("🐛 DEBUG: newDateStr:", newDateStr);
+  //     console.log("🐛 DEBUG: prevDateStr:", prevDateStr);
+  //     console.log("🐛 DEBUG: reportIdFromUrl:", reportIdFromUrl);
+  //     // First date selection: try to load existing data for this date, otherwise clear
+  //     const loadDataForDate = async () => {
+  //       console.log("🐛 DEBUG: loadDataForDate called");
+  //       console.log("🐛 DEBUG: reportDate object:", reportDate);
+  //       console.log("🐛 DEBUG: reportDate type:", typeof reportDate);
+  //       console.log("🐛 DEBUG: reportDate toISOString:", reportDate?.toISOString());
+  //       try {
+  //         // Try to load from database first
+  //         const dbReport = await loadReportFromDB(reportDate!);
+  //         console.log("🐛 DEBUG: dbReport from loadReportFromDB:", dbReport);
+  //         if (dbReport) {
+  //           setProjectName(dbReport.projectName || "");
+  //           // Handle backward compatibility: convert old format to new
+  //           if (dbReport.weatherAM !== undefined) {
+  //             setWeatherAM(dbReport.weatherAM || "");
+  //             setWeatherPM(dbReport.weatherPM || "");
+  //             setTempAM(dbReport.tempAM || "");
+  //             setTempPM(dbReport.tempPM || "");
+  //             setCurrentPeriod(dbReport.currentPeriod || "AM");
+  //           } else {
+  //             // Old format: migrate to new format
+  //             const oldWeather = dbReport.weather || "Sunny";
+  //             const oldPeriod = dbReport.weatherPeriod || "AM";
+  //             const oldTemp = dbReport.temperature || "";
+  //             if (oldPeriod === "AM") {
+  //               setWeatherAM(oldWeather);
+  //               setWeatherPM("");
+  //               setTempAM(oldTemp);
+  //               setTempPM("");
+  //             } else {
+  //               setWeatherAM("");
+  //               setWeatherPM(oldWeather);
+  //               setTempAM("");
+  //               setTempPM(oldTemp);
+  //             }
+  //             setCurrentPeriod("AM");
+  //           }
+  //           setActivityToday(dbReport.activityToday || "");
+  //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
+  //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
+  //           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //           setMaterials(ensureRowIds(dbReport.materials || []));
+  //           setMachinery(ensureRowIds(dbReport.machinery || []));
+  //           setReferenceSections(dbReport.referenceSections || []);
+  //           setTableTitle(dbReport.tableTitle || "SITE PHOTO EVIDENCE");
+  //           setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
+  //           setProjectLogo(dbReport.projectLogo || "");
+  //           return;
+  //         }
 
-          // Fallback to localStorage
-          const localDraft = loadDraftLocally(reportDate);
-          if (localDraft) {
-            setProjectName(localDraft.projectName || "");
-            // Handle backward compatibility
-            if (localDraft.weatherAM !== undefined) {
-              setWeatherAM(localDraft.weatherAM || "");
-              setWeatherPM(localDraft.weatherPM || "");
-              setTempAM(localDraft.tempAM || "");
-              setTempPM(localDraft.tempPM || "");
-              setCurrentPeriod(localDraft.currentPeriod || "AM");
-            } else {
-              const oldWeather = localDraft.weather || "Sunny";
-              const oldPeriod = localDraft.weatherPeriod || "AM";
-              const oldTemp = localDraft.temperature || "";
-              if (oldPeriod === "AM") {
-                setWeatherAM(oldWeather);
-                setWeatherPM("");
-                setTempAM(oldTemp);
-                setTempPM("");
-              } else {
-                setWeatherAM("");
-                setWeatherPM(oldWeather);
-                setTempAM("");
-                setTempPM(oldTemp);
-              }
-              setCurrentPeriod("AM");
-            }
-            setActivityToday(localDraft.activityToday || "");
-            setWorkPlanNextDay(localDraft.workPlanNextDay || "");
-            setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-            setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
-            setMaterials(ensureRowIds(localDraft.materials || []));
-            setMachinery(ensureRowIds(localDraft.machinery || []));
-            return;
-          }
-        } catch (e) {
-          console.error("Failed to load report for date:", e);
-        }
+  //         // Fallback to localStorage
+  //         const localDraft = loadDraftLocally(reportDate);
+  //         if (localDraft) {
+  //           setProjectName(localDraft.projectName || "");
+  //           // Handle backward compatibility
+  //           if (localDraft.weatherAM !== undefined) {
+  //             setWeatherAM(localDraft.weatherAM || "");
+  //             setWeatherPM(localDraft.weatherPM || "");
+  //             setTempAM(localDraft.tempAM || "");
+  //             setTempPM(localDraft.tempPM || "");
+  //             setCurrentPeriod(localDraft.currentPeriod || "AM");
+  //           } else {
+  //             const oldWeather = localDraft.weather || "Sunny";
+  //             const oldPeriod = localDraft.weatherPeriod || "AM";
+  //             const oldTemp = localDraft.temperature || "";
+  //             if (oldPeriod === "AM") {
+  //               setWeatherAM(oldWeather);
+  //               setWeatherPM("");
+  //               setTempAM(oldTemp);
+  //               setTempPM("");
+  //             } else {
+  //               setWeatherAM("");
+  //               setWeatherPM(oldWeather);
+  //               setTempAM("");
+  //               setTempPM(oldTemp);
+  //             }
+  //             setCurrentPeriod("AM");
+  //           }
+  //           setActivityToday(localDraft.activityToday || "");
+  //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
+  //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
+  //           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //           setMaterials(ensureRowIds(localDraft.materials || []));
+  //           setMachinery(ensureRowIds(localDraft.machinery || []));
+  //           return;
+  //         }
+  //       } catch (e) {
+  //         console.error("Failed to load report for date:", e);
+  //       }
 
-        // No existing data: clear form to defaults
-        setProjectName("");
-        setWeatherAM("");
-        setWeatherPM("");
-        setTempAM("");
-        setTempPM("");
-        setCurrentPeriod("AM");
-        setActivityToday("");
-        setWorkPlanNextDay("");
-        setManagementTeam([]);
-        setWorkingTeam([]);
-        setMaterials([]);
-        setMachinery([]);
-      };
+  //       // No existing data: clear form to defaults
+  //       setProjectName("");
+  //       setWeatherAM("");
+  //       setWeatherPM("");
+  //       setTempAM("");
+  //       setTempPM("");
+  //       setCurrentPeriod("AM");
+  //       setActivityToday("");
+  //       setWorkPlanNextDay("");
+  //       setManagementTeam([]);
+  //       setWorkingTeam([]);
+  //       setMaterials([]);
+  //       setMachinery([]);
+  //     };
 
-      loadDataForDate();
-    }
+  //     loadDataForDate();
+  //   }
 
-    lastDateRef.current = newDateStr;
-  }, [reportDate, getReportData]);
+  //   lastDateRef.current = newDateStr;
+  // }, [reportDate, getReportData]);
 
   // Save draft to localStorage (silent mode for auto-save)
   const saveDraft = useCallback(
@@ -988,6 +1158,113 @@ const DailyReport = () => {
     }
   };
 
+  const handleSaveReport = async () => {
+    setIsSaving(true);
+    try {
+      console.log("🔒 SAVE: Saving report to database");
+      
+      // Get current report data
+      const rawData = getReportData();
+      
+      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+        if (!img) return null;
+
+        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        if (typeof img === "string") {
+          if (!img.startsWith("blob:")) return img;
+
+          const resp = await fetch(img);
+          const blob = await resp.blob();
+
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        // Case 2: File object (common)
+        if (img instanceof File) {
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(img);
+          });
+        }
+
+        // Case 3: unknown object shape (skip it safely)
+        return null;
+      };
+
+      const processImages = async (sectionsArr: Section[]) => {
+        return await Promise.all(
+          sectionsArr.map(async (sec: Section) => {
+            const newEntries = await Promise.all(
+              (sec.entries ?? []).map(async (entry: Entry) => {
+                const newSlots = await Promise.all(
+                  (entry.slots ?? []).map(async (slot: Slot) => ({
+                    ...slot,
+                    image: await toBase64DataUrl(slot.image),
+                  }))
+                );
+                return { ...entry, slots: newSlots };
+              })
+            );
+            return { ...sec, entries: newEntries };
+          })
+        );
+      };
+
+      const processedSections = await processImages(referenceSections);
+
+      // Process CAR data
+      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
+        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
+          (await toBase64DataUrl(img)) || ""
+        ));
+        return { 
+          date: g.date || "", 
+          images: [imgs[0] || "", imgs[1] || ""], 
+          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
+        };
+      }));
+
+      const processedLogo = await toBase64DataUrl(projectLogo);
+      
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+        referenceSections: processedSections,
+        carSheet: {
+          ...carSheet,
+          photo_groups: processedCar,
+        },
+        projectLogo: processedLogo,
+      };
+      // Save to database
+      await saveReportToDB(cleanedData);
+      
+      toast({
+        title: "Report Saved",
+        description: "Your report has been saved successfully.",
+      });
+    } catch (error) {
+      console.error("Save Error:", error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleExportCombinedExcel = async () => {
     if (!validateReport()) return;
 
@@ -1132,7 +1409,8 @@ const DailyReport = () => {
         reportPayload,
         processedSections,
         tableTitle,
-        fileName
+        fileName,
+        processedLogo
       );
 
       toast({
@@ -1232,6 +1510,8 @@ const DailyReport = () => {
           footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
         };
       }));
+
+      const processedLogo = await toBase64DataUrl(projectLogo);
       
       const cleanedData = {
         ...rawData,
@@ -1268,7 +1548,8 @@ const DailyReport = () => {
         },
         processedSections,
         tableTitle,
-        fileName
+        fileName,
+        processedLogo
       );
       
       toast({
@@ -1360,9 +1641,7 @@ const DailyReport = () => {
         };
       }));
 
-      // Get custom logos from localStorage for combined mode
-      const cacpmLogo = localStorage.getItem("customCacpmLogo");
-      const koicaLogo = localStorage.getItem("customKoicaLogo");
+      const processedLogo = await toBase64DataUrl(projectLogo);
 
       // Use same payload as export
       const payload = {
@@ -1394,8 +1673,8 @@ const DailyReport = () => {
           description: carSheet.description || "",
           photo_groups: processedCar,
           logos: {
-            cacpm: cacpmLogo,
-            koica: koicaLogo,
+            cacpm: null,
+            koica: processedLogo,
           }
         },
       };
@@ -1512,6 +1791,8 @@ const DailyReport = () => {
         };
       }));
 
+      const processedLogo = await toBase64DataUrl(projectLogo);
+
       // Generate both files
       const reportPayload = {
         projectName,
@@ -1530,10 +1811,6 @@ const DailyReport = () => {
         photo_groups: processedCar,
       };
 
-      // Get custom logos from localStorage for combined mode
-      const cacpmLogo = localStorage.getItem("customCacpmLogo");
-      const koicaLogo = localStorage.getItem("customKoicaLogo");
-
       // Generate PDF
       const pdfResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
         mode: "combined",
@@ -1551,9 +1828,9 @@ const DailyReport = () => {
             })
           ),
           logos: {
-            cacpm: cacpmLogo,
-            koica: koicaLogo,
-          },
+            cacpm: null,
+            koica: processedLogo,
+          }
         },
       });
 
@@ -1572,8 +1849,8 @@ const DailyReport = () => {
           })
         ),
         logos: {
-          cacpm: cacpmLogo,
-          koica: koicaLogo,
+          cacpm: null,
+          koica: processedLogo,
         }
       });
 
@@ -1967,6 +2244,11 @@ const DailyReport = () => {
               Sheet 3
             </div>
             <div className="flex items-center gap-3">
+              {/* ADD THIS: Simple Save Button */}
+              <Button variant="outline" className="min-w-[140px]" onClick={handleSaveReport} disabled={isSaving}>
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? "Saving..." : "Save Report"}
+              </Button>
               <Button variant="outline" className="min-w-[140px]" onClick={handlePreviewCombined} disabled={isPreviewingCombined}>
                 <Eye className="w-4 h-4 mr-2" />
                 {isPreviewingCombined ? "Previewing Combined..." : "Preview Combined"}

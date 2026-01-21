@@ -117,7 +117,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
             <GripVertical className="w-4 h-4" />
           </div> */}
           <div className="flex items-center gap-2">
-            <input type="date" value={group.date} onChange={handleDateChange} className="px-2 py-1 border rounded-md" aria-label={`Group ${index + 1} date`} />
+            <input type="date" value={group.date} onChange={handleDateChange} className="px-2 py-1 border rounded-md bg-background text-foreground" aria-label={`Group ${index + 1} date`} />
             <div className="text-sm text-muted-foreground">Group {index + 1}</div>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
                   )}
                   <input ref={fileInputRefs[i]} type="file" accept="image/*" multiple onChange={(e) => handleMultipleImageUpload(Array.from(e.target.files || []), i)} className="absolute inset-0 opacity-0 cursor-pointer" />
                 </div>
-                <input type="text" placeholder="Caption" value={group.footers[i] || ""} onChange={(e) => handleFooterChange(e, i)} className="mt-2 p-2 border rounded-md" aria-label={`Caption ${i + 1}`} />
+                <input type="text" placeholder="Caption" value={group.footers[i] || ""} onChange={(e) => handleFooterChange(e, i)} className="mt-2 p-2 border rounded-md bg-background text-foreground" aria-label={`Caption ${i + 1}`} />
               </div>
             );
           })}

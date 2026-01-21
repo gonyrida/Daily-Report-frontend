@@ -128,9 +128,9 @@ export default function Section({ section, onUpdate, onDelete }: any) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-shadow hover:shadow-md">
+    <div className="rounded-lg shadow-sm overflow-hidden transition-shadow hover:shadow-md bg-background text-foreground">
       {/* Section Header */}
-      <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200 px-6 py-4">
+      <div className="px-6 py-4 bg-background text-foreground">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex-1">
             <label htmlFor={`section-title-${section.id}`} className="sr-only">Section Title</label>

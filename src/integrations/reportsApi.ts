@@ -56,6 +56,7 @@ export const submitReportToDB = async (
 };
 
 export const loadReportFromDB = async (reportDate: Date) => {
+  console.log("🐛 DEBUG API: loadReportFromDB called with:", reportDate);
   try {
     const year = reportDate.getFullYear();
     const month = String(reportDate.getMonth() + 1).padStart(2, "0");
@@ -82,7 +83,7 @@ export const loadReportFromDB = async (reportDate: Date) => {
     }
 
     const result = await response.json();
-    console.log("🔒 LOAD REPORT: Success:", result);
+    console.log("🐛 DEBUG API: loadReportFromDB result:", result);
     return result;
   } catch (err) {
     console.error("🔒 LOAD REPORT: Exception:", err);
@@ -291,19 +292,17 @@ export const generateCombinedExcel = async (
   reportPayload: any,
   referenceSections: any[],
   tableTitle: string = "SITE PHOTO EVIDENCE",
-  fileName?: string
+  fileName?: string,
+  koicaLogo?: string,
+  cacpmLogo?: string
 ) => {
   try {
-    // Get custom logos from localStorage for combined mode
-    const cacpmLogo = localStorage.getItem("customCacpmLogo");
-    const koicaLogo = localStorage.getItem("customKoicaLogo");
-    
     const enhancedPayload = {
       ...reportPayload,
       logos: {
         cacpm: cacpmLogo,
         koica: koicaLogo,
-      },
+      }
       // userId will be extracted from JWT cookie by Python backend
     };
 
@@ -526,11 +525,10 @@ export const generateCombinedPDF = async (
   reportPayload: any,
   referenceSections: any[],
   tableTitle: string = "SITE PHOTO EVIDENCE",
-  fileName?: string
+  fileName?: string,
+  koicaLogo?: string,
+  cacpmLogo?: string
 ) => {
-  // Get custom logos from localStorage for combined mode
-  const cacpmLogo = localStorage.getItem("customCacpmLogo");
-  const koicaLogo = localStorage.getItem("customKoicaLogo");
   // console.log("DEBUG API: Received referenceSections:", referenceSections);
   const referenceEntries = referenceSections.flatMap((section: any) =>
     (section.entries ?? []).map((entry: any) => {
