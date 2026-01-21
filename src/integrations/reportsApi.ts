@@ -167,7 +167,7 @@ export const generatePythonExcel = async (
 
 export const generateReferenceExcel = async (
   referenceSections: any[],
-  tableTitle: string = "SITE PHOTO EVIDENCE",
+  tableTitle: string = "HSE Tools Metting",
   fileName?: string
 ) => {
   try {
@@ -291,7 +291,7 @@ export const generateCarExcel = async (
 export const generateCombinedExcel = async (
   reportPayload: any,
   referenceSections: any[],
-  tableTitle: string = "SITE PHOTO EVIDENCE",
+  tableTitle: string = "HSE Toolbox Meeting",
   fileName?: string,
   koicaLogo?: string,
   cacpmLogo?: string
@@ -524,7 +524,7 @@ export const getRecentReports = async (limit: number = 20, status?: string) => {
 export const generateCombinedPDF = async (
   reportPayload: any,
   referenceSections: any[],
-  tableTitle: string = "SITE PHOTO EVIDENCE",
+  tableTitle: string = "HSE Toolbox Meeting",
   fileName?: string,
   koicaLogo?: string,
   cacpmLogo?: string

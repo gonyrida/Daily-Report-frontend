@@ -687,7 +687,7 @@ export const useReportForm = () => {
   const handleExportCombinedExcel = useCallback(
     async (
       referenceSections: any[],
-      tableTitle: string = "SITE PHOTO EVIDENCE",
+      tableTitle: string = "HSE Toolbox Meeting",
       fileName: string
     ) => {
       await saveAndExportCombinedExcel(referenceSections, tableTitle, fileName);

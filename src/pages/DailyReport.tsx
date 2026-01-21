@@ -9,6 +9,7 @@ import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
 import CARSection from "@/components/CARSection";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
+import { createDefaultHSESections } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -113,6 +114,8 @@ interface ReportData {
   // Optional merged-reference data (kept optional so export logic isn't changed yet)
   referenceSections?: Section[];
   tableTitle?: string;
+  siteActivitiesSections?: Section[];
+  siteActivitiesTitle?: string;
   carSheet?: {
     description: string;
     photo_groups: Array<{
@@ -151,9 +154,14 @@ const DailyReport = () => {
   const [machinery, setMachinery] = useState<ResourceRow[]>([]);
 
   // Reference Section state
-  const [referenceSections, setReferenceSections] = useState<Section[]>([]);
-  const [tableTitle, setTableTitle] = useState("SITE PHOTO EVIDENCE");
+  const [referenceSections, setReferenceSections] = useState<Section[]>(createDefaultHSESections());
+  const [tableTitle, setTableTitle] = useState("HSE Toolbox Meeting");
   const [isExportingReference, setIsExportingReference] = useState(false);
+
+  // Site Activities Photos state
+  const [siteActivitiesSections, setSiteActivitiesSections] = useState<Section[]>(createDefaultHSESections());
+  const [siteActivitiesTitle, setSiteActivitiesTitle] = useState("Site Activities Photos");
+  const [isExportingSiteActivities, setIsExportingSiteActivities] = useState(false);
 
   // CAR Sheet state
   const [carSheet, setCarSheet] = useState<any>(createEmptyCarSheet());
@@ -220,6 +228,8 @@ const DailyReport = () => {
       // Keep reference sections in the object for future export mapping (no export logic changed yet)
       referenceSections,
       tableTitle,
+      siteActivitiesSections,
+      siteActivitiesTitle,
       carSheet,
       projectLogo,
     }),
@@ -238,6 +248,8 @@ const DailyReport = () => {
       machinery,
       referenceSections,
       tableTitle,
+      siteActivitiesSections,
+      siteActivitiesTitle,
       carSheet,
       projectLogo,
     ]
@@ -316,8 +328,10 @@ const DailyReport = () => {
           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
           setMaterials(ensureRowIds(dbReport.materials || []));
           setMachinery(ensureRowIds(dbReport.machinery || []));
-          setReferenceSections(dbReport.referenceSections || []);
-          setTableTitle(dbReport.tableTitle || "SITE PHOTO EVIDENCE");
+          setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
+          setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
+          setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
+          setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
           setCarSheet(
             dbReport.carSheet || { description: "", photo_groups: [] }
           );
@@ -362,6 +376,9 @@ const DailyReport = () => {
             setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
             setMaterials(ensureRowIds(localDraft.materials || []));
             setMachinery(ensureRowIds(localDraft.machinery || []));
+            setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
+            setSiteActivitiesSections(localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0 ? localDraft.siteActivitiesSections : createDefaultHSESections());
+            setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
           }
         }
       } catch (e) {
@@ -403,6 +420,9 @@ const DailyReport = () => {
           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
           setMaterials(ensureRowIds(localDraft.materials || []));
           setMachinery(ensureRowIds(localDraft.machinery || []));
+          setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
+          setSiteActivitiesSections(localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0 ? localDraft.siteActivitiesSections : createDefaultHSESections());
+          setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
         }
       }
     };
@@ -735,7 +755,7 @@ const DailyReport = () => {
   //           setMaterials(ensureRowIds(dbReport.materials || []));
   //           setMachinery(ensureRowIds(dbReport.machinery || []));
   //           setReferenceSections(dbReport.referenceSections || []);
-  //           setTableTitle(dbReport.tableTitle || "SITE PHOTO EVIDENCE");
+  //           setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
   //           setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
   //           setProjectLogo(dbReport.projectLogo || "");
   //           return;
@@ -2330,7 +2350,7 @@ const DailyReport = () => {
           <>
             <div className="mt-2 pt-2">
               <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground/70 mb-4">
+                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground mb-4">
                   HSE ACTIVITIES PHOTO
                 </h1>
                 <ReferenceSection
@@ -2348,9 +2368,20 @@ const DailyReport = () => {
 
         {activeTab === "site-activities-photos" && (
           <>
-            {/* Site Activities Photos content can be added here */}
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Site Activities Photos section coming soon...</p>
+            <div className="mt-2 pt-2">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground mb-4">
+                  SITE ACTIVITIES PHOTOS
+                </h1>
+                <ReferenceSection
+                  sections={siteActivitiesSections}
+                  setSections={setSiteActivitiesSections}
+                  onExportReference={handleExportReference}
+                  isExporting={isExportingSiteActivities}
+                  tableTitle={siteActivitiesTitle}
+                  setTableTitle={setSiteActivitiesTitle}
+                />
+              </div>
             </div>
           </>
         )}

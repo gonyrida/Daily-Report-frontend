@@ -240,7 +240,7 @@ const Index = () => {
 
   // Reference Section state
   const [referenceSections, setReferenceSections] = useState<Section[]>([]);
-  const [tableTitle, setTableTitle] = useState("SITE PHOTO EVIDENCE");
+  const [tableTitle, setTableTitle] = useState("HSE Toolbox Meeting");
   const [isExportingReference, setIsExportingReference] = useState(false);
 
   // CAR Sheet state

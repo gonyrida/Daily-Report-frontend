@@ -1,7 +1,7 @@
-export function createReferenceSection() {
+export function createReferenceSection(title?: string) {
   return {
     id: crypto.randomUUID(),
-    title: "New Section",
+    title: title || "New Section",
     entries: [
       {
         id: crypto.randomUUID(),
@@ -12,6 +12,13 @@ export function createReferenceSection() {
       },
     ],
   };
+}
+
+export function createDefaultHSESections() {
+  return [
+    createReferenceSection("HSE Toolbox Meeting"),
+    createReferenceSection("HSE Activity Photos")
+  ];
 }
 
 export const validateReferenceSections = (sections: any[]) => {

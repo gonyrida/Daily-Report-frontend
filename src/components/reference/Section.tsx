@@ -153,6 +153,7 @@ export default function Section({ section, onUpdate, onDelete }: any) {
               Upload Images
             </Button>
 
+            {/* DISABLED: Delete Section button - commented out as requested
             {showDeleteConfirm ? (
               <>
                 <Button variant="destructive" onClick={handleDelete} className="text-sm px-3 py-1.5"><Check className="w-4 h-4 mr-2" />Confirm</Button>
@@ -161,13 +162,14 @@ export default function Section({ section, onUpdate, onDelete }: any) {
             ) : (
               <Button variant="destructive" onClick={handleDelete} className="text-sm px-3 py-1.5"><Trash2 className="w-4 h-4 mr-2" />Delete Section</Button>
             )}
+            */}
           </div>
         </div>
       </div>
 
       <div className="p-6">
         {section.entries.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-6">
             {section.entries.map((entry: any, index: number) => (
               <div key={entry.id} className="relative">
                 <Entry entry={entry} onUpdate={updateEntry} onDelete={deleteEntry} entryNumber={index + 1} onBulkUpload={handleBulkUploadFiles} />
@@ -184,7 +186,7 @@ export default function Section({ section, onUpdate, onDelete }: any) {
         <div className="flex items-center justify-end gap-3 mt-6">
           <Button onClick={addEntry} className="inline-flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white"> 
             <ImagePlus className="w-4 h-4" />
-            Add Entry
+            Add More Picture
           </Button>
         </div>
       </div>
