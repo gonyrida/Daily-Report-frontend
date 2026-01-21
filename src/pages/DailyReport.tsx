@@ -817,12 +817,12 @@ const DailyReport = () => {
   );
 
   // Auto-save every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      saveDraft(true);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [saveDraft]);
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     saveDraft(true);
+  //   }, 30000);
+  //   return () => clearInterval(interval);
+  // }, [saveDraft]);
 
   // Google Docs-style: Auto-save with debounce
   const debouncedAutoSave = useRef<NodeJS.Timeout | null>(null);
