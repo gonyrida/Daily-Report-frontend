@@ -24,7 +24,7 @@ import {
   FileText,
   FileType,
   ArrowLeft,
-  Save
+  Save,
 } from "lucide-react";
 import { ResourceRow } from "@/components/ResourceTable";
 import {
@@ -38,7 +38,7 @@ import {
   generatePythonExcel,
   generateReferenceExcel,
   generateCombinedExcel,
-  generateCombinedPDF
+  generateCombinedPDF,
 } from "@/integrations/reportsApi";
 import {
   saveReportToDB,
@@ -48,10 +48,7 @@ import {
   deleteReport,
   autoSaveReport,
 } from "@/integrations/reportsApi";
-import { 
-  API_ENDPOINTS,
-  PYTHON_API_BASE_URL 
-} from "@/config/api";
+import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -131,7 +128,7 @@ const DailyReport = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const reportIdFromUrl = searchParams.get('reportId');
+  const reportIdFromUrl = searchParams.get("reportId");
 
   // Project Info
   const [projectLogo, setProjectLogo] = useState<string>("");
@@ -182,7 +179,14 @@ const DailyReport = () => {
   // File name dialog state
   const [showFileNameDialog, setShowFileNameDialog] = useState(false);
   const [defaultFileName, setDefaultFileName] = useState<string>("");
-  const [pendingExportType, setPendingExportType] = useState<"excel" | "combined" | "reference" | "combined-pdf" | "combined-zip" >(null);
+  const [pendingExportType, setPendingExportType] = useState<
+    "excel" | "combined" | "reference" | "combined-pdf" | "combined-zip"
+  >(null);
+
+  // Active tab state for section filtering
+  const [activeTab, setActiveTab] = useState<
+    "site-activities" | "hse" | "site-activities-photos" | "car"
+  >("site-activities");
 
   // Track previous date to detect changes
   const lastDateRef = useRef<string | null>(null);
@@ -257,9 +261,15 @@ const DailyReport = () => {
 
         // First, try to load by reportId if provided in URL
         if (reportIdFromUrl) {
-          console.log("🔍 DAILY REPORT: Loading report by ID:", reportIdFromUrl);
+          console.log(
+            "🔍 DAILY REPORT: Loading report by ID:",
+            reportIdFromUrl
+          );
           dbReport = await loadReportById(reportIdFromUrl);
-          console.log("🔍 DAILY REPORT: Report by ID result:", dbReport ? "FOUND" : "NOT FOUND");
+          console.log(
+            "🔍 DAILY REPORT: Report by ID result:",
+            dbReport ? "FOUND" : "NOT FOUND"
+          );
         }
 
         // If no report by ID, try loading by date
@@ -308,7 +318,9 @@ const DailyReport = () => {
           setMachinery(ensureRowIds(dbReport.machinery || []));
           setReferenceSections(dbReport.referenceSections || []);
           setTableTitle(dbReport.tableTitle || "SITE PHOTO EVIDENCE");
-          setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
+          setCarSheet(
+            dbReport.carSheet || { description: "", photo_groups: [] }
+          );
           setProjectLogo(dbReport.projectLogo || "");
         } else {
           // Fallback to localStorage
@@ -826,7 +838,7 @@ const DailyReport = () => {
 
   // Google Docs-style: Auto-save with debounce
   const debouncedAutoSave = useRef<NodeJS.Timeout | null>(null);
-  
+
   // const triggerAutoSave = useCallback((partialData: Partial<ReportData>) => {
   //   if (!reportId) {
   //     console.log("🔒 AUTO-SAVE: No reportId, skipping auto-save");
@@ -841,9 +853,9 @@ const DailyReport = () => {
   //     try {
   //       setIsAutoSaving(true);
   //       console.log("🔒 AUTO-SAVE: Triggering auto-save for reportId:", reportId);
-        
+
   //       const result = await autoSaveReport(reportId, partialData);
-        
+
   //       if (result.success) {
   //         setLastSavedAt(new Date());
   //         console.log("🔒 AUTO-SAVE: Success");
@@ -1162,10 +1174,10 @@ const DailyReport = () => {
     setIsSaving(true);
     try {
       console.log("🔒 SAVE: Saving report to database");
-      
+
       // Get current report data
       const rawData = getReportData();
-      
+
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
@@ -1220,19 +1232,23 @@ const DailyReport = () => {
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || ""
+            )
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        })
+      );
 
       const processedLogo = await toBase64DataUrl(projectLogo);
-      
+
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
@@ -1248,7 +1264,7 @@ const DailyReport = () => {
       };
       // Save to database
       await saveReportToDB(cleanedData);
-      
+
       toast({
         title: "Report Saved",
         description: "Your report has been saved successfully.",
@@ -1343,19 +1359,23 @@ const DailyReport = () => {
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || ""
+            )
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        })
+      );
 
       const processedLogo = await toBase64DataUrl(projectLogo);
-      
+
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
@@ -1370,7 +1390,12 @@ const DailyReport = () => {
         projectLogo: processedLogo,
       };
 
-      console.log("🔍 FRONTEND: About to save data with referenceSections:", cleanedData.referenceSections ? "YES (" + cleanedData.referenceSections.length + " sections)" : "NO");
+      console.log(
+        "🔍 FRONTEND: About to save data with referenceSections:",
+        cleanedData.referenceSections
+          ? "YES (" + cleanedData.referenceSections.length + " sections)"
+          : "NO"
+      );
 
       // Save to database
       try {
@@ -1402,7 +1427,7 @@ const DailyReport = () => {
         materials,
         machinery,
         description: carSheet.description || "",
-        photo_groups: processedCar
+        photo_groups: processedCar,
       };
 
       await generateCombinedExcel(
@@ -1433,8 +1458,13 @@ const DailyReport = () => {
   const handleExportCombinedPDF = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]}`;
-    
+    const defaultFileName = `Combined_Report_${
+      projectName?.replace(/\s+/g, "_") || "Report"
+    }_${
+      reportDate?.toISOString().split("T")[0] ||
+      new Date().toISOString().split("T")[0]
+    }`;
+
     setPendingExportType("combined-pdf");
     setDefaultFileName(defaultFileName);
     setShowFileNameDialog(true);
@@ -1500,19 +1530,23 @@ const DailyReport = () => {
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || ""
+            )
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        })
+      );
 
       const processedLogo = await toBase64DataUrl(projectLogo);
-      
+
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
@@ -1551,10 +1585,11 @@ const DailyReport = () => {
         fileName,
         processedLogo
       );
-      
+
       toast({
         title: "Combined PDF Exported",
-        description: "Your combined report has been exported as PDF successfully.",
+        description:
+          "Your combined report has been exported as PDF successfully.",
       });
     } catch (error) {
       console.error("Combined PDF export error:", error);
@@ -1570,7 +1605,7 @@ const DailyReport = () => {
 
   const handlePreviewCombined = async () => {
     if (!validateReport()) return;
-    setIsPreviewingCombined(true);  // Start loading
+    setIsPreviewingCombined(true); // Start loading
     try {
       // Process images to base64 data URLs (same as export)
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
@@ -1630,16 +1665,20 @@ const DailyReport = () => {
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || ""
+            )
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        })
+      );
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
@@ -1665,8 +1704,14 @@ const DailyReport = () => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
-                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+                images: slots
+                  .map((s: any) => s.image)
+                  .filter(Boolean)
+                  .slice(0, 2),
+                footers: slots
+                  .map((s: any) => s.caption)
+                  .filter(Boolean)
+                  .slice(0, 2),
               };
             })
           ),
@@ -1675,12 +1720,15 @@ const DailyReport = () => {
           logos: {
             cacpm: null,
             koica: processedLogo,
-          }
+          },
         },
       };
 
       // Get Excel data as blob
-      const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
+      const response = await pythonApiPost(
+        `${PYTHON_API_BASE_URL}/generate-combined-pdf`,
+        payload
+      );
 
       if (response.ok) {
         const blob = await response.blob();
@@ -1696,15 +1744,20 @@ const DailyReport = () => {
         variant: "destructive",
       });
     } finally {
-      setIsPreviewingCombined(false);  // End loading
+      setIsPreviewingCombined(false); // End loading
     }
   };
 
   const handleExportCombinedZIP = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]}`;
-    
+    const defaultFileName = `Combined_Report_${
+      projectName?.replace(/\s+/g, "_") || "Report"
+    }_${
+      reportDate?.toISOString().split("T")[0] ||
+      new Date().toISOString().split("T")[0]
+    }`;
+
     setPendingExportType("combined-zip");
     setDefaultFileName(defaultFileName);
     setShowFileNameDialog(true);
@@ -1780,16 +1833,20 @@ const DailyReport = () => {
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || ""
+            )
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        })
+      );
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
@@ -1812,9 +1869,41 @@ const DailyReport = () => {
       };
 
       // Generate PDF
-      const pdfResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        mode: "combined",
-        data: {
+      const pdfResponse = await pythonApiPost(
+        `${PYTHON_API_BASE_URL}/generate-combined-pdf`,
+        {
+          mode: "combined",
+          data: {
+            ...reportPayload,
+            table_title: tableTitle,
+            reference: processedSections.flatMap((section: any) =>
+              (section.entries ?? []).map((entry: any) => {
+                const slots = entry.slots ?? [];
+                return {
+                  section_title: section.title || "",
+                  images: slots
+                    .map((s: any) => s.image)
+                    .filter(Boolean)
+                    .slice(0, 2),
+                  footers: slots
+                    .map((s: any) => s.caption)
+                    .filter(Boolean)
+                    .slice(0, 2),
+                };
+              })
+            ),
+            logos: {
+              cacpm: null,
+              koica: processedLogo,
+            },
+          },
+        }
+      );
+
+      // Generate Excel
+      const excelResponse = await pythonApiPost(
+        `${PYTHON_API_BASE_URL}/generate-combined`,
+        {
           ...reportPayload,
           table_title: tableTitle,
           reference: processedSections.flatMap((section: any) =>
@@ -1822,44 +1911,30 @@ const DailyReport = () => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
-                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+                images: slots
+                  .map((s: any) => s.image)
+                  .filter(Boolean)
+                  .slice(0, 2),
+                footers: slots
+                  .map((s: any) => s.caption)
+                  .filter(Boolean)
+                  .slice(0, 2),
               };
             })
           ),
           logos: {
             cacpm: null,
             koica: processedLogo,
-          }
-        },
-      });
-
-      // Generate Excel
-      const excelResponse = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined`, {
-        ...reportPayload,
-        table_title: tableTitle,
-        reference: processedSections.flatMap((section: any) =>
-          (section.entries ?? []).map((entry: any) => {
-            const slots = entry.slots ?? [];
-            return {
-              section_title: section.title || "",
-              images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-              footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-            };
-          })
-        ),
-        logos: {
-          cacpm: null,
-          koica: processedLogo,
+          },
         }
-      });
+      );
 
       if (!pdfResponse.ok || !excelResponse.ok) {
         throw new Error("Failed to generate files");
       }
 
       // Create ZIP file
-      const JSZip = await import('jszip');
+      const JSZip = await import("jszip");
       const zip = new JSZip.default();
 
       const pdfBlob = await pdfResponse.blob();
@@ -1869,7 +1944,7 @@ const DailyReport = () => {
       zip.file(`${fileName}.xlsm`, excelBlob);
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
-      
+
       // Download ZIP
       const url = window.URL.createObjectURL(zipBlob);
       const link = document.createElement("a");
@@ -2106,19 +2181,20 @@ const DailyReport = () => {
 
     try {
       await deleteReport(reportIdFromUrl);
-      
+
       toast({
         title: "Report Deleted",
         description: "The report has been deleted successfully",
       });
-      
+
       // Navigate back to dashboard after deletion
       navigate("/dashboard");
     } catch (error) {
       console.error("Delete error:", error);
       toast({
         title: "Deletion Failed",
-        description: error instanceof Error ? error.message : "Failed to delete report",
+        description:
+          error instanceof Error ? error.message : "Failed to delete report",
         variant: "destructive",
       });
     }
@@ -2126,14 +2202,14 @@ const DailyReport = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <ReportHeader 
+      <ReportHeader
         isAutoSaving={isAutoSaving}
         lastSavedAt={lastSavedAt}
         projectLogo={projectLogo}
         setProjectLogo={setProjectLogo}
       />
 
-      {/* Back Button */}
+      {/* Navigation Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between">
           <Button
@@ -2145,6 +2221,44 @@ const DailyReport = () => {
             Back to Dashboard
           </Button>
 
+          {/* Section Filter Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <Button
+              variant={activeTab === "site-activities" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveTab("site-activities")}
+              className="rounded-full whitespace-nowrap"
+            >
+              Site Activities
+            </Button>
+            <Button
+              variant={activeTab === "hse" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveTab("hse")}
+              className="rounded-full whitespace-nowrap"
+            >
+              HSE
+            </Button>
+            <Button
+              variant={
+                activeTab === "site-activities-photos" ? "default" : "outline"
+              }
+              size="sm"
+              onClick={() => setActiveTab("site-activities-photos")}
+              className="rounded-full whitespace-nowrap"
+            >
+              Site Activities Photos
+            </Button>
+            <Button
+              variant={activeTab === "car" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveTab("car")}
+              className="rounded-full whitespace-nowrap"
+            >
+              CAR
+            </Button>
+          </div>
+
           <div className="flex items-center">
             <ThemeToggle />
           </div>
@@ -2152,85 +2266,108 @@ const DailyReport = () => {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <ProjectInfo
-          projectName={projectName}
-          setProjectName={setProjectName}
-          reportDate={reportDate}
-          setReportDate={setReportDate}
-          weatherAM={weatherAM}
-          setWeatherAM={setWeatherAM}
-          weatherPM={weatherPM}
-          setWeatherPM={setWeatherPM}
-          tempAM={tempAM}
-          setTempAM={setTempAM}
-          tempPM={tempPM}
-          setTempPM={setTempPM}
-          currentPeriod={currentPeriod}
-          setCurrentPeriod={setCurrentPeriod}
-        />
-
-        {/* Report section label for clarity */}
-        <div className="mb-2 mt-2">
-          <h2 className="text-sm font-semibold text-foreground/80">Report</h2>
-        </div>
-
-        <ActivitySection
-          activityToday={activityToday}
-          setActivityToday={setActivityToday}
-          workPlanNextDay={workPlanNextDay}
-          setWorkPlanNextDay={setWorkPlanNextDay}
-        />
-
-        <ResourcesSection
-          managementTeam={managementTeam}
-          setManagementTeam={setManagementTeam}
-          workingTeam={workingTeam}
-          setWorkingTeam={setWorkingTeam}
-          materials={materials}
-          setMaterials={setMaterials}
-          machinery={machinery}
-          setMachinery={setMachinery}
-        />
-
-        <ReportActions
-          onPreview={handlePreview}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          onExportDocs={handleExportDocs}
-          onExportAll={handleExportAll}
-          onClear={handleClear}
-          onSubmit={handleSubmit}
-          onDelete={handleDelete}
-          reportId={reportIdFromUrl}
-          isPreviewing={isPreviewing}
-          isExporting={isExporting}
-          isSubmitting={isSubmitting}
-        />
-
-        {/* Reference section (renders below Report content) */}
-        <div className="mt-8 pt-6 border-t border-muted-foreground/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <h2 className="text-sm font-semibold text-foreground/70 mb-4">
-              Reference
-            </h2>
-            <ReferenceSection
-              sections={referenceSections}
-              setSections={setReferenceSections}
-              onExportReference={handleExportReference}
-              isExporting={isExportingReference}
-              tableTitle={tableTitle}
-              setTableTitle={setTableTitle}
+        {/* Tab-based content rendering */}
+        {activeTab === "site-activities" && (
+          <>
+            <ProjectInfo
+              projectName={projectName}
+              setProjectName={setProjectName}
+              reportDate={reportDate}
+              setReportDate={setReportDate}
+              weatherAM={weatherAM}
+              setWeatherAM={setWeatherAM}
+              weatherPM={weatherPM}
+              setWeatherPM={setWeatherPM}
+              tempAM={tempAM}
+              setTempAM={setTempAM}
+              tempPM={tempPM}
+              setTempPM={setTempPM}
+              currentPeriod={currentPeriod}
+              setCurrentPeriod={setCurrentPeriod}
             />
-          </div>
-        </div>
 
-        {/* CAR section (Sheet 3) */}
-        <div className="mt-8 pt-6 border-t border-muted-foreground/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <h2 className="text-sm font-semibold text-foreground mb-4">Corrective Action Request</h2>
-            <CARSection car={carSheet} setCar={setCarSheet} />
-          </div>
-        </div>
+            {/* Report section label for clarity */}
+            <div className="mb-2 mt-2">
+              <h2 className="text-sm font-semibold text-foreground/80">Report</h2>
+            </div>
+
+            <ActivitySection
+              activityToday={activityToday}
+              setActivityToday={setActivityToday}
+              workPlanNextDay={workPlanNextDay}
+              setWorkPlanNextDay={setWorkPlanNextDay}
+            />
+
+            <ResourcesSection
+              managementTeam={managementTeam}
+              setManagementTeam={setManagementTeam}
+              workingTeam={workingTeam}
+              setWorkingTeam={setWorkingTeam}
+              materials={materials}
+              setMaterials={setMaterials}
+              machinery={machinery}
+              setMachinery={setMachinery}
+            />
+
+            <ReportActions
+              onPreview={handlePreview}
+              onExportPDF={handleExportPDF}
+              onExportExcel={handleExportExcel}
+              onExportDocs={handleExportDocs}
+              onExportAll={handleExportAll}
+              onClear={handleClear}
+              onSubmit={handleSubmit}
+              onDelete={handleDelete}
+              reportId={reportIdFromUrl}
+              isPreviewing={isPreviewing}
+              isExporting={isExporting}
+              isSubmitting={isSubmitting}
+            />
+          </>
+        )}
+
+        {activeTab === "hse" && (
+          <>
+            <div className="mt-2 pt-2">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground/70 mb-4">
+                  HSE ACTIVITIES PHOTO
+                </h1>
+                <ReferenceSection
+                  sections={referenceSections}
+                  setSections={setReferenceSections}
+                  onExportReference={handleExportReference}
+                  isExporting={isExportingReference}
+                  tableTitle={tableTitle}
+                  setTableTitle={setTableTitle}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === "site-activities-photos" && (
+          <>
+            {/* Site Activities Photos content can be added here */}
+            <div className="text-center py-12 text-muted-foreground">
+              <p>Site Activities Photos section coming soon...</p>
+            </div>
+          </>
+        )}
+
+        {activeTab === "car" && (
+          <>
+            {/* CAR section */}
+            <div className="mt-8 pt-6 border-t border-muted-foreground/20">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                <h2 className="text-sm font-semibold text-foreground mb-4">
+                  Corrective Action Request
+                </h2>
+                <CARSection car={carSheet} setCar={setCarSheet} />
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="mt-6 pt-6 border-t border-muted-foreground/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
@@ -2240,18 +2377,32 @@ const DailyReport = () => {
               Sheet 1,{" "}
               <span className="font-medium text-foreground">Reference</span> =
               Sheet 2,{" "}
-              <span className="font-medium text-foreground">Corrective Action Request</span> =
-              Sheet 3
+              <span className="font-medium text-foreground">
+                Corrective Action Request
+              </span>{" "}
+              = Sheet 3
             </div>
             <div className="flex items-center gap-3">
               {/* ADD THIS: Simple Save Button */}
-              <Button variant="outline" className="min-w-[140px]" onClick={handleSaveReport} disabled={isSaving}>
+              <Button
+                variant="outline"
+                className="min-w-[140px]"
+                onClick={handleSaveReport}
+                disabled={isSaving}
+              >
                 <Save className="w-4 h-4 mr-2" />
                 {isSaving ? "Saving..." : "Save Report"}
               </Button>
-              <Button variant="outline" className="min-w-[140px]" onClick={handlePreviewCombined} disabled={isPreviewingCombined}>
+              <Button
+                variant="outline"
+                className="min-w-[140px]"
+                onClick={handlePreviewCombined}
+                disabled={isPreviewingCombined}
+              >
                 <Eye className="w-4 h-4 mr-2" />
-                {isPreviewingCombined ? "Previewing Combined..." : "Preview Combined"}
+                {isPreviewingCombined
+                  ? "Previewing Combined..."
+                  : "Preview Combined"}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -2266,7 +2417,10 @@ const DailyReport = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleExportCombinedPDF} disabled={isExportingCombined}>
+                  <DropdownMenuItem
+                    onClick={handleExportCombinedPDF}
+                    disabled={isExportingCombined}
+                  >
                     <FileText className="w-4 h-4 mr-2" />
                     Export Combined PDF
                   </DropdownMenuItem>
@@ -2283,7 +2437,10 @@ const DailyReport = () => {
                     Export Combined Docs (Word)
                   </DropdownMenuItem>
                   */}
-                  <DropdownMenuItem onClick={handleExportCombinedZIP} disabled={isExportingCombined}>
+                  <DropdownMenuItem
+                    onClick={handleExportCombinedZIP}
+                    disabled={isExportingCombined}
+                  >
                     <FileDown className="w-4 h-4 mr-2" />
                     Export Combined (ZIP)
                   </DropdownMenuItem>
