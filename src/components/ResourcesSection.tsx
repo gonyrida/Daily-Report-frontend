@@ -1,11 +1,14 @@
-import { Users, Wrench, Package, Truck } from "lucide-react";
+import { Users, Package, Truck } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
+import SiteWorkingTeamGroup from "./SiteWorkingTeamGroup";
 
 interface ResourcesSectionProps {
   managementTeam: ResourceRow[];
   setManagementTeam: (rows: ResourceRow[]) => void;
-  workingTeam: ResourceRow[];
-  setWorkingTeam: (rows: ResourceRow[]) => void;
+  interiorTeam: ResourceRow[];
+  setInteriorTeam: (rows: ResourceRow[]) => void;
+  mepTeam: ResourceRow[];
+  setMepTeam: (rows: ResourceRow[]) => void;
   materials: ResourceRow[];
   setMaterials: (rows: ResourceRow[]) => void;
   machinery: ResourceRow[];
@@ -23,6 +26,10 @@ const MANAGEMENT_OPTIONS = [
 ];
 
 const WORKING_TEAM_OPTIONS = ["Site Manager", "Site Engineer","MEP Engineer","Foreman", "Skill Workers","MEP Workers", "General Workers"];
+
+const INTERIOR_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
+
+const MEP_TEAM_OPTIONS = ["MEP Engineer", "MEP Workers"];
 
 const MACHINERY_OPTIONS = [
   "Air compressor",
@@ -89,8 +96,10 @@ const Units = [
 const ResourcesSection = ({
   managementTeam,
   setManagementTeam,
-  workingTeam,
-  setWorkingTeam,
+  interiorTeam,
+  setInteriorTeam,
+  mepTeam,
+  setMepTeam,
   materials,
   setMaterials,
   machinery,
@@ -113,13 +122,11 @@ const ResourcesSection = ({
           dropdownOptions={MANAGEMENT_OPTIONS}
         />
 
-        <ResourceTable
-          title="Site Working Team"
-          icon={<Wrench className="w-5 h-5 text-accent" />}
-          rows={workingTeam}
-          setRows={setWorkingTeam}
-          useDropdown={true}
-          dropdownOptions={WORKING_TEAM_OPTIONS}
+        <SiteWorkingTeamGroup
+          interiorTeam={interiorTeam}
+          setInteriorTeam={setInteriorTeam}
+          mepTeam={mepTeam}
+          setMepTeam={setMepTeam}
         />
 
         <ResourceTable

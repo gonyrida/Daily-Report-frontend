@@ -116,6 +116,8 @@ interface ReportData {
   workPlanNextDay: string;
   managementTeam: ResourceRow[];
   workingTeam: ResourceRow[];
+  interiorTeam: ResourceRow[];
+  mepTeam: ResourceRow[];
   materials: ResourceRow[];
   machinery: ResourceRow[];
   // Optional merged-reference data (kept optional so export logic isn't changed yet)
@@ -157,6 +159,8 @@ const DailyReport = () => {
   // Resources
   const [managementTeam, setManagementTeam] = useState<ResourceRow[]>([]);
   const [workingTeam, setWorkingTeam] = useState<ResourceRow[]>([]);
+  const [interiorTeam, setInteriorTeam] = useState<ResourceRow[]>([]);
+  const [mepTeam, setMepTeam] = useState<ResourceRow[]>([]);
   const [materials, setMaterials] = useState<ResourceRow[]>([]);
   const [machinery, setMachinery] = useState<ResourceRow[]>([]);
 
@@ -217,6 +221,23 @@ const DailyReport = () => {
     }));
   };
 
+  // Helper to split working team into interior and MEP teams
+  const splitWorkingTeam = (workingTeam: ResourceRow[]): { interior: ResourceRow[]; mep: ResourceRow[] } => {
+    const interiorOptions = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
+    const mepOptions = ["MEP Engineer", "MEP Workers"];
+    
+    const interior = workingTeam.filter(row => 
+      interiorOptions.includes(row.description) || 
+      (!mepOptions.includes(row.description) && row.description !== "")
+    );
+    
+    const mep = workingTeam.filter(row => 
+      mepOptions.includes(row.description)
+    );
+    
+    return { interior, mep };
+  };
+
   // Helper to get current report data
   const getReportData = useCallback(
     (): ReportData => ({
@@ -230,6 +251,8 @@ const DailyReport = () => {
       workPlanNextDay,
       managementTeam,
       workingTeam,
+      interiorTeam,
+      mepTeam,
       materials,
       machinery,
       // Keep reference sections in the object for future export mapping (no export logic changed yet)
@@ -251,6 +274,8 @@ const DailyReport = () => {
       workPlanNextDay,
       managementTeam,
       workingTeam,
+      interiorTeam,
+      mepTeam,
       materials,
       machinery,
       referenceSections,
@@ -333,6 +358,19 @@ const DailyReport = () => {
           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+          
+          // Handle interior and MEP team migration
+          if (dbReport.interiorTeam && dbReport.mepTeam) {
+            // New format: use separate teams
+            setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
+            setMepTeam(ensureRowIds(dbReport.mepTeam));
+          } else {
+            // Old format: split working team
+            const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+            setInteriorTeam(interior);
+            setMepTeam(mep);
+          }
+          
           setMaterials(ensureRowIds(dbReport.materials || []));
           setMachinery(ensureRowIds(dbReport.machinery || []));
           setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
@@ -381,6 +419,19 @@ const DailyReport = () => {
             setWorkPlanNextDay(localDraft.workPlanNextDay || "");
             setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
             setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+            
+            // Handle interior and MEP team migration for localStorage
+            if (localDraft.interiorTeam && localDraft.mepTeam) {
+              // New format: use separate teams
+              setInteriorTeam(ensureRowIds(localDraft.interiorTeam));
+              setMepTeam(ensureRowIds(localDraft.mepTeam));
+            } else {
+              // Old format: split working team
+              const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+              setInteriorTeam(interior);
+              setMepTeam(mep);
+            }
+            
             setMaterials(ensureRowIds(localDraft.materials || []));
             setMachinery(ensureRowIds(localDraft.machinery || []));
             setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
@@ -425,6 +476,19 @@ const DailyReport = () => {
           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+          
+          // Handle interior and MEP team migration for fallback localStorage
+          if (localDraft.interiorTeam && localDraft.mepTeam) {
+            // New format: use separate teams
+            setInteriorTeam(ensureRowIds(localDraft.interiorTeam));
+            setMepTeam(ensureRowIds(localDraft.mepTeam));
+          } else {
+            // Old format: split working team
+            const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+            setInteriorTeam(interior);
+            setMepTeam(mep);
+          }
+          
           setMaterials(ensureRowIds(localDraft.materials || []));
           setMachinery(ensureRowIds(localDraft.machinery || []));
           setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
@@ -1280,6 +1344,8 @@ const DailyReport = () => {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeam: cleanResourceRows(rawData.workingTeam),
+        interiorTeam: cleanResourceRows(rawData.interiorTeam),
+        mepTeam: cleanResourceRows(rawData.mepTeam),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
         referenceSections: processedSections,
@@ -1407,6 +1473,8 @@ const DailyReport = () => {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeam: cleanResourceRows(rawData.workingTeam),
+        interiorTeam: cleanResourceRows(rawData.interiorTeam),
+        mepTeam: cleanResourceRows(rawData.mepTeam),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
         referenceSections: processedSections,
@@ -1578,6 +1646,8 @@ const DailyReport = () => {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeam: cleanResourceRows(rawData.workingTeam),
+        interiorTeam: cleanResourceRows(rawData.interiorTeam),
+        mepTeam: cleanResourceRows(rawData.mepTeam),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
         referenceSections: processedSections,
@@ -1799,6 +1869,8 @@ const DailyReport = () => {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeam: cleanResourceRows(rawData.workingTeam),
+        interiorTeam: cleanResourceRows(rawData.interiorTeam),
+        mepTeam: cleanResourceRows(rawData.mepTeam),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
       };
@@ -2120,6 +2192,8 @@ const DailyReport = () => {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeam: cleanResourceRows(rawData.workingTeam),
+        interiorTeam: cleanResourceRows(rawData.interiorTeam),
+        mepTeam: cleanResourceRows(rawData.mepTeam),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
       };
@@ -2154,6 +2228,18 @@ const DailyReport = () => {
           accumulated: r.accumulated,
         })),
         workingTeam: cleanedData.workingTeam.map((r) => ({
+          ...r,
+          prev: r.accumulated,
+          today: 0,
+          accumulated: r.accumulated,
+        })),
+        interiorTeam: cleanedData.interiorTeam.map((r) => ({
+          ...r,
+          prev: r.accumulated,
+          today: 0,
+          accumulated: r.accumulated,
+        })),
+        mepTeam: cleanedData.mepTeam.map((r) => ({
           ...r,
           prev: r.accumulated,
           today: 0,
@@ -2343,8 +2429,10 @@ const DailyReport = () => {
             <ResourcesSection
               managementTeam={managementTeam}
               setManagementTeam={setManagementTeam}
-              workingTeam={workingTeam}
-              setWorkingTeam={setWorkingTeam}
+              interiorTeam={interiorTeam}
+              setInteriorTeam={setInteriorTeam}
+              mepTeam={mepTeam}
+              setMepTeam={setMepTeam}
               materials={materials}
               setMaterials={setMaterials}
               machinery={machinery}
