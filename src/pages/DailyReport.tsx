@@ -8,6 +8,7 @@ import ReportActions from "@/components/ReportActions";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
 import CARSection from "@/components/CARSection";
+import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
 import { createDefaultHSESections } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
@@ -18,6 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import {
   Eye,
   FileDown,
@@ -2221,28 +2227,36 @@ const DailyReport = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <ReportHeader
-        isAutoSaving={isAutoSaving}
-        lastSavedAt={lastSavedAt}
-        projectLogo={projectLogo}
-        setProjectLogo={setProjectLogo}
-      />
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <HierarchicalSidebar />
+        
+        <SidebarInset>
+          <div className="min-h-screen bg-background">
+            <ReportHeader
+              isAutoSaving={isAutoSaving}
+              lastSavedAt={lastSavedAt}
+              projectLogo={projectLogo}
+              setProjectLogo={setProjectLogo}
+            />
 
-      {/* Navigation Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
+            {/* Navigation Header */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <SidebarTrigger />
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate("/dashboard")}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Dashboard
+                  </Button>
+                </div>
 
-          {/* Section Filter Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto">
+                {/* Section Filter Tabs */}
+                <div className="flex items-center gap-2 overflow-x-auto">
             <Button
               variant={activeTab === "site-activities" ? "default" : "outline"}
               size="sm"
@@ -2277,19 +2291,19 @@ const DailyReport = () => {
             >
               CAR
             </Button>
-          </div>
+                </div>
 
-          <div className="flex items-center">
-            <ThemeToggle />
-          </div>
-        </div>
-      </div>
+                <div className="flex items-center">
+                  <ThemeToggle />
+                </div>
+              </div>
+            </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Tab-based content rendering */}
-        {activeTab === "site-activities" && (
-          <>
-            <ProjectInfo
+            {activeTab === "site-activities" && (
+              <>
+                <ProjectInfo
               projectName={projectName}
               setProjectName={setProjectName}
               reportDate={reportDate}
@@ -2389,11 +2403,11 @@ const DailyReport = () => {
         {activeTab === "car" && (
           <>
             {/* CAR section */}
-            <div className="mt-8 pt-6 border-t border-muted-foreground/20">
+            <div className="mt-2 pt-2">
               <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                <h2 className="text-sm font-semibold text-foreground mb-4">
+                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground mb-4">
                   Corrective Action Request
-                </h2>
+                </h1>
                 <CARSection car={carSheet} setCar={setCarSheet} />
               </div>
             </div>
@@ -2542,6 +2556,9 @@ const DailyReport = () => {
         />
       </main>
     </div>
+  </SidebarInset>
+</div>
+</SidebarProvider>
   );
 };
 

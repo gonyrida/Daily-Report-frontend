@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +25,6 @@ import {
 import {
   LayoutDashboard,
   FileText,
-  LogOut,
   Plus,
   Calendar,
   TrendingUp,
@@ -218,16 +209,7 @@ const Dashboard = () => {
     return (
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
-          <Sidebar>
-            <SidebarHeader className="border-b border-sidebar-border">
-              <div className="flex items-center gap-2 px-4 py-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <LayoutDashboard className="h-4 w-4" />
-                </div>
-                <span className="font-semibold">Daily Report</span>
-              </div>
-            </SidebarHeader>
-          </Sidebar>
+          <HierarchicalSidebar />
           <SidebarInset>
             <div className="flex items-center justify-center min-h-screen">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -244,59 +226,7 @@ const Dashboard = () => {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <Sidebar>
-          <SidebarHeader className="border-b border-sidebar-border">
-            <div className="flex items-center gap-2 px-4 py-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <LayoutDashboard className="h-4 w-4" />
-              </div>
-              <span className="font-semibold">Daily Report</span>
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive>
-                      <Link to="/dashboard">
-                        <LayoutDashboard className="h-4 w-4" />
-                        <span>Dashboard</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton onClick={handleCreateReport}>
-                      <Plus className="h-4 w-4" />
-                      <span>New Report</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <Link to="/daily-report">
-                        <FileText className="h-4 w-4" />
-                        <span>Daily Report</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-
-          <SidebarFooter className="border-t border-sidebar-border">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <LogoutButton />
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarFooter>
-
-          <SidebarRail />
-        </Sidebar>
+        <HierarchicalSidebar />
 
         <SidebarInset>
           {/* Header */}
