@@ -12,6 +12,7 @@ import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
 import { createDefaultHSESections } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
+import DailyReportProjectsView from "@/components/DailyReportProjectsView";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -2240,6 +2241,13 @@ const DailyReport = () => {
               setProjectLogo={setProjectLogo}
             />
 
+            {/* Show Projects View when no specific report is selected */}
+            {!reportIdFromUrl ? (
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+                <DailyReportProjectsView />
+              </div>
+            ) : (
+              <>
             {/* Navigation Header */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
               <div className="flex items-center justify-between">
@@ -2555,6 +2563,8 @@ const DailyReport = () => {
           }
         />
       </main>
+      </>
+            )}
     </div>
   </SidebarInset>
 </div>

@@ -10,7 +10,9 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
+import ReportDashboard from "./pages/ReportDashboard";
 import DailyReport from "./pages/DailyReport";
+import DailyReportProjects from "./pages/DailyReportProjects";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -49,11 +51,27 @@ const App = () => (
               }
             />
             <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <ReportDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/daily-report"
               element={
                 <ProtectedRoute>
                   <DailyReport />
                   <FloatingScrollButton />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/daily-report-projects"
+              element={
+                <ProtectedRoute>
+                  <DailyReportProjects />
                 </ProtectedRoute>
               }
             />

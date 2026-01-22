@@ -214,7 +214,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     <Sidebar className={className}>
       {/* Logo Section */}
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div 
+          className="flex items-center gap-3 px-4 py-4 cursor-pointer hover:bg-sidebar-accent transition-colors rounded-lg"
+          onClick={() => navigate('/dashboard')}
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Building2 className="h-5 w-5" />
           </div>
@@ -230,7 +233,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
         <SidebarGroup>
           <Collapsible open={reportSectionOpen} onOpenChange={setReportSectionOpen}>
             <CollapsibleTrigger asChild>
-              <SidebarMenuButton className="w-full justify-between px-4 py-2 font-medium">
+              <SidebarMenuButton 
+                className="w-full justify-between px-4 py-2 font-medium"
+                onClick={() => navigate('/reports')}
+              >
                 <span className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Report
@@ -249,7 +255,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                   <Collapsible open={dailyReportOpen} onOpenChange={setDailyReportOpen}>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
-                        <span className="flex items-center gap-2">
+                        <span 
+                          className="flex items-center gap-2 flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/daily-report-projects');
+                          }}
+                        >
                           <Calendar className="h-3 w-3" />
                           Daily Report
                         </span>
