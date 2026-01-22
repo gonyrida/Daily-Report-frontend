@@ -196,7 +196,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
   const handleProjectClick = (projectName: string, reportType: 'daily' | 'weekly') => {
     if (reportType === 'daily') {
-      navigate(`/daily-report?project=${encodeURIComponent(projectName)}`);
+      navigate(`/dashboard?project=${encodeURIComponent(projectName)}`);
     } else {
       // For weekly report, we'll navigate to a weekly report page (to be implemented)
       toast({
@@ -216,7 +216,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
       <SidebarHeader className="border-b border-sidebar-border">
         <div 
           className="flex items-center gap-3 px-4 py-4 cursor-pointer hover:bg-sidebar-accent transition-colors rounded-lg"
-          onClick={() => navigate('/dashboard')}
+          // onClick={() => navigate('/dashboard')}
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Building2 className="h-5 w-5" />

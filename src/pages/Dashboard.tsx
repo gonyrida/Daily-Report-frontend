@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   SidebarInset,
   SidebarProvider,
@@ -56,6 +56,8 @@ interface Report {
 const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const projectFilter = searchParams.get('project');
   const [reports, setReports] = useState<Report[]>([]);
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,6 +90,11 @@ const Dashboard = () => {
   useEffect(() => {
     let filtered = reports;
 
+    // Filter by project (NEW!)
+    if (projectFilter) {
+      filtered = filtered.filter(report => report.projectName === projectFilter);
+    }
+
     // Filter by status (case-insensitive)
     if (filterStatus !== "all") {
       filtered = filtered.filter(report => report.status.toLowerCase() === filterStatus.toLowerCase());
@@ -104,30 +111,22 @@ const Dashboard = () => {
     }
 
     setFilteredReports(filtered);
-  }, [reports, searchQuery, filterStatus]);
+  }, [reports, searchQuery, filterStatus, projectFilter]);
 
   const handleCreateReport = async () => {
     try {
-      console.log("🚀 DASHBOARD: Creating new blank report (Google Docs style)");
-      const result = await createBlankReport("Untitled Report");
-      
-      if (result.success && result.data) {
-        console.log("🚀 DASHBOARD: Blank report created with ID:", result.data._id);
-        // Navigate to the new report with its unique ID
-        navigate(`/daily-report?reportId=${result.data._id}`);
-        
-        toast({
-          title: "New Report Created",
-          description: "Your blank report is ready. Start typing to begin!",
-        });
+      if (projectFilter) {
+        // Navigate to daily report with project context
+        navigate(`/daily-report?project=${encodeURIComponent(projectFilter)}`);
       } else {
-        throw new Error("Failed to create report");
+        // Navigate to projects overview to select/create a project
+        navigate('/daily-report-projects');
       }
     } catch (error: any) {
-      console.error("🚀 DASHBOARD: Error creating report:", error);
+      console.error("🚀 DASHBOARD: Error navigating to report:", error);
       toast({
         title: "Error",
-        description: "Failed to create new report",
+        description: "Failed to navigate to report creation",
         variant: "destructive",
       });
     }
@@ -259,11 +258,30 @@ const Dashboard = () => {
           <main className="flex-1 space-y-6 p-6">
             {/* Welcome Section */}
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight">Welcome back!</h2>
+              <h2 className="text-2xl font-bold tracking-tight">
+                {projectFilter ? `${projectFilter} Reports` : 'Welcome back!'}
+              </h2>
               <p className="text-muted-foreground">
-                Here's an overview of your daily reports.
+                {projectFilter 
+                  ? `Here's an overview of reports for ${projectFilter}.`
+                  : 'Here\'s an overview of your daily reports.'
+                }
               </p>
             </div>
+
+            {/* Breadcrumb Navigation */}
+            {projectFilter && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                <button 
+                  onClick={() => navigate('/dashboard')}
+                  className="hover:text-foreground transition-colors"
+                >
+                  Dashboard
+                </button>
+                <span>/</span>
+                <span className="text-foreground">{projectFilter}</span>
+              </div>
+            )}
 
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -438,13 +456,24 @@ const Dashboard = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {filterStatus === "submitted" 
-                      ? "No submitted reports found" 
-                      : filterStatus === "draft" 
-                      ? "No draft reports found"
-                      : "No reports found"
-                    }
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      {projectFilter 
+                        ? `No Reports for ${projectFilter}` 
+                        : 'No Reports Found'
+                      }
+                    </h3>
+                    <p className="text-muted-foreground text-center mb-4">
+                      {projectFilter 
+                        ? `No reports found for ${projectFilter}. Create your first report for this project.`
+                        : 'Create your first report to get started.'
+                      }
+                    </p>
+                    <Button onClick={handleCreateReport}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create New Report
+                    </Button>
                   </div>
                 )}
               </CardContent>

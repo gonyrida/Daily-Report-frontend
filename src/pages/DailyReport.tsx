@@ -141,6 +141,7 @@ const DailyReport = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const reportIdFromUrl = searchParams.get("reportId");
+  const projectFromUrl = searchParams.get("project");
 
   // Project Info
   const [projectLogo, setProjectLogo] = useState<string>("");
@@ -2328,7 +2329,7 @@ const DailyReport = () => {
             />
 
             {/* Show Projects View when no specific report is selected */}
-            {!reportIdFromUrl ? (
+            {!reportIdFromUrl && !projectFromUrl ? (
               <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
                 <DailyReportProjectsView />
               </div>
