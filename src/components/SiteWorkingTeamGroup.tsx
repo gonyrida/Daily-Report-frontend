@@ -1,4 +1,4 @@
-import { Wrench } from "lucide-react";
+import { Wrench, Trash2 } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 
 interface SiteWorkingTeamGroupProps {
@@ -196,26 +196,11 @@ const SiteWorkingTeamGroup = ({
                             }
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
                           >
-                            🗑️
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-primary/30 bg-primary/5">
-                      <td className="px-4 py-3 font-semibold text-foreground">
-                        Total
-                      </td>
-                      <td className="px-3 py-3 text-center font-bold text-foreground">
-                        {interiorTeam.reduce((sum, row) => sum + row.prev, 0)}
-                      </td>
-                      <td className="px-3 py-3 text-center font-bold text-foreground">
-                        {interiorTeam.reduce((sum, row) => sum + row.today, 0)}
-                      </td>
-                      <td className="px-3 py-3 text-center font-bold text-primary">
-                        {interiorTeam.reduce((sum, row) => sum + row.accumulated, 0)}
-                      </td>
-                      <td></td>
-                    </tr>
                   </>
                 )}
               </tbody>
@@ -405,26 +390,11 @@ const SiteWorkingTeamGroup = ({
                             }
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
                           >
-                            🗑️
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-primary/30 bg-primary/5">
-                      <td className="px-4 py-3 font-semibold text-foreground">
-                        Total
-                      </td>
-                      <td className="px-3 py-3 text-center font-bold text-foreground">
-                        {mepTeam.reduce((sum, row) => sum + row.prev, 0)}
-                      </td>
-                      <td className="px-3 py-3 text-center font-bold text-foreground">
-                        {mepTeam.reduce((sum, row) => sum + row.today, 0)}
-                      </td>
-                      <td className="px-3 py-3 text-center font-bold text-primary">
-                        {mepTeam.reduce((sum, row) => sum + row.accumulated, 0)}
-                      </td>
-                      <td></td>
-                    </tr>
                   </>
                 )}
               </tbody>
@@ -446,6 +416,29 @@ const SiteWorkingTeamGroup = ({
             + Add Row
           </button>
         </div>
+      </div>
+
+      {/* Combined Total Row */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <tbody>
+            <tr className="border-t-2 border-primary/30 bg-primary/5">
+              <td className="px-4 py-3 font-semibold text-foreground" style={{width: '40%'}}>
+                Total
+              </td>
+              <td className="px-3 py-3 text-center font-bold text-foreground" style={{width: '12%'}}>
+                {interiorTeam.reduce((sum, row) => sum + row.prev, 0) + mepTeam.reduce((sum, row) => sum + row.prev, 0)}
+              </td>
+              <td className="px-3 py-3 text-center font-bold text-foreground" style={{width: '12%'}}>
+                {interiorTeam.reduce((sum, row) => sum + row.today, 0) + mepTeam.reduce((sum, row) => sum + row.today, 0)}
+              </td>
+              <td className="px-3 py-3 text-center font-bold text-primary" style={{width: '12%'}}>
+                {interiorTeam.reduce((sum, row) => sum + row.accumulated, 0) + mepTeam.reduce((sum, row) => sum + row.accumulated, 0)}
+              </td>
+              <td className="px-2 py-3" style={{width: '8%'}}></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
