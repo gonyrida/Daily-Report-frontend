@@ -136,6 +136,30 @@ interface ReportData {
   projectLogo?: string;
 }
 
+// NEW: Validate and correct project context
+const validateAndSetProjectContext = (loadedProjectName: string, urlProjectName: string | null, setProjectName: (name: string) => void) => {
+  // For new reports with URL context, always prioritize URL
+  if (urlProjectName && (!loadedProjectName || loadedProjectName !== urlProjectName)) {
+    console.log(`🔧 PROJECT CONTEXT: Prioritizing URL context "${urlProjectName}" over loaded "${loadedProjectName}"`);
+    setProjectName(urlProjectName);
+    return urlProjectName;
+  }
+  
+  // For existing reports without URL context, use loaded data
+  if (!urlProjectName && loadedProjectName) {
+    setProjectName(loadedProjectName);
+    return loadedProjectName;
+  }
+  
+  // Fallback to URL context if available
+  if (urlProjectName) {
+    setProjectName(urlProjectName);
+    return urlProjectName;
+  }
+  
+  return loadedProjectName;
+};
+
 const DailyReport = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -326,7 +350,8 @@ const DailyReport = () => {
         if (dbReport) {
           // Load from database
           setReportId(dbReport._id || reportIdFromUrl);
-          setProjectName(dbReport.projectName || "");
+          // NEW: Validate project context
+          validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
           setReportDate(
             dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
           );
@@ -386,7 +411,8 @@ const DailyReport = () => {
           // Fallback to localStorage
           const localDraft = loadDraftLocally(reportDate);
           if (localDraft) {
-            setProjectName(localDraft.projectName || "");
+            // NEW: Validate project context
+            validateAndSetProjectContext(localDraft.projectName || "", projectFromUrl, setProjectName);
             setReportDate(
               localDraft.reportDate
                 ? new Date(localDraft.reportDate)
@@ -436,8 +462,13 @@ const DailyReport = () => {
             setMaterials(ensureRowIds(localDraft.materials || []));
             setMachinery(ensureRowIds(localDraft.machinery || []));
             setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
-            setSiteActivitiesSections(localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0 ? localDraft.siteActivitiesSections : createDefaultHSESections());
+            setCarSheet(localDraft.carSheet || { description: "", photo_groups: [] });
             setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
+          } else {
+            // NEW: Set project name from URL context for new reports
+            if (projectFromUrl) {
+              setProjectName(projectFromUrl);
+            }
           }
         }
       } catch (e) {
@@ -445,7 +476,8 @@ const DailyReport = () => {
         // Fallback to localStorage if DB fails
         const localDraft = loadDraftLocally(reportDate);
         if (localDraft) {
-          setProjectName(localDraft.projectName || "");
+          // NEW: Validate project context
+          validateAndSetProjectContext(localDraft.projectName || "", projectFromUrl, setProjectName);
           setReportDate(
             localDraft.reportDate ? new Date(localDraft.reportDate) : new Date()
           );
@@ -495,6 +527,11 @@ const DailyReport = () => {
           setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
           setSiteActivitiesSections(localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0 ? localDraft.siteActivitiesSections : createDefaultHSESections());
           setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
+        } else {
+          // NEW: Set project name from URL context for new reports (error fallback)
+          if (projectFromUrl) {
+            setProjectName(projectFromUrl);
+          }
         }
       }
     };
@@ -2342,7 +2379,13 @@ const DailyReport = () => {
                   <SidebarTrigger />
                   <Button
                     variant="ghost"
-                    onClick={() => navigate("/dashboard")}
+                    onClick={() => {
+                      if (projectFromUrl) {
+                        navigate(`/dashboard?project=${encodeURIComponent(projectFromUrl)}`);
+                      } else {
+                        navigate("/dashboard");
+                      }
+                    }}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
                   >
                     <ArrowLeft className="h-4 w-4" />

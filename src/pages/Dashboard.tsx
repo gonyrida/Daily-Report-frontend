@@ -269,6 +269,14 @@ const Dashboard = () => {
               </p>
             </div>
 
+            {/* Create New Report Button - Always Visible */}
+            <div className="mb-6">
+              <Button onClick={handleCreateReport}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Report
+              </Button>
+            </div>
+
             {/* Breadcrumb Navigation */}
             {projectFilter && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
