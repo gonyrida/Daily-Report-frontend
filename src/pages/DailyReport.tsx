@@ -1457,6 +1457,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -1537,6 +1538,8 @@ const DailyReport = () => {
         reportPayload,
         processedSections,
         tableTitle,
+        processedSiteActivities,
+        siteActivitiesTitle,
         fileName,
         processedLogo
       );
@@ -1631,6 +1634,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -1688,6 +1692,8 @@ const DailyReport = () => {
         },
         processedSections,
         tableTitle,
+        processedSiteActivities,
+        siteActivitiesTitle,
         fileName,
         processedLogo
       );
@@ -1769,6 +1775,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -1805,8 +1812,8 @@ const DailyReport = () => {
           mepTeam,
           materials,
           machinery,
-          table_title: tableTitle,
-          reference: processedSections.flatMap((section: any) =>
+          hse_title: tableTitle,
+          hse: processedSections.flatMap((section: any) =>
             (section.entries ?? []).map((entry: any) => {
               const slots = entry.slots ?? [];
               return {
@@ -1824,6 +1831,23 @@ const DailyReport = () => {
           ),
           description: carSheet.description || "",
           photo_groups: processedCar,
+          site_title: siteActivitiesTitle,
+          site_ref: processedSiteActivities.flatMap((section: any) =>
+            (section.entries ?? []).map((entry: any) => {
+              const slots = entry.slots ?? [];
+              return {
+                section_title: section.title || "",
+                images: slots
+                  .map((s: any) => s.image)
+                  .filter(Boolean)
+                  .slice(0, 2),
+                footers: slots
+                  .map((s: any) => s.caption)
+                  .filter(Boolean)
+                  .slice(0, 2),
+              };
+            })
+          ),
           logos: {
             cacpm: null,
             koica: processedLogo,
@@ -1940,6 +1964,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -1970,7 +1995,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        interiorTeam,
+        mepTeam,
         materials,
         machinery,
         description: carSheet.description || "",
@@ -1984,8 +2010,25 @@ const DailyReport = () => {
           mode: "combined",
           data: {
             ...reportPayload,
-            table_title: tableTitle,
-            reference: processedSections.flatMap((section: any) =>
+            hse_title: tableTitle,
+            hse: processedSections.flatMap((section: any) =>
+              (section.entries ?? []).map((entry: any) => {
+                const slots = entry.slots ?? [];
+                return {
+                  section_title: section.title || "",
+                  images: slots
+                    .map((s: any) => s.image)
+                    .filter(Boolean)
+                    .slice(0, 2),
+                  footers: slots
+                    .map((s: any) => s.caption)
+                    .filter(Boolean)
+                    .slice(0, 2),
+                };
+              })
+            ),
+            site_title: siteActivitiesTitle,
+            site_ref: processedSiteActivities.flatMap((section: any) =>
               (section.entries ?? []).map((entry: any) => {
                 const slots = entry.slots ?? [];
                 return {
@@ -2014,8 +2057,25 @@ const DailyReport = () => {
         `${PYTHON_API_BASE_URL}/generate-combined`,
         {
           ...reportPayload,
-          table_title: tableTitle,
-          reference: processedSections.flatMap((section: any) =>
+          hse_title: tableTitle,
+          hse: processedSections.flatMap((section: any) =>
+            (section.entries ?? []).map((entry: any) => {
+              const slots = entry.slots ?? [];
+              return {
+                section_title: section.title || "",
+                images: slots
+                  .map((s: any) => s.image)
+                  .filter(Boolean)
+                  .slice(0, 2),
+                footers: slots
+                  .map((s: any) => s.caption)
+                  .filter(Boolean)
+                  .slice(0, 2),
+              };
+            })
+          ),
+          site_title: siteActivitiesTitle,
+          site_ref: processedSiteActivities.flatMap((section: any) =>
             (section.entries ?? []).map((entry: any) => {
               const slots = entry.slots ?? [];
               return {
