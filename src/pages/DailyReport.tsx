@@ -115,11 +115,14 @@ interface ReportData {
   activityToday: string;
   workPlanNextDay: string;
   managementTeam: ResourceRow[];
-  workingTeam: ResourceRow[];
-  interiorTeam: ResourceRow[];
-  mepTeam: ResourceRow[];
+  workingTeamInterior: ResourceRow[];
+  workingTeamMEP: ResourceRow[];
   materials: ResourceRow[];
   machinery: ResourceRow[];
+  // Backward compatibility for data loading
+  workingTeam?: ResourceRow[];
+  interiorTeam?: ResourceRow[];
+  mepTeam?: ResourceRow[];
   // Optional merged-reference data (kept optional so export logic isn't changed yet)
   referenceSections?: Section[];
   tableTitle?: string;
@@ -158,7 +161,7 @@ const DailyReport = () => {
 
   // Resources
   const [managementTeam, setManagementTeam] = useState<ResourceRow[]>([]);
-  const [workingTeam, setWorkingTeam] = useState<ResourceRow[]>([]);
+  const [workingTeamInterior, setWorkingTeam] = useState<ResourceRow[]>([]);
   const [interiorTeam, setInteriorTeam] = useState<ResourceRow[]>([]);
   const [mepTeam, setMepTeam] = useState<ResourceRow[]>([]);
   const [materials, setMaterials] = useState<ResourceRow[]>([]);
@@ -222,16 +225,16 @@ const DailyReport = () => {
   };
 
   // Helper to split working team into interior and MEP teams
-  const splitWorkingTeam = (workingTeam: ResourceRow[]): { interior: ResourceRow[]; mep: ResourceRow[] } => {
+  const splitWorkingTeam = (workingTeamInterior: ResourceRow[]): { interior: ResourceRow[]; mep: ResourceRow[] } => {
     const interiorOptions = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
     const mepOptions = ["MEP Engineer", "MEP Workers"];
     
-    const interior = workingTeam.filter(row => 
+    const interior = workingTeamInterior.filter(row => 
       interiorOptions.includes(row.description) || 
       (!mepOptions.includes(row.description) && row.description !== "")
     );
     
-    const mep = workingTeam.filter(row => 
+    const mep = workingTeamInterior.filter(row => 
       mepOptions.includes(row.description)
     );
     
@@ -250,9 +253,8 @@ const DailyReport = () => {
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
-      interiorTeam,
-      mepTeam,
+      workingTeamInterior: interiorTeam,
+      workingTeamMEP: mepTeam,
       materials,
       machinery,
       // Keep reference sections in the object for future export mapping (no export logic changed yet)
@@ -273,7 +275,7 @@ const DailyReport = () => {
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
+      workingTeamInterior,
       interiorTeam,
       mepTeam,
       materials,
@@ -357,7 +359,7 @@ const DailyReport = () => {
           setActivityToday(dbReport.activityToday || "");
           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-          setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+          setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
           
           // Handle interior and MEP team migration
           if (dbReport.interiorTeam && dbReport.mepTeam) {
@@ -366,7 +368,7 @@ const DailyReport = () => {
             setMepTeam(ensureRowIds(dbReport.mepTeam));
           } else {
             // Old format: split working team
-            const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+            const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
             setInteriorTeam(interior);
             setMepTeam(mep);
           }
@@ -418,7 +420,7 @@ const DailyReport = () => {
             setActivityToday(localDraft.activityToday || "");
             setWorkPlanNextDay(localDraft.workPlanNextDay || "");
             setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-            setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+            setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
             
             // Handle interior and MEP team migration for localStorage
             if (localDraft.interiorTeam && localDraft.mepTeam) {
@@ -427,7 +429,7 @@ const DailyReport = () => {
               setMepTeam(ensureRowIds(localDraft.mepTeam));
             } else {
               // Old format: split working team
-              const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+              const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
               setInteriorTeam(interior);
               setMepTeam(mep);
             }
@@ -475,7 +477,7 @@ const DailyReport = () => {
           setActivityToday(localDraft.activityToday || "");
           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-          setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+          setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
           
           // Handle interior and MEP team migration for fallback localStorage
           if (localDraft.interiorTeam && localDraft.mepTeam) {
@@ -484,7 +486,7 @@ const DailyReport = () => {
             setMepTeam(ensureRowIds(localDraft.mepTeam));
           } else {
             // Old format: split working team
-            const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+            const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
             setInteriorTeam(interior);
             setMepTeam(mep);
           }
@@ -560,7 +562,7 @@ const DailyReport = () => {
   //         setActivityToday(dbReport.activityToday || "");
   //         setWorkPlanNextDay(dbReport.workPlanNextDay || "");
   //         setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //         setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //         setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
   //         setMaterials(ensureRowIds(dbReport.materials || []));
   //         setMachinery(ensureRowIds(dbReport.machinery || []));
   //       } else {
@@ -600,7 +602,7 @@ const DailyReport = () => {
   //           setActivityToday(localDraft.activityToday || "");
   //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(localDraft.materials || []));
   //           setMachinery(ensureRowIds(localDraft.machinery || []));
   //         }
@@ -641,7 +643,7 @@ const DailyReport = () => {
   //         setActivityToday(localDraft.activityToday || "");
   //         setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //         setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //         setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //         setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //         setMaterials(ensureRowIds(localDraft.materials || []));
   //         setMachinery(ensureRowIds(localDraft.machinery || []));
   //       }
@@ -697,7 +699,7 @@ const DailyReport = () => {
   //           setActivityToday(dbReport.activityToday || "");
   //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(dbReport.materials || []));
   //           setMachinery(ensureRowIds(dbReport.machinery || []));
   //         } else {
@@ -734,7 +736,7 @@ const DailyReport = () => {
   //             setActivityToday(localDraft.activityToday || "");
   //             setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //             setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //             setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //             setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //             setMaterials(ensureRowIds(localDraft.materials || []));
   //             setMachinery(ensureRowIds(localDraft.machinery || []));
   //           } else {
@@ -755,7 +757,7 @@ const DailyReport = () => {
   //               setManagementTeam(
   //                 mapPrevFromAccum(prevData.managementTeam || [])
   //               );
-  //               setWorkingTeam(mapPrevFromAccum(prevData.workingTeam || []));
+  //               setWorkingTeam(mapPrevFromAccum(prevData.workingTeamInterior || []));
   //               setMaterials(mapPrevFromAccum(prevData.materials || []));
   //               setMachinery(mapPrevFromAccum(prevData.machinery || []));
 
@@ -822,7 +824,7 @@ const DailyReport = () => {
   //           setActivityToday(dbReport.activityToday || "");
   //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(dbReport.materials || []));
   //           setMachinery(ensureRowIds(dbReport.machinery || []));
   //           setReferenceSections(dbReport.referenceSections || []);
@@ -863,7 +865,7 @@ const DailyReport = () => {
   //           setActivityToday(localDraft.activityToday || "");
   //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(localDraft.materials || []));
   //           setMachinery(ensureRowIds(localDraft.machinery || []));
   //           return;
@@ -975,7 +977,7 @@ const DailyReport = () => {
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
+      workingTeamInterior,
       materials,
       machinery,
     };
@@ -992,7 +994,7 @@ const DailyReport = () => {
     activityToday,
     workPlanNextDay,
     managementTeam,
-    workingTeam,
+    workingTeamInterior,
     materials,
     machinery,
     // triggerAutoSave,
@@ -1041,9 +1043,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
-        interiorTeam,
-        mepTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -1077,9 +1078,8 @@ const DailyReport = () => {
           activityToday,
           workPlanNextDay,
           managementTeam,
-          workingTeam,
-          interiorTeam,
-          mepTeam,
+          workingTeamInterior: interiorTeam,
+          workingTeamMEP: mepTeam,
           materials,
           machinery,
         },
@@ -1110,9 +1110,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
-        interiorTeam,
-        mepTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -1156,8 +1155,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        interiorTeam,
-        mepTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       };
@@ -1350,9 +1349,8 @@ const DailyReport = () => {
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
         referenceSections: processedSections,
@@ -1480,9 +1478,8 @@ const DailyReport = () => {
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
         referenceSections: processedSections,
@@ -1526,13 +1523,20 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        interiorTeam,
-        mepTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
         description: carSheet.description || "",
         photo_groups: processedCar,
       };
+
+      console.log("Combined Excel Payload:", {
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
+        interiorLength: interiorTeam?.length || 0,
+        mepLength: mepTeam?.length || 0
+      });
 
       await generateCombinedExcel(
         reportPayload,
@@ -1654,23 +1658,18 @@ const DailyReport = () => {
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
-      const cleanedData = {
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
-        referenceSections: processedSections,
-        carSheet: {
-          ...carSheet,
-          photo_groups: processedCar,
-        },
       };
 
       // Save to database
-      await saveReportToDB(cleanedData);
+      await saveReportToDB(basicCleanedData);
 
       await generateCombinedPDF(
         {
@@ -1683,8 +1682,8 @@ const DailyReport = () => {
           activityToday,
           workPlanNextDay,
           managementTeam,
-          interiorTeam,
-          mepTeam,
+          workingTeamInterior: interiorTeam,
+          workingTeamMEP: mepTeam,
           materials,
           machinery,
           description: carSheet.description || "",
@@ -1808,8 +1807,8 @@ const DailyReport = () => {
           activityToday,
           workPlanNextDay,
           managementTeam,
-          interiorTeam,
-          mepTeam,
+          workingTeamInterior: interiorTeam,
+          workingTeamMEP: mepTeam,
           materials,
           machinery,
           hse_title: tableTitle,
@@ -1902,9 +1901,8 @@ const DailyReport = () => {
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
       };
@@ -1995,8 +1993,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        interiorTeam,
-        mepTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
         description: carSheet.description || "",
@@ -2155,9 +2153,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
-        interiorTeam,
-        mepTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -2191,9 +2188,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
-        interiorTeam,
-        mepTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -2265,9 +2261,8 @@ const DailyReport = () => {
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
       };
@@ -2301,19 +2296,13 @@ const DailyReport = () => {
           today: 0,
           accumulated: r.accumulated,
         })),
-        workingTeam: cleanedData.workingTeam.map((r) => ({
+        workingTeamInterior: cleanedData.workingTeamInterior.map((r) => ({
           ...r,
           prev: r.accumulated,
           today: 0,
           accumulated: r.accumulated,
         })),
-        interiorTeam: cleanedData.interiorTeam.map((r) => ({
-          ...r,
-          prev: r.accumulated,
-          today: 0,
-          accumulated: r.accumulated,
-        })),
-        mepTeam: cleanedData.mepTeam.map((r) => ({
+        workingTeamMEP: cleanedData.workingTeamMEP.map((r) => ({
           ...r,
           prev: r.accumulated,
           today: 0,

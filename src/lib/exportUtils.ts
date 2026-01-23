@@ -27,11 +27,31 @@ interface ReportData {
   activityToday: string;
   workPlanNextDay: string;
   managementTeam: ResourceRow[];
-  workingTeam: ResourceRow[];
-  interiorTeam: ResourceRow[];
-  mepTeam: ResourceRow[];
+  workingTeamInterior: ResourceRow[];
+  workingTeamMEP: ResourceRow[];
   materials: ResourceRow[];
   machinery: ResourceRow[];
+  logos?: {
+    koica?: string;
+  };
+  hse_title?: string;
+  hse?: Array<{
+    section_title: string;
+    images: string[];
+    footers: string[];
+  }>;
+  site_title?: string;
+  site_ref?: Array<{
+    section_title: string;
+    images: string[];
+    footers: string[];
+  }>;
+  description?: string;
+  photo_groups?: Array<{
+    images: string[];
+    date: string;
+    footers: string[];
+  }>;
 }
 
 const formatDate = (date: Date | undefined): string => {
@@ -553,7 +573,7 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
 
   // Resource tables - matching Excel row positions (row 25+ for teams, row 34+ for materials)
   // Combine interior and MEP teams for Site Working Team display
-  const combinedWorkingTeam = [...(data.interiorTeam || []), ...(data.mepTeam || [])];
+  const combinedWorkingTeam = [...(data.workingTeamInterior || []), ...(data.workingTeamMEP || [])];
   
   addResourceTablePair(
     "Resources Employeed",
@@ -756,7 +776,7 @@ export const exportToExcel = async (data: ReportData) => {
   const startTeamRow = 25;
   const baseTeamRows = 6;
   // Combine interior and MEP teams for Site Working Team display
-  const combinedWorkingTeam = [...(data.interiorTeam || []), ...(data.mepTeam || [])];
+  const combinedWorkingTeam = [...(data.workingTeamInterior || []), ...(data.workingTeamMEP || [])];
   const teamRowsNeeded = Math.max(
     baseTeamRows,
     data.managementTeam.length,
@@ -1019,7 +1039,7 @@ export const exportToZIP = async (data: ReportData): Promise<void> => {
   const startTeamRow = 25;
   const baseTeamRows = 6;
   // Combine interior and MEP teams for Site Working Team display
-  const combinedWorkingTeam = [...(data.interiorTeam || []), ...(data.mepTeam || [])];
+  const combinedWorkingTeam = [...(data.workingTeamInterior || []), ...(data.workingTeamMEP || [])];
   const teamRowsNeeded = Math.max(
     baseTeamRows,
     data.managementTeam.length,
@@ -2005,7 +2025,7 @@ export const exportToWord = async (data: ReportData): Promise<void> => {
   // Resources section - side by side tables (matching Excel)
   // Resources Employeed - Site Management Team & Site Working Team
   // Combine interior and MEP teams for Site Working Team display
-  const combinedWorkingTeam = [...(data.interiorTeam || []), ...(data.mepTeam || [])];
+  const combinedWorkingTeam = [...(data.workingTeamInterior || []), ...(data.workingTeamMEP || [])];
   children.push(
     createSideBySideResourceTables(
       "Resources Employeed",
