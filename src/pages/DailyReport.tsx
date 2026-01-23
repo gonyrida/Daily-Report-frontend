@@ -9,6 +9,7 @@ import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
 import CARSection from "@/components/CARSection";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
+import { processHSEForDB, processSiteActivitiesForDB } from "@/utils/hseDataUtils";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
 import { createDefaultHSESections } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
@@ -158,6 +159,27 @@ const DailyReport = () => {
   // Activities
   const [activityToday, setActivityToday] = useState("");
   const [workPlanNextDay, setWorkPlanNextDay] = useState("");
+
+  // Helper function to clean resource rows
+  const cleanResourceRows = (rows: ResourceRow[]) => {
+    return rows
+      .filter(
+        (r) =>
+          // Keep row if it has description OR any numeric values
+          (r.description && r.description.trim() !== "") ||
+          (r.prev && r.prev > 0) ||
+          (r.today && r.today > 0) ||
+          (r.accumulated && r.accumulated > 0)
+      )
+      .map((r) => ({
+        id: r.id,
+        description: r.description?.trim() || "",
+        unit: r.unit || "",
+        prev: r.prev || 0,
+        today: r.today || 0,
+        accumulated: r.accumulated || 0,
+      }));
+  };
 
   // Resources
   const [managementTeam, setManagementTeam] = useState<ResourceRow[]>([]);
@@ -1346,13 +1368,23 @@ const DailyReport = () => {
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
-      const cleanedData = {
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
+      };
+
+      const cleanedData = {
+        ...basicCleanedData,
         referenceSections: processedSections,
         carSheet: {
           ...carSheet,
@@ -1360,8 +1392,11 @@ const DailyReport = () => {
         },
         projectLogo: processedLogo,
       };
+      
       // Save to database
-      await saveReportToDB(cleanedData);
+      console.log("🔍 HSE DEBUG: Saving HSE sections:", basicCleanedData.hse?.length || 0);
+      console.log("🔍 HSE DEBUG: HSE title:", basicCleanedData.hse_title);
+      await saveReportToDB(basicCleanedData); // Save basic data without large images
 
       toast({
         title: "Report Saved",
@@ -1475,13 +1510,23 @@ const DailyReport = () => {
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
-      const cleanedData = {
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
+      };
+
+      const cleanedData = {
+        ...basicCleanedData,
         referenceSections: processedSections,
         carSheet: {
           ...carSheet,
@@ -1491,16 +1536,16 @@ const DailyReport = () => {
       };
 
       console.log(
-        "🔍 FRONTEND: About to save data with referenceSections:",
-        cleanedData.referenceSections
-          ? "YES (" + cleanedData.referenceSections.length + " sections)"
+        "🔍 FRONTEND: About to save data with HSE sections:",
+        basicCleanedData.hse
+          ? "YES (" + basicCleanedData.hse.length + " sections)"
           : "NO"
       );
 
       // Save to database
       try {
         console.log("🔍 FRONTEND: About to save to DB");
-        await saveReportToDB(cleanedData);
+        await saveReportToDB(basicCleanedData); // Save basic data without large images
         console.log("🔍 FRONTEND: Save completed successfully");
       } catch (error) {
         console.error("🔍 FRONTEND: Save failed:", error);
@@ -1666,6 +1711,11 @@ const DailyReport = () => {
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
       };
 
       // Save to database
@@ -1819,12 +1869,10 @@ const DailyReport = () => {
                 section_title: section.title || "",
                 images: slots
                   .map((s: any) => s.image)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
                 footers: slots
                   .map((s: any) => s.caption)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
               };
             })
           ),
@@ -1838,12 +1886,10 @@ const DailyReport = () => {
                 section_title: section.title || "",
                 images: slots
                   .map((s: any) => s.image)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
                 footers: slots
                   .map((s: any) => s.caption)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
               };
             })
           ),
@@ -1898,17 +1944,24 @@ const DailyReport = () => {
     try {
       // Step 1: Save report to database first (same logic as combined Excel)
       const rawData = getReportData();
-      const cleanedData = {
+      
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
       };
 
       // Save to database
-      await saveReportToDB(cleanedData);
+      await saveReportToDB(basicCleanedData);
       // Process images for both exports
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
@@ -2063,12 +2116,10 @@ const DailyReport = () => {
                 section_title: section.title || "",
                 images: slots
                   .map((s: any) => s.image)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
                 footers: slots
                   .map((s: any) => s.caption)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
               };
             })
           ),
@@ -2080,12 +2131,10 @@ const DailyReport = () => {
                 section_title: section.title || "",
                 images: slots
                   .map((s: any) => s.image)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
                 footers: slots
                   .map((s: any) => s.caption)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
               };
             })
           ),
@@ -2229,26 +2278,6 @@ const DailyReport = () => {
       title: "Data Cleared",
       description: "All form data has been cleared.",
     });
-  };
-
-  const cleanResourceRows = (rows: ResourceRow[]) => {
-    return rows
-      .filter(
-        (r) =>
-          // Keep row if it has description OR any numeric values
-          (r.description && r.description.trim() !== "") ||
-          (r.prev && r.prev > 0) ||
-          (r.today && r.today > 0) ||
-          (r.accumulated && r.accumulated > 0)
-      )
-      .map((r) => ({
-        id: r.id,
-        description: r.description?.trim() || "",
-        unit: r.unit || "",
-        prev: r.prev || 0,
-        today: r.today || 0,
-        accumulated: r.accumulated || 0,
-      }));
   };
 
   const handleSubmit = async () => {
