@@ -160,6 +160,60 @@ const validateAndSetProjectContext = (loadedProjectName: string, urlProjectName:
   return loadedProjectName;
 };
 
+// NEW: Detect if this is a new report creation vs existing report edit
+const isNewReportCreation = (reportIdFromUrl: string | null, projectFromUrl: string | null, dbReport: any) => {
+  // If no reportId and has project context → New report creation
+  if (!reportIdFromUrl && projectFromUrl) {
+    return true;
+  }
+  
+  // If reportId exists but project context doesn't match → New report for different project
+  if (reportIdFromUrl && projectFromUrl && dbReport && dbReport.projectName !== projectFromUrl) {
+    return true;
+  }
+  
+  // If no reportId and no project context → Main dashboard new report
+  if (!reportIdFromUrl && !projectFromUrl) {
+    return true;
+  }
+  
+  // Otherwise → Existing report edit
+  return false;
+};
+
+// NEW: Initialize clean state for new reports
+const initializeCleanReportState = (projectName: string, setProjectName: (name: string) => void) => {
+  console.log(`🔧 CLEAN STATE: Initializing new report for project "${projectName}"`);
+  
+  // Set project name from URL context
+  setProjectName(projectName);
+  
+  // Smart defaults based on current time and date
+  const currentHour = new Date().getHours();
+  const defaultPeriod = currentHour < 12 ? "AM" : "PM";
+  
+  return {
+    weatherAM: "",
+    weatherPM: "",
+    tempAM: "",
+    tempPM: "",
+    currentPeriod: defaultPeriod,
+    activityToday: "",
+    workPlanNextDay: "",
+    managementTeam: [],
+    workingTeam: [],
+    interiorTeam: [],
+    mepTeam: [],
+    materials: [],
+    machinery: [],
+    referenceSections: createDefaultHSESections(),
+    siteActivitiesSections: createDefaultHSESections(),
+    siteActivitiesTitle: "Site Activities Photos",
+    carSheet: { description: "", photo_groups: [] },
+    projectLogo: ""
+  };
+};
+
 const DailyReport = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -348,65 +402,96 @@ const DailyReport = () => {
         }
 
         if (dbReport) {
-          // Load from database
-          setReportId(dbReport._id || reportIdFromUrl);
-          // NEW: Validate project context
-          validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
-          setReportDate(
-            dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
-          );
-          // Handle backward compatibility: convert old format to new
-          if (dbReport.weatherAM !== undefined) {
-            setWeatherAM(dbReport.weatherAM || "");
-            setWeatherPM(dbReport.weatherPM || "");
-            setTempAM(dbReport.tempAM || "");
-            setTempPM(dbReport.tempPM || "");
-            setCurrentPeriod(dbReport.currentPeriod || "AM");
+          const isNewReport = isNewReportCreation(reportIdFromUrl, projectFromUrl, dbReport);
+          
+          if (isNewReport) {
+            // NEW: Initialize clean state for new report
+            console.log("🔧 NEW REPORT: Detected new report creation, using clean state");
+            const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName);
+            
+            // Set only project name, leave everything else empty/default
+            setReportId("");
+            setReportDate(new Date());
+            setWeatherAM(cleanState.weatherAM);
+            setWeatherPM(cleanState.weatherPM);
+            setTempAM(cleanState.tempAM);
+            setTempPM(cleanState.tempPM);
+            setCurrentPeriod(cleanState.currentPeriod as "AM" | "PM");
+            setActivityToday(cleanState.activityToday);
+            setWorkPlanNextDay(cleanState.workPlanNextDay);
+            setManagementTeam(cleanState.managementTeam);
+            setWorkingTeam(cleanState.workingTeam);
+            setInteriorTeam(cleanState.interiorTeam);
+            setMepTeam(cleanState.mepTeam);
+            setMaterials(cleanState.materials);
+            setMachinery(cleanState.machinery);
+            setReferenceSections(cleanState.referenceSections);
+            setSiteActivitiesSections(cleanState.siteActivitiesSections);
+            setSiteActivitiesTitle(cleanState.siteActivitiesTitle);
+            setCarSheet(cleanState.carSheet);
+            setProjectLogo(cleanState.projectLogo);
+            
           } else {
-            // Old format: migrate to new format
-            const oldWeather = dbReport.weather || "Sunny";
-            const oldPeriod = dbReport.weatherPeriod || "AM";
-            const oldTemp = dbReport.temperature || "";
-            if (oldPeriod === "AM") {
-              setWeatherAM(oldWeather);
-              setWeatherPM("");
-              setTempAM(oldTemp);
-              setTempPM("");
+            // Load from database
+            setReportId(dbReport._id || reportIdFromUrl);
+            // NEW: Validate project context
+            validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
+            setReportDate(
+              dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
+            );
+            // Handle backward compatibility: convert old format to new
+            if (dbReport.weatherAM !== undefined) {
+              setWeatherAM(dbReport.weatherAM || "");
+              setWeatherPM(dbReport.weatherPM || "");
+              setTempAM(dbReport.tempAM || "");
+              setTempPM(dbReport.tempPM || "");
+              setCurrentPeriod(dbReport.currentPeriod || "AM");
             } else {
-              setWeatherAM("");
-              setWeatherPM(oldWeather);
-              setTempAM("");
-              setTempPM(oldTemp);
+              // Old format: migrate to new format
+              const oldWeather = dbReport.weather || "Sunny";
+              const oldPeriod = dbReport.weatherPeriod || "AM";
+              const oldTemp = dbReport.temperature || "";
+              if (oldPeriod === "AM") {
+                setWeatherAM(oldWeather);
+                setWeatherPM("");
+                setTempAM(oldTemp);
+                setTempPM("");
+              } else {
+                setWeatherAM("");
+                setWeatherPM(oldWeather);
+                setTempAM("");
+                setTempPM(oldTemp);
+              }
+              setCurrentPeriod("AM");
             }
-            setCurrentPeriod("AM");
+            setActivityToday(dbReport.activityToday || "");
+            setWorkPlanNextDay(dbReport.workPlanNextDay || "");
+            setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
+            setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+            
+            // Handle interior and MEP team migration
+            if (dbReport.interiorTeam && dbReport.mepTeam) {
+              // New format: use separate teams
+              setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
+              setMepTeam(ensureRowIds(dbReport.mepTeam));
+            } else {
+              // Old format: split working team
+              const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+              setInteriorTeam(interior);
+              setMepTeam(mep);
+            }
+            
+            setMaterials(ensureRowIds(dbReport.materials || []));
+            setMachinery(ensureRowIds(dbReport.machinery || []));
+            setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
+            setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
+            setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
+            setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
+            setCarSheet(
+              dbReport.carSheet || { description: "", photo_groups: [] }
+            );
+            setProjectLogo(dbReport.projectLogo || "");
           }
-          setActivityToday(dbReport.activityToday || "");
-          setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-          setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-          setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-          
-          // Handle interior and MEP team migration
-          if (dbReport.interiorTeam && dbReport.mepTeam) {
-            // New format: use separate teams
-            setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
-            setMepTeam(ensureRowIds(dbReport.mepTeam));
-          } else {
-            // Old format: split working team
-            const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-            setInteriorTeam(interior);
-            setMepTeam(mep);
-          }
-          
-          setMaterials(ensureRowIds(dbReport.materials || []));
-          setMachinery(ensureRowIds(dbReport.machinery || []));
-          setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
-          setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
-          setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
-          setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
-          setCarSheet(
-            dbReport.carSheet || { description: "", photo_groups: [] }
-          );
-          setProjectLogo(dbReport.projectLogo || "");
         } else {
           // Fallback to localStorage
           const localDraft = loadDraftLocally(reportDate);
