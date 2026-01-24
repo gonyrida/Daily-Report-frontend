@@ -33,6 +33,9 @@ import {
   FileType,
   ArrowLeft,
   Save,
+  Send,
+  Lock,
+  CheckCircle,
 } from "lucide-react";
 import { ResourceRow } from "@/components/ResourceTable";
 import {
@@ -59,6 +62,12 @@ import {
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -183,11 +192,13 @@ const isNewReportCreation = async (reportIdFromUrl: string | null, projectFromUr
 };
 
 // NEW: Initialize clean state for new reports
-const initializeCleanReportState = (projectName: string, setProjectName: (name: string) => void) => {
+const initializeCleanReportState = (projectName: string, setProjectName: (name: string) => void, setReportStatus: (status: string) => void) => {
   console.log(`🔧 CLEAN STATE: Initializing new report for project "${projectName}"`);
   
   // Set project name from URL context
   setProjectName(projectName);
+  // ADD THIS: Reset status to draft for new reports
+  setReportStatus('draft');
   
   // Smart defaults based on current time and date
   const currentHour = new Date().getHours();
@@ -310,6 +321,7 @@ const DailyReport = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reportStatus, setReportStatus] = useState<string>('draft');
 
   // Google Docs-style auto-save state
   const [reportId, setReportId] = useState<string | null>(reportIdFromUrl);
@@ -452,7 +464,7 @@ const DailyReport = () => {
           if (isNewReport) {
             // NEW: Initialize clean state for new report
             console.log("🔧 NEW REPORT: Detected new report creation, using clean state");
-            const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName);
+            const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
             
             // Set only project name, leave everything else empty/default
             setReportId("");
@@ -489,6 +501,9 @@ const DailyReport = () => {
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
+
+                // ADD THIS: Reset status to draft for new reports based on templates
+                setReportStatus('draft');
                 
                 // Load data from project's most recent report
                 setWeatherAM(projectRecentReport.weatherAM || "");
@@ -522,7 +537,7 @@ const DailyReport = () => {
               } else {
                 // Clean state for projects with no history
                 console.log("🔧 CLEAN STATE: No project history found, using clean state");
-                const cleanState = initializeCleanReportState(projectFromUrl, setProjectName);
+                const cleanState = initializeCleanReportState(projectFromUrl, setProjectName, setReportStatus);
                 setReportId("");
                 setReportDate(new Date());
                 setWeatherAM(cleanState.weatherAM);
@@ -550,6 +565,7 @@ const DailyReport = () => {
               setReportId(dbReport._id || reportIdFromUrl);
               validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
               setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
+              setReportStatus(dbReport.status || 'draft');
               
               // Handle backward compatibility: convert old format to new
               if (dbReport.weatherAM !== undefined) {
@@ -612,7 +628,7 @@ const DailyReport = () => {
             if (isNewReport) {
               // NEW: Initialize clean state for new report (no project history)
               console.log("🔧 NEW REPORT: Project has no history in localStorage, using clean state");
-              const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName);
+              const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
               
               // Set only project name, ignore localStorage data for new reports
               setReportDate(new Date());
@@ -648,6 +664,9 @@ const DailyReport = () => {
                   setReportId(""); // Keep as new report
                   setProjectName(projectFromUrl);
                   setReportDate(new Date());
+
+                  // ADD THIS: Reset status to draft for new reports based on templates
+                  setReportStatus('draft');
                   
                   // Load data from project's most recent report
                   setWeatherAM(projectRecentReport.weatherAM || "");
@@ -681,7 +700,7 @@ const DailyReport = () => {
                 } else {
                   // Clean state for projects with no history
                   console.log("🔧 CLEAN STATE: No project history found, using clean state");
-                  const cleanState = initializeCleanReportState(projectFromUrl, setProjectName);
+                  const cleanState = initializeCleanReportState(projectFromUrl, setProjectName, setReportStatus);
                   setReportId("");
                   setReportDate(new Date());
                   setWeatherAM(cleanState.weatherAM);
@@ -709,6 +728,7 @@ const DailyReport = () => {
                 setReportId(dbReport._id || reportIdFromUrl);
                 validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
                 setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
+                setReportStatus(dbReport.status || 'draft');
                 
                 // Handle backward compatibility: convert old format to new
                 if (dbReport.weatherAM !== undefined) {
@@ -779,7 +799,7 @@ const DailyReport = () => {
           if (isNewReport) {
             // NEW: Initialize clean state for new report (no project history)
             console.log("🔧 ERROR FALLBACK: Project has no history, using clean state");
-            const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName);
+            const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
             
             // Set only project name, ignore localStorage data for new reports
             setReportDate(new Date());
@@ -815,6 +835,9 @@ const DailyReport = () => {
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
+
+                // ADD THIS: Reset status to draft for new reports based on templates
+                setReportStatus('draft');
                 
                 // Load data from project's most recent report
                 setWeatherAM(projectRecentReport.weatherAM || "");
@@ -848,7 +871,7 @@ const DailyReport = () => {
               } else {
                 // Clean state for projects with no history
                 console.log("🔧 CLEAN STATE: No project history found, using clean state");
-                const cleanState = initializeCleanReportState(projectFromUrl, setProjectName);
+                const cleanState = initializeCleanReportState(projectFromUrl, setProjectName, setReportStatus);
                 setReportId("");
                 setReportDate(new Date());
                 setWeatherAM(cleanState.weatherAM);
@@ -1814,6 +1837,44 @@ const DailyReport = () => {
     }
   };
 
+  const handleSaveAsDraft = async () => {
+    setIsSaving(true);
+    try {
+      console.log("🔒 DRAFT SAVE: Saving report as draft");
+
+      // Get current report data
+      const rawData = getReportData();
+      const cleanedData = {
+        ...rawData,
+        managementTeam: cleanResourceRows(rawData.managementTeam),
+        workingTeam: cleanResourceRows(rawData.workingTeam),
+        interiorTeam: cleanResourceRows(rawData.interiorTeam),
+        mepTeam: cleanResourceRows(rawData.mepTeam),
+        materials: cleanResourceRows(rawData.materials),
+        machinery: cleanResourceRows(rawData.machinery),
+      };
+
+      // Save to database (keeps status as "draft")
+      await saveReportToDB(cleanedData);
+      // ADD THIS: Update local status
+      setReportStatus('draft');
+
+      toast({
+        title: "Draft Saved",
+        description: "Your report has been saved as draft successfully.",
+      });
+    } catch (error) {
+      console.error("Draft Save Error:", error);
+      toast({
+        title: "Draft Save Failed",
+        description: "Could not save draft. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleExportCombinedExcel = async () => {
     if (!validateReport()) return;
 
@@ -2646,6 +2707,8 @@ const DailyReport = () => {
         cleanedData.projectName,
         new Date(cleanedData.reportDate!)
       );
+      // ADD THIS: Update local status
+      setReportStatus('submitted');
 
       // Step 3: Clear localStorage after successful submission
       localStorage.removeItem(dateKey(reportDate));
@@ -2971,15 +3034,53 @@ const DailyReport = () => {
             </div>
             <div className="flex items-center gap-3">
               {/* ADD THIS: Simple Save Button */}
-              <Button
-                variant="outline"
-                className="min-w-[140px]"
-                onClick={handleSaveReport}
-                disabled={isSaving}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? "Saving..." : "Save Report"}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="min-w-[140px]"
+                    disabled={isSaving || isSubmitting}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {(isSaving || isSubmitting) ? "Processing..." : "Save As..."}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[140px]">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuItem 
+                          onClick={handleSaveAsDraft} 
+                          disabled={isSaving || reportStatus === 'submitted'}
+                          className={reportStatus === 'submitted' ? 'opacity-50 cursor-not-allowed' : ''}
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          {isSaving ? "Saving..." : "Draft"}
+                          {reportStatus === 'submitted' && (
+                            <Lock className="w-3 h-3 ml-auto" />
+                          )}
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      {reportStatus === 'submitted' && (
+                        <TooltipContent>
+                          <p>Submitted reports cannot be reverted to draft status</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                  <DropdownMenuItem 
+                    onClick={handleSubmit} 
+                    disabled={isSubmitting}
+                    className={reportStatus === 'submitted' ? 'bg-green-50 border-green-200' : ''}
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {isSubmitting ? "Submitting..." : "Submitted"}
+                    {reportStatus === 'submitted' && (
+                      <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
+                    )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="outline"
                 className="min-w-[140px]"
@@ -2988,19 +3089,19 @@ const DailyReport = () => {
               >
                 <Eye className="w-4 h-4 mr-2" />
                 {isPreviewingCombined
-                  ? "Previewing Combined..."
-                  : "Preview Combined"}
+                  ? "Previewing ..."
+                  : "Preview"}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    className="min-w-[160px] bg-primary hover:bg-primary/90"
+                    className="min-w-[130px] bg-primary hover:bg-primary/90"
                     disabled={isExportingCombined}
                   >
                     <FileDown className="w-4 h-4 mr-2" />
                     {isExportingCombined
-                      ? "Exporting Combined..."
-                      : "Export Combined Excel"}
+                      ? "Exporting ..."
+                      : "Export"}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -3009,14 +3110,14 @@ const DailyReport = () => {
                     disabled={isExportingCombined}
                   >
                     <FileText className="w-4 h-4 mr-2" />
-                    Export Combined PDF
+                    Export As PDF
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleExportCombinedExcel}
                     disabled={isExportingCombined}
                   >
                     <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Export Combined Excel
+                    Export As Excel
                   </DropdownMenuItem>
                   {/* DISABLED: Export Combined Docs - commented out
                   <DropdownMenuItem>
@@ -3029,7 +3130,7 @@ const DailyReport = () => {
                     disabled={isExportingCombined}
                   >
                     <FileDown className="w-4 h-4 mr-2" />
-                    Export Combined (ZIP)
+                    Export As (ZIP)
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
