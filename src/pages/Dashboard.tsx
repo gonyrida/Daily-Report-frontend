@@ -34,12 +34,14 @@ import {
   ArrowLeft,
   Edit,
   Trash2,
+  Building2,
+  User,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport } from "@/integrations/reportsApi";
+import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport, getCompanyReports } from "@/integrations/reportsApi";
 
 interface Report {
   _id: string;
@@ -51,6 +53,13 @@ interface Report {
   updatedAt: string;
   // Google Docs-style: Show if recently edited
   isRecentlyEdited?: boolean;
+  // ADD USER INFO
+  userId?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }
 
 const Dashboard = () => {
@@ -58,11 +67,15 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectFilter = searchParams.get('project');
+  const [companyReports, setCompanyReports] = useState([]);
+  const [filteredCompanyReports, setFilteredCompanyReports] = useState([]); // ← ADD THIS
+  const [isLoadingCompany, setIsLoadingCompany] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
+  const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -112,6 +125,55 @@ const Dashboard = () => {
 
     setFilteredReports(filtered);
   }, [reports, searchQuery, filterStatus, projectFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'company') {
+      fetchCompanyReports();
+    }
+  }, [activeTab, projectFilter]);
+
+  // Filter company reports based on search query and status
+  useEffect(() => {
+    let filtered = companyReports;
+
+    // Filter by status (case-insensitive)
+    if (filterStatus !== "all") {
+      filtered = filtered.filter(report => report.status.toLowerCase() === filterStatus.toLowerCase());
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(report => 
+        report.projectName.toLowerCase().includes(query) ||
+        new Date(report.reportDate).toLocaleDateString().toLowerCase().includes(query) ||
+        report.status.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredCompanyReports(filtered);
+  }, [companyReports, searchQuery, filterStatus]);
+
+  const fetchCompanyReports = async (
+    page: number = 1,
+    search: string = ""
+  ) => {
+    try {
+      setIsLoadingCompany(true);
+      // ADD PROJECT FILTER!
+      const response = await getCompanyReports(page, 20, search, projectFilter);
+      setCompanyReports(response.reports);
+    } catch (error) {
+      console.error("Failed to fetch company reports:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch company reports",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingCompany(false);
+    }
+  };
 
   const handleCreateReport = async () => {
     try {
@@ -347,6 +409,48 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             </div>
+            {/* Tabs */}
+            <div className="mb-6">
+              <div className="border-b border-gray-200">
+                <nav className="-mb-px flex space-x-8">
+                  <button
+                    onClick={() => setActiveTab('personal')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'personal'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      My Reports
+                      {reports.length > 0 && (
+                        <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
+                          {filteredReports.length}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setActiveTab('company')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'company'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Project Reports
+                      <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
+                        {companyReports.length}
+                      </span>
+                    </div>
+                  </button>
+                </nav>
+              </div>
+            </div>
 
             {/* Recent Documents */}
             <Card>
@@ -356,36 +460,38 @@ const Dashboard = () => {
                     <FileText className="h-5 w-5" />
                     Recent Documents ({filteredReports.length})
                   </div>
-                  {/* Filter Buttons */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={filterStatus === "all" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterStatus("all")}
-                    >
-                      All
-                    </Button>
-                    <Button
-                      variant={filterStatus === "draft" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterStatus("draft")}
-                    >
-                      Draft
-                    </Button>
-                    <Button
-                      variant={filterStatus === "submitted" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterStatus("submitted")}
-                    >
-                      Submitted
-                    </Button>
-                  </div>
+                  {/* Filter Buttons - Only show in Personal tab */}
+                  {activeTab === 'personal' && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={filterStatus === "all" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setFilterStatus("all")}
+                      >
+                        All
+                      </Button>
+                      <Button
+                        variant={filterStatus === "draft" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setFilterStatus("draft")}
+                      >
+                        Draft
+                      </Button>
+                      <Button
+                        variant={filterStatus === "submitted" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setFilterStatus("submitted")}
+                      >
+                        Submitted
+                      </Button>
+                    </div>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {filteredReports.length > 0 ? (
+                {(activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length) > 0 ? (
                   <div className="space-y-3">
-                    {filteredReports.map((report) => (
+                    {(activeTab === 'personal' ? filteredReports : filteredCompanyReports).map((report) => (
                       <div
                         key={report._id}
                         className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
@@ -406,6 +512,13 @@ const Dashboard = () => {
                               <Calendar className="h-3 w-3" />
                               {new Date(report.reportDate).toLocaleDateString()}
                             </span>
+                            {/* User Info - Only show in Company tab */}
+                            {activeTab === 'company' && report.userId && (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {report.userId.firstName} {report.userId.lastName}
+                              </span>
+                            )}
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
                               {formatLastUpdated(report.updatedAt)}

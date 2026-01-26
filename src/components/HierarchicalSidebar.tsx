@@ -46,7 +46,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
-import { getRecentReports } from "@/integrations/reportsApi";
+import { getRecentReports, getCompanyProjects } from "@/integrations/reportsApi";
 
 interface HierarchicalSidebarProps {
   className?: string;
@@ -74,15 +74,24 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        const response = await getRecentReports(100);
-        const reports = response.data as any[] || [];
-        const reportProjects = reports
-          .map((report: any) => report.projectName)
-          .filter((name: unknown): name is string => Boolean(name) && typeof name === 'string');
-        const uniqueProjects = Array.from(new Set(reportProjects));
+        const response = await getCompanyProjects(); // ← Gets ALL company projects
+        const projects = response as string[] || [];
+        const uniqueProjects = Array.from(new Set(projects));
         setDbProjects(uniqueProjects);
       } catch (error) {
-        console.error("Failed to load projects:", error);
+        console.error("Failed to load company projects:", error);
+        // Fallback to personal projects if company projects fail
+        try {
+          const fallbackResponse = await getRecentReports(100);
+          const reports = fallbackResponse.data as any[] || [];
+          const reportProjects = reports
+            .map((report: any) => report.projectName)
+            .filter((name: unknown): name is string => Boolean(name) && typeof name === 'string');
+          const uniqueProjects = Array.from(new Set(reportProjects));
+          setDbProjects(uniqueProjects);
+        } catch (fallbackError) {
+          console.error("Failed to load fallback projects:", fallbackError);
+        }
       }
     };
     

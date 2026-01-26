@@ -606,3 +606,86 @@ export const generateCombinedPDF = async (
 
   return { success: true };
 };
+
+export const getCompanyReports = async (
+  page: number = 1,
+  limit: number = 20,
+  search: string = "",
+  projectFilter?: string
+) => {
+  try {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search && { search }),
+      ...(projectFilter && { project: projectFilter }), // ← ADD PROJECT FILTER
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}/company?${queryParams}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to fetch company reports");
+    }
+
+    const data = await response.json();
+    return {
+      reports: data.reports || [],
+      pagination: data.pagination || {
+        page: 1,
+        limit: 20,
+        total: 0,
+        pages: 0,
+        hasNext: false,
+        hasPrev: false,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching company reports:", error);
+    throw error;
+  }
+};
+
+export const getCompanyProjects = async () => {
+  try {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/projects`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to fetch company projects");
+    }
+
+    const data = await response.json();
+    return data.projects || [];
+  } catch (error) {
+    console.error("Error fetching company projects:", error);
+    throw error;
+  }
+};
