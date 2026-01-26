@@ -171,10 +171,9 @@ const validateAndSetProjectContext = (loadedProjectName: string, urlProjectName:
 
 // UPDATED: Enhanced detection logic with project history awareness
 const isNewReportCreation = async (reportIdFromUrl: string | null, projectFromUrl: string | null, dbReport: any): Promise<boolean> => {
-  // If no reportId and has project context → Check project history
+  // If no reportId and has project context → Always treat as new report
   if (!reportIdFromUrl && projectFromUrl) {
-    const projectHasReports = await checkIfProjectHasReports(projectFromUrl);
-    return !projectHasReports; // Only clean state if project has NO reports
+    return true; // Always new report creation for smart loading
   }
   
   // If reportId exists but project context doesn't match → New report for different project
@@ -230,10 +229,11 @@ const initializeCleanReportState = (projectName: string, setProjectName: (name: 
 const checkIfProjectHasReports = async (projectName: string): Promise<boolean> => {
   try {
     // Use existing API endpoint that actually exists
-    const response = await fetch('/api/daily-reports/');
+    const response = await fetch('/api/daily-reports/company');
     if (!response.ok) return false;
     
-    const allReports = await response.json();
+    const apiResponse = await response.json();
+    const allReports = apiResponse.reports || apiResponse.data || [];
     const projectReports = allReports.filter(report => report.projectName === projectName);
     return projectReports.length > 0;
   } catch (error) {
@@ -499,33 +499,186 @@ const DailyReport = () => {
           const isNewReport = await isNewReportCreation(reportIdFromUrl, projectFromUrl, dbReport);
           
           if (isNewReport) {
-            // NEW: Initialize clean state for new report
-            console.log("🔧 NEW REPORT: Detected new report creation, using clean state");
-            const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
-            
-            // Set only project name, leave everything else empty/default
-            setReportId("");
-            setReportDate(new Date());
-            setWeatherAM(cleanState.weatherAM);
-            setWeatherPM(cleanState.weatherPM);
-            setTempAM(cleanState.tempAM);
-            setTempPM(cleanState.tempPM);
-            setCurrentPeriod(cleanState.currentPeriod as "AM" | "PM");
-            setActivityToday(cleanState.activityToday);
-            setWorkPlanNextDay(cleanState.workPlanNextDay);
-            setManagementTeam(cleanState.managementTeam);
-            setWorkingTeam(cleanState.workingTeam);
-            setInteriorTeam(cleanState.interiorTeam);
-            setMepTeam(cleanState.mepTeam);
-            setMaterials(cleanState.materials);
-            setMachinery(cleanState.machinery);
-            setReferenceSections(cleanState.referenceSections);
-            setSiteActivitiesSections(cleanState.siteActivitiesSections);
-            setSiteActivitiesTitle(cleanState.siteActivitiesTitle);
-            setCarSheet(cleanState.carSheet);
-            setProjectLogo(cleanState.projectLogo);
-            
+            // SMART: Check if we should load project's most recent report
+            if (!reportIdFromUrl && projectFromUrl) {
+              console.log("🔧 SMART LOAD: Creating new report for project:", projectFromUrl);
+              const projectRecentReport = await loadMostRecentReportForProject(projectFromUrl);
+              
+              if (projectRecentReport) {
+                // Load project's most recent report as template
+                console.log("🔧 SMART LOAD: Found project report, using as template");
+                setReportId(""); // Keep as new report
+                setProjectName(projectFromUrl);
+                setReportDate(new Date());
+                setReportStatus('draft');
+
+                // Load data from project's most recent report
+                setWeatherAM(projectRecentReport.weatherAM || "");
+                setWeatherPM(projectRecentReport.weatherPM || "");
+                setTempAM(projectRecentReport.tempAM || "");
+                setTempPM(projectRecentReport.tempPM || "");
+                setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
+                setActivityToday(projectRecentReport.activityToday || "");
+                setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                setManagementTeam(ensureRowIds(projectRecentReport.managementTeam || []));
+                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
+
+                // Handle interior and MEP team migration
+                if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam) {
+                  setInteriorTeam(ensureRowIds(projectRecentReport.interiorTeam));
+                  setMepTeam(ensureRowIds(projectRecentReport.mepTeam));
+                } else {
+                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
+                  setInteriorTeam(interior);
+                  setMepTeam(mep);
+                }
+
+                setMaterials(ensureRowIds(projectRecentReport.materials || []));
+                setMachinery(ensureRowIds(projectRecentReport.machinery || []));
+                setReferenceSections(projectRecentReport.referenceSections || []);
+                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections || []);
+                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "");
+                setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                setProjectLogo(projectRecentReport.projectLogo || null);
+
+                // Set ownership for new reports (always editable for the creator)
+                const currentUserId = getCurrentUserId();
+                setIsReadOnly(false); // New reports are always editable by the creator
+                console.log("🔧 SMART LOAD: New report created, setting as editable for current user");
+                console.log("🔧 SMART LOAD: Found project report, using as template");
+                // We'll add this in Step 2
+              } else {
+                // Fallback to clean state
+                console.log("🔧 SMART LOAD: No project report found, using clean state");
+                const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
+
+                setReportId("");
+                setReportDate(new Date());
+                setWeatherAM(cleanState.weatherAM);
+                setWeatherPM(cleanState.weatherPM);
+                setTempAM(cleanState.tempAM);
+                setTempPM(cleanState.tempPM);
+                setCurrentPeriod(cleanState.currentPeriod as "AM" | "PM");
+                setActivityToday(cleanState.activityToday);
+                setWorkPlanNextDay(cleanState.workPlanNextDay);
+                setManagementTeam(cleanState.managementTeam);
+                setWorkingTeam(cleanState.workingTeam);
+                setInteriorTeam(cleanState.interiorTeam);
+                setMepTeam(cleanState.mepTeam);
+                setMaterials(cleanState.materials);
+                setMachinery(cleanState.machinery);
+                setReferenceSections(cleanState.referenceSections);
+                setSiteActivitiesSections(cleanState.siteActivitiesSections);
+                setSiteActivitiesTitle(cleanState.siteActivitiesTitle);
+                setCarSheet(cleanState.carSheet);
+                setProjectLogo(cleanState.projectLogo);
+              }
+            } else {
+              // Clean state fallback (no project context)
+              console.log("🔧 SMART LOAD: No project context, using clean state");
+              const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
+
+              setReportId("");
+              setReportDate(new Date());
+              setWeatherAM(cleanState.weatherAM);
+              setWeatherPM(cleanState.weatherPM);
+              setTempAM(cleanState.tempAM);
+              setTempPM(cleanState.tempPM);
+              setCurrentPeriod(cleanState.currentPeriod as "AM" | "PM");
+              setActivityToday(cleanState.activityToday);
+              setWorkPlanNextDay(cleanState.workPlanNextDay);
+              setManagementTeam(cleanState.managementTeam);
+              setWorkingTeam(cleanState.workingTeam);
+              setInteriorTeam(cleanState.interiorTeam);
+              setMepTeam(cleanState.mepTeam);
+              setMaterials(cleanState.materials);
+              setMachinery(cleanState.machinery);
+              setReferenceSections(cleanState.referenceSections);
+              setSiteActivitiesSections(cleanState.siteActivitiesSections);
+              setSiteActivitiesTitle(cleanState.siteActivitiesTitle);
+              setCarSheet(cleanState.carSheet);
+              setProjectLogo(cleanState.projectLogo);
+            }
           } else {
+            // EXISTING REPORT EDITING - Load normally
+            console.log("🔧 EXISTING REPORT: Loading existing report data");
+            
+            // Check if current user is the owner
+            const currentUserId = getCurrentUserId();
+            const isOwner = dbReport.userId === currentUserId;
+            setIsReadOnly(!isOwner); // Read-only if not the owner
+            
+            console.log("🔧 OWNERSHIP CHECK:", { 
+              reportUserId: dbReport.userId, 
+              currentUserId, 
+              isOwner, 
+              isReadOnly: !isOwner 
+            });
+            
+            setReportId(dbReport._id || reportIdFromUrl);
+            validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
+            setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
+            setReportStatus(dbReport.status || 'draft');
+            
+            // Handle backward compatibility: convert old format to new
+            if (dbReport.weatherAM !== undefined) {
+              setWeatherAM(dbReport.weatherAM || "");
+              setWeatherPM(dbReport.weatherPM || "");
+              setTempAM(dbReport.tempAM || "");
+              setTempPM(dbReport.tempPM || "");
+              setCurrentPeriod(dbReport.currentPeriod || "AM");
+            } else {
+              // Old format: migrate to new format
+              const oldWeather = dbReport.weather || "Sunny";
+              const oldPeriod = dbReport.weatherPeriod || "AM";
+              const oldTemp = dbReport.temperature || "";
+              if (oldPeriod === "AM") {
+                setWeatherAM(oldWeather);
+                setWeatherPM("");
+                setTempAM(oldTemp);
+                setTempPM("");
+              } else {
+                setWeatherAM("");
+                setWeatherPM(oldWeather);
+                setTempAM("");
+                setTempPM(oldTemp);
+              }
+              setCurrentPeriod("AM");
+            }
+            setActivityToday(dbReport.activityToday || "");
+            setWorkPlanNextDay(dbReport.workPlanNextDay || "");
+            setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
+            setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+            
+            // Handle interior and MEP team migration
+            if (dbReport.interiorTeam && dbReport.mepTeam) {
+              // New format: use separate teams
+              setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
+              setMepTeam(ensureRowIds(dbReport.mepTeam));
+            } else {
+              // Old format: split working team
+              const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+              setInteriorTeam(interior);
+              setMepTeam(mep);
+            }
+            
+            setMaterials(ensureRowIds(dbReport.materials || []));
+            setMachinery(ensureRowIds(dbReport.machinery || []));
+            setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
+            setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
+            setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
+            setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
+            setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
+            setProjectLogo(dbReport.projectLogo || "");
+          }
+        } else {
+          // NO DB REPORT FOUND - Try smart loading for new reports
+          console.log("🔍 DEBUG: No dbReport found, checking for smart loading");
+          
+          const isNewReport = await isNewReportCreation(reportIdFromUrl, projectFromUrl, null);
+          console.log("🔍 DEBUG: isNewReport result:", isNewReport);
+          
+          if (isNewReport) {
             // SMART: Check if we should load project's most recent report
             if (!reportIdFromUrl && projectFromUrl) {
               // Always try smart loading for new reports with project context
@@ -538,8 +691,6 @@ const DailyReport = () => {
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
-
-                // ADD THIS: Reset status to draft for new reports based on templates
                 setReportStatus('draft');
                 
                 // Load data from project's most recent report
@@ -565,16 +716,22 @@ const DailyReport = () => {
                 
                 setMaterials(ensureRowIds(projectRecentReport.materials || []));
                 setMachinery(ensureRowIds(projectRecentReport.machinery || []));
-                setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
-                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections && projectRecentReport.siteActivitiesSections.length > 0 ? projectRecentReport.siteActivitiesSections : createDefaultHSESections());
-                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "Site Activities Photos");
-                setCarSheet(projectRecentReport.carSheet || { description: "", photo_groups: [] });
-                setProjectLogo(projectRecentReport.projectLogo || "");
+                setReferenceSections(projectRecentReport.referenceSections || []);
+                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections || []);
+                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "");
+                setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                setProjectLogo(projectRecentReport.projectLogo || null);
+                
+                // Set ownership for new reports (always editable for the creator)
+                const currentUserId = getCurrentUserId();
+                setIsReadOnly(false); // New reports are always editable by the creator
+                console.log("🔧 SMART LOAD: New report created, setting as editable for current user");
                 
               } else {
-                // Clean state for projects with no history
-                console.log("🔧 CLEAN STATE: No project history found, using clean state");
-                const cleanState = initializeCleanReportState(projectFromUrl, setProjectName, setReportStatus);
+                // Fallback to clean state
+                console.log("🔧 SMART LOAD: No project report found, using clean state");
+                const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
+                
                 setReportId("");
                 setReportDate(new Date());
                 setWeatherAM(cleanState.weatherAM);
@@ -597,90 +754,11 @@ const DailyReport = () => {
                 setProjectLogo(cleanState.projectLogo);
               }
             } else {
-              // EXISTING REPORT EDITING - Load normally
-              console.log("🔧 EXISTING REPORT: Loading existing report data");
-              
-              // Check if current user is the owner
-              const currentUserId = getCurrentUserId();
-              const isOwner = dbReport.userId === currentUserId;
-              setIsReadOnly(!isOwner); // Read-only if not the owner
-              
-              console.log("🔧 OWNERSHIP CHECK:", { 
-                reportUserId: dbReport.userId, 
-                currentUserId, 
-                isOwner, 
-                isReadOnly: !isOwner 
-              });
-              
-              setReportId(dbReport._id || reportIdFromUrl);
-              validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
-              setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
-              setReportStatus(dbReport.status || 'draft');
-              
-              // Handle backward compatibility: convert old format to new
-              if (dbReport.weatherAM !== undefined) {
-                setWeatherAM(dbReport.weatherAM || "");
-                setWeatherPM(dbReport.weatherPM || "");
-                setTempAM(dbReport.tempAM || "");
-                setTempPM(dbReport.tempPM || "");
-                setCurrentPeriod(dbReport.currentPeriod || "AM");
-              } else {
-                // Old format: migrate to new format
-                const oldWeather = dbReport.weather || "Sunny";
-                const oldPeriod = dbReport.weatherPeriod || "AM";
-                const oldTemp = dbReport.temperature || "";
-                if (oldPeriod === "AM") {
-                  setWeatherAM(oldWeather);
-                  setWeatherPM("");
-                  setTempAM(oldTemp);
-                  setTempPM("");
-                } else {
-                  setWeatherAM("");
-                  setWeatherPM(oldWeather);
-                  setTempAM("");
-                  setTempPM(oldTemp);
-                }
-                setCurrentPeriod("AM");
-              }
-              setActivityToday(dbReport.activityToday || "");
-              setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-              setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-              setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-              
-              // Handle interior and MEP team migration
-              if (dbReport.interiorTeam && dbReport.mepTeam) {
-                // New format: use separate teams
-                setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
-                setMepTeam(ensureRowIds(dbReport.mepTeam));
-              } else {
-                // Old format: split working team
-                const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-                setInteriorTeam(interior);
-                setMepTeam(mep);
-              }
-              
-              setMaterials(ensureRowIds(dbReport.materials || []));
-              setMachinery(ensureRowIds(dbReport.machinery || []));
-              setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
-              setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
-              setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
-              setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
-              setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
-              setProjectLogo(dbReport.projectLogo || "");
-            }
-          }
-        } else {
-          // Fallback to localStorage
-          const localDraft = loadDraftLocally(reportDate);
-          if (localDraft) {
-            const isNewReport = await isNewReportCreation(reportIdFromUrl, projectFromUrl, null);
-            
-            if (isNewReport) {
-              // NEW: Initialize clean state for new report (no project history)
-              console.log("🔧 NEW REPORT: Project has no history in localStorage, using clean state");
+              // Fallback to clean state (no project context)
+              console.log("🔧 SMART LOAD: No project context, using clean state");
               const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
               
-              // Set only project name, ignore localStorage data for new reports
+              setReportId("");
               setReportDate(new Date());
               setWeatherAM(cleanState.weatherAM);
               setWeatherPM(cleanState.weatherPM);
@@ -700,156 +778,10 @@ const DailyReport = () => {
               setSiteActivitiesTitle(cleanState.siteActivitiesTitle);
               setCarSheet(cleanState.carSheet);
               setProjectLogo(cleanState.projectLogo);
-              
-            } else {
-              // SMART: Check if we should load project's most recent report
-              if (!reportIdFromUrl && projectFromUrl) {
-                // Always try smart loading for new reports with project context
-                console.log("🔧 SMART LOAD: Creating new report for project:", projectFromUrl);
-                const projectRecentReport = await loadMostRecentReportForProject(projectFromUrl);
-                
-                if (projectRecentReport) {
-                  // Load project's most recent report as template
-                  console.log("🔧 SMART LOAD: Found project report, using as template");
-                  setReportId(""); // Keep as new report
-                  setProjectName(projectFromUrl);
-                  setReportDate(new Date());
-
-                  // ADD THIS: Reset status to draft for new reports based on templates
-                  setReportStatus('draft');
-                  
-                  // Load data from project's most recent report
-                  setWeatherAM(projectRecentReport.weatherAM || "");
-                  setWeatherPM(projectRecentReport.weatherPM || "");
-                  setTempAM(projectRecentReport.tempAM || "");
-                  setTempPM(projectRecentReport.tempPM || "");
-                  setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
-                  setActivityToday(projectRecentReport.activityToday || "");
-                  setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
-                  setManagementTeam(ensureRowIds(projectRecentReport.managementTeam || []));
-                  setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
-                  
-                  // Handle interior and MEP team migration
-                  if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam) {
-                    setInteriorTeam(ensureRowIds(projectRecentReport.interiorTeam));
-                    setMepTeam(ensureRowIds(projectRecentReport.mepTeam));
-                  } else {
-                    const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
-                    setInteriorTeam(interior);
-                    setMepTeam(mep);
-                  }
-                  
-                  setMaterials(ensureRowIds(projectRecentReport.materials || []));
-                  setMachinery(ensureRowIds(projectRecentReport.machinery || []));
-                  setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
-                  setSiteActivitiesSections(projectRecentReport.siteActivitiesSections && projectRecentReport.siteActivitiesSections.length > 0 ? projectRecentReport.siteActivitiesSections : createDefaultHSESections());
-                  setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "Site Activities Photos");
-                  setCarSheet(projectRecentReport.carSheet || { description: "", photo_groups: [] });
-                  setProjectLogo(projectRecentReport.projectLogo || "");
-                  
-                } else {
-                  // Clean state for projects with no history
-                  console.log("🔧 CLEAN STATE: No project history found, using clean state");
-                  const cleanState = initializeCleanReportState(projectFromUrl, setProjectName, setReportStatus);
-                  setReportId("");
-                  setReportDate(new Date());
-                  setWeatherAM(cleanState.weatherAM);
-                  setWeatherPM(cleanState.weatherPM);
-                  setTempAM(cleanState.tempAM);
-                  setTempPM(cleanState.tempPM);
-                  setCurrentPeriod(cleanState.currentPeriod as "AM" | "PM");
-                  setActivityToday(cleanState.activityToday);
-                  setWorkPlanNextDay(cleanState.workPlanNextDay);
-                  setManagementTeam(cleanState.managementTeam);
-                  setWorkingTeam(cleanState.workingTeam);
-                  setInteriorTeam(cleanState.interiorTeam);
-                  setMepTeam(cleanState.mepTeam);
-                  setMaterials(cleanState.materials);
-                  setMachinery(cleanState.machinery);
-                  setReferenceSections(cleanState.referenceSections);
-                  setSiteActivitiesSections(cleanState.siteActivitiesSections);
-                  setSiteActivitiesTitle(cleanState.siteActivitiesTitle);
-                  setCarSheet(cleanState.carSheet);
-                  setProjectLogo(cleanState.projectLogo);
-                }
-              } else {
-                // EXISTING REPORT EDITING - Load normally
-                console.log("🔧 EXISTING REPORT: Loading existing report data");
-                
-                // Check if current user is the owner
-                const currentUserId = getCurrentUserId();
-                const isOwner = dbReport.userId === currentUserId;
-                setIsReadOnly(!isOwner); // Read-only if not the owner
-                
-                console.log("🔧 OWNERSHIP CHECK (Path 2):", { 
-                  reportUserId: dbReport.userId, 
-                  currentUserId, 
-                  isOwner, 
-                  isReadOnly: !isOwner 
-                });
-                
-                setReportId(dbReport._id || reportIdFromUrl);
-                validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
-                setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
-                setReportStatus(dbReport.status || 'draft');
-                
-                // Handle backward compatibility: convert old format to new
-                if (dbReport.weatherAM !== undefined) {
-                  setWeatherAM(dbReport.weatherAM || "");
-                  setWeatherPM(dbReport.weatherPM || "");
-                  setTempAM(dbReport.tempAM || "");
-                  setTempPM(dbReport.tempPM || "");
-                  setCurrentPeriod(dbReport.currentPeriod || "AM");
-                } else {
-                  // Old format: migrate to new format
-                  const oldWeather = dbReport.weather || "Sunny";
-                  const oldPeriod = dbReport.weatherPeriod || "AM";
-                  const oldTemp = dbReport.temperature || "";
-                  if (oldPeriod === "AM") {
-                    setWeatherAM(oldWeather);
-                    setWeatherPM("");
-                    setTempAM(oldTemp);
-                    setTempPM("");
-                  } else {
-                    setWeatherAM("");
-                    setWeatherPM(oldWeather);
-                    setTempAM("");
-                    setTempPM(oldTemp);
-                  }
-                  setCurrentPeriod("AM");
-                }
-                setActivityToday(dbReport.activityToday || "");
-                setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-                setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-                setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-                
-                // Handle interior and MEP team migration
-                if (dbReport.interiorTeam && dbReport.mepTeam) {
-                  // New format: use separate teams
-                  setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
-                  setMepTeam(ensureRowIds(dbReport.mepTeam));
-                } else {
-                  // Old format: split working team
-                  const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-                  setInteriorTeam(interior);
-                  setMepTeam(mep);
-                }
-                
-                setMaterials(ensureRowIds(dbReport.materials || []));
-                setMachinery(ensureRowIds(dbReport.machinery || []));
-                setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
-                setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
-                setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
-                setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
-                setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
-                setProjectLogo(dbReport.projectLogo || "");
-              }
             }
           } else {
-            // NEW: Set project name from URL context for new reports
-            if (projectFromUrl) {
-              setProjectName(projectFromUrl);
-            }
+            // We'll add localStorage fallback in Step 4c-2c
+            console.log("🔍 DEBUG: This is an existing report, localStorage fallback will go here");
           }
         }
       } catch (e) {

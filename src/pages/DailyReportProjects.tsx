@@ -33,11 +33,12 @@ import {
   FileText,
   Clock,
   MoreVertical,
+  User
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ProfileIcon from "@/components/ProfileIcon";
-import { getRecentReports } from "@/integrations/reportsApi";
+import { getRecentReports, getCompanyReports } from "@/integrations/reportsApi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +52,8 @@ interface Project {
   reportCount: number;
   lastReportDate?: string;
   lastReportId?: string;
+  createdBy?: string;        // User ID who created project
+  createdByName?: string;   // User's name for display
 }
 
 const DailyReportProjects: React.FC = () => {
@@ -70,8 +73,8 @@ const DailyReportProjects: React.FC = () => {
     const loadProjects = async () => {
       try {
         // Load projects from database reports
-        const response = await getRecentReports(100);
-        const reports = response.data as any[] || [];
+        const response = await getCompanyReports();
+        const reports = response.reports as any[] || [];
         
         // Group reports by project name
         const projectMap = new Map<string, Project>();
@@ -81,11 +84,19 @@ const DailyReportProjects: React.FC = () => {
           if (!projectName) return;
           
           if (!projectMap.has(projectName)) {
+            // Get user info from the first report for this project
+            const userId = report.userId?._id || report.userId;
+            const userName = report.userId?.firstName && report.userId?.lastName 
+              ? `${report.userId.firstName} ${report.userId.lastName}` 
+              : 'Unknown';
+            
             projectMap.set(projectName, {
               name: projectName,
               reportCount: 0,
               lastReportDate: report.reportDate,
               lastReportId: report._id,
+              createdBy: userId,
+              createdByName: userName,
             });
           }
           
@@ -146,6 +157,20 @@ const DailyReportProjects: React.FC = () => {
     }
   }, [projects, searchQuery]);
 
+  // Helper function to get current user ID from JWT token
+  const getCurrentUserId = () => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.userId;
+      } catch (error) {
+        console.error('Error parsing token:', error);
+      }
+    }
+    return null;
+  };
+
   const handleAddProject = () => {
     if (newProjectName.trim() && !projects.find(p => p.name === newProjectName.trim())) {
       const newProject = newProjectName.trim();
@@ -169,7 +194,7 @@ const DailyReportProjects: React.FC = () => {
   };
 
   const handleProjectClick = (projectName: string) => {
-    navigate(`/daily-report?project=${encodeURIComponent(projectName)}`);
+    navigate(`/dashboard?project=${encodeURIComponent(projectName)}&tab=company`);
   };
 
   const handleEditProject = (projectName: string) => {
@@ -473,6 +498,23 @@ const DailyReportProjects: React.FC = () => {
                               </span>
                               <span className="text-sm font-medium">
                                 {formatDate(project.lastReportDate)}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Project Creator */}
+                          {project.createdByName && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Created By
+                              </span>
+                              <span className="text-sm font-medium">
+                                {(() => {
+                                  const currentUserId = getCurrentUserId();
+                                  const isCurrentUser = project.createdBy === currentUserId || project.createdBy === currentUserId;
+                                  return isCurrentUser ? 'You' : project.createdByName;
+                                })()}
                               </span>
                             </div>
                           )}

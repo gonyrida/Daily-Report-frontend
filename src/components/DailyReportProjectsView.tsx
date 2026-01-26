@@ -13,7 +13,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { 
   getAllUserReports, 
-  createNewReport
+  createNewReport,
+  getCompanyReports,
 } from "@/integrations/reportsApi";
 
 interface Report {
@@ -51,15 +52,24 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
     try {
       setLoading(true);
       
-      // Fetch all reports and group by project
-      const response = await getAllUserReports();
-      const allReports = response.data || [];
+      console.log("🔍 DEBUG: Fetching company reports...");
+      const response = await getCompanyReports();
+      console.log("🔍 DEBUG: Company reports response:", response);
+      
+      const allReports = response.reports || [];
+      console.log("🔍 DEBUG: All reports count:", allReports.length);
+      console.log("🔍 DEBUG: All reports:", allReports.map(r => ({
+        projectName: r.projectName,
+        userId: r.userId,
+        userName: r.userId?.firstName ? `${r.userId.firstName} ${r.userId.lastName}` : 'Unknown'
+      })));
       
       // Group reports by project
       const projectMap = new Map<string, Project>();
       
       allReports.forEach((report: Report) => {
         const projectName = report.projectName || 'Untitled Project';
+        console.log("🔍 DEBUG: Processing report for project:", projectName);
         
         if (!projectMap.has(projectName)) {
           projectMap.set(projectName, {
@@ -78,14 +88,12 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
         }
       });
       
-      setProjects(Array.from(projectMap.values()));
+      const projects = Array.from(projectMap.values());
+      console.log("🔍 DEBUG: Final projects:", projects);
+      
+      setProjects(projects);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load data. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -144,8 +152,8 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
       setShowCreateProject(false);
       
       // Refresh the projects list
-      const response = await getAllUserReports();
-      const allReports = response.data || [];
+      const response = await getCompanyReports();
+      const allReports = response.reports || [];
       
       const projectMap = new Map<string, Project>();
       allReports.forEach((report: Report) => {
