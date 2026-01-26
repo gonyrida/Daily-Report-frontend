@@ -383,9 +383,14 @@ const DailyReport = () => {
           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
           setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
           
-          // Handle interior and MEP team migration
-          if (dbReport.interiorTeam && dbReport.mepTeam) {
-            // New format: use separate teams
+          // Handle interior and MEP teams
+          if (dbReport.workingTeamMEP && dbReport.workingTeamMEP.length > 0) {
+            // New format: use separate workingTeamMEP from database
+            setMepTeam(ensureRowIds(dbReport.workingTeamMEP));
+            // Also set interiorTeam from workingTeamInterior if available
+            setInteriorTeam(ensureRowIds(dbReport.workingTeamInterior || []));
+          } else if (dbReport.interiorTeam && dbReport.mepTeam) {
+            // Legacy format: use separate teams
             setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
             setMepTeam(ensureRowIds(dbReport.mepTeam));
           } else {
@@ -399,8 +404,24 @@ const DailyReport = () => {
           setMachinery(ensureRowIds(dbReport.machinery || []));
           setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
           setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
-          setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
-          setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
+          
+          // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+          if (dbReport.site_ref && dbReport.site_ref.length > 0) {
+            // Convert DB format back to frontend format
+            const convertedSiteActivities = dbReport.site_ref.map((section: any) => ({
+              title: section.section_title || "",
+              entries: [{
+                slots: section.images.map((image: string, index: number) => ({
+                  image: image,
+                  caption: section.footers[index] || ""
+                }))
+              }]
+            }));
+            setSiteActivitiesSections(convertedSiteActivities);
+          } else {
+            setSiteActivitiesSections(createDefaultHSESections());
+          }
+          setSiteActivitiesTitle(dbReport.site_title || "Site Activities Photos");
           setCarSheet(
             dbReport.carSheet || { description: "", photo_groups: [] }
           );
@@ -444,9 +465,14 @@ const DailyReport = () => {
             setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
             setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
             
-            // Handle interior and MEP team migration for localStorage
-            if (localDraft.interiorTeam && localDraft.mepTeam) {
-              // New format: use separate teams
+            // Handle interior and MEP teams for localStorage
+            if (localDraft.workingTeamMEP && localDraft.workingTeamMEP.length > 0) {
+              // New format: use separate workingTeamMEP from database
+              setMepTeam(ensureRowIds(localDraft.workingTeamMEP));
+              // Also set interiorTeam from workingTeamInterior if available
+              setInteriorTeam(ensureRowIds(localDraft.workingTeamInterior || []));
+            } else if (localDraft.interiorTeam && localDraft.mepTeam) {
+              // Legacy format: use separate teams
               setInteriorTeam(ensureRowIds(localDraft.interiorTeam));
               setMepTeam(ensureRowIds(localDraft.mepTeam));
             } else {
@@ -459,8 +485,24 @@ const DailyReport = () => {
             setMaterials(ensureRowIds(localDraft.materials || []));
             setMachinery(ensureRowIds(localDraft.machinery || []));
             setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
-            setSiteActivitiesSections(localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0 ? localDraft.siteActivitiesSections : createDefaultHSESections());
-            setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
+            
+            // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+            if (localDraft.site_ref && localDraft.site_ref.length > 0) {
+              // Convert DB format back to frontend format
+              const convertedSiteActivities = localDraft.site_ref.map((section: any) => ({
+                title: section.section_title || "",
+                entries: [{
+                  slots: section.images.map((image: string, index: number) => ({
+                    image: image,
+                    caption: section.footers[index] || ""
+                  }))
+                }]
+              }));
+              setSiteActivitiesSections(convertedSiteActivities);
+            } else {
+              setSiteActivitiesSections(createDefaultHSESections());
+            }
+            setSiteActivitiesTitle(localDraft.site_title || "Site Activities Photos");
           }
         }
       } catch (e) {
@@ -501,9 +543,14 @@ const DailyReport = () => {
           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
           setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
           
-          // Handle interior and MEP team migration for fallback localStorage
-          if (localDraft.interiorTeam && localDraft.mepTeam) {
-            // New format: use separate teams
+          // Handle interior and MEP teams for fallback localStorage
+          if (localDraft.workingTeamMEP && localDraft.workingTeamMEP.length > 0) {
+            // New format: use separate workingTeamMEP from database
+            setMepTeam(ensureRowIds(localDraft.workingTeamMEP));
+            // Also set interiorTeam from workingTeamInterior if available
+            setInteriorTeam(ensureRowIds(localDraft.workingTeamInterior || []));
+          } else if (localDraft.interiorTeam && localDraft.mepTeam) {
+            // Legacy format: use separate teams
             setInteriorTeam(ensureRowIds(localDraft.interiorTeam));
             setMepTeam(ensureRowIds(localDraft.mepTeam));
           } else {
@@ -516,8 +563,24 @@ const DailyReport = () => {
           setMaterials(ensureRowIds(localDraft.materials || []));
           setMachinery(ensureRowIds(localDraft.machinery || []));
           setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
-          setSiteActivitiesSections(localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0 ? localDraft.siteActivitiesSections : createDefaultHSESections());
-          setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
+          
+          // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+          if (localDraft.site_ref && localDraft.site_ref.length > 0) {
+            // Convert DB format back to frontend format
+            const convertedSiteActivities = localDraft.site_ref.map((section: any) => ({
+              title: section.section_title || "",
+              entries: [{
+                slots: section.images.map((image: string, index: number) => ({
+                  image: image,
+                  caption: section.footers[index] || ""
+                }))
+              }]
+            }));
+            setSiteActivitiesSections(convertedSiteActivities);
+          } else {
+            setSiteActivitiesSections(createDefaultHSESections());
+          }
+          setSiteActivitiesTitle(localDraft.site_title || "Site Activities Photos");
         }
       }
     };

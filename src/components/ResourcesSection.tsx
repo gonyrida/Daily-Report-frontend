@@ -27,9 +27,9 @@ const MANAGEMENT_OPTIONS = [
 
 const WORKING_TEAM_OPTIONS = ["Site Manager", "Site Engineer","MEP Engineer","Foreman", "Skill Workers","MEP Workers", "General Workers"];
 
-const INTERIOR_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
+export const INTERIOR_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers","MEP Workers", "General Workers"];
 
-const MEP_TEAM_OPTIONS = ["MEP Engineer", "MEP Workers"];
+export const MEP_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers","MEP Workers", "General Workers"];
 
 const MACHINERY_OPTIONS = [
   "Air compressor",

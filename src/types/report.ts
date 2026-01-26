@@ -35,4 +35,9 @@ export interface ReportData {
     date: string;
     footers: string[];
   }>;
+  // Frontend-specific fields for backward compatibility
+  siteActivitiesSections?: any[];
+  siteActivitiesTitle?: string;
+  referenceSections?: any[];
+  tableTitle?: string;
 }
