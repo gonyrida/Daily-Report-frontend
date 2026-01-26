@@ -76,38 +76,52 @@ const DailyReportProjects: React.FC = () => {
         const response = await getCompanyReports();
         const reports = response.reports as any[] || [];
         
-        // Group reports by project name
-        const projectMap = new Map<string, Project>();
-        
+        // First pass: Group all reports by project name
+        const projectReportsMap = new Map<string, any[]>();
+
         reports.forEach((report: any) => {
           const projectName = report.projectName;
           if (!projectName) return;
           
-          if (!projectMap.has(projectName)) {
-            // Get user info from the first report for this project
-            const userId = report.userId?._id || report.userId;
-            const userName = report.userId?.firstName && report.userId?.lastName 
-              ? `${report.userId.firstName} ${report.userId.lastName}` 
-              : 'Unknown';
-            
-            projectMap.set(projectName, {
-              name: projectName,
-              reportCount: 0,
-              lastReportDate: report.reportDate,
-              lastReportId: report._id,
-              createdBy: userId,
-              createdByName: userName,
-            });
+          if (!projectReportsMap.has(projectName)) {
+            projectReportsMap.set(projectName, []);
           }
           
-          const project = projectMap.get(projectName)!;
-          project.reportCount++;
+          projectReportsMap.get(projectName)!.push(report);
+        });
+
+        // Second pass: Create project objects with correct creator
+        const projectMap = new Map<string, Project>();
+
+        projectReportsMap.forEach((projectReports, projectName) => {
+          // Find the earliest report (true creator)
+          const sortedReports = projectReports.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.reportDate || 0);
+            const dateB = new Date(b.createdAt || b.reportDate || 0);
+            return dateA.getTime() - dateB.getTime(); // Ascending order (earliest first)
+          });
           
-          // Update last report date if this one is more recent
-          if (report.reportDate && (!project.lastReportDate || new Date(report.reportDate) > new Date(project.lastReportDate))) {
-            project.lastReportDate = report.reportDate;
-            project.lastReportId = report._id;
-          }
+          const earliestReport = sortedReports[0];
+          const userId = earliestReport.userId?._id || earliestReport.userId;
+          const userName = earliestReport.userId?.firstName && earliestReport.userId?.lastName 
+            ? `${earliestReport.userId.firstName} ${earliestReport.userId.lastName}` 
+            : 'Unknown';
+          
+          // Find the most recent report for "Last Report" info
+          const mostRecentReport = projectReports.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.reportDate || 0);
+            const dateB = new Date(b.createdAt || b.reportDate || 0);
+            return dateB.getTime() - dateA.getTime(); // Descending order (most recent first)
+          })[0];
+          
+          projectMap.set(projectName, {
+            name: projectName,
+            reportCount: projectReports.length,
+            lastReportDate: mostRecentReport.reportDate,
+            lastReportId: mostRecentReport._id,
+            createdBy: userId,        // ← TRUE creator (earliest report)
+            createdByName: userName,   // ← TRUE creator name
+          });
         });
 
         // Load locally added projects from sessionStorage
