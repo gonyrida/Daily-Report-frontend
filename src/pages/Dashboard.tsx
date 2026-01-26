@@ -127,7 +127,11 @@ const Dashboard = () => {
   }, [reports, searchQuery, filterStatus, projectFilter]);
 
   useEffect(() => {
-    if (activeTab === 'company') {
+    // Always fetch company reports when there's a project filter
+    if (projectFilter) {
+      fetchCompanyReports();
+    } else if (activeTab === 'company') {
+      // Also fetch when switching to company tab without project filter
       fetchCompanyReports();
     }
   }, [activeTab, projectFilter]);
@@ -153,6 +157,20 @@ const Dashboard = () => {
 
     setFilteredCompanyReports(filtered);
   }, [companyReports, searchQuery, filterStatus]);
+
+  // Helper function to get current user ID from JWT token
+  const getCurrentUserId = () => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.userId;
+      } catch (error) {
+        console.error('Error parsing token:', error);
+      }
+    }
+    return null;
+  };
 
   const fetchCompanyReports = async (
     page: number = 1,
@@ -195,7 +213,8 @@ const Dashboard = () => {
   };
 
   const handleOpenReport = (reportId: string) => {
-    navigate(`/daily-report?reportId=${reportId}`);
+    const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
+    navigate(`/daily-report?reportId=${reportId}${projectParam}`);
   };
 
   const handleDeleteReport = async (reportId: string, event: React.MouseEvent) => {
@@ -516,7 +535,12 @@ const Dashboard = () => {
                             {activeTab === 'company' && report.userId && (
                               <span className="flex items-center gap-1">
                                 <User className="h-3 w-3" />
-                                {report.userId.firstName} {report.userId.lastName}
+                                {(() => {
+                                  const currentUserId = getCurrentUserId();
+                                  const isCurrentUser = report.userId._id === currentUserId || report.userId === currentUserId;
+                                  
+                                  return isCurrentUser ? 'You' : `${report.userId.firstName} ${report.userId.lastName}`;
+                                })()}
                               </span>
                             )}
                             <span className="flex items-center gap-1">
@@ -526,52 +550,84 @@ const Dashboard = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {/* Edit/Open Button */}
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenReport(report._id);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          
-                          {/* Delete Button */}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Are you sure you want to delete this report?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action will permanently delete the report "{report.projectName}" and all its data. This cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={(e) => handleDeleteReport(report._id, e)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Delete Report
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {/* Check if current user is the owner */}
+                          {(() => {
+                            const currentUserId = getCurrentUserId();
+                            
+                            // For "My Reports" tab, assume ownership (since these are user's own reports)
+                            // For "Project Reports" tab, check actual ownership
+                            const isOwner = activeTab === 'personal' || report.userId?._id === currentUserId || report.userId === currentUserId;
+                            
+                            return (
+                              <>
+                                {/* Edit/Open Button - Only for owners */}
+                                {isOwner && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenReport(report._id);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    Edit
+                                  </Button>
+                                )}
+                                
+                                {/* Delete Button - Only for owners */}
+                                {isOwner && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Delete
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                          Are you sure you want to delete this report?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This action will permanently delete the report "{report.projectName}" and all its data. This cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={(e) => handleDeleteReport(report._id, e)}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          Delete Report
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
+
+                                {/* View Button for non-owners in Project Reports only */}
+                                {!isOwner && activeTab === 'company' && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenReport(report._id);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    View
+                                  </Button>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}

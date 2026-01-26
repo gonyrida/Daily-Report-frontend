@@ -245,25 +245,47 @@ const checkIfProjectHasReports = async (projectName: string): Promise<boolean> =
 // FIXED: Use existing API endpoint instead of non-existent APIs
 const loadMostRecentReportForProject = async (projectName: string): Promise<any> => {
   try {
-    // Use existing API endpoint that actually exists
-    const response = await fetch('/api/daily-reports/');
+    console.log("🔍 DEBUG: Loading most recent report for project:", projectName);
+    
+    // Use company reports API instead of user reports API
+    const response = await fetch('/api/daily-reports/company');
     if (!response.ok) return null;
     
-    const allReports = await response.json();
-    const projectReports = allReports
-      .filter(report => report.projectName === projectName)
-      .sort((a, b) => {
-        const dateA = new Date(a.reportDate || a.createdAt || 0);
-        const dateB = new Date(b.reportDate || b.createdAt || 0);
-        
-        // Handle invalid dates
-        if (isNaN(dateA.getTime())) return 1;
-        if (isNaN(dateB.getTime())) return -1;
-        
-        return dateB.getTime() - dateA.getTime(); // Descending order
-      });
+    const apiResponse = await response.json();
+    console.log("🔍 DEBUG: API response:", apiResponse);
     
-    return projectReports.length > 0 ? projectReports[0] : null;
+    // Extract the reports array from the response
+    const allReports = apiResponse.reports || apiResponse.data || [];
+    console.log("🔍 DEBUG: All company reports count:", allReports.length);
+    
+    const projectReports = allReports.filter(report => report.projectName === projectName);
+    console.log("🔍 DEBUG: Project reports count:", projectReports.length);
+    console.log("🔍 DEBUG: Project reports:", projectReports.map(r => ({
+      id: r._id,
+      projectName: r.projectName,
+      reportDate: r.reportDate,
+      createdAt: r.createdAt,
+      userId: r.userId,
+      userName: r.userId?.firstName ? `${r.userId.firstName} ${r.userId.lastName}` : 'Unknown'
+    })));
+    
+    const sortedReports = projectReports.sort((a, b) => {
+      const dateA = new Date(a.reportDate || a.createdAt || 0);
+      const dateB = new Date(b.reportDate || b.createdAt || 0);
+      
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+      
+      return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+    
+    const mostRecent = sortedReports.length > 0 ? sortedReports[0] : null;
+    console.log("🔍 DEBUG: Most recent report:", mostRecent ? {
+      id: mostRecent._id,
+      userName: mostRecent.userId?.firstName ? `${mostRecent.userId.firstName} ${mostRecent.userId.lastName}` : 'Unknown'
+    } : 'None');
+    
+    return mostRecent;
   } catch (error) {
     console.error("Failed to load project's most recent report:", error);
     return null;
@@ -322,6 +344,7 @@ const DailyReport = () => {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reportStatus, setReportStatus] = useState<string>('draft');
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   // Google Docs-style auto-save state
   const [reportId, setReportId] = useState<string | null>(reportIdFromUrl);
@@ -427,6 +450,20 @@ const DailyReport = () => {
   const handleDateChange = (newDate: Date | null) => {
     setReportDate(newDate);
     // Just set the date - no automatic loading/saving
+  };
+
+  // Helper function to get current user ID from JWT token
+  const getCurrentUserId = () => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.userId;
+      } catch (error) {
+        console.error('Error parsing token:', error);
+      }
+    }
+    return null;
   };
 
   // Load report on mount - Try ID first, then DB by date, fallback to localStorage (only on first mount)
@@ -562,6 +599,19 @@ const DailyReport = () => {
             } else {
               // EXISTING REPORT EDITING - Load normally
               console.log("🔧 EXISTING REPORT: Loading existing report data");
+              
+              // Check if current user is the owner
+              const currentUserId = getCurrentUserId();
+              const isOwner = dbReport.userId === currentUserId;
+              setIsReadOnly(!isOwner); // Read-only if not the owner
+              
+              console.log("🔧 OWNERSHIP CHECK:", { 
+                reportUserId: dbReport.userId, 
+                currentUserId, 
+                isOwner, 
+                isReadOnly: !isOwner 
+              });
+              
               setReportId(dbReport._id || reportIdFromUrl);
               validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
               setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
@@ -725,6 +775,19 @@ const DailyReport = () => {
               } else {
                 // EXISTING REPORT EDITING - Load normally
                 console.log("🔧 EXISTING REPORT: Loading existing report data");
+                
+                // Check if current user is the owner
+                const currentUserId = getCurrentUserId();
+                const isOwner = dbReport.userId === currentUserId;
+                setIsReadOnly(!isOwner); // Read-only if not the owner
+                
+                console.log("🔧 OWNERSHIP CHECK (Path 2):", { 
+                  reportUserId: dbReport.userId, 
+                  currentUserId, 
+                  isOwner, 
+                  isReadOnly: !isOwner 
+                });
+                
                 setReportId(dbReport._id || reportIdFromUrl);
                 validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
                 setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
@@ -895,7 +958,16 @@ const DailyReport = () => {
               }
             } else {
               // EXISTING REPORT EDITING - Load normally
-              console.log("🔧 EXISTING REPORT: Loading existing report data");
+              console.log("🔧 EXISTING REPORT: Loading existing report data (localStorage)");
+              
+              // For localStorage drafts, assume current user is owner (editable)
+              setIsReadOnly(false);
+              
+              console.log("🔧 OWNERSHIP CHECK (Path 3 - localStorage):", { 
+                isReadOnly: false,
+                reason: "localStorage draft - current user is owner"
+              });
+              
               setReportId("");
               validateAndSetProjectContext(localDraft.projectName || "", projectFromUrl, setProjectName);
               setReportDate(localDraft.reportDate ? new Date(localDraft.reportDate) : new Date());
@@ -1838,6 +1910,16 @@ const DailyReport = () => {
   };
 
   const handleSaveAsDraft = async () => {
+    // Prevent saving in read-only mode
+    if (isReadOnly) {
+      toast({
+        title: "Read-Only Mode",
+        description: "Cannot save another user's report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       console.log("🔒 DRAFT SAVE: Saving report as draft");
@@ -2830,6 +2912,19 @@ const DailyReport = () => {
               setProjectLogo={setProjectLogo}
             />
 
+            {/* Read-Only Banner */}
+            {isReadOnly && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 m-4">
+                <div className="flex items-center">
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">
+                      <strong>🔒 View Only Mode:</strong> You are viewing another user's report. Editing is disabled.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Show Projects View when no specific report is selected */}
             {!reportIdFromUrl && !projectFromUrl ? (
               <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -3039,7 +3134,7 @@ const DailyReport = () => {
                   <Button
                     variant="outline"
                     className="min-w-[140px]"
-                    disabled={isSaving || isSubmitting}
+                    disabled={isSaving || isSubmitting || isReadOnly}
                   >
                     <Save className="w-4 h-4 mr-2" />
                     {(isSaving || isSubmitting) ? "Processing..." : "Save As..."}
@@ -3051,8 +3146,8 @@ const DailyReport = () => {
                       <TooltipTrigger asChild>
                         <DropdownMenuItem 
                           onClick={handleSaveAsDraft} 
-                          disabled={isSaving || reportStatus === 'submitted'}
-                          className={reportStatus === 'submitted' ? 'opacity-50 cursor-not-allowed' : ''}
+                          disabled={isSaving || reportStatus === 'submitted' || isReadOnly}
+                          className={reportStatus === 'submitted' || isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}
                         >
                           <Save className="w-4 h-4 mr-2" />
                           {isSaving ? "Saving..." : "Draft"}
