@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, User, Camera, Save, X, Upload } from "lucide-react";
+import { Loader2, User, Camera, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/integrations/userProfileApi";
 import { handleImageError, getFallbackAvatarUrl, constructImageUrl, getCacheBustingTimestamp } from "@/utils/imageUtils";
@@ -31,6 +31,7 @@ const EditProfileModal = ({
   
   // Form state
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [profilePicture, setProfilePicture] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
@@ -41,6 +42,7 @@ const EditProfileModal = ({
   useEffect(() => {
     if (profile) {
       setFullName(profile.fullName || "");
+      setEmail(profile.email || "");
       setProfilePicture(profile.profilePicture || "");
       // Construct URL from relative path for preview
       setPreviewUrl(profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : "");
@@ -53,11 +55,12 @@ const EditProfileModal = ({
   useEffect(() => {
     if (profile) {
       const nameChanged = fullName !== profile.fullName;
+      const emailChanged = email !== profile.email;
       const currentPreviewUrl = profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : "";
       const pictureChanged = previewUrl !== currentPreviewUrl;
-      setHasChanges(nameChanged || pictureChanged);
+      setHasChanges(nameChanged || emailChanged || pictureChanged);
     }
-  }, [fullName, previewUrl, profile]);
+  }, [fullName, email, previewUrl, profile]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -93,52 +96,46 @@ const EditProfileModal = ({
     }
   };
 
-  const handleUploadPicture = async () => {
-    if (!selectedFile) return;
-    
-    setIsUploading(true);
-    try {
-      const { uploadProfilePicture } = await import("@/integrations/userProfileApi");
-      const result = await uploadProfilePicture(selectedFile);
-      
-      if (result.success && result.data) {
-        // Store relative path and construct URL for preview
-        const fullUrl = constructImageUrl(result.data.path, getCacheBustingTimestamp());
-        
-        setProfilePicture(result.data.path); // Store relative path
-        setPreviewUrl(fullUrl); // Show full URL for preview
-        setSelectedFile(null);
-        
-        toast({
-          title: "Picture Uploaded",
-          description: "Profile picture uploaded successfully.",
-        });
-      } else {
-        throw new Error("Failed to upload picture");
-      }
-    } catch (error) {
-      toast({
-        title: "Upload Failed",
-        description: error instanceof Error ? error.message : "Failed to upload picture",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleSave = async () => {
     if (!profile) return;
     
-    const changes: { fullName?: string; profilePicture?: string } = {};
+    const changes: { fullName?: string; email?: string; profilePicture?: string } = {};
     
     if (fullName !== profile.fullName) {
       changes.fullName = fullName;
     }
     
+    if (email !== profile.email) {
+      changes.email = email;
+    }
+    
+    // If there's a selected file, upload it first
+    if (selectedFile) {
+      setIsUploading(true);
+      try {
+        const { uploadProfilePicture } = await import("@/integrations/userProfileApi");
+        const result = await uploadProfilePicture(selectedFile);
+        
+        if (result.success && result.data) {
+          changes.profilePicture = result.data.path; // Store relative path
+        } else {
+          throw new Error("Failed to upload picture");
+        }
+      } catch (error) {
+        toast({
+          title: "Upload Failed",
+          description: error instanceof Error ? error.message : "Failed to upload picture",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    }
     // Use the stored relative path for database update
-    if (profilePicture !== profile.profilePicture) {
-      changes.profilePicture = profilePicture; // This is now the relative path
+    else if (profilePicture !== profile.profilePicture) {
+      changes.profilePicture = profilePicture;
     }
     
     if (Object.keys(changes).length > 0) {
@@ -154,6 +151,7 @@ const EditProfileModal = ({
     // Reset form
     if (profile) {
       setFullName(profile.fullName);
+      setEmail(profile.email);
       setProfilePicture(profile.profilePicture);
       setPreviewUrl(profile.profilePicture);
       setSelectedFile(null);
@@ -231,6 +229,11 @@ const EditProfileModal = ({
               <p className="text-sm text-muted-foreground mb-2">
                 Click the camera icon to change your photo
               </p>
+              {selectedFile && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {selectedFile.name}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 JPG, PNG or JPEG. Maximum 5MB.
               </p>
@@ -244,33 +247,6 @@ const EditProfileModal = ({
               onChange={handleFileChange}
               className="hidden"
             />
-            
-            {/* Upload button for selected file */}
-            {selectedFile && (
-              <div className="w-full space-y-2">
-                <p className="text-sm text-muted-foreground text-center">
-                  Selected: {selectedFile.name}
-                </p>
-                <Button
-                  onClick={handleUploadPicture}
-                  disabled={isUploading}
-                  className="w-full"
-                  variant="outline"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Picture
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
           </div>
           
           {/* Name Section */}
@@ -283,6 +259,18 @@ const EditProfileModal = ({
               placeholder="Enter your full name"
               disabled={isSaving || isUploading}
             />
+            
+            <div className="pt-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                disabled={isSaving || isUploading}
+              />
+            </div>
           </div>
         </div>
         
@@ -299,10 +287,10 @@ const EditProfileModal = ({
             onClick={handleSave}
             disabled={!hasChanges || isSaving || isUploading}
           >
-            {isSaving ? (
+            {isSaving || isUploading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
+                {isUploading ? "Uploading..." : "Saving..."}
               </>
             ) : (
               <>

@@ -37,6 +37,9 @@ interface UserProfilePageProps {
 const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) => {
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  
   const {
     profile,
     isLoading,
@@ -87,7 +90,13 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
         return;
       }
       
-      await uploadPicture(file);
+      // Store file for later upload and create preview
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -157,10 +166,19 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
   };
 
   const handleSaveChanges = async () => {
-    console.log('DEBUG: Calling hook saveChanges directly');
+    console.log('DEBUG: Starting save with file upload integration');
     
-    // Just call the hook's saveChanges which already has all the logic
+    // If there's a selected file, upload it first
+    if (selectedFile) {
+      await uploadPicture(selectedFile);
+    }
+    
+    // Then save all profile changes
     await saveChanges();
+    
+    // Clear selected file and preview after successful save
+    setSelectedFile(null);
+    setPreviewUrl("");
   };
 
   if (!isOpen) return null;
@@ -219,10 +237,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
                   <div className="relative">
                     <Avatar className="h-24 w-24">
                       <AvatarImage 
-                        src={isEditing ? (tempProfile.profilePicture || profile.profilePicture) : profile.profilePicture} 
+                        src={isEditing ? (previewUrl || tempProfile.profilePicture || profile.profilePicture) : profile.profilePicture} 
                         alt={isEditing ? (tempProfile.fullName || profile.fullName) : profile.fullName}
                         onError={(e) => {
-                          console.error('Profile image failed to load:', isEditing ? (tempProfile.profilePicture || profile.profilePicture) : profile.profilePicture);
+                          console.error('Profile image failed to load:', isEditing ? (previewUrl || tempProfile.profilePicture || profile.profilePicture) : profile.profilePicture);
                           e.currentTarget.style.display = 'none';
                         }}
                       />
@@ -246,6 +264,19 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
                         )}
                       </Button>
                     )}
+                    
+                    {isEditing && (
+                      <div className="text-center mt-4">
+                        {selectedFile && (
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Selected: {selectedFile.name}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Click the camera icon to change your photo
+                        </p>
+                      </div>
+                    )}
                   </div>
                   
                   {isEditing ? (
@@ -264,6 +295,24 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
                         className="text-base"
                         aria-label="Full name"
                       />
+                      
+                      <div className="pt-2">
+                        <Label htmlFor="email" className="text-sm font-medium">
+                          Email
+                        </Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={tempProfile.email || profile.email || ''}
+                          onChange={(e) => {
+                            updateTempProfile({ email: e.target.value });
+                            console.log('Email changed:', e.target.value);
+                          }}
+                          placeholder="Enter your email"
+                          className="text-base"
+                          aria-label="Email"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center">
@@ -305,7 +354,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={cancelEditing}
+                      onClick={() => {
+                        cancelEditing();
+                        setSelectedFile(null);
+                        setPreviewUrl("");
+                      }}
                       disabled={isSaving}
                       className="flex-1"
                     >
