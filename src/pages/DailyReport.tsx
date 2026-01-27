@@ -11,7 +11,7 @@ import CARSection from "@/components/CARSection";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import { processHSEForDB, processSiteActivitiesForDB } from "@/utils/hseDataUtils";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
-import { createDefaultHSESections } from "@/utils/referenceHelpers";
+import { createDefaultHSESections, createDefaultSiteActivitiesSections } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import DailyReportProjectsView from "@/components/DailyReportProjectsView";
 import { Button } from "@/components/ui/button";
@@ -195,7 +195,7 @@ const DailyReport = () => {
   const [isExportingReference, setIsExportingReference] = useState(false);
 
   // Site Activities Photos state
-  const [siteActivitiesSections, setSiteActivitiesSections] = useState<Section[]>(createDefaultHSESections());
+  const [siteActivitiesSections, setSiteActivitiesSections] = useState<Section[]>(createDefaultSiteActivitiesSections());
   const [siteActivitiesTitle, setSiteActivitiesTitle] = useState("Site Activities Photos");
   const [isExportingSiteActivities, setIsExportingSiteActivities] = useState(false);
 
@@ -479,7 +479,7 @@ const DailyReport = () => {
             }));
             setSiteActivitiesSections(convertedSiteActivities);
           } else {
-            setSiteActivitiesSections(createDefaultHSESections());
+            setSiteActivitiesSections(createDefaultSiteActivitiesSections());
           }
           setSiteActivitiesTitle(dbReport.site_title || "Site Activities Photos");
           setCarSheet(
@@ -560,7 +560,7 @@ const DailyReport = () => {
               }));
               setSiteActivitiesSections(convertedSiteActivities);
             } else {
-              setSiteActivitiesSections(createDefaultHSESections());
+              setSiteActivitiesSections(createDefaultSiteActivitiesSections());
             }
             setSiteActivitiesTitle(localDraft.site_title || "Site Activities Photos");
           }
@@ -638,7 +638,7 @@ const DailyReport = () => {
             }));
             setSiteActivitiesSections(convertedSiteActivities);
           } else {
-            setSiteActivitiesSections(createDefaultHSESections());
+            setSiteActivitiesSections(createDefaultSiteActivitiesSections());
           }
           setSiteActivitiesTitle(localDraft.site_title || "Site Activities Photos");
         }
@@ -2623,10 +2623,10 @@ const DailyReport = () => {
                       />
 
                       {/* Report section label for clarity */}
-                      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      {/* <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                         <div className="w-1 h-5 bg-accent rounded-full" />
                         Report
-                      </h2>
+                      </h2> */}
 
                       <ActivitySection
                         activityToday={activityToday}
