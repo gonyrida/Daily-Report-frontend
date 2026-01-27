@@ -56,6 +56,7 @@ const FeedbackSection: React.FC<FeedbackSectionProps> = ({ userId, userEmail }) 
   ];
 
   const handleRatingClick = (rating: number) => {
+    console.log('Rating clicked:', rating);
     setFeedback(prev => ({ ...prev, rating }));
   };
 
@@ -68,6 +69,8 @@ const FeedbackSection: React.FC<FeedbackSectionProps> = ({ userId, userEmail }) 
   };
 
   const handleSubmit = async () => {
+    console.log('Submit button clicked, current rating:', feedback.rating);
+    
     if (feedback.rating === 0) {
       toast({
         title: "Rating Required",
@@ -89,21 +92,30 @@ const FeedbackSection: React.FC<FeedbackSectionProps> = ({ userId, userEmail }) 
         url: window.location.href
       };
 
-      // Send feedback to backend
-      const response = await fetch('/api/feedback/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(feedbackData),
-      });
+      // Try to send feedback to backend
+      try {
+        const response = await fetch('/api/feedback/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(feedbackData),
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+        if (!response.ok) {
+          throw new Error('Failed to submit feedback');
+        }
+
+        const result = await response.json();
+        console.log('Feedback submitted successfully:', result);
+      } catch (apiError) {
+        console.log('Backend not available, storing feedback locally:', apiError);
+        // Store feedback in localStorage as fallback
+        const existingFeedback = JSON.parse(localStorage.getItem('feedbackSubmissions') || '[]');
+        existingFeedback.push(feedbackData);
+        localStorage.setItem('feedbackSubmissions', JSON.stringify(existingFeedback));
       }
-
-      const result = await response.json();
 
       toast({
         title: "Thank You!",
@@ -268,23 +280,31 @@ const FeedbackSection: React.FC<FeedbackSectionProps> = ({ userId, userEmail }) 
         </Alert>
 
         {/* Submit Button */}
-        <Button 
-          onClick={handleSubmit}
-          disabled={isSubmitting || feedback.rating === 0}
-          className="w-full"
-        >
-          {isSubmitting ? (
-            <>
-              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Submitting...
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4 mr-2" />
-              Submit Feedback
-            </>
+        <div className="space-y-2">
+          {feedback.rating === 0 && (
+            <p className="text-sm text-orange-600 text-center">
+              ⭐ Please select a rating above to enable submission
+            </p>
           )}
-        </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={isSubmitting || feedback.rating === 0}
+            className="w-full"
+            size="lg"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Submit Feedback
+              </>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
