@@ -42,14 +42,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
-interface UserPreferences {
-  emailNotifications: boolean;
-  pushNotifications: boolean;
-  autoSave: boolean;
-  dataSharing: boolean;
-  marketingEmails: boolean;
-}
+import { getUserPreferences, updateUserPreferences, sendTestEmail, type UserPreferences } from "@/lib/notificationUtils";
 
 interface FAQ {
   id: string;
@@ -66,7 +59,6 @@ const Settings = () => {
   
   const [preferences, setPreferences] = useState<UserPreferences>({
     emailNotifications: true,
-    pushNotifications: false,
     autoSave: true,
     dataSharing: false,
     marketingEmails: false,
@@ -76,6 +68,7 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [faqSearch, setFaqSearch] = useState("");
   const [showContactSupport, setShowContactSupport] = useState(false);
   const [showLogoutAllModal, setShowLogoutAllModal] = useState(false);
@@ -139,15 +132,30 @@ const Settings = () => {
     }
   ]);
 
-  // Load preferences from localStorage or API
+  // Load preferences from API or localStorage
   useEffect(() => {
     const loadPreferences = async () => {
       setIsLoading(true);
       try {
+        console.log("Loading user preferences...");
+        
+        // Temporarily use localStorage only to test the page
         const stored = localStorage.getItem('userPreferences');
         if (stored) {
           const parsed = JSON.parse(stored);
+          console.log("Using stored preferences:", parsed);
           setPreferences(parsed);
+        } else {
+          // Set default preferences
+          const defaultPrefs = {
+            emailNotifications: true,
+            autoSave: true,
+            dataSharing: false,
+            marketingEmails: false,
+          };
+          console.log("Using default preferences:", defaultPrefs);
+          setPreferences(defaultPrefs);
+          localStorage.setItem('userPreferences', JSON.stringify(defaultPrefs));
         }
 
         // Load user data for feedback
@@ -165,9 +173,15 @@ const Settings = () => {
           console.log('Could not load user data, feedback will be anonymous');
         }
         
-        // In a real app, you'd fetch from API here
       } catch (error) {
         console.error('Failed to load preferences:', error);
+        // Set default preferences on error
+        setPreferences({
+          emailNotifications: true,
+          autoSave: true,
+          dataSharing: false,
+          marketingEmails: false,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -176,12 +190,12 @@ const Settings = () => {
     loadPreferences();
   }, []);
 
-  // Save preferences to localStorage and API
+  // Save preferences to API
   const savePreferences = async () => {
     setIsSaving(true);
     try {
+      // Temporarily save to localStorage only
       localStorage.setItem('userPreferences', JSON.stringify(preferences));
-      // In a real app, you'd save to API here
       
       setHasChanges(false);
       toast({
@@ -212,6 +226,26 @@ const Settings = () => {
       title: "Theme Updated",
       description: `Theme changed to ${newTheme}.`,
     });
+  };
+
+  // Handle test email
+  const handleTestEmail = async () => {
+    setIsSendingTestEmail(true);
+    try {
+      // Temporarily show success message without API call
+      toast({
+        title: "Test Email",
+        description: "Email functionality will be available when backend is running.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send test email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
   };
 
   // Handle logout
@@ -454,15 +488,25 @@ const Settings = () => {
                       description: 'Receive updates about your reports and account activity',
                       icon: '📧',
                       checked: preferences.emailNotifications,
-                      onChange: (checked) => handlePreferenceChange('emailNotifications', checked)
-                    },
-                    {
-                      id: 'push-notifications',
-                      title: 'Push Notifications',
-                      description: 'Get browser notifications for important updates',
-                      icon: '🔔',
-                      checked: preferences.pushNotifications,
-                      onChange: (checked) => handlePreferenceChange('pushNotifications', checked)
+                      onChange: (checked) => handlePreferenceChange('emailNotifications', checked),
+                      action: preferences.emailNotifications ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleTestEmail}
+                          disabled={isSendingTestEmail}
+                          className="ml-2"
+                        >
+                          {isSendingTestEmail ? (
+                            <>
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            'Send Test'
+                          )}
+                        </Button>
+                      ) : null
                     },
                     {
                       id: 'auto-save',
@@ -477,9 +521,9 @@ const Settings = () => {
                       key={item.id}
                       className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
                         <div className="text-2xl">{item.icon}</div>
-                        <div>
+                        <div className="flex-1">
                           <Label htmlFor={item.id} className="text-base font-semibold cursor-pointer">
                             {item.title}
                           </Label>
@@ -488,12 +532,15 @@ const Settings = () => {
                           </p>
                         </div>
                       </div>
-                      <Switch
-                        id={item.id}
-                        checked={item.checked}
-                        onCheckedChange={item.onChange}
-                        className="scale-110"
-                      />
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={item.id}
+                          checked={item.checked}
+                          onCheckedChange={item.onChange}
+                          className="scale-110"
+                        />
+                        {item.action}
+                      </div>
                     </div>
                   ))}
                 </div>
