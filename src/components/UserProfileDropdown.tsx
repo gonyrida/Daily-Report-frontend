@@ -13,16 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { User, Settings, LogOut, Loader2 } from "lucide-react";
+import { User, LogOut, Loader2 } from "lucide-react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/integrations/userProfileApi";
-import AccountSettings from "./AccountSettings";
 import EditProfileModal from "./EditProfileModal";
 import { handleImageError, constructImageUrl, getCacheBustingTimestamp } from "@/utils/imageUtils";
 
 const UserProfileDropdown = () => {
-  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   
   const {
@@ -174,14 +172,6 @@ const UserProfileDropdown = () => {
               Edit Profile
             </DropdownMenuItem>
             
-            <DropdownMenuItem 
-              onClick={() => setShowAccountSettings(true)}
-              className="flex items-center gap-2 cursor-pointer"
-            >
-              <Settings className="h-4 w-4" />
-              Account Settings
-            </DropdownMenuItem>
-            
             <DropdownMenuSeparator />
             
             <DropdownMenuItem
@@ -203,16 +193,6 @@ const UserProfileDropdown = () => {
         onSave={handleSaveProfile}
         isSaving={isSaving}
       />
-      
-      {/* Account Settings Modal */}
-      {showAccountSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setShowAccountSettings(false)} />
-          <div className="relative bg-background rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <AccountSettings onClose={() => setShowAccountSettings(false)} />
-          </div>
-        </div>
-      )}
     </>
   );
 };
