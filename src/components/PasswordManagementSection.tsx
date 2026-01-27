@@ -256,89 +256,113 @@ const PasswordManagementSection: React.FC = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Key className="h-5 w-5" />
-          Password Management
-        </CardTitle>
-        <CardDescription>
-          Update your password to keep your account secure
-        </CardDescription>
+    <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white">
+            <Key className="h-5 w-5" />
+          </div>
+          <div>
+            <CardTitle className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
+              Password Management
+            </CardTitle>
+            <CardDescription className="text-sm text-muted-foreground mt-1">
+              Keep your account secure with a strong password
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Current Password */}
-          <div className="space-y-2">
-            <Label htmlFor="current-password">Current Password *</Label>
-            <div className="relative">
+          <div className="space-y-3">
+            <Label htmlFor="current-password" className="text-base font-semibold flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Current Password
+            </Label>
+            <div className="relative group">
               <Input
                 id="current-password"
                 type={showPasswords.current ? "text" : "password"}
                 value={formData.currentPassword}
                 onChange={(e) => handleInputChange('currentPassword', e.target.value)}
                 placeholder="Enter your current password"
-                className={errors.currentPassword ? "border-red-500" : ""}
+                className={`
+                  pr-12 h-12 rounded-xl border-2 transition-all duration-200
+                  ${errors.currentPassword 
+                    ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
+                    : "border-muted bg-background hover:border-indigo-300 focus:border-indigo-500"
+                  }
+                `}
                 disabled={isLoading}
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                 onClick={() => togglePasswordVisibility('current')}
                 disabled={isLoading}
               >
                 {showPasswords.current ? (
-                  <EyeOff className="h-4 w-4" />
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-4 w-4 text-muted-foreground" />
                 )}
               </Button>
             </div>
             {errors.currentPassword && (
-              <p className="text-sm text-red-500">{errors.currentPassword}</p>
+              <div className="flex items-center gap-2 text-red-600 text-sm animate-pulse">
+                <AlertTriangle className="h-4 w-4" />
+                {errors.currentPassword}
+              </div>
             )}
           </div>
 
           {/* New Password */}
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New Password *</Label>
-            <div className="relative">
+          <div className="space-y-3">
+            <Label htmlFor="new-password" className="text-base font-semibold flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              New Password
+            </Label>
+            <div className="relative group">
               <Input
                 id="new-password"
                 type={showPasswords.new ? "text" : "password"}
                 value={formData.newPassword}
                 onChange={(e) => handleInputChange('newPassword', e.target.value)}
-                placeholder="Enter your new password"
-                className={errors.newPassword ? "border-red-500" : ""}
+                placeholder="Create a strong password"
+                className={`
+                  pr-12 h-12 rounded-xl border-2 transition-all duration-200
+                  ${errors.newPassword 
+                    ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
+                    : "border-muted bg-background hover:border-indigo-300 focus:border-indigo-500"
+                  }
+                `}
                 disabled={isLoading}
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                 onClick={() => togglePasswordVisibility('new')}
                 disabled={isLoading}
               >
                 {showPasswords.new ? (
-                  <EyeOff className="h-4 w-4" />
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-4 w-4 text-muted-foreground" />
                 )}
               </Button>
             </div>
-            {errors.newPassword && (
-              <p className="text-sm text-red-500">{errors.newPassword}</p>
-            )}
-
+            
             {/* Password Strength Indicator */}
             {formData.newPassword && (
-              <div className="space-y-2">
+              <div className="space-y-3 p-4 rounded-xl bg-muted/50 border border-muted">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Password Strength</span>
-                  <span className={`text-sm font-medium ${getPasswordStrengthColor()}`}>
+                  <span className={`text-sm font-semibold ${getPasswordStrengthColor()}`}>
                     {passwordStrength.label}
                   </span>
                 </div>
@@ -347,78 +371,110 @@ const PasswordManagementSection: React.FC = () => {
                   className="h-2"
                 />
                 {passwordStrength.suggestions.length > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    <p className="font-medium mb-1">Suggestions:</p>
-                    <ul className="list-disc list-inside space-y-1">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Suggestions:</p>
+                    <ul className="space-y-1">
                       {passwordStrength.suggestions.map((suggestion, index) => (
-                        <li key={index}>{suggestion}</li>
+                        <li key={index} className="text-xs text-muted-foreground flex items-center gap-2">
+                          <div className="w-1 h-1 rounded-full bg-indigo-500" />
+                          {suggestion}
+                        </li>
                       ))}
                     </ul>
                   </div>
                 )}
               </div>
             )}
+            {errors.newPassword && (
+              <div className="flex items-center gap-2 text-red-600 text-sm animate-pulse">
+                <AlertTriangle className="h-4 w-4" />
+                {errors.newPassword}
+              </div>
+            )}
           </div>
 
           {/* Confirm Password */}
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm New Password *</Label>
-            <div className="relative">
+          <div className="space-y-3">
+            <Label htmlFor="confirm-password" className="text-base font-semibold flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Confirm New Password
+            </Label>
+            <div className="relative group">
               <Input
                 id="confirm-password"
                 type={showPasswords.confirm ? "text" : "password"}
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                placeholder="Confirm your new password"
-                className={errors.confirmPassword ? "border-red-500" : ""}
+                placeholder="Re-enter your new password"
+                className={`
+                  pr-12 h-12 rounded-xl border-2 transition-all duration-200
+                  ${errors.confirmPassword 
+                    ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
+                    : "border-muted bg-background hover:border-indigo-300 focus:border-indigo-500"
+                  }
+                `}
                 disabled={isLoading}
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                 onClick={() => togglePasswordVisibility('confirm')}
                 disabled={isLoading}
               >
                 {showPasswords.confirm ? (
-                  <EyeOff className="h-4 w-4" />
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-4 w-4 text-muted-foreground" />
                 )}
               </Button>
             </div>
             {errors.confirmPassword && (
-              <p className="text-sm text-red-500">{errors.confirmPassword}</p>
+              <div className="flex items-center gap-2 text-red-600 text-sm animate-pulse">
+                <AlertTriangle className="h-4 w-4" />
+                {errors.confirmPassword}
+              </div>
             )}
           </div>
 
           {/* Security Tips */}
-          <Alert>
-            <Shield className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Security Tips:</strong> Use a unique password with at least 12 characters, including uppercase, lowercase, numbers, and special characters. Avoid using common words or personal information.
-            </AlertDescription>
-          </Alert>
+          <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-start gap-3">
+              <div className="p-1 rounded-lg bg-blue-500 text-white">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                  Security Tips
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Use a unique password with at least 12 characters, including uppercase, lowercase, numbers, and special characters. Avoid using common words or personal information.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Submit Button */}
-          <Button 
-            type="submit" 
-            className="w-full"
-            disabled={isLoading || passwordStrength.score < 3}
-          >
-            {isLoading ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Updating Password...
-              </>
-            ) : (
-              <>
-                <Lock className="h-4 w-4 mr-2" />
-                Update Password
-              </>
-            )}
-          </Button>
+          <div className="flex justify-center pt-4">
+            <Button 
+              type="submit"
+              disabled={isLoading || passwordStrength.score < 3}
+              className="px-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors duration-200 min-w-48"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Updating Password...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Update Password
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

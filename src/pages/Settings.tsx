@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Input } from "@/components/ui/input";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft } from "lucide-react";
+import ContactSupportModal from "@/components/ContactSupportModal";
+import FeedbackSection from "@/components/FeedbackSection";
+import LoginHistorySection from "@/components/LoginHistorySection";
+import LogoutAllDevicesModal from "@/components/LogoutAllDevicesModal";
+import PasswordManagementSection from "@/components/PasswordManagementSection";
+import AccountStatusSection from "@/components/AccountStatusSection";
 import { 
   Settings as SettingsIcon,
   Monitor,
@@ -18,22 +27,21 @@ import {
   User,
   Trash2,
   LogOut,
-  ArrowLeft,
   Loader2,
   Check,
   HelpCircle,
   Search,
   AlertTriangle,
 } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
-import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import ContactSupportModal from "@/components/ContactSupportModal";
-import FeedbackSection from "@/components/FeedbackSection";
-import LoginHistorySection from "@/components/LoginHistorySection";
-import LogoutAllDevicesModal from "@/components/LogoutAllDevicesModal";
-import PasswordManagementSection from "@/components/PasswordManagementSection";
-import AccountStatusSection from "@/components/AccountStatusSection";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface UserPreferences {
   emailNotifications: boolean;
@@ -275,336 +283,346 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Settings</h1>
-              <p className="text-muted-foreground">Manage your account preferences</p>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <HierarchicalSidebar />
+        <SidebarInset>
+          {/* Header */}
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/data-[collapsible=icon]:h-12">
+            <div className="flex items-center gap-2 px-4">
+              <SidebarTrigger className="-ml-1" />
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Dashboard
+                </Button>
+              </div>
             </div>
-          </div>
-          
-          {hasChanges && (
-            <Button onClick={savePreferences} disabled={isSaving}>
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4 mr-2" />
-              )}
-              Save Changes
-            </Button>
-          )}
-        </div>
+            <div className="flex items-center gap-2 px-4">
+              <h1 className="text-lg font-semibold flex items-center gap-2">
+                <SettingsIcon className="h-5 w-5" />
+                Settings
+              </h1>
+            </div>
+          </header>
 
-        <div className="space-y-8">
-          {/* Appearance Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Monitor className="h-5 w-5" />
-                Appearance
-              </CardTitle>
-              <CardDescription>
-                Customize how the application looks and feels
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label className="text-base font-medium">Theme</Label>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Choose your preferred color scheme
-                </p>
-                
-                <RadioGroup 
-                  value={theme} 
-                  onValueChange={handleThemeChange}
-                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
-                >
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
-                    <RadioGroupItem value="light" id="light" />
-                    <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4" />
-                      <div>
-                        <Label htmlFor="light" className="font-medium cursor-pointer">
-                          Light
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Clean and bright interface
-                        </p>
-                      </div>
+          <div className="flex-1 space-y-6 p-6">
+            {/* Appearance Section */}
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                    <Monitor className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Appearance
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground mt-1">
+                      Personalize your visual experience
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-semibold text-foreground">Theme</Label>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Choose your preferred color scheme
+                      </p>
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                      {theme === 'system' ? 'Auto' : theme === 'light' ? 'Light' : 'Dark'}
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
-                    <RadioGroupItem value="dark" id="dark" />
-                    <div className="flex items-center gap-2">
-                      <Moon className="h-4 w-4" />
-                      <div>
-                        <Label htmlFor="dark" className="font-medium cursor-pointer">
-                          Dark
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Easy on the eyes in low light
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
-                    <RadioGroupItem value="system" id="system" />
-                    <div className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4" />
-                      <div>
-                        <Label htmlFor="system" className="font-medium cursor-pointer">
-                          System
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Follows your device settings
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </RadioGroup>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Notifications Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notifications
-              </CardTitle>
-              <CardDescription>
-                Control how you receive updates and alerts
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email-notifications" className="text-base font-medium">
-                    Email Notifications
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive email updates about your account activity
-                  </p>
-                </div>
-                <Switch
-                  id="email-notifications"
-                  checked={preferences.emailNotifications}
-                  onCheckedChange={(checked) => handlePreferenceChange('emailNotifications', checked)}
-                />
-              </div>
-              
-              <Separator />
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="push-notifications" className="text-base font-medium">
-                    Push Notifications
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive browser push notifications for important updates
-                  </p>
-                </div>
-                <Switch
-                  id="push-notifications"
-                  checked={preferences.pushNotifications}
-                  onCheckedChange={(checked) => handlePreferenceChange('pushNotifications', checked)}
-                />
-              </div>
-              
-              <Separator />
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="marketing-emails" className="text-base font-medium">
-                    Marketing Emails
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive emails about new features and updates
-                  </p>
-                </div>
-                <Switch
-                  id="marketing-emails"
-                  checked={preferences.marketingEmails}
-                  onCheckedChange={(checked) => handlePreferenceChange('marketingEmails', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Privacy & Security Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5" />
-                Privacy & Security
-              </CardTitle>
-              <CardDescription>
-                Manage your privacy settings and security preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="auto-save" className="text-base font-medium">
-                    Auto-save
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically save your work as you type
-                  </p>
-                </div>
-                <Switch
-                  id="auto-save"
-                  checked={preferences.autoSave}
-                  onCheckedChange={(checked) => handlePreferenceChange('autoSave', checked)}
-                />
-              </div>
-              
-              <Separator />
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="data-sharing" className="text-base font-medium">
-                    Data Sharing
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Share anonymous usage data to help improve the service
-                  </p>
-                </div>
-                <Switch
-                  id="data-sharing"
-                  checked={preferences.dataSharing}
-                  onCheckedChange={(checked) => handlePreferenceChange('dataSharing', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Help & FAQ Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HelpCircle className="h-5 w-5" />
-                Help
-              </CardTitle>
-              <CardDescription>
-                Frequently asked questions and support resources
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Search Field */}
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search FAQs..."
-                  value={faqSearch}
-                  onChange={(e) => setFaqSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* FAQ Accordion */}
-              <Accordion type="multiple" className="space-y-2">
-                {filteredFAQs.length > 0 ? (
-                  filteredFAQs.map((faq) => (
-                    <AccordionItem key={faq.id} value={faq.id} className="border rounded-lg px-4">
-                      <AccordionTrigger 
-                        className="text-left hover:no-underline"
-                        onClick={() => handleFAQClick(faq.id)}
-                      >
-                        <div className="flex items-center justify-between w-full pr-2">
-                          <span className="font-medium">{faq.question}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                              {faq.category}
-                            </span>
-                            {faq.views > 30 && (
-                              <span className="text-xs text-orange-600">
-                                Popular
-                              </span>
-                            )}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div 
+                      className={`
+                        relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:scale-105
+                        ${theme === 'light' 
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-lg' 
+                          : 'border-muted bg-background hover:border-muted-foreground/20'
+                        }
+                      `}
+                      onClick={() => handleThemeChange('light')}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="p-2 rounded-lg bg-white shadow-sm border">
+                          <Sun className="h-5 w-5 text-yellow-500" />
+                        </div>
+                        <span className="text-sm font-medium">Light</span>
+                        {theme === 'light' && (
+                          <div className="absolute top-2 right-2">
+                            <div className="w-3 h-3 rounded-full bg-blue-500 flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            </div>
                           </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div 
+                      className={`
+                        relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:scale-105
+                        ${theme === 'dark' 
+                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-950 shadow-lg' 
+                          : 'border-muted bg-background hover:border-muted-foreground/20'
+                        }
+                      `}
+                      onClick={() => handleThemeChange('dark')}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="p-2 rounded-lg bg-slate-900 shadow-sm border">
+                          <Moon className="h-5 w-5 text-blue-300" />
                         </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">
-                        {faq.answer}
-                        <div className="mt-3 text-xs text-muted-foreground">
-                          Viewed {faq.views} times
+                        <span className="text-sm font-medium">Dark</span>
+                        {theme === 'dark' && (
+                          <div className="absolute top-2 right-2">
+                            <div className="w-3 h-3 rounded-full bg-purple-500 flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div 
+                      className={`
+                        relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:scale-105
+                        ${theme === 'system' 
+                          ? 'border-green-500 bg-green-50 dark:bg-green-950 shadow-lg' 
+                          : 'border-muted bg-background hover:border-muted-foreground/20'
+                        }
+                      `}
+                      onClick={() => handleThemeChange('system')}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-slate-800 dark:to-slate-700 shadow-sm border">
+                          <Monitor className="h-5 w-5 text-green-600" />
                         </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <HelpCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No FAQs found matching your search.</p>
-                    <p className="text-sm">Try different keywords or browse all questions.</p>
+                        <span className="text-sm font-medium">System</span>
+                        {theme === 'system' && (
+                          <div className="absolute top-2 right-2">
+                            <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </Accordion>
 
-              {/* Additional Help */}
-              <Separator />
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Still need help?
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowContactSupport(true)}
-                  >
-                    Contact Support
-                  </Button>
+                  <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-muted">
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      {theme === 'system' 
+                        ? "Automatically follows your device's appearance settings" 
+                        : `Theme is set to ${theme} mode`
+                      }
+                    </p>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Notifications Section */}
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-r from-green-500 to-teal-600 text-white">
+                    <Bell className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
+                      Notifications
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground mt-1">
+                      Manage your alert preferences and communication
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  {[
+                    {
+                      id: 'email-notifications',
+                      title: 'Email Notifications',
+                      description: 'Receive updates about your reports and account activity',
+                      icon: '📧',
+                      checked: preferences.emailNotifications,
+                      onChange: (checked) => handlePreferenceChange('emailNotifications', checked)
+                    },
+                    {
+                      id: 'push-notifications',
+                      title: 'Push Notifications',
+                      description: 'Get browser notifications for important updates',
+                      icon: '🔔',
+                      checked: preferences.pushNotifications,
+                      onChange: (checked) => handlePreferenceChange('pushNotifications', checked)
+                    },
+                    {
+                      id: 'auto-save',
+                      title: 'Auto-save',
+                      description: 'Automatically save your work every few minutes',
+                      icon: '💾',
+                      checked: preferences.autoSave,
+                      onChange: (checked) => handlePreferenceChange('autoSave', checked)
+                    }
+                  ].map((item) => (
+                    <div 
+                      key={item.id}
+                      className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl">{item.icon}</div>
+                        <div>
+                          <Label htmlFor={item.id} className="text-base font-semibold cursor-pointer">
+                            {item.title}
+                          </Label>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id={item.id}
+                        checked={item.checked}
+                        onCheckedChange={item.onChange}
+                        className="scale-110"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Privacy & Security Section */}
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-r from-red-500 to-orange-600 text-white">
+                    <Lock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">
+                      Privacy & Security
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground mt-1">
+                      Control your data sharing and security preferences
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  {[
+                    {
+                      id: 'data-sharing',
+                      title: 'Data Sharing',
+                      description: 'Help improve our services with anonymous usage data',
+                      icon: '📊',
+                      checked: preferences.dataSharing,
+                      onChange: (checked) => handlePreferenceChange('dataSharing', checked)
+                    },
+                    {
+                      id: 'marketing-emails',
+                      title: 'Marketing Emails',
+                      description: 'Receive emails about new features and updates',
+                      icon: '📨',
+                      checked: preferences.marketingEmails,
+                      onChange: (checked) => handlePreferenceChange('marketingEmails', checked)
+                    }
+                  ].map((item) => (
+                    <div 
+                      key={item.id}
+                      className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl">{item.icon}</div>
+                        <div>
+                          <Label htmlFor={item.id} className="text-base font-semibold cursor-pointer">
+                            {item.title}
+                          </Label>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id={item.id}
+                        checked={item.checked}
+                        onCheckedChange={item.onChange}
+                        className="scale-110"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Password Management Section */}
+            <PasswordManagementSection />
+
+            {/* Login History Section */}
+            <LoginHistorySection 
+              userId={user?.id}
+            />
+
+            {/* Feedback Section */}
+            <FeedbackSection 
+              userId={user?.id}
+              userEmail={user?.email}
+            />
+
+            {/* Account Status Section */}
+            <AccountStatusSection 
+              userId={user?.id}
+              userEmail={user?.email}
+            />
+
+            {/* Save Button */}
+            {hasChanges && (
+              <div className="fixed bottom-6 right-6 z-50">
+                <Button 
+                  onClick={savePreferences} 
+                  disabled={isSaving}
+                  className="px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors duration-200 shadow-lg min-w-40"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
 
-          {/* Feedback Section */}
-          <FeedbackSection 
-            userId={user?.id}
-            userEmail={user?.email}
+          {/* Contact Support Modal */}
+          <ContactSupportModal 
+            isOpen={showContactSupport}
+            onClose={() => setShowContactSupport(false)}
           />
 
-          {/* Login History Section */}
-          <LoginHistorySection 
-            userId={user?.id}
+          {/* Logout All Devices Modal */}
+          <LogoutAllDevicesModal 
+            isOpen={showLogoutAllModal}
+            onClose={() => setShowLogoutAllModal(false)}
+            includeCurrent={true}
           />
-
-          {/* Password Management Section */}
-          <PasswordManagementSection />
-
-          {/* Account Status Section */}
-          <AccountStatusSection 
-            userId={user?.id}
-            userEmail={user?.email}
-          />
-        </div>
+        </SidebarInset>
       </div>
-
-      {/* Contact Support Modal */}
-      <ContactSupportModal 
-        isOpen={showContactSupport}
-        onClose={() => setShowContactSupport(false)}
-      />
-
-      {/* Logout All Devices Modal */}
-      <LogoutAllDevicesModal 
-        isOpen={showLogoutAllModal}
-        onClose={() => setShowLogoutAllModal(false)}
-        includeCurrent={true}
-      />
-    </div>
+    </SidebarProvider>
   );
 };
 
