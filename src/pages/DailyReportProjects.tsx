@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   SidebarInset,
@@ -46,6 +46,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { projectEvents } from '@/utils/eventEmitter';
 
 interface Project {
   name: string;
@@ -68,93 +69,97 @@ const DailyReportProjects: React.FC = () => {
   const [newProjectName, setNewProjectName] = useState("");
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editProjectName, setEditProjectName] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [renameConfirmOpen, setRenameConfirmOpen] = useState(false);
+  const [renameData, setRenameData] = useState<{ oldName: string; newName: string } | null>(null);
 
-  useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        // Load projects from database reports
-        const response = await getCompanyReports();
-        const reports = response.reports as any[] || [];
+  const loadProjects = async () => {
+    try {
+      // Load projects from database reports
+      const response = await getCompanyReports();
+      const reports = response.reports as any[] || [];
+      
+      // First pass: Group all reports by project name
+      const projectReportsMap = new Map<string, any[]>();
+
+      reports.forEach((report: any) => {
+        const projectName = report.projectName;
+        if (!projectName) return;
         
-        // First pass: Group all reports by project name
-        const projectReportsMap = new Map<string, any[]>();
+        if (!projectReportsMap.has(projectName)) {
+          projectReportsMap.set(projectName, []);
+        }
+        
+        projectReportsMap.get(projectName)!.push(report);
+      });
 
-        reports.forEach((report: any) => {
-          const projectName = report.projectName;
-          if (!projectName) return;
-          
-          if (!projectReportsMap.has(projectName)) {
-            projectReportsMap.set(projectName, []);
-          }
-          
-          projectReportsMap.get(projectName)!.push(report);
+      // Second pass: Create project objects with correct creator
+      const projectMap = new Map<string, Project>();
+
+      projectReportsMap.forEach((projectReports, projectName) => {
+        // Find the earliest report (true creator)
+        const sortedReports = projectReports.sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.reportDate || 0);
+          const dateB = new Date(b.createdAt || b.reportDate || 0);
+          return dateA.getTime() - dateB.getTime(); // Ascending order (earliest first)
         });
+        
+        const earliestReport = sortedReports[0];
+        const userId = earliestReport.userId?._id || earliestReport.userId;
+        const userName = earliestReport.userId?.firstName && earliestReport.userId?.lastName 
+          ? `${earliestReport.userId.firstName} ${earliestReport.userId.lastName}` 
+          : 'Unknown';
+        
+        // Find the most recent report for "Last Report" info
+        const mostRecentReport = projectReports.sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.reportDate || 0);
+          const dateB = new Date(b.createdAt || b.reportDate || 0);
+          return dateB.getTime() - dateA.getTime(); // Descending order (most recent first)
+        })[0];
+        
+        projectMap.set(projectName, {
+          name: projectName,
+          reportCount: projectReports.length,
+          lastReportDate: mostRecentReport.reportDate,
+          lastReportId: mostRecentReport._id,
+          createdBy: userId,        // ← TRUE creator (earliest report)
+          createdByName: userName,   // ← TRUE creator name
+        });
+      });
 
-        // Second pass: Create project objects with correct creator
-        const projectMap = new Map<string, Project>();
-
-        projectReportsMap.forEach((projectReports, projectName) => {
-          // Find the earliest report (true creator)
-          const sortedReports = projectReports.sort((a, b) => {
-            const dateA = new Date(a.createdAt || a.reportDate || 0);
-            const dateB = new Date(b.createdAt || b.reportDate || 0);
-            return dateA.getTime() - dateB.getTime(); // Ascending order (earliest first)
-          });
-          
-          const earliestReport = sortedReports[0];
-          const userId = earliestReport.userId?._id || earliestReport.userId;
-          const userName = earliestReport.userId?.firstName && earliestReport.userId?.lastName 
-            ? `${earliestReport.userId.firstName} ${earliestReport.userId.lastName}` 
-            : 'Unknown';
-          
-          // Find the most recent report for "Last Report" info
-          const mostRecentReport = projectReports.sort((a, b) => {
-            const dateA = new Date(a.createdAt || a.reportDate || 0);
-            const dateB = new Date(b.createdAt || b.reportDate || 0);
-            return dateB.getTime() - dateA.getTime(); // Descending order (most recent first)
-          })[0];
-          
+      // Load locally added projects from sessionStorage
+      const localProjects = sessionStorage.getItem('localProjects');
+      const parsedLocalProjects = localProjects ? JSON.parse(localProjects) : [];
+      
+      // Add local projects that don't exist in database
+      parsedLocalProjects.forEach((projectName: string) => {
+        if (!projectMap.has(projectName)) {
           projectMap.set(projectName, {
             name: projectName,
-            reportCount: projectReports.length,
-            lastReportDate: mostRecentReport.reportDate,
-            lastReportId: mostRecentReport._id,
-            createdBy: userId,        // ← TRUE creator (earliest report)
-            createdByName: userName,   // ← TRUE creator name
+            reportCount: 0,
+            lastReportDate: undefined,
+            lastReportId: undefined,
           });
-        });
+        }
+      });
+      
+      const projectList = Array.from(projectMap.values());
+      setProjects(projectList);
+      setFilteredProjects(projectList);
+    } catch (error) {
+      console.error("Failed to load projects:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load projects",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        // Load locally added projects from sessionStorage
-        const localProjects = sessionStorage.getItem('localProjects');
-        const parsedLocalProjects = localProjects ? JSON.parse(localProjects) : [];
-        
-        // Add local projects that don't exist in database
-        parsedLocalProjects.forEach((projectName: string) => {
-          if (!projectMap.has(projectName)) {
-            projectMap.set(projectName, {
-              name: projectName,
-              reportCount: 0,
-              lastReportDate: undefined,
-              lastReportId: undefined,
-            });
-          }
-        });
-        
-        const projectList = Array.from(projectMap.values());
-        setProjects(projectList);
-        setFilteredProjects(projectList);
-      } catch (error) {
-        console.error("Failed to load projects:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load projects",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
+  useEffect(() => {
     loadProjects();
   }, [toast]);
 
@@ -170,6 +175,50 @@ const DailyReportProjects: React.FC = () => {
       setFilteredProjects(projects);
     }
   }, [projects, searchQuery]);
+
+  // Wrap event handlers with useCallback
+  const handleProjectDeleted = useCallback(({ projectName }: { projectName: string }) => {
+    setProjects(currentProjects => currentProjects.filter(p => p.name !== projectName));
+    setFilteredProjects(currentProjects => currentProjects.filter(p => p.name !== projectName));
+    
+    toast({
+      title: "Project Synced",
+      description: `${projectName} removed from sidebar.`,
+    });
+  }, []);
+  const handleProjectAdded = useCallback(({ projectName }: { projectName: string }) => {
+    loadProjects();
+    
+    toast({
+      title: "Project Synced", 
+      description: `${projectName} added from sidebar.`,
+    });
+  }, [loadProjects]);
+  const handleProjectUpdated = useCallback(({ oldName, newName }: { oldName: string, newName: string }) => {
+    setProjects(currentProjects => currentProjects.map(p => 
+      p.name === oldName ? { ...p, name: newName } : p
+    ));
+    setFilteredProjects(currentProjects => currentProjects.map(p => 
+      p.name === oldName ? { ...p, name: newName } : p
+    ));
+    
+    toast({
+      title: "Project Synced",
+      description: `Project renamed from ${oldName} to ${newName}.`,
+    });
+  }, []);
+  useEffect(() => {
+    // Subscribe to events
+    projectEvents.on('projectDeleted', handleProjectDeleted);
+    projectEvents.on('projectAdded', handleProjectAdded);
+    projectEvents.on('projectUpdated', handleProjectUpdated);
+    // Cleanup on unmount
+    return () => {
+      projectEvents.off('projectDeleted', handleProjectDeleted);
+      projectEvents.off('projectAdded', handleProjectAdded);
+      projectEvents.off('projectUpdated', handleProjectUpdated);
+    };
+  }, [handleProjectDeleted, handleProjectAdded, handleProjectUpdated]);
 
   // Helper function to get current user ID from JWT token
   const getCurrentUserId = () => {
@@ -196,7 +245,7 @@ const DailyReportProjects: React.FC = () => {
       sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
       
       // Navigate to daily report with the new project
-      navigate(`/daily-report?project=${encodeURIComponent(newProject)}`);
+      navigate(`/dashboard?project=${encodeURIComponent(newProject)}&tab=company`);
       setNewProjectName("");
       setShowAddProject(false);
       
@@ -218,20 +267,43 @@ const DailyReportProjects: React.FC = () => {
 
   const handleSaveEdit = () => {
     if (editProjectName.trim() && editProjectName.trim() !== editingProject) {
+      console.log('🔧 Setting rename data and opening dialog');
+      setRenameData({
+        oldName: editingProject,
+        newName: editProjectName.trim()
+      });
+      setRenameConfirmOpen(true);
+    } else {
+      console.log('🔧 Clearing edit state');
+      setEditingProject(null);
+      setEditProjectName("");
+    }
+  };
+
+  const confirmRename = () => {
+    if (renameData) {
       // Update sessionStorage
       const localProjects = sessionStorage.getItem('localProjects') || '[]';
       const parsedLocalProjects = JSON.parse(localProjects);
-      const updatedLocalProjects = parsedLocalProjects.map((p: string) => p === editingProject ? editProjectName.trim() : p);
+      const updatedLocalProjects = parsedLocalProjects.map((p: string) => 
+        p === renameData.oldName ? renameData.newName : p
+      );
       sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
+      
+      // Emit event to sidebar
+      projectEvents.emit('projectUpdated', { 
+        oldName: renameData.oldName, 
+        newName: renameData.newName 
+      });
       
       toast({
         title: "Project Updated",
-        description: `Project renamed to "${editProjectName.trim()}".`,
+        description: `Project renamed to "${renameData.newName}".`,
       });
-      
-      // Navigate with the new name
-      navigate(`/daily-report?project=${encodeURIComponent(editProjectName.trim())}`);
     }
+    
+    setRenameConfirmOpen(false);
+    setRenameData(null);
     setEditingProject(null);
     setEditProjectName("");
   };
@@ -247,6 +319,14 @@ const DailyReportProjects: React.FC = () => {
     const parsedLocalProjects = JSON.parse(localProjects);
     const updatedLocalProjects = parsedLocalProjects.filter((p: string) => p !== projectName);
     sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
+    
+    // Update React state to refresh UI immediately
+    const updatedProjects = projects.filter(p => p.name !== projectName);
+    setProjects(updatedProjects);
+    setFilteredProjects(updatedProjects);
+    
+    // ADD THIS LINE - Emit event to sidebar
+    projectEvents.emit('projectDeleted', { projectName });
     
     toast({
       title: "Project Deleted",
@@ -345,10 +425,6 @@ const DailyReportProjects: React.FC = () => {
                     Manage your daily report projects and access their reports
                   </p>
                 </div>
-                <Button onClick={() => setShowAddProject(!showAddProject)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Project
-                </Button>
               </div>
 
               {/* Add Project Input */}
@@ -408,8 +484,12 @@ const DailyReportProjects: React.FC = () => {
                                   onChange={(e) => setEditProjectName(e.target.value)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
+                                      e.preventDefault(); // ← ADD THIS
+                                      e.stopPropagation(); // ← ADD THIS
                                       handleSaveEdit();
                                     } else if (e.key === 'Escape') {
+                                      e.preventDefault(); // ← ADD THIS
+                                      e.stopPropagation(); // ← ADD THIS
                                       handleCancelEdit();
                                     }
                                   }}
@@ -466,7 +546,7 @@ const DailyReportProjects: React.FC = () => {
                                     handleEditProject(project.name);
                                   }}>
                                     <Edit className="h-3 w-3 mr-2" />
-                                    Edit
+                                    Rename
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={(e) => {
                                     e.stopPropagation();
@@ -476,16 +556,49 @@ const DailyReportProjects: React.FC = () => {
                                     Duplicate
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteProject(project.name);
-                                    }}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="h-3 w-3 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setProjectToDelete(project.name);
+                                        }}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        onSelect={(e) => {
+                                          e.preventDefault();
+                                          setDeleteConfirmOpen(true);
+                                        }}
+                                      >
+                                        <Trash2 className="h-3 w-3 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                          Are you sure you want to delete this project?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This action will permanently delete "{project.name}" from your project list. This cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+                                          Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteProject(project.name);
+                                            setDeleteConfirmOpen(false);
+                                          }}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          Delete Project
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             )}
@@ -579,6 +692,32 @@ const DailyReportProjects: React.FC = () => {
           </main>
         </SidebarInset>
       </div>
+      {/* Rename Confirmation Dialog */}
+      <AlertDialog open={renameConfirmOpen} onOpenChange={setRenameConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Rename Project
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to rename "{renameData?.oldName}" to "{renameData?.newName}"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setRenameConfirmOpen(false);
+              setRenameData(null);
+              setEditingProject(null);
+              setEditProjectName("");
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRename}>
+              Confirm Rename
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 };

@@ -599,7 +599,7 @@ const Dashboard = () => {
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
                                         <AlertDialogAction 
                                           onClick={(e) => handleDeleteReport(report._id, e)}
                                           className="bg-red-600 hover:bg-red-700"

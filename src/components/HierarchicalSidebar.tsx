@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -47,6 +47,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import { getRecentReports, getCompanyProjects } from "@/integrations/reportsApi";
+import { projectEvents } from '@/utils/eventEmitter';
 
 interface HierarchicalSidebarProps {
   className?: string;
@@ -70,31 +71,31 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editProjectName, setEditProjectName] = useState("");
 
+  const loadProjects = async () => {
+    try {
+      const response = await getCompanyProjects(); // ← Gets ALL company projects
+      const projects = response as string[] || [];
+      const uniqueProjects = Array.from(new Set(projects));
+      setDbProjects(uniqueProjects);
+    } catch (error) {
+      console.error("Failed to load company projects:", error);
+      // Fallback to personal projects if company projects fail
+      try {
+        const fallbackResponse = await getRecentReports(100);
+        const reports = fallbackResponse.data as any[] || [];
+        const reportProjects = reports
+          .map((report: any) => report.projectName)
+          .filter((name: unknown): name is string => Boolean(name) && typeof name === 'string');
+        const uniqueProjects = Array.from(new Set(reportProjects));
+        setDbProjects(uniqueProjects);
+      } catch (fallbackError) {
+        console.error("Failed to load fallback projects:", fallbackError);
+      }
+    }
+  };
+
   // Load projects from existing reports
   useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        const response = await getCompanyProjects(); // ← Gets ALL company projects
-        const projects = response as string[] || [];
-        const uniqueProjects = Array.from(new Set(projects));
-        setDbProjects(uniqueProjects);
-      } catch (error) {
-        console.error("Failed to load company projects:", error);
-        // Fallback to personal projects if company projects fail
-        try {
-          const fallbackResponse = await getRecentReports(100);
-          const reports = fallbackResponse.data as any[] || [];
-          const reportProjects = reports
-            .map((report: any) => report.projectName)
-            .filter((name: unknown): name is string => Boolean(name) && typeof name === 'string');
-          const uniqueProjects = Array.from(new Set(reportProjects));
-          setDbProjects(uniqueProjects);
-        } catch (fallbackError) {
-          console.error("Failed to load fallback projects:", fallbackError);
-        }
-      }
-    };
-    
     loadProjects();
   }, []);
 
@@ -106,6 +107,44 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     const allProjects = Array.from(new Set([...dbProjects, ...parsedLocalProjects]));
     setProjects(allProjects);
   }, [dbProjects]);
+
+  // Wrap event handlers with useCallback
+  const handleProjectDeleted = useCallback(({ projectName }: { projectName: string }) => {
+    setProjects(currentProjects => currentProjects.filter(p => p !== projectName));
+    
+    toast({
+      title: "Project Synced",
+      description: `${projectName} removed from projects page.`,
+    });
+  }, []);
+  const handleProjectAdded = useCallback(({ projectName }: { projectName: string }) => {
+    loadProjects();
+    
+    toast({
+      title: "Project Synced", 
+      description: `${projectName} added from projects page.`,
+    });
+  }, [loadProjects]);
+  const handleProjectUpdated = useCallback(({ oldName, newName }: { oldName: string, newName: string }) => {
+    setProjects(currentProjects => currentProjects.map(p => p === oldName ? newName : p));
+    
+    toast({
+      title: "Project Synced",
+      description: `Project renamed from ${oldName} to ${newName}.`,
+    });
+  }, []);
+  useEffect(() => {
+    // Subscribe to events
+    projectEvents.on('projectDeleted', handleProjectDeleted);
+    projectEvents.on('projectAdded', handleProjectAdded);
+    projectEvents.on('projectUpdated', handleProjectUpdated);
+    // Cleanup on unmount
+    return () => {
+      projectEvents.off('projectDeleted', handleProjectDeleted);
+      projectEvents.off('projectAdded', handleProjectAdded);
+      projectEvents.off('projectUpdated', handleProjectUpdated);
+    };
+  }, [handleProjectDeleted, handleProjectAdded, handleProjectUpdated]);
 
   const handleAddProject = () => {
     if (newProjectName.trim() && !projects.includes(newProjectName.trim())) {
@@ -126,9 +165,12 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
         title: "Project Added",
         description: `${newProject} has been added to your project list.`,
       });
+
+      // ADD THIS LINE - Emit event to other components
+      projectEvents.emit('projectAdded', { projectName: newProject });
       
       // Navigate to daily report with the new project
-      navigate(`/daily-report?project=${encodeURIComponent(newProject)}`);
+      navigate(`/dashboard?project=${encodeURIComponent(newProject)}&tab=company`);
     }
   };
 
@@ -147,6 +189,12 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
       const parsedLocalProjects = JSON.parse(localProjects);
       const updatedLocalProjects = parsedLocalProjects.map((p: string) => p === editingProject ? editProjectName.trim() : p);
       sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
+      
+      // ADD THIS LINE - Emit event to other components
+      projectEvents.emit('projectUpdated', { 
+        oldName: editingProject, 
+        newName: editProjectName.trim() 
+      });
       
       toast({
         title: "Project Updated",
@@ -171,11 +219,17 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     const parsedLocalProjects = JSON.parse(localProjects);
     const updatedLocalProjects = parsedLocalProjects.filter((p: string) => p !== projectName);
     sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
+
+    // ADD THIS LINE - Emit event to other components
+    projectEvents.emit('projectDeleted', { projectName });
     
     toast({
       title: "Project Deleted",
       description: `${projectName} has been removed from your project list.`,
     });
+
+    // Navigate to projects page
+    navigate('/daily-report-projects');
   };
 
   const handleDuplicateProject = (projectName: string) => {
@@ -278,10 +332,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-5 w-5 p-0 hover:bg-sidebar-accent"
+                            className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShowAddProject(!showAddProject);
+                              if (!dailyReportOpen) {
+                                setDailyReportOpen(true); // Auto-expand if collapsed
+                              }
+                              setShowAddProject(true);   // Always show input
                             }}
                           >
                             <Plus className="h-3 w-3" />
@@ -350,14 +407,6 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                     variant="ghost"
                                     size="sm"
                                     className="h-5 w-5 p-0"
-                                    onClick={handleSaveEdit}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0"
                                     onClick={handleCancelEdit}
                                   >
                                     ×
@@ -385,7 +434,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                     <DropdownMenuContent align="end" className="w-32">
                                       <DropdownMenuItem onClick={() => handleEditProject(project)}>
                                         <Edit className="h-3 w-3 mr-2" />
-                                        Edit
+                                        Rename
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => handleDuplicateProject(project)}>
                                         <Copy className="h-3 w-3 mr-2" />
