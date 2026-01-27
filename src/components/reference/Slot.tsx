@@ -69,11 +69,8 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
         <input id={`slot-file-${slot.id}`} ref={logic.fileInputRef} type="file" accept="image/*" multiple onChange={(e) => logic.handleImageChange(e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label={`Upload image ${slotIndex + 1}`} />
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <Input id={`caption-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="flex-1 text-center" aria-label={`Caption for image ${slotIndex + 1}`} />
-        <button type="button" onClick={() => onDeleteSlot(slot.id)} className="inline-flex items-center p-2 rounded-md text-sm text-red-500 hover:bg-red-50" aria-label={`Delete slot ${slotIndex + 1}`}>
-          <Trash2 className="w-4 h-4" />
-        </button>
+      <div className="mt-3">
+        <Input id={`caption-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full text-center" aria-label={`Caption for image ${slotIndex + 1}`} />
       </div>
     </div>
   );
