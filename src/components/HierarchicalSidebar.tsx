@@ -47,7 +47,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import { getRecentReports, getCompanyProjects } from "@/integrations/reportsApi";
+import { getProjects, createProject, updateProject, deleteProject, Project } from "@/integrations/projectsApi"; // ← ADD THIS
 import { projectEvents } from '@/utils/eventEmitter';
+import { apiFetch, apiGet } from '@/lib/apiFetch';
 
 interface HierarchicalSidebarProps {
   className?: string;
@@ -62,55 +64,74 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   const [reportSectionOpen, setReportSectionOpen] = useState(true);
   const [dailyReportOpen, setDailyReportOpen] = useState(true);
   const [weeklyReportOpen, setWeeklyReportOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   // State for project list
-  const [projects, setProjects] = useState<string[]>([]);
-  const [dbProjects, setDbProjects] = useState<string[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newProjectName, setNewProjectName] = useState("");
   const [showAddProject, setShowAddProject] = useState(false);
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editProjectName, setEditProjectName] = useState("");
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
-      const response = await getCompanyProjects(); // ← Gets ALL company projects
-      const projects = response as string[] || [];
-      const uniqueProjects = Array.from(new Set(projects));
-      setDbProjects(uniqueProjects);
-    } catch (error) {
-      console.error("Failed to load company projects:", error);
-      // Fallback to personal projects if company projects fail
-      try {
-        const fallbackResponse = await getRecentReports(100);
-        const reports = fallbackResponse.data as any[] || [];
-        const reportProjects = reports
-          .map((report: any) => report.projectName)
-          .filter((name: unknown): name is string => Boolean(name) && typeof name === 'string');
-        const uniqueProjects = Array.from(new Set(reportProjects));
-        setDbProjects(uniqueProjects);
-      } catch (fallbackError) {
-        console.error("Failed to load fallback projects:", fallbackError);
+      setIsLoading(true);
+      
+      // Fetch projects from API
+      const response = await getProjects();
+      
+      if (response.success) {
+        const projectList = (response.data as Project[]);
+        setProjects(projectList);
+      } else {
+        console.error("Failed to load projects:", response.error);
       }
+    } catch (error) {
+      console.error("Failed to load projects:", error);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Get current user info on mount
+  useEffect(() => {
+    const getUserInfo = async () => {
+      try {
+        const response = await apiGet('/api/auth/profile');
+        const data = await response.json();  // ← ADD THIS LINE
+
+        console.log("DEBUG: Full user response:", data);  // ← ADD THIS
+
+        if (data.success && data.user?._id) {
+          console.log("DEBUG: Setting currentUserId to:", data.user._id);
+          setCurrentUserId(data.user._id);  // ← Use _id instead of userId
+        }
+      } catch (error) {
+        console.error('Failed to get user info:', error);
+      }
+    };
+    
+    getUserInfo();
+  }, []);
 
   // Load projects from existing reports
   useEffect(() => {
     loadProjects();
-  }, []);
+  }, [loadProjects]); // Change from [] to [loadProjects]
 
-  // Merge database projects with any locally added projects
-  useEffect(() => {
-    // Load any locally added projects from sessionStorage
-    const localProjects = sessionStorage.getItem('localProjects');
-    const parsedLocalProjects = localProjects ? JSON.parse(localProjects) : [];
-    const allProjects = Array.from(new Set([...dbProjects, ...parsedLocalProjects]));
-    setProjects(allProjects);
-  }, [dbProjects]);
+  // // Merge database projects with any locally added projects
+  // useEffect(() => {
+  //   // Load any locally added projects from sessionStorage
+  //   const localProjects = sessionStorage.getItem('localProjects');
+  //   const parsedLocalProjects = localProjects ? JSON.parse(localProjects) : [];
+  //   const allProjects = Array.from(new Set([...dbProjects, ...parsedLocalProjects]));
+  //   setProjects(allProjects);
+  // }, [dbProjects]);
 
   // Wrap event handlers with useCallback
   const handleProjectDeleted = useCallback(({ projectName }: { projectName: string }) => {
-    setProjects(currentProjects => currentProjects.filter(p => p !== projectName));
+    setProjects(currentProjects => currentProjects.filter(p => p.name !== projectName));
     
     toast({
       title: "Project Synced",
@@ -126,7 +147,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     });
   }, [loadProjects]);
   const handleProjectUpdated = useCallback(({ oldName, newName }: { oldName: string, newName: string }) => {
-    setProjects(currentProjects => currentProjects.map(p => p === oldName ? newName : p));
+    setProjects(currentProjects => currentProjects.map(p => p.name === oldName ? { ...p, name: newName } : p));
     
     toast({
       title: "Project Synced",
@@ -146,31 +167,47 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     };
   }, [handleProjectDeleted, handleProjectAdded, handleProjectUpdated]);
 
-  const handleAddProject = () => {
-    if (newProjectName.trim() && !projects.includes(newProjectName.trim())) {
-      const newProject = newProjectName.trim();
-      const updatedProjects = [...projects, newProject];
-      setProjects(updatedProjects);
-      
-      // Save to sessionStorage to persist across page refreshes
-      const localProjects = sessionStorage.getItem('localProjects') || '[]';
-      const parsedLocalProjects = JSON.parse(localProjects);
-      const updatedLocalProjects = [...parsedLocalProjects, newProject];
-      sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
-      
-      setNewProjectName("");
-      setShowAddProject(false);
-      
-      toast({
-        title: "Project Added",
-        description: `${newProject} has been added to your project list.`,
-      });
+  const handleAddProject = async () => {
+    if (newProjectName.trim()) {
+      try {
+        const response = await createProject(newProjectName.trim());
+        
+        if (response.success) {
+          // Refresh projects list
+          await loadProjects();
+          
+          setNewProjectName("");
+          setShowAddProject(false);
+          
+          toast({
+            title: "Project Added",
+            description: `${newProjectName.trim()} has been added to your project list.`,
+          });
 
-      // ADD THIS LINE - Emit event to other components
-      projectEvents.emit('projectAdded', { projectName: newProject });
-      
-      // Navigate to daily report with the new project
-      navigate(`/dashboard?project=${encodeURIComponent(newProject)}&tab=company`);
+          // Emit event to other components
+          projectEvents.emit('projectAdded', { 
+            projectName: (response.data as Project).name,
+            createdBy: (response.data as Project).createdBy,
+            createdByName: (response.data as Project).createdByName
+          });
+          
+          // Navigate to daily report with the new project
+          navigate(`/dashboard?project=${encodeURIComponent(newProjectName.trim())}&tab=company`);
+        } else {
+          toast({
+            title: "Error",
+            description: response.error || "Failed to create project",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Error creating project:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create project",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -179,27 +216,51 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     setEditProjectName(projectName);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editProjectName.trim() && editProjectName.trim() !== editingProject) {
-      const updatedProjects = projects.map(p => p === editingProject ? editProjectName.trim() : p);
-      setProjects(updatedProjects);
-      
-      // Update sessionStorage
-      const localProjects = sessionStorage.getItem('localProjects') || '[]';
-      const parsedLocalProjects = JSON.parse(localProjects);
-      const updatedLocalProjects = parsedLocalProjects.map((p: string) => p === editingProject ? editProjectName.trim() : p);
-      sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
-      
-      // ADD THIS LINE - Emit event to other components
-      projectEvents.emit('projectUpdated', { 
-        oldName: editingProject, 
-        newName: editProjectName.trim() 
-      });
-      
-      toast({
-        title: "Project Updated",
-        description: `Project renamed to "${editProjectName.trim()}".`,
-      });
+      try {
+        // Find the project to get its ID
+        const project = projects.find(p => p.name === editingProject);
+        if (!project) {
+          toast({
+            title: "Error",
+            description: "Project not found",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const response = await updateProject(project._id, editProjectName.trim());
+        
+        if (response.success) {
+          // Refresh projects list
+          await loadProjects();
+          
+          // Emit event to other components
+          projectEvents.emit('projectUpdated', { 
+            oldName: editingProject, 
+            newName: editProjectName.trim() 
+          });
+          
+          toast({
+            title: "Project Updated",
+            description: `Project renamed to "${editProjectName.trim()}".`,
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: response.error || "Failed to update project",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Error updating project:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update project",
+          variant: "destructive",
+        });
+      }
     }
     setEditingProject(null);
     setEditProjectName("");
@@ -210,51 +271,49 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     setEditProjectName("");
   };
 
-  const handleDeleteProject = (projectName: string) => {
-    const updatedProjects = projects.filter(p => p !== projectName);
-    setProjects(updatedProjects);
-    
-    // Update sessionStorage
-    const localProjects = sessionStorage.getItem('localProjects') || '[]';
-    const parsedLocalProjects = JSON.parse(localProjects);
-    const updatedLocalProjects = parsedLocalProjects.filter((p: string) => p !== projectName);
-    sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
+  const handleDeleteProject = async (projectName: string) => {
+    try {
+      const project = projects.find(p => p.name === projectName);
+      if (!project) return;
 
-    // ADD THIS LINE - Emit event to other components
-    projectEvents.emit('projectDeleted', { projectName });
-    
-    toast({
-      title: "Project Deleted",
-      description: `${projectName} has been removed from your project list.`,
-    });
-
-    // Navigate to projects page
-    navigate('/daily-report-projects');
+      const response = await deleteProject(project._id);
+      
+      if (response.success) {
+        await loadProjects();
+        projectEvents.emit('projectDeleted', { projectName });
+        
+        toast({
+          title: "Project Deleted",
+          description: `${projectName} has been removed.`,
+        });
+        
+        navigate('/daily-report-projects');
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete project", variant: "destructive" });
+    }
   };
 
-  const handleDuplicateProject = (projectName: string) => {
+  const handleDuplicateProject = async (projectName: string) => {
     const duplicateName = `${projectName} Copy`;
     let finalName = duplicateName;
     let counter = 1;
     
-    while (projects.includes(finalName)) {
+    // Find unique name
+    while (projects.some(p => p.name === finalName)) {
       finalName = `${duplicateName} ${counter}`;
       counter++;
     }
     
-    const updatedProjects = [...projects, finalName];
-    setProjects(updatedProjects);
-    
-    // Save to sessionStorage
-    const localProjects = sessionStorage.getItem('localProjects') || '[]';
-    const parsedLocalProjects = JSON.parse(localProjects);
-    const updatedLocalProjects = [...parsedLocalProjects, finalName];
-    sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
-    
-    toast({
-      title: "Project Duplicated",
-      description: `${finalName} has been created.`,
-    });
+    try {
+      const response = await createProject(finalName);
+      if (response.success) {
+        await loadProjects();
+        toast({ title: "Project Duplicated", description: `${finalName} created.` });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to duplicate project", variant: "destructive" });
+    }
   };
 
   const handleProjectClick = (projectName: string, reportType: 'daily' | 'weekly') => {
@@ -386,9 +445,9 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                         
                         {/* Project List */}
                         {projects.map((project) => (
-                          <SidebarMenuSubItem key={project}>
+                          <SidebarMenuSubItem key={project._id}>
                             <div className="flex items-center justify-between w-full px-2 py-1 group">
-                              {editingProject === project ? (
+                              {editingProject === project.name ? (
                                 <div className="flex items-center gap-1 flex-1">
                                   <Input
                                     value={editProjectName}
@@ -415,41 +474,45 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                               ) : (
                                 <>
                                   <SidebarMenuSubButton
-                                    onClick={() => handleProjectClick(project, 'daily')}
-                                    isActive={isActive('/daily-report') && new URLSearchParams(location.search).get('project') === project}
-                                    className="flex-1 text-xs"
+                                    onClick={() => handleProjectClick(project.name, 'daily')}
+                                    isActive={isActive('/daily-report') && new URLSearchParams(location.search).get('project') === project.name}
+                                    className="flex-1 text-xs cursor-pointer"
                                   >
-                                    {project}
+                                    {project.name}
                                   </SidebarMenuSubButton>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      >
-                                        <MoreVertical className="h-3 w-3" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-32">
-                                      <DropdownMenuItem onClick={() => handleEditProject(project)}>
-                                        <Edit className="h-3 w-3 mr-2" />
-                                        Rename
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => handleDuplicateProject(project)}>
-                                        <Copy className="h-3 w-3 mr-2" />
-                                        Duplicate
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem 
-                                        onClick={() => handleDeleteProject(project)}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                      >
-                                        <Trash2 className="h-3 w-3 mr-2" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  {/* DEBUG: Add this logging */}
+                                  {console.log(`DEBUG: Project ${project.name} - createdBy: ${project.createdBy}, currentUserId: ${currentUserId}, match: ${project.createdBy === currentUserId}`)}
+                                    {project.createdBy === currentUserId && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          >
+                                            <MoreVertical className="h-3 w-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-32">
+                                          <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
+                                            <Edit className="h-3 w-3 mr-2" />
+                                            Rename
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
+                                            <Copy className="h-3 w-3 mr-2" />
+                                            Duplicate
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem 
+                                            onClick={() => handleDeleteProject(project.name)}
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          >
+                                            <Trash2 className="h-3 w-3 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
                                 </>
                               )}
                             </div>
@@ -488,10 +551,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                         {projects.map((project) => (
                           <SidebarMenuSubItem key={`weekly-${project}`}>
                             <SidebarMenuSubButton
-                              onClick={() => handleProjectClick(project, 'weekly')}
+                              onClick={() => handleProjectClick(project.name, 'weekly')}
                               className="text-muted-foreground"
                             >
-                              <span className="text-xs">{project}</span>
+                              <span className="text-xs">{project.name}</span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}

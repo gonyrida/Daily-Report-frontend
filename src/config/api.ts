@@ -69,4 +69,11 @@ export const API_ENDPOINTS = {
     SUBMIT: `${API_BASE_URL}/daily-reports/submit`,
     GET_BY_DATE: (date: string) => `${API_BASE_URL}/daily-reports/date/${date}`,
   },
+  PROJECTS: {
+    BASE: `${API_BASE_URL}/projects`,
+    CREATE: `${API_BASE_URL}/projects`,
+    GET_ALL: `${API_BASE_URL}/projects`,
+    UPDATE: (id: string) => `${API_BASE_URL}/projects/${id}`,
+    DELETE: (id: string) => `${API_BASE_URL}/projects/${id}`,
+  },
 };

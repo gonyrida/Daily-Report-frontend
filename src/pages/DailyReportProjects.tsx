@@ -47,15 +47,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { projectEvents } from '@/utils/eventEmitter';
+import { getProjects, createProject, updateProject, deleteProject, Project } from "@/integrations/projectsApi";
+import { apiGet } from '@/lib/apiFetch';
 
-interface Project {
-  name: string;
-  reportCount: number;
-  lastReportDate?: string;
-  lastReportId?: string;
-  createdBy?: string;        // User ID who created project
-  createdByName?: string;   // User's name for display
-}
+// interface Project {
+//   name: string;
+//   reportCount: number;
+//   lastReportDate?: string;
+//   lastReportId?: string;
+//   createdBy?: string;        // User ID who created project
+//   createdByName?: string;   // User's name for display
+// }
 
 const DailyReportProjects: React.FC = () => {
   const navigate = useNavigate();
@@ -73,80 +75,33 @@ const DailyReportProjects: React.FC = () => {
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [renameConfirmOpen, setRenameConfirmOpen] = useState(false);
   const [renameData, setRenameData] = useState<{ oldName: string; newName: string } | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
-      // Load projects from database reports
-      const response = await getCompanyReports();
-      const reports = response.reports as any[] || [];
+      setIsLoading(true);
       
-      // First pass: Group all reports by project name
-      const projectReportsMap = new Map<string, any[]>();
-
-      reports.forEach((report: any) => {
-        const projectName = report.projectName;
-        if (!projectName) return;
+      // Fetch projects from API
+      const response = await getProjects();
+      
+      if (response.success) {
+        // Transform API data to match component needs
+        const transformedProjects = (response.data as Project[]).map((project: Project) => ({
+          ...project,
+          // Add lastReportId for compatibility (will be populated by reports later)
+          lastReportId: undefined,
+        }));
         
-        if (!projectReportsMap.has(projectName)) {
-          projectReportsMap.set(projectName, []);
-        }
-        
-        projectReportsMap.get(projectName)!.push(report);
-      });
-
-      // Second pass: Create project objects with correct creator
-      const projectMap = new Map<string, Project>();
-
-      projectReportsMap.forEach((projectReports, projectName) => {
-        // Find the earliest report (true creator)
-        const sortedReports = projectReports.sort((a, b) => {
-          const dateA = new Date(a.createdAt || a.reportDate || 0);
-          const dateB = new Date(b.createdAt || b.reportDate || 0);
-          return dateA.getTime() - dateB.getTime(); // Ascending order (earliest first)
+        setProjects(transformedProjects);
+        setFilteredProjects(transformedProjects);
+      } else {
+        console.error("Failed to load projects:", response.error);
+        toast({
+          title: "Error",
+          description: response.error || "Failed to load projects",
+          variant: "destructive",
         });
-        
-        const earliestReport = sortedReports[0];
-        const userId = earliestReport.userId?._id || earliestReport.userId;
-        const userName = earliestReport.userId?.firstName && earliestReport.userId?.lastName 
-          ? `${earliestReport.userId.firstName} ${earliestReport.userId.lastName}` 
-          : 'Unknown';
-        
-        // Find the most recent report for "Last Report" info
-        const mostRecentReport = projectReports.sort((a, b) => {
-          const dateA = new Date(a.createdAt || a.reportDate || 0);
-          const dateB = new Date(b.createdAt || b.reportDate || 0);
-          return dateB.getTime() - dateA.getTime(); // Descending order (most recent first)
-        })[0];
-        
-        projectMap.set(projectName, {
-          name: projectName,
-          reportCount: projectReports.length,
-          lastReportDate: mostRecentReport.reportDate,
-          lastReportId: mostRecentReport._id,
-          createdBy: userId,        // ← TRUE creator (earliest report)
-          createdByName: userName,   // ← TRUE creator name
-        });
-      });
-
-      // Load locally added projects from sessionStorage
-      const localProjects = sessionStorage.getItem('localProjects');
-      const parsedLocalProjects = localProjects ? JSON.parse(localProjects) : [];
-      
-      // Add local projects that don't exist in database
-      parsedLocalProjects.forEach((projectName: string) => {
-        if (!projectMap.has(projectName)) {
-          projectMap.set(projectName, {
-            name: projectName,
-            reportCount: 0,
-            lastReportDate: undefined,
-            lastReportId: undefined,
-          });
-        }
-      });
-      
-      const projectList = Array.from(projectMap.values());
-      setProjects(projectList);
-      setFilteredProjects(projectList);
+      }
     } catch (error) {
       console.error("Failed to load projects:", error);
       toast({
@@ -157,11 +112,30 @@ const DailyReportProjects: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Get current user info on mount
+  useEffect(() => {
+    const getUserInfo = async () => {
+      try {
+        const response = await apiGet('/api/auth/profile');
+        const data = await response.json();
+        
+        if (data.success && data.user?._id) {
+          console.log("DEBUG: Setting currentUserId to:", data.user._id);
+          setCurrentUserId(data.user._id);  // ← Use _id instead of userId
+        }
+      } catch (error) {
+        console.error('Failed to get user info:', error);
+      }
+    };
+    
+    getUserInfo();
+  }, []);
 
   useEffect(() => {
     loadProjects();
-  }, [toast]);
+  }, [loadProjects]); // Changed from [toast] to [loadProjects]
 
   // Filter projects based on search query
   useEffect(() => {
@@ -234,25 +208,46 @@ const DailyReportProjects: React.FC = () => {
     return null;
   };
 
-  const handleAddProject = () => {
-    if (newProjectName.trim() && !projects.find(p => p.name === newProjectName.trim())) {
-      const newProject = newProjectName.trim();
-      
-      // Save to sessionStorage to persist across page refreshes (like the original sidebar)
-      const localProjects = sessionStorage.getItem('localProjects') || '[]';
-      const parsedLocalProjects = JSON.parse(localProjects);
-      const updatedLocalProjects = [...parsedLocalProjects, newProject];
-      sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
-      
-      // Navigate to daily report with the new project
-      navigate(`/dashboard?project=${encodeURIComponent(newProject)}&tab=company`);
-      setNewProjectName("");
-      setShowAddProject(false);
-      
-      toast({
-        title: "Project Created",
-        description: `${newProject} has been created.`,
-      });
+  const handleAddProject = async () => {
+    if (newProjectName.trim()) {
+      try {
+        const response = await createProject(newProjectName.trim());
+        
+        if (response.success) {
+          // Refresh projects list
+          await loadProjects();
+          
+          // Navigate to daily report with the new project
+          navigate(`/dashboard?project=${encodeURIComponent(newProjectName.trim())}&tab=company`);
+          setNewProjectName("");
+          setShowAddProject(false);
+          
+          toast({
+            title: "Project Created",
+            description: `${newProjectName.trim()} has been created.`,
+          });
+          
+          // Emit event to sidebar
+          projectEvents.emit('projectAdded', { 
+            name: (response.data as Project).name,
+            createdBy: (response.data as Project).createdBy,
+            createdByName: (response.data as Project).createdByName
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: response.error || "Failed to create project",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Error creating project:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create project",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -280,32 +275,55 @@ const DailyReportProjects: React.FC = () => {
     }
   };
 
-  const confirmRename = () => {
+  const confirmRename = async () => {
     if (renameData) {
-      // Update sessionStorage
-      const localProjects = sessionStorage.getItem('localProjects') || '[]';
-      const parsedLocalProjects = JSON.parse(localProjects);
-      const updatedLocalProjects = parsedLocalProjects.map((p: string) => 
-        p === renameData.oldName ? renameData.newName : p
-      );
-      sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
-      
-      // Emit event to sidebar
-      projectEvents.emit('projectUpdated', { 
-        oldName: renameData.oldName, 
-        newName: renameData.newName 
-      });
-      
-      toast({
-        title: "Project Updated",
-        description: `Project renamed to "${renameData.newName}".`,
-      });
+      try {
+        // Find the project to get its ID
+        const project = projects.find(p => p.name === renameData.oldName);
+        if (!project) {
+          toast({
+            title: "Error",
+            description: "Project not found",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const response = await updateProject(project._id, renameData.newName);
+        
+        if (response.success) {
+          // Refresh projects list
+          await loadProjects();
+          
+          // Emit event to sidebar
+          projectEvents.emit('projectUpdated', { 
+            oldName: renameData.oldName, 
+            newName: renameData.newName 
+          });
+          
+          toast({
+            title: "Project Updated",
+            description: `Project renamed to "${renameData.newName}".`,
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: response.error || "Failed to update project",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Error updating project:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update project",
+          variant: "destructive",
+        });
+      }
     }
     
     setRenameConfirmOpen(false);
     setRenameData(null);
-    setEditingProject(null);
-    setEditProjectName("");
   };
 
   const handleCancelEdit = () => {
@@ -313,25 +331,47 @@ const DailyReportProjects: React.FC = () => {
     setEditProjectName("");
   };
 
-  const handleDeleteProject = (projectName: string) => {
-    // Update sessionStorage
-    const localProjects = sessionStorage.getItem('localProjects') || '[]';
-    const parsedLocalProjects = JSON.parse(localProjects);
-    const updatedLocalProjects = parsedLocalProjects.filter((p: string) => p !== projectName);
-    sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
-    
-    // Update React state to refresh UI immediately
-    const updatedProjects = projects.filter(p => p.name !== projectName);
-    setProjects(updatedProjects);
-    setFilteredProjects(updatedProjects);
-    
-    // ADD THIS LINE - Emit event to sidebar
-    projectEvents.emit('projectDeleted', { projectName });
-    
-    toast({
-      title: "Project Deleted",
-      description: `${projectName} has been deleted.`,
-    });
+  const handleDeleteProject = async (projectName: string) => {
+    try {
+      // Find the project to get its ID
+      const project = projects.find(p => p.name === projectName);
+      if (!project) {
+        toast({
+          title: "Error",
+          description: "Project not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await deleteProject(project._id);
+      
+      if (response.success) {
+        // Refresh projects list
+        await loadProjects();
+        
+        // Emit event to sidebar
+        projectEvents.emit('projectDeleted', { projectName });
+        
+        toast({
+          title: "Project Deleted",
+          description: `${projectName} has been deleted.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to delete project",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDuplicateProject = (projectName: string) => {
@@ -426,6 +466,13 @@ const DailyReportProjects: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {filteredProjects.length > 0 && (
+                <Button onClick={() => setShowAddProject(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Project
+                </Button>
+              )}
 
               {/* Add Project Input */}
               {showAddProject && (
@@ -541,13 +588,7 @@ const DailyReportProjects: React.FC = () => {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-32">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditProject(project.name);
-                                  }}>
-                                    <Edit className="h-3 w-3 mr-2" />
-                                    Rename
-                                  </DropdownMenuItem>
+                                  {/* Show Duplicate to everyone */}
                                   <DropdownMenuItem onClick={(e) => {
                                     e.stopPropagation();
                                     handleDuplicateProject(project.name);
@@ -555,50 +596,67 @@ const DailyReportProjects: React.FC = () => {
                                     <Copy className="h-3 w-3 mr-2" />
                                     Duplicate
                                   </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setProjectToDelete(project.name);
-                                        }}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        onSelect={(e) => {
-                                          e.preventDefault();
-                                          setDeleteConfirmOpen(true);
-                                        }}
-                                      >
-                                        <Trash2 className="h-3 w-3 mr-2" />
-                                        Delete
+                                  
+                                  {/* Only show Edit/Delete to project creator */}
+                                  {project.createdBy === currentUserId && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditProject(project.name);
+                                      }}>
+                                        <Edit className="h-3 w-3 mr-2" />
+                                        Rename
                                       </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>
-                                          Are you sure you want to delete this project?
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          This action will permanently delete "{project.name}" from your project list. This cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
-                                          Cancel
-                                        </AlertDialogCancel>
-                                        <AlertDialogAction 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteProject(project.name);
-                                            setDeleteConfirmOpen(false);
-                                          }}
-                                          className="bg-red-600 hover:bg-red-700"
-                                        >
-                                          Delete Project
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                      <DropdownMenuSeparator />
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <DropdownMenuItem 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setProjectToDelete(project.name);
+                                            }}
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            onSelect={(e) => {
+                                              e.preventDefault();
+                                              setDeleteConfirmOpen(true);
+                                            }}
+                                          >
+                                            <Trash2 className="h-3 w-3 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>
+                                              Are you sure you want to delete this project?
+                                            </AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              This action will permanently delete "{project.name}" from your project list. This cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDeleteConfirmOpen(false);
+                                            }}>
+                                              Cancel
+                                            </AlertDialogCancel>
+                                            <AlertDialogAction 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteProject(project.name);
+                                                setDeleteConfirmOpen(false);
+                                              }}
+                                              className="bg-red-600 hover:bg-red-700"
+                                            >
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             )}
