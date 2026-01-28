@@ -232,6 +232,8 @@ const Dashboard = () => {
       const userReports = await getRecentReports(50);
       setReports(userReports.data || []);
       setFilteredReports(userReports.data || []);
+      // Always refresh company reports to keep counts in sync
+      await fetchCompanyReports();
     } catch (error) {
       console.error("Delete error:", error);
       toast({
@@ -242,17 +244,43 @@ const Dashboard = () => {
     }
   };
 
+  // 🚀 NEW: Get weekly total reports
   const getWeeklyTotal = () => {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    return reports.filter(report => 
-      new Date(report.reportDate) >= oneWeekAgo &&
-      report.status === "submitted"
-    ).length;
+    
+    const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
+    
+    return reportsToCheck.filter(report => {
+      const matchesProject = !projectFilter || report.projectName === projectFilter;
+      return matchesProject &&
+            new Date(report.reportDate) >= oneWeekAgo &&
+            report.status === "submitted";
+    }).length;
   };
 
+  // 🚀 NEW: Get today's report status
+  const getTodayReportStatus = () => {
+    const today = new Date().toDateString();
+    const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
+      
+    const todayReport = reportsToCheck.find(report => {
+      const matchesProject = !projectFilter || report.projectName === projectFilter;
+      return matchesProject && new Date(report.reportDate).toDateString() === today;
+    });
+      
+    return todayReport?.status || null;
+  };
+
+  // 🚀 NEW: Get last submitted report
   const getLastSubmitted = () => {
-    const submittedReports = reports.filter(report => report.status === "submitted");
+    const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
+    
+    const submittedReports = reportsToCheck.filter(report => {
+      const matchesProject = !projectFilter || report.projectName === projectFilter;
+      return matchesProject && report.status === "submitted";
+    });
+    
     if (submittedReports.length === 0) return null;
     return submittedReports.reduce((latest, report) => 
       new Date(report.submittedAt || report.updatedAt) > new Date(latest.submittedAt || latest.updatedAt) ? report : latest
@@ -350,13 +378,15 @@ const Dashboard = () => {
               </p>
             </div>
 
-            {/* Create New Report Button - Always Visible */}
-            <div className="mb-6">
-              <Button onClick={handleCreateReport}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Report
-              </Button>
-            </div>
+            {/* Create New Report Button - Hide when no reports */}
+            {(activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length) > 0 && (
+              <div className="mb-6">
+                <Button onClick={handleCreateReport}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Report
+                </Button>
+              </div>
+            )}
 
             {/* Breadcrumb Navigation */}
             {projectFilter && (
@@ -389,7 +419,7 @@ const Dashboard = () => {
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">Status:</span>
-                        {getStatusBadge("not-started")}
+                        {getStatusBadge(getTodayReportStatus() || "not-started")}
                       </div>
                     </div>
                   </div>
@@ -477,7 +507,7 @@ const Dashboard = () => {
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
-                    Recent Documents ({filteredReports.length})
+                    Recent Documents ({activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length})
                   </div>
                   {/* Filter Buttons - Only show in Personal tab */}
                   {activeTab === 'personal' && (

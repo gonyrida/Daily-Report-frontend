@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ProfileIcon from "@/components/ProfileIcon";
 import { getAllUserReports } from "@/integrations/reportsApi";
+import { getProjects } from "@/integrations/projectsApi"; // 🚀 ADD THIS
 
 interface ReportType {
   name: string;
@@ -36,20 +37,44 @@ const ReportDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
+  // 🚨 DEBUG: Confirm ReportDashboard is mounting
+  console.log('🚨 REPORT DASHBOARD: Component mounting!');
+
   const [reportTypes, setReportTypes] = useState<ReportType[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+
+    // 🚨 DEBUG: Confirm useEffect is running
+    console.log('🚨 REPORT DASHBOARD: useEffect running!');
+    
     const fetchReportData = async () => {
+      console.log('🚨 REPORT DASHBOARD: Starting fetchReportData!');
       try {
         setLoading(true);
         const response = await getAllUserReports();
-        const allReports = response.data || [];
+        const allReports = Array.isArray(response) ? response : response.data || [];
+
+        // 🚨 DEBUG: Check what we got
+        console.log('🚨 REPORT DASHBOARD: Raw allReports:', allReports);
+        console.log('🚨 REPORT DASHBOARD: allReports.length:', allReports.length);
         
         // Group reports by type (currently only daily reports exist)
         const dailyReports = allReports.filter((report: any) => 
           report.reportDate // Daily reports have reportDate
         );
+
+        // 🚨 DEBUG: Check daily reports
+        console.log('🚨 REPORT DASHBOARD: dailyReports:', dailyReports);
+        console.log('🚨 REPORT DASHBOARD: dailyReports.length:', dailyReports.length);
+
+        // 🚀 NEW: Fetch all projects (including empty ones)
+        const projectsResponse = await getProjects();
+        const allProjects = Array.isArray(projectsResponse.data) ? projectsResponse.data : [projectsResponse.data].filter(Boolean);
+        const projectCount = allProjects.length;
+        // 🚨 DEBUG: Check projects
+        console.log('🚨 REPORT DASHBOARD: All projects:', allProjects);
+        console.log('🚨 REPORT DASHBOARD: Project count:', projectCount);
         
         const weeklyReports = allReports.filter((report: any) => 
           report.weekNumber // Weekly reports would have weekNumber
@@ -63,9 +88,9 @@ const ReportDashboard: React.FC = () => {
           {
             name: "Daily Report",
             icon: <Calendar className="h-6 w-6" />,
-            description: "Create and manage daily project reports",
-            path: "/daily-report",
-            count: dailyReports.length,
+            description: "Create and manage daily report projects",
+            path: "/daily-report-projects", // ← Change this!
+            count: projectCount, // ← Use project count instead of dailyReports.length
             lastReportDate: dailyReports.length > 0 
               ? Math.max(...dailyReports.map((r: any) => new Date(r.reportDate).getTime()))
                 ? new Date(Math.max(...dailyReports.map((r: any) => new Date(r.reportDate).getTime()))).toISOString()
@@ -108,7 +133,7 @@ const ReportDashboard: React.FC = () => {
     };
 
     fetchReportData();
-  }, [toast]);
+  }, []);
 
   const handleReportTypeClick = (path: string) => {
     navigate(path);
@@ -199,21 +224,21 @@ const ReportDashboard: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground flex items-center gap-2">
                             <FolderOpen className="h-4 w-4" />
-                            Total Reports
+                            Total Projects
                           </span>
                           <Badge variant="secondary" className="font-semibold">
                             {reportType.count}
                           </Badge>
                         </div>
                         
-                        {reportType.lastReportDate && (
+                        {/* {reportType.lastReportDate && (
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground">Last Report</span>
                             <span className="text-sm font-medium">
                               {formatDate(reportType.lastReportDate)}
                             </span>
                           </div>
-                        )}
+                        )} */}
                         
                         <div className="pt-2">
                           <Button 

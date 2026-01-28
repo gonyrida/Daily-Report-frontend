@@ -758,7 +758,7 @@ const DailyReportProjects: React.FC = () => {
               Rename Project
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to rename "{renameData?.oldName}" to "{renameData?.newName}"?
+              Are you sure you want to rename "{renameData?.oldName}" to "{renameData?.newName}"? This action <strong>will rename all reports</strong> inside to match the new project name.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
