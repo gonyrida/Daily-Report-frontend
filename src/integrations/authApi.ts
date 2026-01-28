@@ -44,7 +44,7 @@ export const loginUser = async (email: string, password: string) => {
       throw new Error(error.message || "Login failed");
     }
     
-    const result = await response.json();
+    const result = await response.json(); 
     console.log("DEBUG FRONTEND: Login success:", result);
     return result;
   } catch (error) {
