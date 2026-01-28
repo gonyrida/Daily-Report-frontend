@@ -65,7 +65,7 @@ export const API_ENDPOINTS = {
   },
   DAILY_REPORTS: {
     BASE: `${API_BASE_URL}/daily-reports`,
-    SAVE: `${API_BASE_URL}/daily-reports/save`,
+    SAVE: `${API_BASE_URL}/daily-reports/upsert`,
     SUBMIT: `${API_BASE_URL}/daily-reports/submit`,
     GET_BY_DATE: (date: string) => `${API_BASE_URL}/daily-reports/date/${date}`,
   },

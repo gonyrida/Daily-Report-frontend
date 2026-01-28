@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-type Theme = 'dark' | 'light';
+type Theme = 'dark' | 'light' | 'system';
 
 interface ThemeContextType {
   theme: Theme;
+  effectiveTheme: 'dark' | 'light';
   toggleTheme: () => void;
   setTheme: (theme: Theme) => void;
 }
@@ -26,23 +27,48 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     // Check localStorage first
     const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored) {
+    if (stored && ['light', 'dark', 'system'].includes(stored)) {
       return stored;
     }
     
     // Fall back to system preference
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
+    return 'system';
+  });
+
+  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>(() => {
+    const stored = localStorage.getItem('theme') as Theme | null;
+    if (stored === 'system' || !stored) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    
-    return 'light';
+    return stored === 'dark' ? 'dark' : 'light';
   });
 
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
-    root.classList.add(theme);
+    root.classList.add(effectiveTheme);
     localStorage.setItem('theme', theme);
+  }, [theme, effectiveTheme]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const handleChange = () => {
+      if (theme === 'system') {
+        setEffectiveTheme(mediaQuery.matches ? 'dark' : 'light');
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme]);
+
+  useEffect(() => {
+    if (theme === 'system') {
+      setEffectiveTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    } else {
+      setEffectiveTheme(theme);
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -55,6 +81,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   const value = {
     theme,
+    effectiveTheme,
     toggleTheme,
     setTheme,
   };

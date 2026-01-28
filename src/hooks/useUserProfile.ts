@@ -19,7 +19,7 @@ interface ProfileState {
 
 interface ProfileActions {
   fetchProfile: () => Promise<void>;
-  updateProfile: (data: { fullName?: string; profilePicture?: string }) => Promise<void>;
+  updateProfile: (data: { fullName?: string; email?: string; profilePicture?: string }) => Promise<void>;
   uploadPicture: (file: File) => Promise<void>;
   startEditing: () => void;
   cancelEditing: () => void;
@@ -85,7 +85,7 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     }
   }, [toast]);
 
-  const updateProfile = useCallback(async (data: { fullName?: string; profilePicture?: string }) => {
+  const updateProfile = useCallback(async (data: { fullName?: string; email?: string; profilePicture?: string }) => {
     setIsSaving(true);
     setError(null);
     
@@ -169,6 +169,7 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     if (profile) {
       setTempProfile({
         fullName: profile.fullName,
+        email: profile.email,
         profilePicture: profile.profilePicture, // Store relative path
       });
       setIsEditing(true);
@@ -185,7 +186,7 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
   const saveChanges = useCallback(async () => {
     if (!profile) return;
     
-    const changes: { fullName?: string; profilePicture?: string } = {};
+    const changes: { fullName?: string; email?: string; profilePicture?: string } = {};
     
     console.log('DEBUG HOOK: Current profile:', profile);
     console.log('DEBUG HOOK: Temp profile:', tempProfile);
@@ -193,6 +194,11 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     if (tempProfile.fullName !== undefined && tempProfile.fullName !== profile.fullName) {
       changes.fullName = tempProfile.fullName;
       console.log('DEBUG HOOK: Adding fullName to changes:', changes.fullName);
+    }
+    
+    if (tempProfile.email !== undefined && tempProfile.email !== profile.email) {
+      changes.email = tempProfile.email;
+      console.log('DEBUG HOOK: Adding email to changes:', changes.email);
     }
     
     // Use the stored path for database, not the constructed URL

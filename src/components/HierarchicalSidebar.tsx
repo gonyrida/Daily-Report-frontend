@@ -43,6 +43,7 @@ import {
   Edit,
   Trash2,
   Copy,
+  Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
@@ -688,9 +689,17 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
           </SidebarGroup>
         </SidebarContent>
 
-        {/* Logout Section */}
+        {/* Settings & Logout Section */}
         <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link to="/settings">
+                  <Settings />
+                  <span>Settings</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <LogoutButton />
             </SidebarMenuItem>

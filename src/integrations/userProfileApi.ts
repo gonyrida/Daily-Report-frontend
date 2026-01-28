@@ -17,6 +17,7 @@ export interface UserProfile {
 
 export interface UpdateProfileData {
   fullName?: string;
+  email?: string;
   profilePicture?: string;
 }
 

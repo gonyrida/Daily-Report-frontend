@@ -9,8 +9,9 @@ import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
 import CARSection from "@/components/CARSection";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
+import { processHSEForDB, processSiteActivitiesForDB } from "@/utils/hseDataUtils";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
-import { createDefaultHSESections } from "@/utils/referenceHelpers";
+import { createDefaultHSESections, createDefaultSiteActivitiesSections } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import DailyReportProjectsView from "@/components/DailyReportProjectsView";
 import { Button } from "@/components/ui/button";
@@ -124,11 +125,14 @@ interface ReportData {
   activityToday: string;
   workPlanNextDay: string;
   managementTeam: ResourceRow[];
-  workingTeam: ResourceRow[];
-  interiorTeam: ResourceRow[];
-  mepTeam: ResourceRow[];
+  workingTeamInterior: ResourceRow[];
+  workingTeamMEP: ResourceRow[];
   materials: ResourceRow[];
   machinery: ResourceRow[];
+  // Backward compatibility for data loading
+  workingTeam?: ResourceRow[];
+  interiorTeam?: ResourceRow[];
+  mepTeam?: ResourceRow[];
   // Optional merged-reference data (kept optional so export logic isn't changed yet)
   referenceSections?: Section[];
   tableTitle?: string;
@@ -313,9 +317,30 @@ const DailyReport = () => {
   const [activityToday, setActivityToday] = useState("");
   const [workPlanNextDay, setWorkPlanNextDay] = useState("");
 
+  // Helper function to clean resource rows
+  const cleanResourceRows = (rows: ResourceRow[]) => {
+    return rows
+      .filter(
+        (r) =>
+          // Keep row if it has description OR any numeric values
+          (r.description && r.description.trim() !== "") ||
+          (r.prev && r.prev > 0) ||
+          (r.today && r.today > 0) ||
+          (r.accumulated && r.accumulated > 0)
+      )
+      .map((r) => ({
+        id: r.id,
+        description: r.description?.trim() || "",
+        unit: r.unit || "",
+        prev: r.prev || 0,
+        today: r.today || 0,
+        accumulated: r.accumulated || 0,
+      }));
+  };
+
   // Resources
   const [managementTeam, setManagementTeam] = useState<ResourceRow[]>([]);
-  const [workingTeam, setWorkingTeam] = useState<ResourceRow[]>([]);
+  const [workingTeamInterior, setWorkingTeam] = useState<ResourceRow[]>([]);
   const [interiorTeam, setInteriorTeam] = useState<ResourceRow[]>([]);
   const [mepTeam, setMepTeam] = useState<ResourceRow[]>([]);
   const [materials, setMaterials] = useState<ResourceRow[]>([]);
@@ -327,7 +352,7 @@ const DailyReport = () => {
   const [isExportingReference, setIsExportingReference] = useState(false);
 
   // Site Activities Photos state
-  const [siteActivitiesSections, setSiteActivitiesSections] = useState<Section[]>(createDefaultHSESections());
+  const [siteActivitiesSections, setSiteActivitiesSections] = useState<Section[]>(createDefaultSiteActivitiesSections());
   const [siteActivitiesTitle, setSiteActivitiesTitle] = useState("Site Activities Photos");
   const [isExportingSiteActivities, setIsExportingSiteActivities] = useState(false);
 
@@ -381,19 +406,19 @@ const DailyReport = () => {
   };
 
   // Helper to split working team into interior and MEP teams
-  const splitWorkingTeam = (workingTeam: ResourceRow[]): { interior: ResourceRow[]; mep: ResourceRow[] } => {
+  const splitWorkingTeam = (workingTeamInterior: ResourceRow[]): { interior: ResourceRow[]; mep: ResourceRow[] } => {
     const interiorOptions = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
     const mepOptions = ["MEP Engineer", "MEP Workers"];
-    
-    const interior = workingTeam.filter(row => 
-      interiorOptions.includes(row.description) || 
+
+    const interior = workingTeamInterior.filter(row =>
+      interiorOptions.includes(row.description) ||
       (!mepOptions.includes(row.description) && row.description !== "")
     );
-    
-    const mep = workingTeam.filter(row => 
+
+    const mep = workingTeamInterior.filter(row =>
       mepOptions.includes(row.description)
     );
-    
+
     return { interior, mep };
   };
 
@@ -409,9 +434,8 @@ const DailyReport = () => {
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
-      interiorTeam,
-      mepTeam,
+      workingTeamInterior: interiorTeam,
+      workingTeamMEP: mepTeam,
       materials,
       machinery,
       // Keep reference sections in the object for future export mapping (no export logic changed yet)
@@ -432,7 +456,7 @@ const DailyReport = () => {
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
+      workingTeamInterior,
       interiorTeam,
       mepTeam,
       materials,
@@ -446,10 +470,70 @@ const DailyReport = () => {
     ]
   );
 
-  // Simple date change notification
   const handleDateChange = (newDate: Date | null) => {
     setReportDate(newDate);
-    // Just set the date - no automatic loading/saving
+
+    // 🔥 FIX: Clear prev and accumulated when date changes
+    // This ensures backend recalculates rolling totals from scratch
+
+    console.log("📅 Date changed - clearing rolling totals for new date");
+
+    // Clear managementTeam rolling totals
+    setManagementTeam((prev) =>
+      prev.map(item => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+        // Keep description, unit, and today value
+      }))
+    );
+
+    // Clear workingTeam rolling totals (used for workingTeamInterior)
+    setWorkingTeam((prev) =>
+      prev.map(item => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear interiorTeam rolling totals
+    setInteriorTeam((prev) =>
+      prev.map(item => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear mepTeam rolling totals
+    setMepTeam((prev) =>
+      prev.map(item => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear materials rolling totals
+    setMaterials((prev) =>
+      prev.map(item => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear machinery rolling totals
+    setMachinery((prev) =>
+      prev.map(item => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    console.log("✅ Rolling totals cleared - backend will recalculate on save");
   };
 
   // Helper function to get current user ID from JWT token
@@ -666,8 +750,23 @@ const DailyReport = () => {
             setMachinery(ensureRowIds(dbReport.machinery || []));
             setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
             setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
-            setSiteActivitiesSections(dbReport.siteActivitiesSections && dbReport.siteActivitiesSections.length > 0 ? dbReport.siteActivitiesSections : createDefaultHSESections());
-            setSiteActivitiesTitle(dbReport.siteActivitiesTitle || "Site Activities Photos");
+            // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+            if (dbReport.site_ref && dbReport.site_ref.length > 0) {
+              // Convert DB format back to frontend format
+              const convertedSiteActivities = dbReport.site_ref.map((section: any) => ({
+                title: section.section_title || "",
+                entries: [{
+                  slots: section.images.map((image: string, index: number) => ({
+                    image: image,
+                    caption: section.footers[index] || ""
+                  }))
+                }]
+              }));
+              setSiteActivitiesSections(convertedSiteActivities);
+            } else {
+              setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+            }
+            setSiteActivitiesTitle(dbReport.site_title || "Site Activities Photos");
             setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
             setProjectLogo(dbReport.projectLogo || "");
           }
@@ -702,23 +801,46 @@ const DailyReport = () => {
                 setActivityToday(projectRecentReport.activityToday || "");
                 setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(ensureRowIds(projectRecentReport.managementTeam || []));
-                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
-                
+                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeamInterior || []));
+            
                 // Handle interior and MEP team migration
-                if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam) {
+                if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam > 0) {
+                  // New format: use separate workingTeamMEP from database
+                  setMepTeam(ensureRowIds(projectRecentReport.workingTeamMEP));
+                  // Also set interiorTeam from workingTeamInterior if available
+                  setInteriorTeam(ensureRowIds(projectRecentReport.workingTeamInterior || []));
+                } else if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam) {
+                  // Legacy format: use separate teams
                   setInteriorTeam(ensureRowIds(projectRecentReport.interiorTeam));
                   setMepTeam(ensureRowIds(projectRecentReport.mepTeam));
                 } else {
-                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
+                  // Old format: split working team
+                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeamInterior || []));
                   setInteriorTeam(interior);
                   setMepTeam(mep);
                 }
-                
+            
                 setMaterials(ensureRowIds(projectRecentReport.materials || []));
                 setMachinery(ensureRowIds(projectRecentReport.machinery || []));
-                setReferenceSections(projectRecentReport.referenceSections || []);
-                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections || []);
-                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "");
+                setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
+
+                // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+                if (projectRecentReport.site_ref && projectRecentReport.site_ref.length > 0) {
+                  // Convert DB format back to frontend format
+                  const convertedSiteActivities = projectRecentReport.site_ref.map((section: any) => ({
+                    title: section.section_title || "",
+                    entries: [{
+                      slots: section.images.map((image: string, index: number) => ({
+                        image: image,
+                        caption: section.footers[index] || ""
+                      }))
+                    }]
+                  }));
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+                }
+                setSiteActivitiesTitle(projectRecentReport.site_title || "Site Activities Photos");
                 setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
                 setProjectLogo(projectRecentReport.projectLogo || null);
                 
@@ -859,7 +981,7 @@ const DailyReport = () => {
                 setMachinery(ensureRowIds(projectRecentReport.machinery || []));
                 setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
                 setSiteActivitiesSections(projectRecentReport.siteActivitiesSections && projectRecentReport.siteActivitiesSections.length > 0 ? projectRecentReport.siteActivitiesSections : createDefaultHSESections());
-                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "Site Activities Photos");
+                setSiteActivitiesTitle(projectRecentReport.site_title || "Site Activities Photos");
                 setCarSheet(projectRecentReport.carSheet || { description: "", photo_groups: [] });
                 setProjectLogo(projectRecentReport.projectLogo || "");
                 
@@ -903,8 +1025,8 @@ const DailyReport = () => {
               setReportId("");
               validateAndSetProjectContext(localDraft.projectName || "", projectFromUrl, setProjectName);
               setReportDate(localDraft.reportDate ? new Date(localDraft.reportDate) : new Date());
-              
-              // Handle backward compatibility: convert old format to new
+
+              // Handle backward compatibility
               if (localDraft.weatherAM !== undefined) {
                 setWeatherAM(localDraft.weatherAM || "");
                 setWeatherPM(localDraft.weatherPM || "");
@@ -912,7 +1034,6 @@ const DailyReport = () => {
                 setTempPM(localDraft.tempPM || "");
                 setCurrentPeriod(localDraft.currentPeriod || "AM");
               } else {
-                // Old format: migrate to new format
                 const oldWeather = localDraft.weather || "Sunny";
                 const oldPeriod = localDraft.weatherPeriod || "AM";
                 const oldTemp = localDraft.temperature || "";
@@ -932,25 +1053,46 @@ const DailyReport = () => {
               setActivityToday(localDraft.activityToday || "");
               setWorkPlanNextDay(localDraft.workPlanNextDay || "");
               setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-              setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
-              
-              // Handle interior and MEP team migration
-              if (localDraft.interiorTeam && localDraft.mepTeam) {
-                // New format: use separate teams
+              setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
+          
+              // Handle interior and MEP teams for fallback localStorage
+              if (localDraft.workingTeamMEP && localDraft.workingTeamMEP.length > 0) {
+                // New format: use separate workingTeamMEP from database
+                setMepTeam(ensureRowIds(localDraft.workingTeamMEP));
+                // Also set interiorTeam from workingTeamInterior if available
+                setInteriorTeam(ensureRowIds(localDraft.workingTeamInterior || []));
+              } else if (localDraft.interiorTeam && localDraft.mepTeam) {
+                // Legacy format: use separate teams
                 setInteriorTeam(ensureRowIds(localDraft.interiorTeam));
                 setMepTeam(ensureRowIds(localDraft.mepTeam));
               } else {
                 // Old format: split working team
-                const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+                const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
                 setInteriorTeam(interior);
                 setMepTeam(mep);
               }
-              
+          
               setMaterials(ensureRowIds(localDraft.materials || []));
               setMachinery(ensureRowIds(localDraft.machinery || []));
               setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
               setTableTitle(localDraft.tableTitle || "HSE Toolbox Meeting");
-              setSiteActivitiesSections(localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0 ? localDraft.siteActivitiesSections : createDefaultHSESections());
+
+              // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+              if (localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0) {
+                // Convert DB format back to frontend format
+                const convertedSiteActivities = localDraft.siteActivitiesSections.map((section: any) => ({
+                  title: section.section_title || "",
+                  entries: [{
+                    slots: section.images.map((image: string, index: number) => ({
+                      image: image,
+                      caption: section.footers[index] || ""
+                    }))
+                  }]
+                }));
+                setSiteActivitiesSections(convertedSiteActivities);
+              } else {
+                setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+              }
               setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
               setCarSheet(localDraft.carSheet || { description: "", photo_groups: [] });
               setProjectLogo(localDraft.projectLogo || "");
@@ -1027,7 +1169,7 @@ const DailyReport = () => {
   //         setActivityToday(dbReport.activityToday || "");
   //         setWorkPlanNextDay(dbReport.workPlanNextDay || "");
   //         setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //         setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //         setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
   //         setMaterials(ensureRowIds(dbReport.materials || []));
   //         setMachinery(ensureRowIds(dbReport.machinery || []));
   //       } else {
@@ -1067,7 +1209,7 @@ const DailyReport = () => {
   //           setActivityToday(localDraft.activityToday || "");
   //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(localDraft.materials || []));
   //           setMachinery(ensureRowIds(localDraft.machinery || []));
   //         }
@@ -1108,7 +1250,7 @@ const DailyReport = () => {
   //         setActivityToday(localDraft.activityToday || "");
   //         setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //         setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //         setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //         setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //         setMaterials(ensureRowIds(localDraft.materials || []));
   //         setMachinery(ensureRowIds(localDraft.machinery || []));
   //       }
@@ -1164,7 +1306,7 @@ const DailyReport = () => {
   //           setActivityToday(dbReport.activityToday || "");
   //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(dbReport.materials || []));
   //           setMachinery(ensureRowIds(dbReport.machinery || []));
   //         } else {
@@ -1201,7 +1343,7 @@ const DailyReport = () => {
   //             setActivityToday(localDraft.activityToday || "");
   //             setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //             setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //             setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //             setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //             setMaterials(ensureRowIds(localDraft.materials || []));
   //             setMachinery(ensureRowIds(localDraft.machinery || []));
   //           } else {
@@ -1222,7 +1364,7 @@ const DailyReport = () => {
   //               setManagementTeam(
   //                 mapPrevFromAccum(prevData.managementTeam || [])
   //               );
-  //               setWorkingTeam(mapPrevFromAccum(prevData.workingTeam || []));
+  //               setWorkingTeam(mapPrevFromAccum(prevData.workingTeamInterior || []));
   //               setMaterials(mapPrevFromAccum(prevData.materials || []));
   //               setMachinery(mapPrevFromAccum(prevData.machinery || []));
 
@@ -1289,7 +1431,7 @@ const DailyReport = () => {
   //           setActivityToday(dbReport.activityToday || "");
   //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(dbReport.materials || []));
   //           setMachinery(ensureRowIds(dbReport.machinery || []));
   //           setReferenceSections(dbReport.referenceSections || []);
@@ -1330,7 +1472,7 @@ const DailyReport = () => {
   //           setActivityToday(localDraft.activityToday || "");
   //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
   //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(localDraft.workingTeam || []));
+  //           setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
   //           setMaterials(ensureRowIds(localDraft.materials || []));
   //           setMachinery(ensureRowIds(localDraft.machinery || []));
   //           return;
@@ -1442,7 +1584,7 @@ const DailyReport = () => {
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
+      workingTeamInterior,
       materials,
       machinery,
     };
@@ -1459,7 +1601,7 @@ const DailyReport = () => {
     activityToday,
     workPlanNextDay,
     managementTeam,
-    workingTeam,
+    workingTeamInterior,
     materials,
     machinery,
     // triggerAutoSave,
@@ -1508,7 +1650,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -1542,7 +1685,8 @@ const DailyReport = () => {
           activityToday,
           workPlanNextDay,
           managementTeam,
-          workingTeam,
+          workingTeamInterior: interiorTeam,
+          workingTeamMEP: mepTeam,
           materials,
           machinery,
         },
@@ -1573,7 +1717,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -1594,9 +1739,8 @@ const DailyReport = () => {
     if (!validateReport()) return;
 
     // Generate default filename
-    const defaultFileName = `${projectName || "Report"}_${
-      reportDate?.toISOString().split("T")[0] || "export"
-    }`;
+    const defaultFileName = `${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
+      }`;
 
     // Show file name dialog
     setPendingExportType("excel");
@@ -1617,7 +1761,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       };
@@ -1644,9 +1789,8 @@ const DailyReport = () => {
 
   const handleExportReference = async () => {
     // Generate default filename
-    const defaultFileName = `reference_${
-      reportDate?.toISOString().split("T")[0] || "export"
-    }`;
+    const defaultFileName = `reference_${reportDate?.toISOString().split("T")[0] || "export"
+      }`;
 
     // Show file name dialog
     setPendingExportType("reference");
@@ -1807,14 +1951,23 @@ const DailyReport = () => {
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
-      const cleanedData = {
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
+      };
+
+      const cleanedData = {
+        ...basicCleanedData,
         referenceSections: processedSections,
         carSheet: {
           ...carSheet,
@@ -1822,8 +1975,11 @@ const DailyReport = () => {
         },
         projectLogo: processedLogo,
       };
+
       // Save to database
-      await saveReportToDB(cleanedData);
+      console.log("🔍 HSE DEBUG: Saving HSE sections:", basicCleanedData.hse?.length || 0);
+      console.log("🔍 HSE DEBUG: HSE title:", basicCleanedData.hse_title);
+      await saveReportToDB(basicCleanedData); // Save basic data without large images
 
       toast({
         title: "Report Saved",
@@ -1893,9 +2049,8 @@ const DailyReport = () => {
     if (!validateReport()) return;
 
     // Generate default filename
-    const defaultFileName = `combined-${projectName || "Report"}_${
-      reportDate?.toISOString().split("T")[0] || "export"
-    }`;
+    const defaultFileName = `combined-${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
+      }`;
 
     // Show file name dialog
     setPendingExportType("combined");
@@ -1965,6 +2120,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -1984,14 +2140,23 @@ const DailyReport = () => {
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
-      const cleanedData = {
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
+      };
+
+      const cleanedData = {
+        ...basicCleanedData,
         referenceSections: processedSections,
         carSheet: {
           ...carSheet,
@@ -2001,16 +2166,16 @@ const DailyReport = () => {
       };
 
       console.log(
-        "🔍 FRONTEND: About to save data with referenceSections:",
-        cleanedData.referenceSections
-          ? "YES (" + cleanedData.referenceSections.length + " sections)"
+        "🔍 FRONTEND: About to save data with HSE sections:",
+        basicCleanedData.hse
+          ? "YES (" + basicCleanedData.hse.length + " sections)"
           : "NO"
       );
 
       // Save to database
       try {
         console.log("🔍 FRONTEND: About to save to DB");
-        await saveReportToDB(cleanedData);
+        await saveReportToDB(basicCleanedData); // Save basic data without large images
         console.log("🔍 FRONTEND: Save completed successfully");
       } catch (error) {
         console.error("🔍 FRONTEND: Save failed:", error);
@@ -2033,17 +2198,27 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
         description: carSheet.description || "",
         photo_groups: processedCar,
       };
 
+      console.log("Combined Excel Payload:", {
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
+        interiorLength: interiorTeam?.length || 0,
+        mepLength: mepTeam?.length || 0
+      });
+
       await generateCombinedExcel(
         reportPayload,
         processedSections,
         tableTitle,
+        processedSiteActivities,
+        siteActivitiesTitle,
         fileName,
         processedLogo
       );
@@ -2068,12 +2243,10 @@ const DailyReport = () => {
   const handleExportCombinedPDF = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${
-      projectName?.replace(/\s+/g, "_") || "Report"
-    }_${
-      reportDate?.toISOString().split("T")[0] ||
+    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"
+      }_${reportDate?.toISOString().split("T")[0] ||
       new Date().toISOString().split("T")[0]
-    }`;
+      }`;
 
     setPendingExportType("combined-pdf");
     setDefaultFileName(defaultFileName);
@@ -2138,6 +2311,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -2157,23 +2331,23 @@ const DailyReport = () => {
 
       const processedLogo = await toBase64DataUrl(projectLogo);
 
-      const cleanedData = {
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
-        referenceSections: processedSections,
-        carSheet: {
-          ...carSheet,
-          photo_groups: processedCar,
-        },
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
       };
 
       // Save to database
-      await saveReportToDB(cleanedData);
+      await saveReportToDB(basicCleanedData);
 
       await generateCombinedPDF(
         {
@@ -2186,7 +2360,8 @@ const DailyReport = () => {
           activityToday,
           workPlanNextDay,
           managementTeam,
-          workingTeam,
+          workingTeamInterior: interiorTeam,
+          workingTeamMEP: mepTeam,
           materials,
           machinery,
           description: carSheet.description || "",
@@ -2194,6 +2369,8 @@ const DailyReport = () => {
         },
         processedSections,
         tableTitle,
+        processedSiteActivities,
+        siteActivitiesTitle,
         fileName,
         processedLogo
       );
@@ -2275,6 +2452,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -2307,28 +2485,42 @@ const DailyReport = () => {
           activityToday,
           workPlanNextDay,
           managementTeam,
-          workingTeam,
+          workingTeamInterior: interiorTeam,
+          workingTeamMEP: mepTeam,
           materials,
           machinery,
-          table_title: tableTitle,
-          reference: processedSections.flatMap((section: any) =>
+          hse_title: tableTitle,
+          hse: processedSections.flatMap((section: any) =>
             (section.entries ?? []).map((entry: any) => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
                 images: slots
                   .map((s: any) => s.image)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
                 footers: slots
                   .map((s: any) => s.caption)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
               };
             })
           ),
           description: carSheet.description || "",
           photo_groups: processedCar,
+          site_title: siteActivitiesTitle,
+          site_ref: processedSiteActivities.flatMap((section: any) =>
+            (section.entries ?? []).map((entry: any) => {
+              const slots = entry.slots ?? [];
+              return {
+                section_title: section.title || "",
+                images: slots
+                  .map((s: any) => s.image)
+                  .filter(Boolean),
+                footers: slots
+                  .map((s: any) => s.caption)
+                  .filter(Boolean),
+              };
+            })
+          ),
           logos: {
             cacpm: null,
             koica: processedLogo,
@@ -2363,12 +2555,10 @@ const DailyReport = () => {
   const handleExportCombinedZIP = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${
-      projectName?.replace(/\s+/g, "_") || "Report"
-    }_${
-      reportDate?.toISOString().split("T")[0] ||
+    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"
+      }_${reportDate?.toISOString().split("T")[0] ||
       new Date().toISOString().split("T")[0]
-    }`;
+      }`;
 
     setPendingExportType("combined-zip");
     setDefaultFileName(defaultFileName);
@@ -2380,18 +2570,24 @@ const DailyReport = () => {
     try {
       // Step 1: Save report to database first (same logic as combined Excel)
       const rawData = getReportData();
-      const cleanedData = {
+
+      // Save basic data to database (without large image data)
+      const basicCleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Process HSE data for database storage (with image processing)
+        ...(await processHSEForDB(referenceSections, tableTitle)),
+        // Process site activities data for database storage (with image processing)
+        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        description: carSheet.description || "",
       };
 
       // Save to database
-      await saveReportToDB(cleanedData);
+      await saveReportToDB(basicCleanedData);
       // Process images for both exports
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
@@ -2445,6 +2641,7 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
+      const processedSiteActivities = await processImages(siteActivitiesSections);
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -2475,7 +2672,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
         description: carSheet.description || "",
@@ -2489,8 +2687,25 @@ const DailyReport = () => {
           mode: "combined",
           data: {
             ...reportPayload,
-            table_title: tableTitle,
-            reference: processedSections.flatMap((section: any) =>
+            hse_title: tableTitle,
+            hse: processedSections.flatMap((section: any) =>
+              (section.entries ?? []).map((entry: any) => {
+                const slots = entry.slots ?? [];
+                return {
+                  section_title: section.title || "",
+                  images: slots
+                    .map((s: any) => s.image)
+                    .filter(Boolean)
+                    .slice(0, 2),
+                  footers: slots
+                    .map((s: any) => s.caption)
+                    .filter(Boolean)
+                    .slice(0, 2),
+                };
+              })
+            ),
+            site_title: siteActivitiesTitle,
+            site_ref: processedSiteActivities.flatMap((section: any) =>
               (section.entries ?? []).map((entry: any) => {
                 const slots = entry.slots ?? [];
                 return {
@@ -2519,20 +2734,33 @@ const DailyReport = () => {
         `${PYTHON_API_BASE_URL}/generate-combined`,
         {
           ...reportPayload,
-          table_title: tableTitle,
-          reference: processedSections.flatMap((section: any) =>
+          hse_title: tableTitle,
+          hse: processedSections.flatMap((section: any) =>
             (section.entries ?? []).map((entry: any) => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
                 images: slots
                   .map((s: any) => s.image)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
                 footers: slots
                   .map((s: any) => s.caption)
-                  .filter(Boolean)
-                  .slice(0, 2),
+                  .filter(Boolean),
+              };
+            })
+          ),
+          site_title: siteActivitiesTitle,
+          site_ref: processedSiteActivities.flatMap((section: any) =>
+            (section.entries ?? []).map((entry: any) => {
+              const slots = entry.slots ?? [];
+              return {
+                section_title: section.title || "",
+                images: slots
+                  .map((s: any) => s.image)
+                  .filter(Boolean),
+                footers: slots
+                  .map((s: any) => s.caption)
+                  .filter(Boolean),
               };
             })
           ),
@@ -2600,7 +2828,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -2634,7 +2863,8 @@ const DailyReport = () => {
         activityToday,
         workPlanNextDay,
         managementTeam,
-        workingTeam,
+        workingTeamInterior: interiorTeam,
+        workingTeamMEP: mepTeam,
         materials,
         machinery,
       });
@@ -2676,26 +2906,6 @@ const DailyReport = () => {
     });
   };
 
-  const cleanResourceRows = (rows: ResourceRow[]) => {
-    return rows
-      .filter(
-        (r) =>
-          // Keep row if it has description OR any numeric values
-          (r.description && r.description.trim() !== "") ||
-          (r.prev && r.prev > 0) ||
-          (r.today && r.today > 0) ||
-          (r.accumulated && r.accumulated > 0)
-      )
-      .map((r) => ({
-        id: r.id,
-        description: r.description?.trim() || "",
-        unit: r.unit || "",
-        prev: r.prev || 0,
-        today: r.today || 0,
-        accumulated: r.accumulated || 0,
-      }));
-  };
-
   const handleSubmit = async () => {
     if (!validateReport()) return;
 
@@ -2706,9 +2916,8 @@ const DailyReport = () => {
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
       };
@@ -2744,19 +2953,13 @@ const DailyReport = () => {
           today: 0,
           accumulated: r.accumulated,
         })),
-        workingTeam: cleanedData.workingTeam.map((r) => ({
+        workingTeamInterior: cleanedData.workingTeamInterior.map((r) => ({
           ...r,
           prev: r.accumulated,
           today: 0,
           accumulated: r.accumulated,
         })),
-        interiorTeam: cleanedData.interiorTeam.map((r) => ({
-          ...r,
-          prev: r.accumulated,
-          today: 0,
-          accumulated: r.accumulated,
-        })),
-        mepTeam: cleanedData.mepTeam.map((r) => ({
+        workingTeamMEP: cleanedData.workingTeamMEP.map((r) => ({
           ...r,
           prev: r.accumulated,
           today: 0,
@@ -2834,7 +3037,7 @@ const DailyReport = () => {
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <HierarchicalSidebar />
-        
+
         <SidebarInset>
           <div className="min-h-screen bg-background">
             <ReportHeader
@@ -2885,352 +3088,344 @@ const DailyReport = () => {
                   </Button>
                 </div>
 
-                {/* Section Filter Tabs */}
-                <div className="flex items-center gap-2 overflow-x-auto">
-            <Button
-              variant={activeTab === "site-activities" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveTab("site-activities")}
-              className="rounded-full whitespace-nowrap"
-            >
-              Site Activities
-            </Button>
-            <Button
-              variant={activeTab === "hse" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveTab("hse")}
-              className="rounded-full whitespace-nowrap"
-            >
-              HSE
-            </Button>
-            <Button
-              variant={
-                activeTab === "site-activities-photos" ? "default" : "outline"
-              }
-              size="sm"
-              onClick={() => setActiveTab("site-activities-photos")}
-              className="rounded-full whitespace-nowrap"
-            >
-              Site Activities Photos
-            </Button>
-            <Button
-              variant={activeTab === "car" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveTab("car")}
-              className="rounded-full whitespace-nowrap"
-            >
-              CAR
-            </Button>
+                    {/* Section Filter Tabs */}
+                    <div className="flex items-center gap-2 overflow-x-auto">
+                      <Button
+                        variant={activeTab === "site-activities" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveTab("site-activities")}
+                        className="rounded-full whitespace-nowrap"
+                      >
+                        Report
+                      </Button>
+                      <Button
+                        variant={activeTab === "hse" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveTab("hse")}
+                        className="rounded-full whitespace-nowrap"
+                      >
+                        HSE
+                      </Button>
+                      <Button
+                        variant={
+                          activeTab === "site-activities-photos" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => setActiveTab("site-activities-photos")}
+                        className="rounded-full whitespace-nowrap"
+                      >
+                        Site Activities Photos
+                      </Button>
+                      <Button
+                        variant={activeTab === "car" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveTab("car")}
+                        className="rounded-full whitespace-nowrap"
+                      >
+                        CAR
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center">
+                      <ThemeToggle />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center">
-                  <ThemeToggle />
-                </div>
-              </div>
-            </div>
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+                  {/* Tab-based content rendering */}
+                  {activeTab === "site-activities" && (
+                    <>
+                      <ProjectInfo
+                        projectName={projectName}
+                        setProjectName={setProjectName}
+                        reportDate={reportDate}
+                        setReportDate={setReportDate}
+                        weatherAM={weatherAM}
+                        setWeatherAM={setWeatherAM}
+                        weatherPM={weatherPM}
+                        setWeatherPM={setWeatherPM}
+                        tempAM={tempAM}
+                        setTempAM={setTempAM}
+                        tempPM={tempPM}
+                        setTempPM={setTempPM}
+                        currentPeriod={currentPeriod}
+                        setCurrentPeriod={setCurrentPeriod}
+                      />
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Tab-based content rendering */}
-            {activeTab === "site-activities" && (
-              <>
-                <ProjectInfo
-              projectName={projectName}
-              setProjectName={setProjectName}
-              reportDate={reportDate}
-              setReportDate={setReportDate}
-              weatherAM={weatherAM}
-              setWeatherAM={setWeatherAM}
-              weatherPM={weatherPM}
-              setWeatherPM={setWeatherPM}
-              tempAM={tempAM}
-              setTempAM={setTempAM}
-              tempPM={tempPM}
-              setTempPM={setTempPM}
-              currentPeriod={currentPeriod}
-              setCurrentPeriod={setCurrentPeriod}
-            />
+                      {/* Report section label for clarity */}
+                      {/* <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        <div className="w-1 h-5 bg-accent rounded-full" />
+                        Report
+                      </h2> */}
 
-            {/* Report section label for clarity */}
-            <div className="mb-2 mt-2">
-              <h2 className="text-sm font-semibold text-foreground/80">Report</h2>
-            </div>
+                      <ActivitySection
+                        activityToday={activityToday}
+                        setActivityToday={setActivityToday}
+                        workPlanNextDay={workPlanNextDay}
+                        setWorkPlanNextDay={setWorkPlanNextDay}
+                      />
 
-            <ActivitySection
-              activityToday={activityToday}
-              setActivityToday={setActivityToday}
-              workPlanNextDay={workPlanNextDay}
-              setWorkPlanNextDay={setWorkPlanNextDay}
-            />
+                      <ResourcesSection
+                        managementTeam={managementTeam}
+                        setManagementTeam={setManagementTeam}
+                        interiorTeam={interiorTeam}
+                        setInteriorTeam={setInteriorTeam}
+                        mepTeam={mepTeam}
+                        setMepTeam={setMepTeam}
+                        materials={materials}
+                        setMaterials={setMaterials}
+                        machinery={machinery}
+                        setMachinery={setMachinery}
+                      />
 
-            <ResourcesSection
-              managementTeam={managementTeam}
-              setManagementTeam={setManagementTeam}
-              interiorTeam={interiorTeam}
-              setInteriorTeam={setInteriorTeam}
-              mepTeam={mepTeam}
-              setMepTeam={setMepTeam}
-              materials={materials}
-              setMaterials={setMaterials}
-              machinery={machinery}
-              setMachinery={setMachinery}
-            />
+                      <ReportActions
+                        onPreview={handlePreview}
+                        onExportPDF={handleExportPDF}
+                        onExportExcel={handleExportExcel}
+                        onExportDocs={handleExportDocs}
+                        onExportAll={handleExportAll}
+                        onClear={handleClear}
+                        onSubmit={handleSubmit}
+                        onDelete={handleDelete}
+                        reportId={reportIdFromUrl}
+                        isPreviewing={isPreviewing}
+                        isExporting={isExporting}
+                        isSubmitting={isSubmitting}
+                      />
+                    </>
+                  )}
 
-            <ReportActions
-              onPreview={handlePreview}
-              onExportPDF={handleExportPDF}
-              onExportExcel={handleExportExcel}
-              onExportDocs={handleExportDocs}
-              onExportAll={handleExportAll}
-              onClear={handleClear}
-              onSubmit={handleSubmit}
-              onDelete={handleDelete}
-              reportId={reportIdFromUrl}
-              isPreviewing={isPreviewing}
-              isExporting={isExporting}
-              isSubmitting={isSubmitting}
-            />
-          </>
-        )}
+                  {activeTab === "hse" && (
+                    <>
+                      <div className="mt-2 pt-2">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                          
+                          <ReferenceSection
+                            sections={referenceSections}
+                            setSections={setReferenceSections}
+                            onExportReference={handleExportReference}
+                            isExporting={isExportingReference}
+                            tableTitle={tableTitle}
+                            setTableTitle={setTableTitle}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-        {activeTab === "hse" && (
-          <>
-            <div className="mt-2 pt-2">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground mb-4">
-                  HSE ACTIVITIES PHOTO
-                </h1>
-                <ReferenceSection
-                  sections={referenceSections}
-                  setSections={setReferenceSections}
-                  onExportReference={handleExportReference}
-                  isExporting={isExportingReference}
-                  tableTitle={tableTitle}
-                  setTableTitle={setTableTitle}
-                />
-              </div>
-            </div>
-          </>
-        )}
+                  {activeTab === "site-activities-photos" && (
+                    <>
+                      <div className="mt-2 pt-2">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                          
+                          <ReferenceSection
+                            sections={siteActivitiesSections}
+                            setSections={setSiteActivitiesSections}
+                            onExportReference={handleExportReference}
+                            isExporting={isExportingSiteActivities}
+                            tableTitle={siteActivitiesTitle}
+                            setTableTitle={setSiteActivitiesTitle}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-        {activeTab === "site-activities-photos" && (
-          <>
-            <div className="mt-2 pt-2">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground mb-4">
-                  SITE ACTIVITIES PHOTOS
-                </h1>
-                <ReferenceSection
-                  sections={siteActivitiesSections}
-                  setSections={setSiteActivitiesSections}
-                  onExportReference={handleExportReference}
-                  isExporting={isExportingSiteActivities}
-                  tableTitle={siteActivitiesTitle}
-                  setTableTitle={setSiteActivitiesTitle}
-                />
-              </div>
-            </div>
-          </>
-        )}
+                  {activeTab === "car" && (
+                    <>
+                      {/* CAR section */}
+                      <div className="mt-2 pt-2">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                          
+                          <CARSection car={carSheet} setCar={setCarSheet} />
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-        {activeTab === "car" && (
-          <>
-            {/* CAR section */}
-            <div className="mt-2 pt-2">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                <h1 className="text-2xl text-center underline decoration-primary font-semibold text-foreground mb-4">
-                  Corrective Action Request
-                </h1>
-                <CARSection car={carSheet} setCar={setCarSheet} />
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="mt-6 pt-6 border-t border-muted-foreground/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Export combined:{" "}
-              <span className="font-medium text-foreground">Report</span> =
-              Sheet 1,{" "}
-              <span className="font-medium text-foreground">Reference</span> =
-              Sheet 2,{" "}
-              <span className="font-medium text-foreground">
-                Corrective Action Request
-              </span>{" "}
-              = Sheet 3
-            </div>
-            <div className="flex items-center gap-3">
-              {/* ADD THIS: Simple Save Button */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="min-w-[140px]"
-                    disabled={isSaving || isSubmitting || isReadOnly}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {(isSaving || isSubmitting) ? "Processing..." : "Save As..."}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[140px]">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <DropdownMenuItem 
-                          onClick={handleSaveAsDraft} 
-                          disabled={isSaving || reportStatus === 'submitted' || isReadOnly}
-                          className={reportStatus === 'submitted' || isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}
+                  <div className="mt-6 pt-6 border-t border-muted-foreground/20">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        Export combined:{" "}
+                        <span className="font-medium text-foreground">Report</span> =
+                        Sheet 1,{" "}
+                        <span className="font-medium text-foreground">Reference</span> =
+                        Sheet 2,{" "}
+                        <span className="font-medium text-foreground">
+                          Corrective Action Request
+                        </span>{" "}
+                        = Sheet 3
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {/* ADD THIS: Simple Save Button */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="min-w-[140px]"
+                              disabled={isSaving || isSubmitting || isReadOnly}
+                            >
+                              <Save className="w-4 h-4 mr-2" />
+                              {(isSaving || isSubmitting) ? "Processing..." : "Save As..."}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-[140px]">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuItem 
+                                    onClick={handleSaveAsDraft} 
+                                    disabled={isSaving || reportStatus === 'submitted' || isReadOnly}
+                                    className={reportStatus === 'submitted' || isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}
+                                  >
+                                    <Save className="w-4 h-4 mr-2" />
+                                    {isSaving ? "Saving..." : "Draft"}
+                                    {reportStatus === 'submitted' && (
+                                      <Lock className="w-3 h-3 ml-auto" />
+                                    )}
+                                  </DropdownMenuItem>
+                                </TooltipTrigger>
+                                {reportStatus === 'submitted' && (
+                                  <TooltipContent>
+                                    <p>Submitted reports cannot be reverted to draft status</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                            <DropdownMenuItem 
+                              onClick={handleSubmit} 
+                              disabled={isSubmitting}
+                              className={reportStatus === 'submitted' ? 'bg-green-50 border-green-200' : ''}
+                            >
+                              <Send className="w-4 h-4 mr-2" />
+                              {isSubmitting ? "Submitting..." : "Submitted"}
+                              {reportStatus === 'submitted' && (
+                                <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
+                              )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button
+                          variant="outline"
+                          className="min-w-[140px]"
+                          onClick={handlePreviewCombined}
+                          disabled={isPreviewingCombined}
                         >
-                          <Save className="w-4 h-4 mr-2" />
-                          {isSaving ? "Saving..." : "Draft"}
-                          {reportStatus === 'submitted' && (
-                            <Lock className="w-3 h-3 ml-auto" />
-                          )}
-                        </DropdownMenuItem>
-                      </TooltipTrigger>
-                      {reportStatus === 'submitted' && (
-                        <TooltipContent>
-                          <p>Submitted reports cannot be reverted to draft status</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
-                  <DropdownMenuItem 
-                    onClick={handleSubmit} 
-                    disabled={isSubmitting}
-                    className={reportStatus === 'submitted' ? 'bg-green-50 border-green-200' : ''}
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    {isSubmitting ? "Submitting..." : "Submitted"}
-                    {reportStatus === 'submitted' && (
-                      <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
-                    )}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                variant="outline"
-                className="min-w-[140px]"
-                onClick={handlePreviewCombined}
-                disabled={isPreviewingCombined}
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                {isPreviewingCombined
-                  ? "Previewing ..."
-                  : "Preview"}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    className="min-w-[130px] bg-primary hover:bg-primary/90"
-                    disabled={isExportingCombined}
-                  >
-                    <FileDown className="w-4 h-4 mr-2" />
-                    {isExportingCombined
-                      ? "Exporting ..."
-                      : "Export"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={handleExportCombinedPDF}
-                    disabled={isExportingCombined}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Export As PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleExportCombinedExcel}
-                    disabled={isExportingCombined}
-                  >
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Export As Excel
-                  </DropdownMenuItem>
-                  {/* DISABLED: Export Combined Docs - commented out
-                  <DropdownMenuItem>
-                    <FileType className="w-4 h-4 mr-2" />
-                    Export Combined Docs (Word)
-                  </DropdownMenuItem>
-                  */}
-                  <DropdownMenuItem
-                    onClick={handleExportCombinedZIP}
-                    disabled={isExportingCombined}
-                  >
-                    <FileDown className="w-4 h-4 mr-2" />
-                    Export As (ZIP)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
+                          <Eye className="w-4 h-4 mr-2" />
+                          {isPreviewingCombined
+                            ? "Previewing ..."
+                            : "Preview"}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              className="min-w-[160px] bg-primary hover:bg-primary/90"
+                              disabled={isExportingCombined}
+                            >
+                              <FileDown className="w-4 h-4 mr-2" />
+                              {isExportingCombined
+                                ? "Exporting ..."
+                                : "Export"}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={handleExportCombinedPDF}
+                              disabled={isExportingCombined}
+                            >
+                              <FileText className="w-4 h-4 mr-2" />
+                              Export As PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={handleExportCombinedExcel}
+                              disabled={isExportingCombined}
+                            >
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              Export As Excel
+                            </DropdownMenuItem>
+                            {/* DISABLED: Export Combined Docs - commented out
+                            <DropdownMenuItem>
+                              <FileType className="w-4 h-4 mr-2" />
+                              Export Combined Docs (Word)
+                            </DropdownMenuItem>
+                            */}
+                            <DropdownMenuItem
+                              onClick={handleExportCombinedZIP}
+                              disabled={isExportingCombined}
+                            >
+                              <FileDown className="w-4 h-4 mr-2" />
+                              Export As (ZIP)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
 
-        <PDFPreviewModal
-          open={showPreview}
-          onClose={() => {
-            setShowPreview(false);
-            if (previewUrl) {
-              URL.revokeObjectURL(previewUrl);
-            }
-          }}
-          pdfUrl={previewUrl}
-        />
+                  <PDFPreviewModal
+                    open={showPreview}
+                    onClose={() => {
+                      setShowPreview(false);
+                      if (previewUrl) {
+                        URL.revokeObjectURL(previewUrl);
+                      }
+                    }}
+                    pdfUrl={previewUrl}
+                  />
 
-        <FileNameDialog
-          open={showFileNameDialog}
-          onClose={() => {
-            setShowFileNameDialog(false);
-            setPendingExportType(null);
-          }}
-          onConfirm={(fileName) => {
-            if (pendingExportType === "excel") {
-              handleExportExcelWithFilename(fileName);
-            } else if (pendingExportType === "combined") {
-              handleExportCombinedExcelWithFilename(fileName);
-            } else if (pendingExportType === "reference") {
-              handleExportReferenceWithFilename(fileName);
-            } else if (pendingExportType === "combined-pdf") {
-              handleExportCombinedPDFWithFilename(fileName);
-            } else if (pendingExportType === "combined-zip") {
-              handleExportCombinedZIPWithFilename(fileName);
-            }
-            setPendingExportType(null);
-          }}
-          defaultFileName={
-            pendingExportType === "combined"
-              ? `combined-${projectName || "Report"}_${
-                  reportDate?.toISOString().split("T")[0] || "export"
-                }`
-              : pendingExportType === "reference"
-              ? `reference_${
-                  reportDate?.toISOString().split("T")[0] || "export"
-                }`
-              : `${projectName || "Report"}_${
-                  reportDate?.toISOString().split("T")[0] || "export"
-                }`
-          }
-          title={
-            pendingExportType === "combined"
-              ? "Export Combined Excel File"
-              : pendingExportType === "reference"
-              ? "Export Reference Excel File"
-              : "Export Excel File"
-          }
-          description={
-            pendingExportType === "combined"
-              ? "Enter a name for your combined Excel export file (Report + Reference)."
-              : pendingExportType === "reference"
-              ? "Enter a name for your reference Excel export file."
-              : "Enter a name for your Excel export file."
-          }
-        />
-      </main>
-      </>
+                  <FileNameDialog
+                    open={showFileNameDialog}
+                    onClose={() => {
+                      setShowFileNameDialog(false);
+                      setPendingExportType(null);
+                    }}
+                    onConfirm={(fileName) => {
+                      if (pendingExportType === "excel") {
+                        handleExportExcelWithFilename(fileName);
+                      } else if (pendingExportType === "combined") {
+                        handleExportCombinedExcelWithFilename(fileName);
+                      } else if (pendingExportType === "reference") {
+                        handleExportReferenceWithFilename(fileName);
+                      } else if (pendingExportType === "combined-pdf") {
+                        handleExportCombinedPDFWithFilename(fileName);
+                      } else if (pendingExportType === "combined-zip") {
+                        handleExportCombinedZIPWithFilename(fileName);
+                      }
+                      setPendingExportType(null);
+                    }}
+                    defaultFileName={
+                      pendingExportType === "combined"
+                        ? `combined-${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
+                        }`
+                        : pendingExportType === "reference"
+                          ? `reference_${reportDate?.toISOString().split("T")[0] || "export"
+                          }`
+                          : `${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
+                          }`
+                    }
+                    title={
+                      pendingExportType === "combined"
+                        ? "Export Combined Excel File"
+                        : pendingExportType === "reference"
+                          ? "Export Reference Excel File"
+                          : "Export Excel File"
+                    }
+                    description={
+                      pendingExportType === "combined"
+                        ? "Enter a name for your combined Excel export file (Report + Reference)."
+                        : pendingExportType === "reference"
+                          ? "Enter a name for your reference Excel export file."
+                          : "Enter a name for your Excel export file."
+                    }
+                  />
+                </main>
+              </>
             )}
-    </div>
-  </SidebarInset>
-</div>
-</SidebarProvider>
+          </div>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 };
 

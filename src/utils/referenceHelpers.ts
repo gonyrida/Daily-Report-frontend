@@ -21,6 +21,13 @@ export function createDefaultHSESections() {
   ];
 }
 
+export function createDefaultSiteActivitiesSections() {
+  return [
+    createReferenceSection("Site Activity Toolbox Meeting "),
+    createReferenceSection("Site Activity Photos ")
+  ];
+}
+
 export const validateReferenceSections = (sections: any[]) => {
   return sections.some(
     (section) =>

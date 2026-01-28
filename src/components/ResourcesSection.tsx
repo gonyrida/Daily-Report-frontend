@@ -27,9 +27,9 @@ const MANAGEMENT_OPTIONS = [
 
 const WORKING_TEAM_OPTIONS = ["Site Manager", "Site Engineer","MEP Engineer","Foreman", "Skill Workers","MEP Workers", "General Workers"];
 
-const INTERIOR_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
+export const INTERIOR_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers","MEP Workers", "General Workers"];
 
-const MEP_TEAM_OPTIONS = ["MEP Engineer", "MEP Workers"];
+export const MEP_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers","MEP Workers", "General Workers"];
 
 const MACHINERY_OPTIONS = [
   "Air compressor",
@@ -107,7 +107,7 @@ const ResourcesSection = ({
 }: ResourcesSectionProps) => {
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+      <h2 className="text-md font-semibold text-foreground flex items-center gap-2">
         <div className="w-1 h-5 bg-accent rounded-full" />
         Resources Employed
       </h2>

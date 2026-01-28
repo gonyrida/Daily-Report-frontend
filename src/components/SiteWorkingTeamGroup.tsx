@@ -1,5 +1,6 @@
 import { Wrench, Trash2 } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
+import { INTERIOR_TEAM_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
 
 interface SiteWorkingTeamGroupProps {
   interiorTeam: ResourceRow[];
@@ -8,8 +9,6 @@ interface SiteWorkingTeamGroupProps {
   setMepTeam: (rows: ResourceRow[]) => void;
 }
 
-const INTERIOR_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
-const MEP_TEAM_OPTIONS = ["MEP Engineer", "MEP Workers"];
 
 const SiteWorkingTeamGroup = ({
   interiorTeam,

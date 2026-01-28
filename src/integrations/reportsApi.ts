@@ -190,8 +190,8 @@ export const generateReferenceExcel = async (
 
     // userId will be extracted from JWT cookie by Python backend
     const payload = {
-      table_title: tableTitle,
-      reference: referenceEntries,
+      hse_title: tableTitle,
+      hse: referenceEntries,
     };
 
     console.log("🔑 REFERENCE EXCEL: Sending payload - userId will be validated by backend");
@@ -292,6 +292,8 @@ export const generateCombinedExcel = async (
   reportPayload: any,
   referenceSections: any[],
   tableTitle: string = "HSE Toolbox Meeting",
+  siteActivitiesSections: any[] = [],
+  siteActivitiesTitle: string = "Site Activities Photos",
   fileName?: string,
   koicaLogo?: string,
   cacpmLogo?: string
@@ -323,10 +325,29 @@ export const generateCombinedExcel = async (
       })
     );
 
+    const siteActivitiesEntries = siteActivitiesSections.flatMap((section: any) =>
+      (section.entries ?? []).map((entry: any) => {
+        const slots = entry.slots ?? [];
+        return {
+          section_title: section.title || "",
+          images: slots
+            .map((s: any) => s.image)
+            .filter(Boolean)
+            .slice(0, 2),
+          footers: slots
+            .map((s: any) => s.caption)
+            .filter(Boolean)
+            .slice(0, 2),
+        };
+      })
+    );
+
     const payload = {
       ...enhancedPayload,
-      table_title: tableTitle,
-      reference: referenceEntries,
+      hse_title: tableTitle,
+      hse: referenceEntries,
+      site_title: siteActivitiesTitle,
+      site_ref: siteActivitiesEntries,
     };
 
     console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
@@ -525,6 +546,8 @@ export const generateCombinedPDF = async (
   reportPayload: any,
   referenceSections: any[],
   tableTitle: string = "HSE Toolbox Meeting",
+  siteActivitiesSections: any[] = [],
+  siteActivitiesTitle: string = "Site Activities Photos",
   fileName?: string,
   koicaLogo?: string,
   cacpmLogo?: string
@@ -554,12 +577,29 @@ export const generateCombinedPDF = async (
   // console.log("DEBUG API: Processed referenceEntries:", referenceEntries);
   // console.log("DEBUG API: Total images being sent:", referenceEntries.reduce((acc, entry) => acc + entry.images.length, 0));
 
+  const siteActivitiesEntries = siteActivitiesSections.flatMap((section: any) =>
+    (section.entries ?? []).map((entry: any) => {
+      const slots = entry.slots ?? [];
+      return {
+        section_title: section.title || "",
+        images: slots
+          .map((s: any) => s.image)
+          .filter(Boolean)
+          .slice(0, 2),
+        footers: slots
+          .map((s: any) => s.caption)
+          .filter(Boolean)
+          .slice(0, 2),
+      };
+    })
+  );
+
   const payload = {
     mode: "combined",
     data: {
       ...reportPayload,
-      table_title: tableTitle,
-      reference: referenceSections.flatMap((section: any) =>
+      hse_title: tableTitle,
+      hse: referenceSections.flatMap((section: any) =>
         (section.entries ?? []).map((entry: any) => {
           const slots = entry.slots ?? [];
           return {
@@ -569,6 +609,8 @@ export const generateCombinedPDF = async (
           };
         })
       ),
+      site_title: siteActivitiesTitle,
+      site_ref: siteActivitiesEntries,
       logos: {
         cacpm: cacpmLogo,
         koica: koicaLogo,
@@ -576,7 +618,7 @@ export const generateCombinedPDF = async (
     },
   };
 
-  console.log("🔑 COMBINED EXPORT: Sending payload - userId will be validated by backend");
+  console.log(" COMBINED EXPORT: Sending payload - userId will be validated by backend");
 
   const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, payload);
 

@@ -13,6 +13,7 @@ import { exportToPDF, exportToExcel, exportToZIP } from "@/lib/exportUtils";
 import { saveReportToDB, submitReportToDB, createBlankReport, autoSaveReport } from "@/integrations/reportsApi";
 import { generateCombinedExcel } from "@/integrations/reportsApi";
 import { apiGet } from "@/lib/apiFetch";
+import { getAutoSavePreference } from "@/lib/notificationUtils";
 
 export const useReportForm = () => {
   // Project Info
@@ -334,18 +335,41 @@ export const useReportForm = () => {
     [reportDate, getReportData, toast]
   );
 
-  // 1. Auto-save logic (Now hidden from Index.tsx)
+  // 1. Auto-save logic (Now hidden from Index.tsx) - Enhanced with user preferences
   useEffect(() => {
-    const interval = setInterval(() => {
-      saveDraft(true); // Silent save
-    }, 30000);
-    return () => clearInterval(interval);
+    let interval: NodeJS.Timeout;
+    
+    const setupAutoSave = async () => {
+      const autoSaveEnabled = await getAutoSavePreference();
+      
+      if (autoSaveEnabled) {
+        interval = setInterval(() => {
+          saveDraft(true); // Silent save
+        }, 30000); // 30 seconds
+        console.log("🔧 Auto-save enabled (30-second interval)");
+      } else {
+        console.log("🔧 Auto-save disabled by user preference");
+      }
+    };
+
+    setupAutoSave();
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [saveDraft]);
 
-  // Debounced auto-save on resource changes
+  // Debounced auto-save on resource changes - Enhanced with user preferences
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const debouncedSaveDraft = useCallback(() => {
+  const debouncedSaveDraft = useCallback(async () => {
+    const autoSaveEnabled = await getAutoSavePreference();
+    
+    if (!autoSaveEnabled) {
+      console.log("🔧 Debounced auto-save skipped - disabled by user preference");
+      return;
+    }
+
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }

@@ -17,7 +17,7 @@ export const apiFetch = async (url: string, options: ApiFetchOptions = {}): Prom
     method = "GET",
     body,
     headers = {},
-    timeout = 10000,
+    timeout = 300000, // 5 minutes for large file generation
   } = options;
 
   console.log(`🔒 API FETCH: ${method} ${url}`, { 
