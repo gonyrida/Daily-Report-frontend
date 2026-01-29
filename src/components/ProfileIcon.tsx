@@ -66,7 +66,7 @@ const ProfileIcon = () => {
       }
       
       const data = await response.json();
-      const userData = data.data; // Backend returns data.data
+      const userData = data.user; // Backend returns data.user
       
       // Save to cache
       saveProfileLocally(userData);

@@ -117,6 +117,12 @@ export const extractImageForDBAsync = async (image: any): Promise<string | null>
     startsWithHttp: typeof image === 'string' ? image.startsWith('http') : 'N/A',
     fileSize: image instanceof File ? image.size : 'N/A'
   });
+
+  // REPLACE with this check:
+  if (typeof image === 'object' && image !== null && !(image instanceof File) && Object.keys(image).length === 0) {
+    console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: ❌ Empty image object provided");
+    return null;
+  }
   
   if (!image) {
     console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: ❌ No image provided");
@@ -202,6 +208,71 @@ export const extractCaptionForDB = (caption: any): string => {
   return String(caption);
 };
 
+// Process images within the existing referenceSections structure
+export const processImagesInReferenceSections = async (referenceSections: any[]) => {
+  if (!referenceSections || !Array.isArray(referenceSections)) {
+    return [];
+  }
+
+  console.log("🔍 PROCESSING IMAGES: Starting image processing in referenceSections");
+
+  const processedSections = await Promise.all(referenceSections.map(async (section) => {
+    const processedEntries = await Promise.all(section.entries.map(async (entry) => {
+      const processedSlots = await Promise.all(entry.slots.map(async (slot) => {
+        // Process image to base64 if it exists
+        const processedImage = await extractImageForDBAsync(slot.image);
+        
+        return {
+          ...slot,
+          image: processedImage || null  // ← Base64 string or null
+        };
+      }));
+
+      return {
+        ...entry,
+        slots: processedSlots
+      };
+    }));
+
+    return {
+      ...section,
+      entries: processedEntries
+    };
+  }));
+
+  console.log("🔍 PROCESSING IMAGES: Complete");
+  return processedSections;
+};
+
+// Convert frontend format to site_ref format
+export const convertToSiteRefFormat = (sections: any[]) => {
+  if (!sections || !Array.isArray(sections)) return [];
+  
+  return sections.map((section) => ({
+    section_title: section.title || "",
+    images: section.entries?.[0]?.slots?.map(slot => slot.image).filter(img => img) || [],
+    footers: section.entries?.[0]?.slots?.map(slot => slot.caption).filter(cap => cap) || []
+  }));
+};
+
+// Convert site_ref format to frontend format
+export const convertFromSiteRefFormat = (sections: any[]) => {
+  if (!sections || !Array.isArray(sections)) return [];
+  
+  return sections.map((section) => ({
+    id: crypto.randomUUID(),
+    title: section.section_title || "",
+    entries: [{
+      id: crypto.randomUUID(),
+      slots: section.images.map((img: string, idx: number) => ({
+        id: crypto.randomUUID(),
+        image: img,
+        caption: section.footers[idx] || ""
+      }))
+    }]
+  }));
+};
+
 // Process HSE sections for database storage (with image processing)
 export const processHSEForDB = async (referenceSections: any[], tableTitle: string) => {
   console.log("🔍 HSE DEBUG: Processing sections for DB:", {
@@ -271,14 +342,14 @@ export const processHSEForDB = async (referenceSections: any[], tableTitle: stri
 
   const finalResult = {
     hse_title: tableTitle || "",
-    hse: processedHSE
+    hse_ref: processedHSE  // ✅ Match backend field name
   };
 
   console.log("🔍 HSE DEBUG: Final result:", {
     title: finalResult.hse_title,
-    sectionsCount: finalResult.hse.length,
-    totalImages: finalResult.hse.reduce((sum, section) => sum + section.images.length, 0),
-    totalFooters: finalResult.hse.reduce((sum, section) => sum + section.footers.length, 0)
+    sectionsCount: finalResult.hse_ref.length,
+    totalImages: finalResult.hse_ref.reduce((sum, section) => sum + section.images.length, 0),
+    totalFooters: finalResult.hse_ref.reduce((sum, section) => sum + section.footers.length, 0)
   });
 
   return finalResult;

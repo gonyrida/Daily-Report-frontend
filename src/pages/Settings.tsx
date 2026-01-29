@@ -167,7 +167,7 @@ const Settings = () => {
           
           if (response.ok) {
             const data = await response.json();
-            setUser(data.data);
+            setUser(data.user); //data.user instead of data.data because authController.js has been changed line 263
           }
         } catch (userError) {
           console.log('Could not load user data, feedback will be anonymous');

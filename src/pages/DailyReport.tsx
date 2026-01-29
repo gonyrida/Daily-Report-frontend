@@ -9,7 +9,7 @@ import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
 import CARSection from "@/components/CARSection";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
-import { processHSEForDB, processSiteActivitiesForDB } from "@/utils/hseDataUtils";
+import { processHSEForDB, processSiteActivitiesForDB, processImagesInReferenceSections, convertToSiteRefFormat } from "@/utils/hseDataUtils";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
 import { createDefaultHSESections, createDefaultSiteActivitiesSections } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
@@ -222,7 +222,7 @@ const initializeCleanReportState = (projectName: string, setProjectName: (name: 
     materials: [],
     machinery: [],
     referenceSections: createDefaultHSESections(),
-    siteActivitiesSections: createDefaultHSESections(),
+    siteActivitiesSections: createDefaultSiteActivitiesSections(),
     siteActivitiesTitle: "Site Activities Photos",
     carSheet: { description: "", photo_groups: [] },
     projectLogo: ""
@@ -735,10 +735,10 @@ const DailyReport = () => {
             setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
             
             // Handle interior and MEP team migration
-            if (dbReport.interiorTeam && dbReport.mepTeam) {
+            if (dbReport.workingTeamInterior && dbReport.workingTeamMEP) {
               // New format: use separate teams
-              setInteriorTeam(ensureRowIds(dbReport.interiorTeam));
-              setMepTeam(ensureRowIds(dbReport.mepTeam));
+              setInteriorTeam(ensureRowIds(dbReport.workingTeamInterior));
+              setMepTeam(ensureRowIds(dbReport.workingTeamMEP));
             } else {
               // Old format: split working team
               const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
@@ -748,15 +748,23 @@ const DailyReport = () => {
             
             setMaterials(ensureRowIds(dbReport.materials || []));
             setMachinery(ensureRowIds(dbReport.machinery || []));
-            setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
+            if (dbReport.hse_ref && dbReport.hse_ref.length > 0) {
+              // Convert from DB format (hse_ref) to frontend format (referenceSections)
+              setReferenceSections(dbReport.hse_ref);
+            } else {
+              setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
+            }
             setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
             // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
             if (dbReport.site_ref && dbReport.site_ref.length > 0) {
               // Convert DB format back to frontend format
               const convertedSiteActivities = dbReport.site_ref.map((section: any) => ({
+                id: crypto.randomUUID(),  // ← ADD THIS
                 title: section.section_title || "",
                 entries: [{
+                  id: crypto.randomUUID(),  // ← ADD THIS
                   slots: section.images.map((image: string, index: number) => ({
+                    id: crypto.randomUUID(),  // ← ADD THIS
                     image: image,
                     caption: section.footers[index] || ""
                   }))
@@ -768,6 +776,7 @@ const DailyReport = () => {
             }
             setSiteActivitiesTitle(dbReport.site_title || "Site Activities Photos");
             setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
+            console.log("🔍 DEBUG: CAR loaded from dbReport:", dbReport.carSheet?.description);
             setProjectLogo(dbReport.projectLogo || "");
           }
         } else {
@@ -842,6 +851,7 @@ const DailyReport = () => {
                 }
                 setSiteActivitiesTitle(projectRecentReport.site_title || "Site Activities Photos");
                 setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                console.log("🔍 DEBUG: CAR loaded from projectRecentReport:", projectRecentReport.carSheet?.description);
                 setProjectLogo(projectRecentReport.projectLogo || null);
                 
                 // Set ownership for new reports (always editable for the creator)
@@ -980,7 +990,7 @@ const DailyReport = () => {
                 setMaterials(ensureRowIds(projectRecentReport.materials || []));
                 setMachinery(ensureRowIds(projectRecentReport.machinery || []));
                 setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
-                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections && projectRecentReport.siteActivitiesSections.length > 0 ? projectRecentReport.siteActivitiesSections : createDefaultHSESections());
+                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections && projectRecentReport.siteActivitiesSections.length > 0 ? projectRecentReport.siteActivitiesSections : createDefaultSiteActivitiesSections());
                 setSiteActivitiesTitle(projectRecentReport.site_title || "Site Activities Photos");
                 setCarSheet(projectRecentReport.carSheet || { description: "", photo_groups: [] });
                 setProjectLogo(projectRecentReport.projectLogo || "");
@@ -1977,7 +1987,7 @@ const DailyReport = () => {
       };
 
       // Save to database
-      console.log("🔍 HSE DEBUG: Saving HSE sections:", basicCleanedData.hse?.length || 0);
+      // console.log("🔍 HSE DEBUG: Saving HSE sections:", basicCleanedData.hse_ref?.length || 0);
       console.log("🔍 HSE DEBUG: HSE title:", basicCleanedData.hse_title);
       await saveReportToDB(basicCleanedData); // Save basic data without large images
 
@@ -2014,15 +2024,76 @@ const DailyReport = () => {
 
       // Get current report data
       const rawData = getReportData();
+      console.log("🔍 DEBUG: Raw HSE data before save:", {
+        referenceSections: rawData.referenceSections,
+        siteActivitiesSections: rawData.siteActivitiesSections,
+        firstImage: rawData.referenceSections?.[0]?.entries?.[0]?.slots?.[0]?.image
+      });
+
+      // Process images directly in referenceSections (like captions!)
+      const processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
+      const processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      const siteRefData = convertToSiteRefFormat(processedSiteActivitiesSections);
+
+      // ADD THIS right after line 2031 (before the CAR processing):
+      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+        if (!img) return null;
+      
+        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        if (typeof img === "string") {
+          return img;
+        }
+      
+        // Case 2: File object
+        if (img instanceof File) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(img);
+          });
+        }
+      
+        return null;
+      };
+
+      // ADD CAR PROCESSING:
+      const processedCar = await Promise.all(
+        (rawData.carSheet.photo_groups || []).map(async (g: any) => ({
+          ...g,
+          images: await Promise.all(
+            (g.images || []).map(async (img: any) => {
+              if (img && typeof img === 'object' && img instanceof File) {
+                return await toBase64DataUrl(img);
+              }
+              return img; // Already base64 or null
+            })
+          )
+        }))
+      );
+
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
-        interiorTeam: cleanResourceRows(rawData.interiorTeam),
-        mepTeam: cleanResourceRows(rawData.mepTeam),
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),  // ✅ correct
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),            // ✅ correct
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // Override with processed sections (images now base64)
+        referenceSections: processedReferenceSections,
+        site_ref: siteRefData,
+        carSheet: {
+          ...rawData.carSheet,
+          photo_groups: processedCar
+        },
       };
+
+      // In handleSaveAsDraft, before saveReportToDB()
+      console.log("🔍 DEBUG: About to call saveReportToDB with:", {
+        hasReferenceSections: !!cleanedData.referenceSections,
+        hasSiteActivities: !!cleanedData.siteActivitiesSections,
+        referenceSectionsCount: cleanedData.referenceSections?.length || 0
+      });
 
       // Save to database (keeps status as "draft")
       await saveReportToDB(cleanedData);
@@ -2165,12 +2236,12 @@ const DailyReport = () => {
         projectLogo: processedLogo,
       };
 
-      console.log(
-        "🔍 FRONTEND: About to save data with HSE sections:",
-        basicCleanedData.hse
-          ? "YES (" + basicCleanedData.hse.length + " sections)"
-          : "NO"
-      );
+      // console.log(
+      //   "🔍 FRONTEND: About to save data with HSE sections:",
+      //   basicCleanedData.hse_ref
+      //     ? "YES (" + basicCleanedData.hse_ref.length + " sections)"
+      //     : "NO"
+      // );
 
       // Save to database
       try {

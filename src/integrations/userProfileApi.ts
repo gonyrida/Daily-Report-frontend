@@ -34,6 +34,15 @@ export const getUserProfile = async (): Promise<{ success: boolean; data: UserPr
     
     const result = await response.json();
     console.log("DEBUG FRONTEND: Profile fetched successfully:", result);
+
+    // 🔥 TRANSFORM: Convert backend response to maintain frontend consistency
+    if (result.success && result.user) {
+      return {
+        success: true,
+        data: result.user  // ← Convert user to data
+      };
+    }
+
     return result;
   } catch (error) {
     console.error("DEBUG FRONTEND: Error fetching profile:", error);
@@ -54,6 +63,15 @@ export const updateUserProfile = async (profileData: UpdateProfileData): Promise
     
     const result = await response.json();
     console.log("DEBUG FRONTEND: Profile updated successfully:", result);
+
+    // 🔥 TRANSFORM: Convert backend response to maintain frontend consistency
+    if (result.success && result.user) {
+      return {
+        success: true,
+        data: result.user  // ← Convert user to data
+      };
+    }
+
     return result;
   } catch (error) {
     console.error("DEBUG FRONTEND: Error updating profile:", error);

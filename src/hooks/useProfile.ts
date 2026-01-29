@@ -73,7 +73,7 @@ const useProfile = () => {
       const data = await response.json();
       setState(prev => ({
         ...prev,
-        user: data.data, // Backend returns data.data
+        user: data.user, // Backend returns data.user
         loading: false,
       }));
     } catch (error) {

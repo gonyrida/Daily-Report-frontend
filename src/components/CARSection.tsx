@@ -17,7 +17,10 @@ export default function CARSection({ car, setCar }: Props) {
   useEffect(() => {
     // Ensure at least one group exists
     if (!car || !Array.isArray(car.photo_groups) || car.photo_groups.length === 0) {
-      setCar(createEmptyCarSheet());
+      setCar(prev => ({
+        ...prev,
+        photo_groups: []
+      }));
     }
   }, []);
 

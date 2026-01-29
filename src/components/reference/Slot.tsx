@@ -66,11 +66,11 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
           </div>
         )}
 
-        <input id={`slot-file-${slot.id}`} ref={logic.fileInputRef} type="file" accept="image/*" multiple onChange={(e) => logic.handleImageChange(e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label={`Upload image ${slotIndex + 1}`} />
+        <input id={`slot-file-${entryId}-${slot.id}`} ref={logic.fileInputRef} type="file" accept="image/*" multiple onChange={(e) => logic.handleImageChange(e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label={`Upload image ${slotIndex + 1}`} />
       </div>
 
       <div className="mt-3">
-        <Input id={`caption-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full text-center" aria-label={`Caption for image ${slotIndex + 1}`} />
+        <Input id={`caption-${entryId}-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full text-center" aria-label={`Caption for image ${slotIndex + 1}`} />
       </div>
     </div>
   );
