@@ -134,7 +134,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   // Load projects from existing reports
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]); // Change from [] to [loadProjects]
+  }, []); // Change from [loadProjects] to []
 
   // // Merge database projects with any locally added projects
   // useEffect(() => {
@@ -528,7 +528,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                       {project.name}
                                     </SidebarMenuSubButton>
                                     {/* DEBUG: Add this logging */}
-                                    {console.log(`DEBUG: Project ${project.name} - createdBy: ${project.createdBy}, currentUserId: ${currentUserId}, match: ${project.createdBy === currentUserId}`)}
+                                    {/* {console.log(`DEBUG: Project ${project.name} - createdBy: ${project.createdBy}, currentUserId: ${currentUserId}, match: ${project.createdBy === currentUserId}`)} */}
                                       {project.createdBy === currentUserId && (
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>

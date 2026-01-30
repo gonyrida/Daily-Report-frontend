@@ -135,7 +135,7 @@ const DailyReportProjects: React.FC = () => {
 
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]); // Changed from [toast] to [loadProjects]
+  }, []); // Changed from [loadProjects] to []
 
   // Filter projects based on search query
   useEffect(() => {

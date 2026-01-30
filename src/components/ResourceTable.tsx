@@ -340,7 +340,7 @@ const ResourceTable = ({
                             )
                           }
                           placeholder="0"
-                          className="border-0 bg-transparent text-center focus-visible:ring-1"
+                          className="border-0 bg-transparent text-center focus-visible:ring-1 w-full min-w-[60px]"
                         />
                       </td>
                       <td className="px-3 py-2">

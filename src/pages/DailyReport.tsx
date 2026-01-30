@@ -602,15 +602,15 @@ const DailyReport = () => {
                 setTempAM(projectRecentReport.tempAM || "");
                 setTempPM(projectRecentReport.tempPM || "");
                 setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
-                setActivityToday(projectRecentReport.activityToday || "");
-                setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                // setActivityToday(projectRecentReport.activityToday || "");
+                // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(ensureRowIds(projectRecentReport.managementTeam || []));
                 setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
 
                 // Handle interior and MEP team migration
-                if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam) {
-                  setInteriorTeam(ensureRowIds(projectRecentReport.interiorTeam));
-                  setMepTeam(ensureRowIds(projectRecentReport.mepTeam));
+                if (projectRecentReport.workingTeamInterior && projectRecentReport.workingTeamMEP) {
+                  setInteriorTeam(ensureRowIds(projectRecentReport.workingTeamInterior));
+                  setMepTeam(ensureRowIds(projectRecentReport.workingTeamMEP));
                 } else {
                   const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
                   setInteriorTeam(interior);
@@ -619,10 +619,10 @@ const DailyReport = () => {
 
                 setMaterials(ensureRowIds(projectRecentReport.materials || []));
                 setMachinery(ensureRowIds(projectRecentReport.machinery || []));
-                setReferenceSections(projectRecentReport.referenceSections || []);
-                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections || []);
-                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "");
-                setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                // setReferenceSections(projectRecentReport.referenceSections || []);
+                // setSiteActivitiesSections(projectRecentReport.siteActivitiesSections || []);
+                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "Site Activities Photos");
+                // setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
                 setProjectLogo(projectRecentReport.projectLogo || null);
 
                 // Set ownership for new reports (always editable for the creator)
@@ -1118,7 +1118,7 @@ const DailyReport = () => {
     };
 
     loadInitialReport();
-  }, [reportDate, reportIdFromUrl]); // Include reportDate and reportIdFromUrl to satisfy ESLint
+  }, [reportIdFromUrl]); // ← Only run when reportId changes, not reportDate
 
   // // Load report on mount - Try ID first, then DB by date, fallback to localStorage (only on first mount)
   // useEffect(() => {
@@ -1580,42 +1580,42 @@ const DailyReport = () => {
   // }, [reportId]);
 
   // Watch for changes and trigger auto-save
-  useEffect(() => {
-    if (!reportId) return;
+  // useEffect(() => {
+  //   if (!reportId) return;
 
-    const currentData = {
-      projectName,
-      reportDate: reportDate?.toISOString(),
-      weatherAM,
-      weatherPM,
-      tempAM,
-      tempPM,
-      currentPeriod,
-      activityToday,
-      workPlanNextDay,
-      managementTeam,
-      workingTeamInterior,
-      materials,
-      machinery,
-    };
+  //   const currentData = {
+  //     projectName,
+  //     reportDate: reportDate?.toISOString(),
+  //     weatherAM,
+  //     weatherPM,
+  //     tempAM,
+  //     tempPM,
+  //     currentPeriod,
+  //     activityToday,
+  //     workPlanNextDay,
+  //     managementTeam,
+  //     workingTeamInterior,
+  //     materials,
+  //     machinery,
+  //   };
 
-    // triggerAutoSave(currentData);
-  }, [
-    projectName,
-    reportDate,
-    weatherAM,
-    weatherPM,
-    tempAM,
-    tempPM,
-    currentPeriod,
-    activityToday,
-    workPlanNextDay,
-    managementTeam,
-    workingTeamInterior,
-    materials,
-    machinery,
-    // triggerAutoSave,
-  ]);
+  //   // triggerAutoSave(currentData);
+  // }, [
+  //   projectName,
+  //   reportDate,
+  //   weatherAM,
+  //   weatherPM,
+  //   tempAM,
+  //   tempPM,
+  //   currentPeriod,
+  //   activityToday,
+  //   workPlanNextDay,
+  //   managementTeam,
+  //   workingTeamInterior,
+  //   materials,
+  //   machinery,
+  //   // triggerAutoSave,
+  // ]);
 
   const validateReport = (): boolean => {
     if (!projectName.trim()) {
@@ -2418,7 +2418,7 @@ const DailyReport = () => {
       };
 
       // Save to database
-      await saveReportToDB(basicCleanedData);
+      // await saveReportToDB(basicCleanedData);
 
       await generateCombinedPDF(
         {
@@ -2658,7 +2658,7 @@ const DailyReport = () => {
       };
 
       // Save to database
-      await saveReportToDB(basicCleanedData);
+      // await saveReportToDB(basicCleanedData);
       // Process images for both exports
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
@@ -2984,6 +2984,48 @@ const DailyReport = () => {
     try {
       // Prepare report data and clean empty rows
       const rawData = getReportData();
+      
+      // Process images directly in referenceSections (like captions!)
+      const processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
+      const processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      const siteRefData = convertToSiteRefFormat(processedSiteActivitiesSections);
+      
+      // ADD toBase64DataUrl function:
+      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+        if (!img) return null;
+        
+        if (typeof img === "string") {
+          return img;
+        }
+        
+        if (img instanceof File) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(img);
+          });
+        }
+        
+        return null;
+      };
+      
+      // ADD CAR PROCESSING:
+      const processedCar = await Promise.all(
+        (rawData.carSheet.photo_groups || []).map(async (g: any) => ({
+          ...g,
+          images: await Promise.all(
+            (g.images || []).map(async (img: any) => {
+              if (img && typeof img === 'object' && img instanceof File) {
+                return await toBase64DataUrl(img);
+              }
+              return img;
+            })
+          )
+        }))
+      );
+      
+      // REPLACE cleanedData (lines 2987-2994):
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
@@ -2991,6 +3033,13 @@ const DailyReport = () => {
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
+        // ADD PROCESSED DATA:
+        referenceSections: processedReferenceSections,
+        site_ref: siteRefData,
+        carSheet: {
+          ...rawData.carSheet,
+          photo_groups: processedCar
+        },
       };
 
       // Step 1: Save the report data to database
@@ -3051,7 +3100,7 @@ const DailyReport = () => {
       };
 
       // Save next day's template locally
-      saveDraftLocally(nextDay, carryForwardData);
+      // saveDraftLocally(nextDay, carryForwardData);
 
       toast({
         title: "Report Submitted",
@@ -3120,11 +3169,11 @@ const DailyReport = () => {
 
             {/* Read-Only Banner */}
             {isReadOnly && (
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 m-4">
-                <div className="flex items-center">
+              <div className="bg-background border-l-4 border-yellow-400 p-4 m-4">
+                <div className="flex items-center bg-background">
                   <div className="ml-3">
                     <p className="text-sm text-yellow-700">
-                      <strong>🔒 View Only Mode:</strong> You are viewing another user's report. Editing is disabled.
+                      <strong>🔒 View Only Mode:</strong> You are viewing another user's report.
                     </p>
                   </div>
                 </div>
@@ -3367,7 +3416,7 @@ const DailyReport = () => {
                             <DropdownMenuItem 
                               onClick={handleSubmit} 
                               disabled={isSubmitting}
-                              className={reportStatus === 'submitted' ? 'bg-green-50 border-green-200' : ''}
+                              className={reportStatus === 'submitted' ? 'bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer' : ''}
                             >
                               <Send className="w-4 h-4 mr-2" />
                               {isSubmitting ? "Submitting..." : "Submitted"}
