@@ -604,21 +604,57 @@ const DailyReport = () => {
                 setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
                 // setActivityToday(projectRecentReport.activityToday || "");
                 // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
-                setManagementTeam(ensureRowIds(projectRecentReport.managementTeam || []));
+                setManagementTeam(
+                  ensureRowIds(projectRecentReport.managementTeam || []).map(item => ({
+                    ...item,
+                    prev: item.accumulated,  // ← Carry over accumulated to prev
+                    today: 0,                // ← Reset today to 0
+                    accumulated: item.accumulated // ← Keep accumulated same
+                  }))
+                );
                 setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
 
                 // Handle interior and MEP team migration
                 if (projectRecentReport.workingTeamInterior && projectRecentReport.workingTeamMEP) {
-                  setInteriorTeam(ensureRowIds(projectRecentReport.workingTeamInterior));
-                  setMepTeam(ensureRowIds(projectRecentReport.workingTeamMEP));
+                  // If separate interior/MEP exist, apply carry-over to each
+                  setInteriorTeam(
+                    ensureRowIds(projectRecentReport.workingTeamInterior).map(item => ({
+                      ...item,
+                      prev: item.accumulated,
+                      today: 0,
+                      accumulated: item.accumulated
+                    }))
+                  );
+                  setMepTeam(
+                    ensureRowIds(projectRecentReport.workingTeamMEP).map(item => ({
+                      ...item,
+                      prev: item.accumulated,
+                      today: 0,
+                      accumulated: item.accumulated
+                    }))
+                  );
                 } else {
                   const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
                   setInteriorTeam(interior);
                   setMepTeam(mep);
                 }
 
-                setMaterials(ensureRowIds(projectRecentReport.materials || []));
-                setMachinery(ensureRowIds(projectRecentReport.machinery || []));
+                setMaterials(
+                  ensureRowIds(projectRecentReport.materials || []).map(item => ({
+                    ...item,
+                    prev: item.accumulated,  // ← Carry over accumulated to prev
+                    today: 0,                // ← Reset today to 0
+                    accumulated: item.accumulated // ← Keep accumulated same
+                  }))
+                );
+                setMachinery(
+                  ensureRowIds(projectRecentReport.machinery || []).map(item => ({
+                    ...item,
+                    prev: item.accumulated,  // ← Carry over accumulated to prev
+                    today: 0,                // ← Reset today to 0
+                    accumulated: item.accumulated // ← Keep accumulated same
+                  }))
+                );
                 // setReferenceSections(projectRecentReport.referenceSections || []);
                 // setSiteActivitiesSections(projectRecentReport.siteActivitiesSections || []);
                 setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "Site Activities Photos");
