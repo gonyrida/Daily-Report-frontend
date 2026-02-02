@@ -86,12 +86,19 @@ export const uploadProfilePicture = async (file: File): Promise<{ success: boole
     const formData = new FormData();
     formData.append('profilePicture', file);
     
+    // Add localStorage token for authentication
+    const token = localStorage.getItem('authToken');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['X-Auth-Token'] = token;
+    }
+    
     // Use fetch directly for FormData to avoid JSON stringification
     const response = await fetch(API_ENDPOINTS.USER.UPLOAD_PICTURE, {
       method: 'POST',
       body: formData,
       credentials: 'include',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers, // Include X-Auth-Token header
     });
     
     if (!response.ok) {
