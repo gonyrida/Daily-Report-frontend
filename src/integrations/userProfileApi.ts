@@ -35,12 +35,21 @@ export const getUserProfile = async (): Promise<{ success: boolean; data: UserPr
     const result = await response.json();
     console.log("DEBUG FRONTEND: Profile fetched successfully:", result);
 
-    // 🔥 TRANSFORM: Convert backend response to maintain frontend consistency
-    if (result.success && result.user) {
-      return {
-        success: true,
-        data: result.user  // ← Convert user to data
-      };
+    // 🔥 TRANSFORM: Handle both response formats for compatibility
+    if (result.success) {
+      if (result.user) {
+        // Backend returns user
+        return {
+          success: true,
+          data: result.user
+        };
+      } else if (result.data) {
+        // Fallback for data format
+        return {
+          success: true,
+          data: result.data
+        };
+      }
     }
 
     return result;
@@ -64,12 +73,21 @@ export const updateUserProfile = async (profileData: UpdateProfileData): Promise
     const result = await response.json();
     console.log("DEBUG FRONTEND: Profile updated successfully:", result);
 
-    // 🔥 TRANSFORM: Convert backend response to maintain frontend consistency
-    if (result.success && result.user) {
-      return {
-        success: true,
-        data: result.user  // ← Convert user to data
-      };
+    // 🔥 TRANSFORM: Handle both response formats for compatibility
+    if (result.success) {
+      if (result.data) {
+        // Backend returns data
+        return {
+          success: true,
+          data: result.data
+        };
+      } else if (result.user) {
+        // Fallback for user format
+        return {
+          success: true,
+          data: result.user
+        };
+      }
     }
 
     return result;
