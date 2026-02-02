@@ -10,6 +10,7 @@ import ProfilePage from './ProfilePage';
 import { saveProfileLocally, loadProfileLocally } from '@/lib/storageUtils';
 import { handleImageError, constructImageUrl, getCacheBustingTimestamp } from '@/utils/imageUtils';
 import { API_BASE_URL } from '@/config/api';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface UserProfile {
   id: string;
@@ -54,12 +55,12 @@ const ProfileIcon = () => {
       }
       
       // If no cache, fetch from API
-      const { API_ENDPOINTS } = await import('@/config/api');
       const response = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
         method: 'GET',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'X-Auth-Token': localStorage.getItem('authToken'),
         },
       });
       
