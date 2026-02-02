@@ -1,6 +1,8 @@
 // src/lib/apiFetch.ts
 // SINGLE UNIFIED FETCH LAYER - COOKIE-BASED AUTH ONLY
 
+import { API_BASE_URL } from '@/config/api';
+
 interface ApiFetchOptions {
   method?: string;
   body?: any;
@@ -54,7 +56,7 @@ export const apiFetch = async (url: string, options: ApiFetchOptions = {}): Prom
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
       method,
       headers: {
         "Content-Type": "application/json",
