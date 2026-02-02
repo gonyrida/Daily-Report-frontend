@@ -9,6 +9,7 @@ import UserProfileDropdown from './UserProfileDropdown';
 import ProfilePage from './ProfilePage';
 import { saveProfileLocally, loadProfileLocally } from '@/lib/storageUtils';
 import { handleImageError, constructImageUrl, getCacheBustingTimestamp } from '@/utils/imageUtils';
+import { API_BASE_URL } from '@/config/api';
 
 interface UserProfile {
   id: string;
@@ -53,7 +54,7 @@ const ProfileIcon = () => {
       }
       
       // If no cache, fetch from API
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
         method: 'GET',
         credentials: 'include',
         headers: {
