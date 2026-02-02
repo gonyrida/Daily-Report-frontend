@@ -53,7 +53,8 @@ const ProfileIcon = () => {
       }
       
       // If no cache, fetch from API
-      const response = await fetch('/api/auth/profile', {
+      const { API_ENDPOINTS } = await import('@/config/api');
+      const response = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
         method: 'GET',
         credentials: 'include',
         headers: {
