@@ -118,7 +118,7 @@ const DailyReportProjects: React.FC = () => {
   useEffect(() => {
     const getUserInfo = async () => {
       try {
-        const response = await apiGet('/api/auth/profile');
+        const response = await apiGet('/auth/profile');
         const data = await response.json();
         
         if (data.success && data.user?._id) {

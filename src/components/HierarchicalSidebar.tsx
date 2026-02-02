@@ -114,7 +114,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   useEffect(() => {
     const getUserInfo = async () => {
       try {
-        const response = await apiGet('/api/auth/profile');
+        const response = await apiGet('/auth/profile');
         const data = await response.json();  // ← ADD THIS LINE
 
         console.log("DEBUG: Full user response:", data);  // ← ADD THIS
