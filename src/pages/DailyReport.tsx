@@ -843,50 +843,79 @@ const DailyReport = () => {
                 setTempAM(projectRecentReport.tempAM || "");
                 setTempPM(projectRecentReport.tempPM || "");
                 setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
-                setActivityToday(projectRecentReport.activityToday || "");
-                setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
-                setManagementTeam(ensureRowIds(projectRecentReport.managementTeam || []));
-                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeamInterior || []));
+                // setActivityToday(projectRecentReport.activityToday || "");
+                // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                setManagementTeam(
+                  ensureRowIds(projectRecentReport.managementTeam || []).map(item => ({
+                    ...item,
+                    prev: item.accumulated,  // ← Carry over accumulated to prev
+                    today: 0,                // ← Reset today to 0
+                    accumulated: item.accumulated // ← Keep accumulated same
+                  }))
+                );
+                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
             
                 // Handle interior and MEP team migration
-                if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam > 0) {
-                  // New format: use separate workingTeamMEP from database
-                  setMepTeam(ensureRowIds(projectRecentReport.workingTeamMEP));
-                  // Also set interiorTeam from workingTeamInterior if available
-                  setInteriorTeam(ensureRowIds(projectRecentReport.workingTeamInterior || []));
-                } else if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam) {
-                  // Legacy format: use separate teams
-                  setInteriorTeam(ensureRowIds(projectRecentReport.interiorTeam));
-                  setMepTeam(ensureRowIds(projectRecentReport.mepTeam));
+                if (projectRecentReport.workingTeamInterior && projectRecentReport.workingTeamMEP) {
+                  // If separate interior/MEP exist, apply carry-over to each
+                  setInteriorTeam(
+                    ensureRowIds(projectRecentReport.workingTeamInterior).map(item => ({
+                      ...item,
+                      prev: item.accumulated,
+                      today: 0,
+                      accumulated: item.accumulated
+                    }))
+                  );
+                  setMepTeam(
+                    ensureRowIds(projectRecentReport.workingTeamMEP).map(item => ({
+                      ...item,
+                      prev: item.accumulated,
+                      today: 0,
+                      accumulated: item.accumulated
+                    }))
+                  );
                 } else {
-                  // Old format: split working team
-                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeamInterior || []));
+                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
                   setInteriorTeam(interior);
                   setMepTeam(mep);
                 }
             
-                setMaterials(ensureRowIds(projectRecentReport.materials || []));
-                setMachinery(ensureRowIds(projectRecentReport.machinery || []));
-                setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
+                setMaterials(
+                  ensureRowIds(projectRecentReport.materials || []).map(item => ({
+                    ...item,
+                    prev: item.accumulated,  // ← Carry over accumulated to prev
+                    today: 0,                // ← Reset today to 0
+                    accumulated: item.accumulated // ← Keep accumulated same
+                  }))
+                );
+                setMachinery(
+                  ensureRowIds(projectRecentReport.machinery || []).map(item => ({
+                    ...item,
+                    prev: item.accumulated,  // ← Carry over accumulated to prev
+                    today: 0,                // ← Reset today to 0
+                    accumulated: item.accumulated // ← Keep accumulated same
+                  }))
+                );
+                // setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
 
-                // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-                if (projectRecentReport.site_ref && projectRecentReport.site_ref.length > 0) {
-                  // Convert DB format back to frontend format
-                  const convertedSiteActivities = projectRecentReport.site_ref.map((section: any) => ({
-                    title: section.section_title || "",
-                    entries: [{
-                      slots: section.images.map((image: string, index: number) => ({
-                        image: image,
-                        caption: section.footers[index] || ""
-                      }))
-                    }]
-                  }));
-                  setSiteActivitiesSections(convertedSiteActivities);
-                } else {
-                  setSiteActivitiesSections(createDefaultSiteActivitiesSections());
-                }
+                // // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+                // if (projectRecentReport.site_ref && projectRecentReport.site_ref.length > 0) {
+                //   // Convert DB format back to frontend format
+                //   const convertedSiteActivities = projectRecentReport.site_ref.map((section: any) => ({
+                //     title: section.section_title || "",
+                //     entries: [{
+                //       slots: section.images.map((image: string, index: number) => ({
+                //         image: image,
+                //         caption: section.footers[index] || ""
+                //       }))
+                //     }]
+                //   }));
+                //   setSiteActivitiesSections(convertedSiteActivities);
+                // } else {
+                //   setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+                // }
                 setSiteActivitiesTitle(projectRecentReport.site_title || "Site Activities Photos");
-                setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                // setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
                 console.log("🔍 DEBUG: CAR loaded from projectRecentReport:", projectRecentReport.carSheet?.description);
                 setProjectLogo(projectRecentReport.projectLogo || null);
                 
