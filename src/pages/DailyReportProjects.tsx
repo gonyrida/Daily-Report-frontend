@@ -229,7 +229,7 @@ const DailyReportProjects: React.FC = () => {
           
           // Emit event to sidebar
           projectEvents.emit('projectAdded', { 
-            name: (response.data as Project).name,
+            projectName: (response.data as Project).name,
             createdBy: (response.data as Project).createdBy,
             createdByName: (response.data as Project).createdByName
           });
@@ -632,7 +632,7 @@ const DailyReportProjects: React.FC = () => {
                                               Are you sure you want to delete this project?
                                             </AlertDialogTitle>
                                             <AlertDialogDescription>
-                                              This action will permanently delete "{project.name}" from your project list. This cannot be undone.
+                                              This action will permanently delete "{project.name}" and <strong>ALL its reports.</strong> This cannot be undone.
                                             </AlertDialogDescription>
                                           </AlertDialogHeader>
                                           <AlertDialogFooter>

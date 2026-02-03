@@ -681,11 +681,11 @@ const DailyReport = () => {
                 setReportStatus("draft");
 
                 // Load data from project's most recent report
-                setWeatherAM(projectRecentReport.weatherAM || "");
-                setWeatherPM(projectRecentReport.weatherPM || "");
-                setTempAM(projectRecentReport.tempAM || "");
-                setTempPM(projectRecentReport.tempPM || "");
-                setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
+                // setWeatherAM(projectRecentReport.weatherAM || "");
+                // setWeatherPM(projectRecentReport.weatherPM || "");
+                // setTempAM(projectRecentReport.tempAM || "");
+                // setTempPM(projectRecentReport.tempPM || "");
+                // setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
                 // setActivityToday(projectRecentReport.activityToday || "");
                 // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
@@ -756,31 +756,31 @@ const DailyReport = () => {
                     })
                   )
                 );
-                setReferenceSections(
-                  projectRecentReport.referenceSections &&
-                    projectRecentReport.referenceSections.length > 0
-                    ? projectRecentReport.referenceSections
-                    : createDefaultHSESections()
-                );
+                // setReferenceSections(
+                //   projectRecentReport.referenceSections &&
+                //     projectRecentReport.referenceSections.length > 0
+                //     ? projectRecentReport.referenceSections
+                //     : createDefaultHSESections()
+                // );
 
                 // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-                if (
-                  projectRecentReport.site_ref &&
-                  projectRecentReport.site_ref.length > 0
-                ) {
-                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
-                  const convertedSiteActivities = convertFromSiteRefFormat(
-                    projectRecentReport.site_ref
-                  );
-                  setSiteActivitiesSections(convertedSiteActivities);
-                } else {
-                  setSiteActivitiesSections(
-                    projectRecentReport.siteActivitiesSections &&
-                      projectRecentReport.siteActivitiesSections.length > 0
-                      ? projectRecentReport.siteActivitiesSections
-                      : createDefaultSiteActivitiesSections()
-                  );
-                }
+                // if (
+                //   projectRecentReport.site_ref &&
+                //   projectRecentReport.site_ref.length > 0
+                // ) {
+                //   // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                //   const convertedSiteActivities = convertFromSiteRefFormat(
+                //     projectRecentReport.site_ref
+                //   );
+                //   setSiteActivitiesSections(convertedSiteActivities);
+                // } else {
+                //   setSiteActivitiesSections(
+                //     projectRecentReport.siteActivitiesSections &&
+                //       projectRecentReport.siteActivitiesSections.length > 0
+                //       ? projectRecentReport.siteActivitiesSections
+                //       : createDefaultSiteActivitiesSections()
+                //   );
+                // }
                 setSiteActivitiesTitle(
                   projectRecentReport.siteActivitiesTitle ||
                     "Site Activities Photos"

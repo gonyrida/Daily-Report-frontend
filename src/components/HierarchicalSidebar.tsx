@@ -573,7 +573,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                                     Are you sure you want to delete this project?
                                                   </AlertDialogTitle>
                                                   <AlertDialogDescription>
-                                                    This action will permanently delete "{project.name}" from your project list. This cannot be undone.
+                                                    This action will permanently delete "{project.name}" and <strong>ALL its reports.</strong> This cannot be undone.
                                                   </AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
