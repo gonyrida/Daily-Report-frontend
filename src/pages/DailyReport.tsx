@@ -794,18 +794,25 @@ const DailyReport = () => {
             setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
             // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
             if (dbReport.site_ref && dbReport.site_ref.length > 0) {
-              // Convert DB format back to frontend format
+              // Convert DB format back to frontend format - FIXED: Create multiple entries
               const convertedSiteActivities = dbReport.site_ref.map((section: any) => ({
-                id: crypto.randomUUID(),  // ← ADD THIS
+                id: crypto.randomUUID(),
                 title: section.section_title || "",
-                entries: [{
-                  id: crypto.randomUUID(),  // ← ADD THIS
-                  slots: section.images.map((image: string, index: number) => ({
-                    id: crypto.randomUUID(),  // ← ADD THIS
-                    image: image,
-                    caption: section.footers[index] || ""
-                  }))
-                }]
+                entries: Array.from({length: Math.ceil(section.images.length / 2)}, (_, entryIndex) => ({
+                  id: crypto.randomUUID(),
+                  slots: [
+                    {
+                      id: crypto.randomUUID(),
+                      image: section.images[entryIndex * 2],
+                      caption: section.footers[entryIndex * 2] || ""
+                    },
+                    ...(section.images[entryIndex * 2 + 1] ? [{
+                      id: crypto.randomUUID(),
+                      image: section.images[entryIndex * 2 + 1],
+                      caption: section.footers[entryIndex * 2 + 1] || ""
+                    }] : [])
+                  ]
+                }))
               }));
               setSiteActivitiesSections(convertedSiteActivities);
             } else {

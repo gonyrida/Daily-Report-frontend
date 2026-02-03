@@ -250,8 +250,9 @@ export const convertToSiteRefFormat = (sections: any[]) => {
   
   return sections.map((section) => ({
     section_title: section.title || "",
-    images: section.entries?.[0]?.slots?.map(slot => slot.image).filter(img => img) || [],
-    footers: section.entries?.[0]?.slots?.map(slot => slot.caption).filter(cap => cap) || []
+    // ✅ FIXED: Process ALL entries, not just the first one
+    images: section.entries?.flatMap(entry => entry.slots?.map(slot => slot.image)).filter(img => img) || [],
+    footers: section.entries?.flatMap(entry => entry.slots?.map(slot => slot.caption)).filter(cap => cap) || []
   }));
 };
 
