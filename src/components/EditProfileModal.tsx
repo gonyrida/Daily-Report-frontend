@@ -9,26 +9,34 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, User, Camera, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/integrations/userProfileApi";
-import { handleImageError, getFallbackAvatarUrl, constructImageUrl, getCacheBustingTimestamp } from "@/utils/imageUtils";
+import {
+  handleImageError,
+  getFallbackAvatarUrl,
+  constructAuthenticatedImageUrl,
+  getCacheBustingTimestamp,
+} from "@/utils/imageUtils";
 
 interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: UserProfile | null;
-  onSave: (data: { fullName?: string; profilePicture?: string }) => Promise<void>;
+  onSave: (data: {
+    fullName?: string;
+    profilePicture?: string;
+  }) => Promise<void>;
   isSaving: boolean;
 }
 
-const EditProfileModal = ({ 
-  isOpen, 
-  onClose, 
-  profile, 
-  onSave, 
-  isSaving 
+const EditProfileModal = ({
+  isOpen,
+  onClose,
+  profile,
+  onSave,
+  isSaving,
 }: EditProfileModalProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Form state
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -44,8 +52,14 @@ const EditProfileModal = ({
       setFullName(profile.fullName || "");
       setEmail(profile.email || "");
       setProfilePicture(profile.profilePicture || "");
-      // Construct URL from relative path for preview
-      setPreviewUrl(profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : "");
+      setPreviewUrl(
+        profile.profilePicture
+          ? constructAuthenticatedImageUrl(
+              profile.profilePicture,
+              getCacheBustingTimestamp(),
+            )
+          : "",
+      );
       setSelectedFile(null);
       setHasChanges(false);
     }
@@ -56,17 +70,24 @@ const EditProfileModal = ({
     if (profile) {
       const nameChanged = fullName !== profile.fullName;
       const emailChanged = email !== profile.email;
-      const currentPreviewUrl = profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : "";
+      const currentPreviewUrl = profile.profilePicture
+        ? constructAuthenticatedImageUrl(
+            profile.profilePicture,
+            getCacheBustingTimestamp(),
+          )
+        : "";
       const pictureChanged = previewUrl !== currentPreviewUrl;
       setHasChanges(nameChanged || emailChanged || pictureChanged);
     }
   }, [fullName, email, previewUrl, profile]);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         toast({
           title: "Invalid File",
           description: "Please select an image file (JPG, PNG, JPEG).",
@@ -74,7 +95,7 @@ const EditProfileModal = ({
         });
         return;
       }
-      
+
       // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         toast({
@@ -84,9 +105,9 @@ const EditProfileModal = ({
         });
         return;
       }
-      
+
       setSelectedFile(file);
-      
+
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -98,24 +119,29 @@ const EditProfileModal = ({
 
   const handleSave = async () => {
     if (!profile) return;
-    
-    const changes: { fullName?: string; email?: string; profilePicture?: string } = {};
-    
+
+    const changes: {
+      fullName?: string;
+      email?: string;
+      profilePicture?: string;
+    } = {};
+
     if (fullName !== profile.fullName) {
       changes.fullName = fullName;
     }
-    
+
     if (email !== profile.email) {
       changes.email = email;
     }
-    
+
     // If there's a selected file, upload it first
     if (selectedFile) {
       setIsUploading(true);
       try {
-        const { uploadProfilePicture } = await import("@/integrations/userProfileApi");
+        const { uploadProfilePicture } =
+          await import("@/integrations/userProfileApi");
         const result = await uploadProfilePicture(selectedFile);
-        
+
         if (result.success && result.data) {
           changes.profilePicture = result.data.path; // Store relative path
         } else {
@@ -124,7 +150,8 @@ const EditProfileModal = ({
       } catch (error) {
         toast({
           title: "Upload Failed",
-          description: error instanceof Error ? error.message : "Failed to upload picture",
+          description:
+            error instanceof Error ? error.message : "Failed to upload picture",
           variant: "destructive",
         });
         setIsUploading(false);
@@ -137,7 +164,7 @@ const EditProfileModal = ({
     else if (profilePicture !== profile.profilePicture) {
       changes.profilePicture = profilePicture;
     }
-    
+
     if (Object.keys(changes).length > 0) {
       await onSave(changes);
       onClose();
@@ -162,9 +189,9 @@ const EditProfileModal = ({
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
@@ -174,11 +201,8 @@ const EditProfileModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50" 
-        onClick={handleCancel}
-      />
-      
+      <div className="fixed inset-0 bg-black/50" onClick={handleCancel} />
+
       {/* Modal */}
       <div className="relative bg-background rounded-lg shadow-lg w-full max-w-md mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
@@ -193,15 +217,15 @@ const EditProfileModal = ({
             <X className="h-4 w-4" />
           </Button>
         </div>
-        
+
         {/* Content */}
         <div className="p-6 space-y-6">
           {/* Profile Picture Section */}
           <div className="flex flex-col items-center space-y-4">
             <div className="relative">
               <Avatar className="h-24 w-24">
-                <AvatarImage 
-                  src={previewUrl} 
+                <AvatarImage
+                  src={previewUrl}
                   alt={fullName}
                   onError={(e) => handleImageError(e, fullName)}
                 />
@@ -209,7 +233,7 @@ const EditProfileModal = ({
                   {getInitials(fullName)}
                 </AvatarFallback>
               </Avatar>
-              
+
               {/* Upload Button */}
               <Button
                 size="sm"
@@ -224,7 +248,7 @@ const EditProfileModal = ({
                 )}
               </Button>
             </div>
-            
+
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">
                 Click the camera icon to change your photo
@@ -238,7 +262,7 @@ const EditProfileModal = ({
                 JPG, PNG or JPEG. Maximum 5MB.
               </p>
             </div>
-            
+
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -248,7 +272,7 @@ const EditProfileModal = ({
               className="hidden"
             />
           </div>
-          
+
           {/* Name Section */}
           <div className="space-y-2">
             <Label htmlFor="fullName">Full Name</Label>
@@ -259,7 +283,7 @@ const EditProfileModal = ({
               placeholder="Enter your full name"
               disabled={isSaving || isUploading}
             />
-            
+
             <div className="pt-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -273,7 +297,7 @@ const EditProfileModal = ({
             </div>
           </div>
         </div>
-        
+
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-6 border-t bg-muted/50">
           <Button

@@ -18,11 +18,15 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/integrations/userProfileApi";
 import EditProfileModal from "./EditProfileModal";
-import { handleImageError, constructImageUrl, getCacheBustingTimestamp } from "@/utils/imageUtils";
+import {
+  handleImageError,
+  constructAuthenticatedImageUrl,
+  getCacheBustingTimestamp,
+} from "@/utils/imageUtils";
 
 const UserProfileDropdown = () => {
   const [showEditProfile, setShowEditProfile] = useState(false);
-  
+
   const {
     profile,
     isLoading,
@@ -31,7 +35,7 @@ const UserProfileDropdown = () => {
     updateProfile,
     clearError,
   } = useUserProfile();
-  
+
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -39,16 +43,16 @@ const UserProfileDropdown = () => {
     try {
       const { logoutUser } = await import("@/integrations/authApi");
       await logoutUser();
-      
+
       localStorage.removeItem("token");
       localStorage.removeItem("rememberMe");
       localStorage.removeItem("user");
-      
+
       toast({
         title: "Logged out successfully",
         description: "You have been signed out of your account.",
       });
-      
+
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
@@ -61,9 +65,9 @@ const UserProfileDropdown = () => {
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
@@ -114,14 +118,21 @@ const UserProfileDropdown = () => {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="h-8 w-8 rounded-full p-0"
             aria-label="User profile menu"
           >
             <Avatar className="h-8 w-8">
-              <AvatarImage 
-                src={profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : ''} 
+              <AvatarImage
+                src={
+                  profile.profilePicture
+                    ? constructAuthenticatedImageUrl(
+                        profile.profilePicture,
+                        getCacheBustingTimestamp()
+                      )
+                    : ""
+                }
                 alt={profile.fullName}
                 onError={(e) => handleImageError(e, profile.fullName)}
               />
@@ -129,29 +140,38 @@ const UserProfileDropdown = () => {
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        
+
         <DropdownMenuContent className="w-80" align="end" forceMount>
           {/* Profile Header */}
           <div className="p-4">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
-                <AvatarImage 
-                  src={profile.profilePicture ? constructImageUrl(profile.profilePicture, getCacheBustingTimestamp()) : ''} 
+                <AvatarImage
+                  src={
+                    profile.profilePicture
+                      ? constructAuthenticatedImageUrl(
+                          profile.profilePicture,
+                          getCacheBustingTimestamp()
+                        )
+                      : ""
+                  }
                   alt={profile.fullName}
                   onError={(e) => handleImageError(e, profile.fullName)}
                 />
                 <AvatarFallback>{getInitials(profile.fullName)}</AvatarFallback>
               </Avatar>
-              
+
               <div className="flex-1">
                 <h3 className="font-medium">{profile.fullName}</h3>
                 <p className="text-sm text-muted-foreground">{profile.email}</p>
               </div>
             </div>
-            
+
             {/* Status and Role */}
             <div className="flex items-center gap-2 mt-3">
-              <Badge variant={profile.accountStatus === "active" ? "default" : "secondary"}>
+              <Badge
+                variant={profile.accountStatus === "active" ? "default" : "secondary"}
+              >
                 {profile.accountStatus}
               </Badge>
               <span className="text-sm text-muted-foreground capitalize">
@@ -159,9 +179,9 @@ const UserProfileDropdown = () => {
               </span>
             </div>
           </div>
-          
+
           <DropdownMenuSeparator />
-          
+
           {/* Menu Items */}
           <div className="p-2">
             <DropdownMenuItem
@@ -171,9 +191,9 @@ const UserProfileDropdown = () => {
               <User className="h-4 w-4" />
               Edit Profile
             </DropdownMenuItem>
-            
+
             <DropdownMenuSeparator />
-            
+
             <DropdownMenuItem
               onClick={handleLogout}
               className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600"
@@ -184,7 +204,7 @@ const UserProfileDropdown = () => {
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
-      
+
       {/* Edit Profile Modal */}
       <EditProfileModal
         isOpen={showEditProfile}
