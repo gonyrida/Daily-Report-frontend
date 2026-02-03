@@ -2096,9 +2096,25 @@ const DailyReport = () => {
         firstImage: rawData.referenceSections?.[0]?.entries?.[0]?.slots?.[0]?.image
       });
 
-      // Process images directly in referenceSections (like captions!)
-      const processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
-      const processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      // Process images only if they exist (same optimization as submit)
+      const hasImages = rawData.referenceSections?.some(section => 
+        section.entries?.some(entry => 
+          entry.slots?.some(slot => slot.image)
+        )
+      ) || rawData.siteActivitiesSections?.some(section => 
+        section.entries?.some(entry => 
+          entry.slots?.some(slot => slot.image)
+        )
+      );
+
+      let processedReferenceSections = rawData.referenceSections;
+      let processedSiteActivitiesSections = rawData.siteActivitiesSections;
+
+      if (hasImages) {
+        // Only process if images exist
+        processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
+        processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      }
       const siteRefData = convertToSiteRefFormat(processedSiteActivitiesSections);
 
       // ADD THIS right after line 2031 (before the CAR processing):
@@ -3052,8 +3068,24 @@ const DailyReport = () => {
       const rawData = getReportData();
       
       // Process images directly in referenceSections (like captions!)
-      const processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
-      const processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      const hasImages = rawData.referenceSections?.some(section => 
+        section.entries?.some(entry => 
+          entry.slots?.some(slot => slot.image)
+        )
+      ) || rawData.siteActivitiesSections?.some(section => 
+        section.entries?.some(entry => 
+          entry.slots?.some(slot => slot.image)
+        )
+      );
+
+      let processedReferenceSections = rawData.referenceSections;
+      let processedSiteActivitiesSections = rawData.siteActivitiesSections;
+
+      if (hasImages) {
+        // Only process if images exist
+        processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
+        processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      }
       const siteRefData = convertToSiteRefFormat(processedSiteActivitiesSections);
       
       // ADD toBase64DataUrl function:
@@ -3108,62 +3140,63 @@ const DailyReport = () => {
         },
       };
 
-      // Step 1: Save the report data to database
-      await saveReportToDB(cleanedData);
+      // NEW CODE (single API call):
+      const reportDataWithSubmit = {
+        ...cleanedData,
+        submitImmediately: true  // 🚀 Add this flag
+      };
 
-      // Step 2: Mark it as submitted (changes status)
-      await submitReportToDB(
-        cleanedData.projectName,
-        new Date(cleanedData.reportDate!)
-      );
+      await saveReportToDB(reportDataWithSubmit);  // 🚀 Single API call
+
       // ADD THIS: Update local status
       setReportStatus('submitted');
 
       // Step 3: Clear localStorage after successful submission
       localStorage.removeItem(dateKey(reportDate));
 
+      //Comment ouy Step 4 as it is currently not being used
       // Step 4: Prepare next day's data (Running Total / Carry-Forward)
-      const nextDay = new Date(reportDate!.getTime() + 86400000);
-      const carryForwardData = {
-        projectName: cleanedData.projectName,
-        reportDate: nextDay.toISOString(),
-        weatherAM: "",
-        weatherPM: "",
-        tempAM: "",
-        tempPM: "",
-        activityToday: "",
-        workPlanNextDay: "",
-        managementTeam: cleanedData.managementTeam.map((r) => ({
-          ...r,
-          prev: r.accumulated, // ✅ Carry forward accumulated to prev
-          today: 0,
-          accumulated: r.accumulated,
-        })),
-        workingTeamInterior: cleanedData.workingTeamInterior.map((r) => ({
-          ...r,
-          prev: r.accumulated,
-          today: 0,
-          accumulated: r.accumulated,
-        })),
-        workingTeamMEP: cleanedData.workingTeamMEP.map((r) => ({
-          ...r,
-          prev: r.accumulated,
-          today: 0,
-          accumulated: r.accumulated,
-        })),
-        materials: cleanedData.materials.map((r) => ({
-          ...r,
-          prev: r.accumulated,
-          today: 0,
-          accumulated: r.accumulated,
-        })),
-        machinery: cleanedData.machinery.map((r) => ({
-          ...r,
-          prev: r.accumulated,
-          today: 0,
-          accumulated: r.accumulated,
-        })),
-      };
+      // const nextDay = new Date(reportDate!.getTime() + 86400000);
+      // const carryForwardData = {
+      //   projectName: cleanedData.projectName,
+      //   reportDate: nextDay.toISOString(),
+      //   weatherAM: "",
+      //   weatherPM: "",
+      //   tempAM: "",
+      //   tempPM: "",
+      //   activityToday: "",
+      //   workPlanNextDay: "",
+      //   managementTeam: cleanedData.managementTeam.map((r) => ({
+      //     ...r,
+      //     prev: r.accumulated, // ✅ Carry forward accumulated to prev
+      //     today: 0,
+      //     accumulated: r.accumulated,
+      //   })),
+      //   workingTeamInterior: cleanedData.workingTeamInterior.map((r) => ({
+      //     ...r,
+      //     prev: r.accumulated,
+      //     today: 0,
+      //     accumulated: r.accumulated,
+      //   })),
+      //   workingTeamMEP: cleanedData.workingTeamMEP.map((r) => ({
+      //     ...r,
+      //     prev: r.accumulated,
+      //     today: 0,
+      //     accumulated: r.accumulated,
+      //   })),
+      //   materials: cleanedData.materials.map((r) => ({
+      //     ...r,
+      //     prev: r.accumulated,
+      //     today: 0,
+      //     accumulated: r.accumulated,
+      //   })),
+      //   machinery: cleanedData.machinery.map((r) => ({
+      //     ...r,
+      //     prev: r.accumulated,
+      //     today: 0,
+      //     accumulated: r.accumulated,
+      //   })),
+      // };
 
       // Save next day's template locally
       // saveDraftLocally(nextDay, carryForwardData);
