@@ -22,14 +22,35 @@ const MANAGEMENT_OPTIONS = [
   "Architecture",
   "QS Engineer",
   "MEP Engineer",
- 
 ];
 
-const WORKING_TEAM_OPTIONS = ["Site Manager", "Site Engineer","MEP Engineer","Foreman", "Skill Workers","MEP Workers", "General Workers"];
+const WORKING_TEAM_OPTIONS = [
+  "Site Manager",
+  "Site Engineer",
+  "MEP Engineer",
+  "Foreman",
+  "Skill Workers",
+  "MEP Workers",
+  "General Workers",
+];
 
-export const INTERIOR_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers","MEP Workers", "General Workers"];
+export const INTERIOR_TEAM_OPTIONS = [
+  "Site Manager",
+  "Site Engineer",
+  "Foreman",
+  "Skill Workers",
+  "General Workers",
+  "MEP Workers",
+];
 
-export const MEP_TEAM_OPTIONS = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers","MEP Workers", "General Workers"];
+export const MEP_TEAM_OPTIONS = [
+  "Site Manager",
+  "Site Engineer",
+  "Foreman",
+  "Skill Workers",
+  "General Workers",
+  "MEP Workers",
+];
 
 const MACHINERY_OPTIONS = [
   "Air compressor",
@@ -81,17 +102,7 @@ const MATERIAL_OPTIONS = [
   "Tile",
 ];
 
-const Units = [
-  "Pack",
-  "PCS",
-  "EA",
-  "Box",
-  "m",
-  "m2",
-  "m3",
-  "kg",
-  "ton",
-];
+const Units = ["Pack", "PCS", "EA", "Box", "m", "m2", "m3", "kg", "ton"];
 
 const ResourcesSection = ({
   managementTeam,
