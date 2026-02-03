@@ -25,6 +25,33 @@ export const constructImageUrl = (relativePath: string | null | undefined, times
 };
 
 /**
+ * Constructs a full image URL with authentication token for img tags
+ * @param relativePath - The relative path stored in database
+ * @param timestamp - Optional timestamp for cache-busting
+ * @returns Full URL with auth token for authenticated image requests
+ */
+export const constructAuthenticatedImageUrl = (relativePath: string | null | undefined, timestamp?: number): string => {
+  if (!relativePath) {
+    return '';
+  }
+  
+  let url = `${STATIC_BASE_URL}/uploads${relativePath}`;
+  
+  // Add authentication token for static file requests
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    url += `?token=${encodeURIComponent(token)}`;
+  }
+  
+  // Add cache-busting timestamp if provided
+  if (timestamp) {
+    url += token ? `&t=${timestamp}` : `?t=${timestamp}`;
+  }
+  
+  return url;
+};
+
+/**
  * Gets a fallback avatar URL with user initials
  * @param name - User's full name
  * @param size - Avatar size (default: 200)

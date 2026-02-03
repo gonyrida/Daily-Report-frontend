@@ -6,6 +6,7 @@ import { UserProfile, getUserProfile, updateUserProfile, uploadProfilePicture } 
 import { useToast } from "@/hooks/use-toast";
 import { saveProfileLocally, loadProfileLocally, clearProfileCache } from "@/lib/storageUtils";
 import { constructImageUrl, getCacheBustingTimestamp } from "@/utils/imageUtils";
+import { useProfileContext } from "@/contexts/ProfileContext";
 
 interface ProfileState {
   profile: UserProfile | null;
@@ -29,9 +30,10 @@ interface ProfileActions {
 }
 
 export const useUserProfile = (): ProfileState & ProfileActions => {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Use global context for profile state
+  const { profile, isLoading, error, refreshProfile, updateProfileCache } = useProfileContext();
+  
+  // Local state for editing and temporary changes
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -40,54 +42,12 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
   const { toast } = useToast();
 
   const fetchProfile = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // First try to load from cache
-      const cachedProfile = loadProfileLocally();
-      if (cachedProfile) {
-        console.log('Using cached profile for useUserProfile');
-        // Store relative path directly, construct URL only at render time
-        setProfile(cachedProfile);
-        setTempProfile({});
-      }
-      
-      // Always fetch fresh data from API to ensure consistency
-      const { verifyAuth } = await import("@/integrations/authApi");
-      const authResult = await verifyAuth();
-      
-      if (!authResult.success) {
-        throw new Error("Please log in to view your profile");
-      }
-      
-      const result = await getUserProfile();
-      if (result.success && result.data) {
-        // Store relative path directly, construct URL only at render time
-        setProfile(result.data);
-        setTempProfile({});
-        
-        // Update cache with fresh data (use relative path for cache)
-        saveProfileLocally(result.data);
-      } else {
-        throw new Error("Failed to load profile data");
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to load profile";
-      setError(errorMessage);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
+    // Use global context refresh instead of local state
+    await refreshProfile();
+  }, [refreshProfile]);
 
   const updateProfile = useCallback(async (data: { fullName?: string; email?: string; profilePicture?: string }) => {
     setIsSaving(true);
-    setError(null);
     
     console.log('DEBUG UPDATE: Data received:', data);
     
@@ -96,13 +56,10 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       console.log('DEBUG UPDATE: API result:', result);
       
       if (result.success && result.data) {
-        // Store relative path in state, construct URL only at render time
-        setProfile(result.data);
-        setTempProfile({});
+        // Update global context with new profile data
+        updateProfileCache(result.data);
         setIsEditing(false);
-        
-        // Update cache with new data (use relative path for cache)
-        saveProfileLocally(result.data);
+        setTempProfile({});
         
         toast({
           title: "Profile Updated",
@@ -113,7 +70,6 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update profile";
-      setError(errorMessage);
       toast({
         title: "Update Failed",
         description: errorMessage,
@@ -122,11 +78,10 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     } finally {
       setIsSaving(false);
     }
-  }, [toast]);
+  }, [toast, updateProfileCache]);
 
   const uploadPicture = useCallback(async (file: File) => {
     setIsUploading(true);
-    setError(null);
     
     console.log('DEBUG UPLOAD: File received:', file.name);
     
@@ -154,7 +109,6 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to upload picture";
-      setError(errorMessage);
       toast({
         title: "Upload Failed",
         description: errorMessage,
@@ -173,14 +127,12 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
         profilePicture: profile.profilePicture, // Store relative path
       });
       setIsEditing(true);
-      setError(null);
     }
   }, [profile]);
 
   const cancelEditing = useCallback(() => {
     setTempProfile({});
     setIsEditing(false);
-    setError(null);
   }, []);
 
   const saveChanges = useCallback(async () => {
@@ -219,7 +171,8 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
   }, [profile, tempProfile, updateProfile]);
 
   const clearError = useCallback(() => {
-    setError(null);
+    // Error handling is now managed by the context
+    // This function is kept for backward compatibility
   }, []);
 
   // Add method to update temp profile from components
@@ -227,10 +180,10 @@ export const useUserProfile = (): ProfileState & ProfileActions => {
     setTempProfile(prev => ({ ...prev, ...updates }));
   }, []);
 
-  // Auto-fetch profile on mount
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+  // Auto-fetch profile on mount (handled by context)
+  // useEffect(() => {
+  //   fetchProfile();
+  // }, [fetchProfile]);
 
   return {
     // State

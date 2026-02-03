@@ -3287,7 +3287,7 @@ const DailyReport = () => {
             ) : (
               <>
             {/* Navigation Header */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-hidden">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <SidebarTrigger />
@@ -3308,12 +3308,12 @@ const DailyReport = () => {
                 </div>
 
                     {/* Section Filter Tabs */}
-                    <div className="flex items-center gap-2 overflow-x-auto">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Button
                         variant={activeTab === "site-activities" ? "default" : "outline"}
                         size="sm"
                         onClick={() => setActiveTab("site-activities")}
-                        className="rounded-full whitespace-nowrap"
+                        className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                       >
                         Report
                       </Button>
@@ -3321,7 +3321,7 @@ const DailyReport = () => {
                         variant={activeTab === "hse" ? "default" : "outline"}
                         size="sm"
                         onClick={() => setActiveTab("hse")}
-                        className="rounded-full whitespace-nowrap"
+                        className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                       >
                         HSE
                       </Button>
@@ -3331,7 +3331,7 @@ const DailyReport = () => {
                         }
                         size="sm"
                         onClick={() => setActiveTab("site-activities-photos")}
-                        className="rounded-full whitespace-nowrap"
+                        className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                       >
                         Site Activities Photos
                       </Button>
@@ -3339,7 +3339,7 @@ const DailyReport = () => {
                         variant={activeTab === "car" ? "default" : "outline"}
                         size="sm"
                         onClick={() => setActiveTab("car")}
-                        className="rounded-full whitespace-nowrap"
+                        className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                       >
                         CAR
                       </Button>
@@ -3351,7 +3351,7 @@ const DailyReport = () => {
                   </div>
                 </div>
 
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-6 space-y-6">
                   {/* Tab-based content rendering */}
                   {activeTab === "site-activities" && (
                     <>

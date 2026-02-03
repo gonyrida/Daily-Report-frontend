@@ -1,7 +1,7 @@
 // src/integrations/userProfileApi.ts
 // User profile API integration
 
-import { API_ENDPOINTS } from "../config/api";
+import { API_ENDPOINTS, API_BASE_URL } from "../config/api";
 import { apiGet, apiPost, apiPut } from "../lib/apiFetch";
 
 export interface UserProfile {
@@ -112,7 +112,8 @@ export const uploadProfilePicture = async (file: File): Promise<{ success: boole
     }
     
     // Use fetch directly for FormData to avoid JSON stringification
-    const response = await fetch(API_ENDPOINTS.USER.UPLOAD_PICTURE, {
+    const uploadUrl = `${API_BASE_URL}${API_ENDPOINTS.USER.UPLOAD_PICTURE}`;
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       body: formData,
       credentials: 'include',
