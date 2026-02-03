@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Section({ section, onUpdate, onDelete }: any) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Add a new entry (single-image entry)
+  // Add a new entry (with slots format)
   const addEntry = () => {
     onUpdate({
       ...section,
@@ -16,8 +16,10 @@ export default function Section({ section, onUpdate, onDelete }: any) {
         ...section.entries,
         {
           id: crypto.randomUUID(),
-          image: null,
-          caption: "",
+          slots: [
+            { id: crypto.randomUUID(), image: null, caption: "" },
+            { id: crypto.randomUUID(), image: null, caption: "" }
+          ],
         },
       ],
     });
@@ -184,7 +186,7 @@ export default function Section({ section, onUpdate, onDelete }: any) {
         )}
 
         <div className="flex items-center justify-end gap-3 mt-6">
-          <Button onClick={addEntry} className="inline-flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white"> 
+          <Button onClick={addEntry} className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-white transition-colors"> 
             <ImagePlus className="w-4 h-4" />
             Add More Picture
           </Button>
