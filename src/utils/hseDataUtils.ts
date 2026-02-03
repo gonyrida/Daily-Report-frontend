@@ -3,202 +3,133 @@
  */
 
 // Helper to process small images to base64 for database storage
-export const processImageToBase64 = async (image: any): Promise<string | null> => {
-  console.log("🔍 PROCESS TO BASE64 DEBUG: Starting processing:", {
-    type: typeof image,
-    isFile: image instanceof File,
-    isString: typeof image === 'string',
-    fileSize: image instanceof File ? image.size : 'N/A',
-    stringStart: typeof image === 'string' ? image.substring(0, 20) : 'N/A'
-  });
-  
+export const processImageToBase64 = async (
+  image: any
+): Promise<string | null> => {
   if (!image) {
-    console.log("🔍 PROCESS TO BASE64 DEBUG: ❌ No image provided");
     return null;
   }
-  
+
   // If it's already base64, return as-is
-  if (typeof image === 'string' && image.startsWith('data:')) {
-    console.log("🔍 PROCESS TO BASE64 DEBUG: ✅ Already base64, returning as-is");
+  if (typeof image === "string" && image.startsWith("data:")) {
     return image;
   }
-  
+
   // If it's a blob URL, try to convert to base64 (but only if it's not too large)
-  if (typeof image === 'string' && image.startsWith('blob:')) {
-    console.log("🔍 PROCESS TO BASE64 DEBUG: Processing blob URL");
+  if (typeof image === "string" && image.startsWith("blob:")) {
     try {
       const response = await fetch(image);
       const blob = await response.blob();
-      
-      console.log("🔍 PROCESS TO BASE64 DEBUG: Blob info:", {
-        size: blob.size,
-        type: blob.type,
-        isOver15MB: blob.size > 15 * 1024 * 1024
-      });
-      
+
       // Check size - only process if less than 15MB to avoid timeouts
       if (blob.size > 15 * 1024 * 1024) {
-        console.log("🔍 PROCESS TO BASE64 DEBUG: ⚠️ Skipping large blob image (>15MB)");
         return image; // Return blob URL instead
       }
-      
-      console.log("🔍 PROCESS TO BASE64 DEBUG: Converting blob to base64");
+
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-          console.log("🔍 PROCESS TO BASE64 DEBUG: ✅ Blob converted to base64");
           resolve(reader.result as string);
         };
         reader.onerror = (error) => {
-          console.log("🔍 PROCESS TO BASE64 DEBUG: ❌ Blob conversion failed:", error);
           reject(error);
         };
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.log("🔍 PROCESS TO BASE64 DEBUG: ❌ Failed to process blob image:", error);
       return image; // Return original blob URL on failure
     }
   }
-  
+
   // If it's a File object, try to convert to base64 (but only if small)
   if (image instanceof File) {
-    console.log("🔍 PROCESS TO BASE64 DEBUG: Processing File object:", {
-      name: image.name,
-      size: image.size,
-      type: image.type,
-      isOver15MB: image.size > 15 * 1024 * 1024
-    });
-    
     // Check size - only process if less than 15MB
     if (image.size > 15 * 1024 * 1024) {
-      console.log("🔍 PROCESS TO BASE64 DEBUG: ⚠️ Skipping large File image (>15MB)");
       return null;
     }
-    
-    console.log("🔍 PROCESS TO BASE64 DEBUG: Converting File to base64");
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        console.log("🔍 PROCESS TO BASE64 DEBUG: ✅ File converted to base64");
         resolve(reader.result as string);
       };
       reader.onerror = (error) => {
-        console.log("🔍 PROCESS TO BASE64 DEBUG: ❌ File conversion failed:", error);
         reject(error);
       };
       reader.readAsDataURL(image);
     });
   }
-  
+
   // For HTTP URLs, return as-is
-  if (typeof image === 'string' && image.startsWith('http')) {
-    console.log("🔍 PROCESS TO BASE64 DEBUG: ✅ Using HTTP URL as-is");
+  if (typeof image === "string" && image.startsWith("http")) {
     return image;
   }
-  
+
   // For any other type, try to convert to string
-  console.log("🔍 PROCESS TO BASE64 DEBUG: Converting to string");
   return String(image);
 };
 
 // Helper to safely extract image data for database storage (async version)
-export const extractImageForDBAsync = async (image: any): Promise<string | null> => {
-  console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: Input:", {
-    type: typeof image,
-    value: image,
-    isNull: image === null,
-    isUndefined: image === undefined,
-    isString: typeof image === 'string',
-    isFile: image instanceof File,
-    stringLength: typeof image === 'string' ? image.length : 'N/A',
-    startsWithData: typeof image === 'string' ? image.startsWith('data:') : 'N/A',
-    startsWithBlob: typeof image === 'string' ? image.startsWith('blob:') : 'N/A',
-    startsWithHttp: typeof image === 'string' ? image.startsWith('http') : 'N/A',
-    fileSize: image instanceof File ? image.size : 'N/A'
-  });
-
+export const extractImageForDBAsync = async (
+  image: any
+): Promise<string | null> => {
   // REPLACE with this check:
-  if (typeof image === 'object' && image !== null && !(image instanceof File) && Object.keys(image).length === 0) {
-    console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: ❌ Empty image object provided");
+  if (
+    typeof image === "object" &&
+    image !== null &&
+    !(image instanceof File) &&
+    Object.keys(image).length === 0
+  ) {
     return null;
   }
-  
+
   if (!image) {
-    console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: ❌ No image provided");
     return null;
   }
-  
+
   // If it's already a base64 data URL, use it as-is
-  if (typeof image === 'string' && image.startsWith('data:')) {
-    console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: ✅ Using base64 data URL");
+  if (typeof image === "string" && image.startsWith("data:")) {
     return image;
   }
-  
+
   // Try to process to base64 for better persistence
   try {
     const result = await processImageToBase64(image);
-    console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: Process result:", {
-      success: !!result,
-      resultType: typeof result,
-      resultLength: typeof result === 'string' ? result.length : 'N/A',
-      startsWithData: typeof result === 'string' ? result.startsWith('data:') : 'N/A'
-    });
     return result;
   } catch (error) {
-    console.log("🔍 EXTRACT IMAGE ASYNC DEBUG: ❌ Processing failed:", error);
     return null;
   }
 };
 
 // Helper to safely extract image data for database storage (sync version - fallback)
 export const extractImageForDB = (image: any): string | null => {
-  console.log("🔍 EXTRACT IMAGE DEBUG: Input:", {
-    type: typeof image,
-    value: image,
-    isNull: image === null,
-    isUndefined: image === undefined,
-    isString: typeof image === 'string',
-    isFile: image instanceof File,
-    stringLength: typeof image === 'string' ? image.length : 'N/A',
-    startsWithData: typeof image === 'string' ? image.startsWith('data:') : 'N/A',
-    startsWithBlob: typeof image === 'string' ? image.startsWith('blob:') : 'N/A',
-    startsWithHttp: typeof image === 'string' ? image.startsWith('http') : 'N/A'
-  });
-  
   if (!image) {
-    console.log("🔍 EXTRACT IMAGE DEBUG: ❌ No image provided");
     return null;
   }
-  
+
   // If it's already a base64 data URL, use it as-is
-  if (typeof image === 'string' && image.startsWith('data:')) {
-    console.log("🔍 EXTRACT IMAGE DEBUG: ✅ Using base64 data URL");
+  if (typeof image === "string" && image.startsWith("data:")) {
     return image;
   }
-  
+
   // For site activities, we want to be more permissive and try to save blob URLs too
   // since these are important for the report functionality
-  if (typeof image === 'string' && image.startsWith('blob:')) {
-    console.log("🔍 EXTRACT IMAGE DEBUG: ⚠️ Using blob URL (may not work later)");
+  if (typeof image === "string" && image.startsWith("blob:")) {
     return image;
   }
-  
+
   // For HTTP URLs, save as-is
-  if (typeof image === 'string' && image.startsWith('http')) {
-    console.log("🔍 EXTRACT IMAGE DEBUG: ✅ Using HTTP URL");
+  if (typeof image === "string" && image.startsWith("http")) {
     return image;
   }
-  
+
   // If it's a File object, we can't save it directly to DB without processing
   // For now, skip it to avoid large payload issues
   if (image instanceof File) {
-    console.log("🔍 EXTRACT IMAGE DEBUG: ❌ Skipping File object to avoid timeouts");
     return null;
   }
-  
+
   // For any other type, try to convert to string
-  console.log("🔍 EXTRACT IMAGE DEBUG: ✅ Converting to string");
   return String(image);
 };
 
@@ -209,256 +140,269 @@ export const extractCaptionForDB = (caption: any): string => {
 };
 
 // Process images within the existing referenceSections structure
-export const processImagesInReferenceSections = async (referenceSections: any[]) => {
+export const processImagesInReferenceSections = async (
+  referenceSections: any[]
+) => {
   if (!referenceSections || !Array.isArray(referenceSections)) {
     return [];
   }
 
-  console.log("🔍 PROCESSING IMAGES: Starting image processing in referenceSections");
+  const processedSections = await Promise.all(
+    referenceSections.map(async (section) => {
+      const processedEntries = await Promise.all(
+        section.entries.map(async (entry) => {
+          const processedSlots = await Promise.all(
+            entry.slots.map(async (slot) => {
+              // Process image to base64 if it exists
+              const processedImage = await extractImageForDBAsync(slot.image);
 
-  const processedSections = await Promise.all(referenceSections.map(async (section) => {
-    const processedEntries = await Promise.all(section.entries.map(async (entry) => {
-      const processedSlots = await Promise.all(entry.slots.map(async (slot) => {
-        // Process image to base64 if it exists
-        const processedImage = await extractImageForDBAsync(slot.image);
-        
-        return {
-          ...slot,
-          image: processedImage || null  // ← Base64 string or null
-        };
-      }));
+              return {
+                ...slot,
+                image: processedImage || null, // ← Base64 string or null
+              };
+            })
+          );
+
+          return {
+            ...entry,
+            slots: processedSlots,
+          };
+        })
+      );
 
       return {
-        ...entry,
-        slots: processedSlots
+        ...section,
+        entries: processedEntries,
       };
-    }));
+    })
+  );
 
-    return {
-      ...section,
-      entries: processedEntries
-    };
-  }));
-
-  console.log("🔍 PROCESSING IMAGES: Complete");
   return processedSections;
 };
 
 // Convert frontend format to site_ref format
 export const convertToSiteRefFormat = (sections: any[]) => {
   if (!sections || !Array.isArray(sections)) return [];
-  
-  return sections.map((section) => ({
-    section_title: section.title || "",
-    // ✅ FIXED: Process ALL entries, not just the first one
-    images: section.entries?.flatMap(entry => entry.slots?.map(slot => slot.image)).filter(img => img) || [],
-    footers: section.entries?.flatMap(entry => entry.slots?.map(slot => slot.caption)).filter(cap => cap) || []
-  }));
-};
 
-// Convert site_ref format to frontend format
-export const convertFromSiteRefFormat = (sections: any[]) => {
-  if (!sections || !Array.isArray(sections)) return [];
-  
-  return sections.map((section) => ({
-    id: crypto.randomUUID(),
-    title: section.section_title || "",
-    entries: [{
-      id: crypto.randomUUID(),
-      slots: section.images.map((img: string, idx: number) => ({
-        id: crypto.randomUUID(),
-        image: img,
-        caption: section.footers[idx] || ""
-      }))
-    }]
-  }));
-};
-
-// Process HSE sections for database storage (with image processing)
-export const processHSEForDB = async (referenceSections: any[], tableTitle: string) => {
-  console.log("🔍 HSE DEBUG: Processing sections for DB:", {
-    sectionsCount: referenceSections?.length || 0,
-    tableTitle
-  });
-  
-  if (!referenceSections || !Array.isArray(referenceSections)) {
-    return {
-      hse_title: tableTitle || "",
-      hse: []
-    };
-  }
-
-  const processedHSE = await Promise.all(referenceSections.map(async (section: any) => {
+  // IMPORTANT:
+  // A section can have many entries; each entry has up to 2 slots.
+  // We must include images from ALL entries, not just entries[0].
+  return sections.map((section) => {
     const images: string[] = [];
     const footers: string[] = [];
 
-    console.log("🔍 HSE DEBUG: Processing section:", section.title);
-
-    if (section.entries && Array.isArray(section.entries)) {
-      for (const entry of section.entries) {
-        if (entry.slots && Array.isArray(entry.slots)) {
-          console.log("🔍 HSE DEBUG: Processing entry with", entry.slots.length, "slots");
-          for (const slot of entry.slots) {
-            // Process images to base64 for better persistence (same as site activities)
-            const image = await extractImageForDBAsync(slot.image);
-            console.log("🔍 HSE DEBUG: Slot image:", {
-              type: typeof slot.image,
-              hasImage: !!slot.image,
-              preview: typeof slot.image === 'string' ? slot.image.substring(0, 50) : 'non-string',
-              willSave: !!image,
-              isBase64: image?.startsWith('data:') || false,
-              imageSize: slot.image instanceof File ? slot.image.size : 'N/A',
-              imageStartsWith: typeof slot.image === 'string' ? slot.image.substring(0, 10) : 'N/A'
-            });
-            if (image) {
-              images.push(image);
-              console.log("🔍 HSE DEBUG: ✅ Image added, total now:", images.length);
-            } else {
-              console.log("🔍 HSE DEBUG: ❌ Image skipped/failed");
-            }
-            
-            // Always add captions
-            const caption = extractCaptionForDB(slot.caption);
-            console.log("🔍 HSE DEBUG: Slot caption:", caption);
-            if (caption) footers.push(caption);
-          }
+    const entries = Array.isArray(section?.entries) ? section.entries : [];
+    for (const entry of entries) {
+      const slots = Array.isArray(entry?.slots) ? entry.slots : [];
+      for (const slot of slots) {
+        // Only persist real images (string URLs/data URLs). If null/undefined, skip.
+        // At this point images should already be processed to strings by processImagesInReferenceSections.
+        if (typeof slot?.image === "string" && slot.image) {
+          images.push(slot.image);
+          footers.push(typeof slot?.caption === "string" ? slot.caption : "");
         }
       }
     }
 
-    const result = {
+    return {
       section_title: section.title || "",
       images,
-      footers
+      footers,
     };
-    
-    console.log("🔍 HSE DEBUG: Section result:", {
-      title: result.section_title,
-      imagesCount: result.images.length,
-      footersCount: result.footers.length
-    });
+  });
+};
+
+// Convert site_ref format to frontend format
+// Splits images into multiple entries with 2 slots each (matching Entry component structure)
+export const convertFromSiteRefFormat = (sections: any[]) => {
+  if (!sections || !Array.isArray(sections)) {
+    return [];
+  }
+
+  return sections.map((section, sectionIdx) => {
+    const images = section.images || [];
+    const footers = section.footers || [];
+
+    // Filter out only null/undefined/empty string images, but keep all others (including blob URLs)
+    // This ensures we preserve all valid images even if some failed to convert
+    const validImages: string[] = [];
+    const validFooters: string[] = [];
+
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      // Keep the image if it's truthy (not null, undefined, or empty string)
+      // This includes base64 strings, blob URLs, http URLs, etc.
+      if (img != null && img !== "" && typeof img === "string") {
+        validImages.push(img);
+        validFooters.push(footers[i] || "");
+      }
+    }
+
+    // Split images into entries of 2 slots each
+    const entries = [];
+    for (let i = 0; i < validImages.length; i += 2) {
+      const entrySlots = [];
+
+      // Add up to 2 slots per entry
+      for (let j = 0; j < 2 && i + j < validImages.length; j++) {
+        entrySlots.push({
+          id: crypto.randomUUID(),
+          image: validImages[i + j],
+          caption: validFooters[i + j] || "",
+        });
+      }
+
+      // Ensure exactly 2 slots (add empty slot if needed)
+      while (entrySlots.length < 2) {
+        entrySlots.push({
+          id: crypto.randomUUID(),
+          image: null,
+          caption: "",
+        });
+      }
+
+      entries.push({
+        id: crypto.randomUUID(),
+        slots: entrySlots,
+      });
+    }
+
+    // If no images, create one empty entry
+    if (entries.length === 0) {
+      entries.push({
+        id: crypto.randomUUID(),
+        slots: [
+          { id: crypto.randomUUID(), image: null, caption: "" },
+          { id: crypto.randomUUID(), image: null, caption: "" },
+        ],
+      });
+    }
+
+    const result = {
+      id: crypto.randomUUID(),
+      title: section.section_title || "",
+      entries,
+    };
 
     return result;
-  }));
+  });
+};
+
+// Process HSE sections for database storage (with image processing)
+export const processHSEForDB = async (
+  referenceSections: any[],
+  tableTitle: string
+) => {
+  if (!referenceSections || !Array.isArray(referenceSections)) {
+    return {
+      hse_title: tableTitle || "",
+      hse: [],
+    };
+  }
+
+  const processedHSE = await Promise.all(
+    referenceSections.map(async (section: any) => {
+      const images: string[] = [];
+      const footers: string[] = [];
+
+      if (section.entries && Array.isArray(section.entries)) {
+        for (const entry of section.entries) {
+          if (entry.slots && Array.isArray(entry.slots)) {
+            for (const slot of entry.slots) {
+              // Process images to base64 for better persistence (same as site activities)
+              const image = await extractImageForDBAsync(slot.image);
+              if (image) {
+                images.push(image);
+              }
+
+              // Always add captions
+              const caption = extractCaptionForDB(slot.caption);
+              if (caption) footers.push(caption);
+            }
+          }
+        }
+      }
+
+      const result = {
+        section_title: section.title || "",
+        images,
+        footers,
+      };
+
+      return result;
+    })
+  );
 
   const finalResult = {
     hse_title: tableTitle || "",
-    hse_ref: processedHSE  // ✅ Match backend field name
+    hse_ref: processedHSE, // ✅ Match backend field name
   };
-
-  console.log("🔍 HSE DEBUG: Final result:", {
-    title: finalResult.hse_title,
-    sectionsCount: finalResult.hse_ref.length,
-    totalImages: finalResult.hse_ref.reduce((sum, section) => sum + section.images.length, 0),
-    totalFooters: finalResult.hse_ref.reduce((sum, section) => sum + section.footers.length, 0)
-  });
 
   return finalResult;
 };
 
 // Process site activities sections for database storage (with image processing)
-export const processSiteActivitiesForDB = async (siteActivitiesSections: any[], siteActivitiesTitle: string) => {
-  console.log("🔍 SITE ACTIVITIES DEBUG: Processing sections for DB:", {
-    sectionsCount: siteActivitiesSections?.length || 0,
-    siteActivitiesTitle
-  });
-  
+export const processSiteActivitiesForDB = async (
+  siteActivitiesSections: any[],
+  siteActivitiesTitle: string
+) => {
   if (!siteActivitiesSections || !Array.isArray(siteActivitiesSections)) {
     return {
       site_title: siteActivitiesTitle || "",
-      site_ref: []
+      site_ref: [],
     };
   }
 
-  const processedSiteActivities = await Promise.all(siteActivitiesSections.map(async (section: any) => {
-    const images: string[] = [];
-    const footers: string[] = [];
-    let totalSlots = 0;
-    let slotsWithImages = 0;
-    let slotsWithoutImages = 0;
+  const processedSiteActivities = await Promise.all(
+    siteActivitiesSections.map(async (section: any) => {
+      const images: string[] = [];
+      const footers: string[] = [];
 
-    console.log("🔍 SITE ACTIVITIES DEBUG: Processing section:", section.title);
+      if (section.entries && Array.isArray(section.entries)) {
+        for (const entry of section.entries) {
+          if (entry.slots && Array.isArray(entry.slots)) {
+            for (const slot of entry.slots) {
+              // Process images to base64 for better persistence
+              // IMPORTANT: Always save the image, even if conversion fails
+              // Use the original image if conversion returns null
+              let imageToSave = await extractImageForDBAsync(slot.image);
 
-    if (section.entries && Array.isArray(section.entries)) {
-      for (const entry of section.entries) {
-        if (entry.slots && Array.isArray(entry.slots)) {
-          console.log("🔍 SITE ACTIVITIES DEBUG: Processing entry with", entry.slots.length, "slots");
-          totalSlots += entry.slots.length;
-          
-          for (const slot of entry.slots) {
-            // Count slots with/without images
-            if (slot.image) {
-              slotsWithImages++;
-            } else {
-              slotsWithoutImages++;
+              // If conversion failed but we have an original image, use the original
+              if (!imageToSave && slot.image) {
+                // Try to use the original image if it's already a string (blob URL, data URL, etc.)
+                if (typeof slot.image === "string") {
+                  imageToSave = slot.image;
+                }
+                // For File objects, we need to convert them - but if that failed, we'll skip
+                // However, we should still add a placeholder to maintain the array structure
+              }
+
+              // Always add the image (or null if conversion failed and no fallback)
+              // This ensures we maintain the correct array structure
+              images.push(imageToSave || null);
+
+              // Always add captions (even if image is null, to maintain array alignment)
+              const caption = extractCaptionForDB(slot.caption);
+              footers.push(caption || "");
             }
-            
-            // Process images to base64 for better persistence
-            const image = await extractImageForDBAsync(slot.image);
-            console.log("🔍 SITE ACTIVITIES DEBUG: Slot image:", {
-              type: typeof slot.image,
-              hasImage: !!slot.image,
-              preview: typeof slot.image === 'string' ? slot.image.substring(0, 50) : 'non-string',
-              willSave: !!image,
-              isBase64: image?.startsWith('data:') || false,
-              imageSize: slot.image instanceof File ? slot.image.size : 'N/A',
-              imageStartsWith: typeof slot.image === 'string' ? slot.image.substring(0, 10) : 'N/A'
-            });
-            if (image) {
-              images.push(image);
-              console.log("🔍 SITE ACTIVITIES DEBUG: ✅ Image added, total now:", images.length);
-            } else {
-              console.log("🔍 SITE ACTIVITIES DEBUG: ❌ Image skipped/failed");
-            }
-            
-            // Always add captions
-            const caption = extractCaptionForDB(slot.caption);
-            console.log("🔍 SITE ACTIVITIES DEBUG: Slot caption:", caption);
-            if (caption) footers.push(caption);
           }
         }
       }
-    }
 
-    console.log("🔍 SITE ACTIVITIES DEBUG: Section slot summary:", {
-      totalSlots,
-      slotsWithImages,
-      slotsWithoutImages,
-      imagesSaved: images.length,
-      footersSaved: footers.length
-    });
+      const result = {
+        section_title: section.title || "",
+        images,
+        footers,
+      };
 
-    const result = {
-      section_title: section.title || "",
-      images,
-      footers
-    };
-    
-    console.log("🔍 SITE ACTIVITIES DEBUG: Section result:", {
-      title: result.section_title,
-      imagesCount: result.images.length,
-      footersCount: result.footers.length
-    });
-
-    return result;
-  }));
+      return result;
+    })
+  );
 
   const finalResult = {
     site_title: siteActivitiesTitle || "",
-    site_ref: processedSiteActivities
+    site_ref: processedSiteActivities,
   };
-
-  console.log("🔍 SITE ACTIVITIES DEBUG: Final result:", {
-    title: finalResult.site_title,
-    sectionsCount: finalResult.site_ref.length,
-    totalImages: finalResult.site_ref.reduce((sum, section) => sum + section.images.length, 0),
-    totalFooters: finalResult.site_ref.reduce((sum, section) => sum + section.footers.length, 0),
-    sectionDetails: finalResult.site_ref.map(section => ({
-      title: section.section_title,
-      imagesCount: section.images.length,
-      footersCount: section.footers.length
-    }))
-  });
 
   return finalResult;
 };

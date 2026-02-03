@@ -9,9 +9,18 @@ import PDFPreviewModal from "@/components/PDFPreviewModal";
 import ReferenceSection from "@/components/ReferenceSection";
 import CARSection from "@/components/CARSection";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
-import { processHSEForDB, processSiteActivitiesForDB, processImagesInReferenceSections, convertToSiteRefFormat } from "@/utils/hseDataUtils";
+import {
+  processHSEForDB,
+  processSiteActivitiesForDB,
+  processImagesInReferenceSections,
+  convertToSiteRefFormat,
+  convertFromSiteRefFormat,
+} from "@/utils/hseDataUtils";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
-import { createDefaultHSESections, createDefaultSiteActivitiesSections } from "@/utils/referenceHelpers";
+import {
+  createDefaultHSESections,
+  createDefaultSiteActivitiesSections,
+} from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import DailyReportProjectsView from "@/components/DailyReportProjectsView";
 import { Button } from "@/components/ui/button";
@@ -63,13 +72,13 @@ import {
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { apiGet } from '@/lib/apiFetch';
+import { apiGet } from "@/lib/apiFetch";
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -151,63 +160,87 @@ interface ReportData {
 }
 
 // NEW: Validate and correct project context
-const validateAndSetProjectContext = (loadedProjectName: string, urlProjectName: string | null, setProjectName: (name: string) => void) => {
+const validateAndSetProjectContext = (
+  loadedProjectName: string,
+  urlProjectName: string | null,
+  setProjectName: (name: string) => void
+) => {
   // For new reports with URL context, always prioritize URL
-  if (urlProjectName && (!loadedProjectName || loadedProjectName !== urlProjectName)) {
-    console.log(`🔧 PROJECT CONTEXT: Prioritizing URL context "${urlProjectName}" over loaded "${loadedProjectName}"`);
+  if (
+    urlProjectName &&
+    (!loadedProjectName || loadedProjectName !== urlProjectName)
+  ) {
+    console.log(
+      `🔧 PROJECT CONTEXT: Prioritizing URL context "${urlProjectName}" over loaded "${loadedProjectName}"`
+    );
     setProjectName(urlProjectName);
     return urlProjectName;
   }
-  
+
   // For existing reports without URL context, use loaded data
   if (!urlProjectName && loadedProjectName) {
     setProjectName(loadedProjectName);
     return loadedProjectName;
   }
-  
+
   // Fallback to URL context if available
   if (urlProjectName) {
     setProjectName(urlProjectName);
     return urlProjectName;
   }
-  
+
   return loadedProjectName;
 };
 
 // UPDATED: Enhanced detection logic with project history awareness
-const isNewReportCreation = async (reportIdFromUrl: string | null, projectFromUrl: string | null, dbReport: any): Promise<boolean> => {
+const isNewReportCreation = async (
+  reportIdFromUrl: string | null,
+  projectFromUrl: string | null,
+  dbReport: any
+): Promise<boolean> => {
   // If no reportId and has project context → Always treat as new report
   if (!reportIdFromUrl && projectFromUrl) {
     return true; // Always new report creation for smart loading
   }
-  
+
   // If reportId exists but project context doesn't match → New report for different project
-  if (reportIdFromUrl && projectFromUrl && dbReport && dbReport.projectName !== projectFromUrl) {
+  if (
+    reportIdFromUrl &&
+    projectFromUrl &&
+    dbReport &&
+    dbReport.projectName !== projectFromUrl
+  ) {
     return true;
   }
-  
+
   // If no reportId and no project context → Main dashboard new report
   if (!reportIdFromUrl && !projectFromUrl) {
     return true;
   }
-  
+
   // Otherwise → Existing report edit
   return false;
 };
 
 // NEW: Initialize clean state for new reports
-const initializeCleanReportState = (projectName: string, setProjectName: (name: string) => void, setReportStatus: (status: string) => void) => {
-  console.log(`🔧 CLEAN STATE: Initializing new report for project "${projectName}"`);
-  
+const initializeCleanReportState = (
+  projectName: string,
+  setProjectName: (name: string) => void,
+  setReportStatus: (status: string) => void
+) => {
+  console.log(
+    `🔧 CLEAN STATE: Initializing new report for project "${projectName}"`
+  );
+
   // Set project name from URL context
   setProjectName(projectName);
   // ADD THIS: Reset status to draft for new reports
-  setReportStatus('draft');
-  
+  setReportStatus("draft");
+
   // Smart defaults based on current time and date
   const currentHour = new Date().getHours();
   const defaultPeriod = currentHour < 12 ? "AM" : "PM";
-  
+
   return {
     weatherAM: "",
     weatherPM: "",
@@ -226,20 +259,24 @@ const initializeCleanReportState = (projectName: string, setProjectName: (name: 
     siteActivitiesSections: createDefaultSiteActivitiesSections(),
     siteActivitiesTitle: "Site Activities Photos",
     carSheet: { description: "", photo_groups: [] },
-    projectLogo: ""
+    projectLogo: "",
   };
 };
 
 // FIXED: Use existing API endpoint instead of non-existent APIs
-const checkIfProjectHasReports = async (projectName: string): Promise<boolean> => {
+const checkIfProjectHasReports = async (
+  projectName: string
+): Promise<boolean> => {
   try {
     // Use existing API endpoint that actually exists
-    const response = await apiGet('/daily-reports/company');
+    const response = await apiGet("/daily-reports/company");
     if (!response.ok) return false;
-    
+
     const apiResponse = await response.json();
     const allReports = apiResponse.reports || apiResponse.data || [];
-    const projectReports = allReports.filter(report => report.projectName === projectName);
+    const projectReports = allReports.filter(
+      (report) => report.projectName === projectName
+    );
     return projectReports.length > 0;
   } catch (error) {
     console.error("Failed to check project reports:", error);
@@ -248,48 +285,67 @@ const checkIfProjectHasReports = async (projectName: string): Promise<boolean> =
 };
 
 // FIXED: Use existing API endpoint instead of non-existent APIs
-const loadMostRecentReportForProject = async (projectName: string): Promise<any> => {
+const loadMostRecentReportForProject = async (
+  projectName: string
+): Promise<any> => {
   try {
-    console.log("🔍 DEBUG: Loading most recent report for project:", projectName);
-    
+    console.log(
+      "🔍 DEBUG: Loading most recent report for project:",
+      projectName
+    );
+
     // Use company reports API instead of user reports API
-    const response = await apiGet('/daily-reports/company');
+    const response = await apiGet("/daily-reports/company");
     if (!response.ok) return null;
-    
+
     const apiResponse = await response.json();
     console.log("🔍 DEBUG: API response:", apiResponse);
-    
+
     // Extract the reports array from the response
     const allReports = apiResponse.reports || apiResponse.data || [];
     console.log("🔍 DEBUG: All company reports count:", allReports.length);
-    
-    const projectReports = allReports.filter(report => report.projectName === projectName);
+
+    const projectReports = allReports.filter(
+      (report) => report.projectName === projectName
+    );
     console.log("🔍 DEBUG: Project reports count:", projectReports.length);
-    console.log("🔍 DEBUG: Project reports:", projectReports.map(r => ({
-      id: r._id,
-      projectName: r.projectName,
-      reportDate: r.reportDate,
-      createdAt: r.createdAt,
-      userId: r.userId,
-      userName: r.userId?.firstName ? `${r.userId.firstName} ${r.userId.lastName}` : 'Unknown'
-    })));
-    
+    console.log(
+      "🔍 DEBUG: Project reports:",
+      projectReports.map((r) => ({
+        id: r._id,
+        projectName: r.projectName,
+        reportDate: r.reportDate,
+        createdAt: r.createdAt,
+        userId: r.userId,
+        userName: r.userId?.firstName
+          ? `${r.userId.firstName} ${r.userId.lastName}`
+          : "Unknown",
+      }))
+    );
+
     const sortedReports = projectReports.sort((a, b) => {
       const dateA = new Date(a.reportDate || a.createdAt || 0);
       const dateB = new Date(b.reportDate || b.createdAt || 0);
-      
+
       if (isNaN(dateA.getTime())) return 1;
       if (isNaN(dateB.getTime())) return -1;
-      
+
       return dateB.getTime() - dateA.getTime(); // Descending order
     });
-    
+
     const mostRecent = sortedReports.length > 0 ? sortedReports[0] : null;
-    console.log("🔍 DEBUG: Most recent report:", mostRecent ? {
-      id: mostRecent._id,
-      userName: mostRecent.userId?.firstName ? `${mostRecent.userId.firstName} ${mostRecent.userId.lastName}` : 'Unknown'
-    } : 'None');
-    
+    console.log(
+      "🔍 DEBUG: Most recent report:",
+      mostRecent
+        ? {
+            id: mostRecent._id,
+            userName: mostRecent.userId?.firstName
+              ? `${mostRecent.userId.firstName} ${mostRecent.userId.lastName}`
+              : "Unknown",
+          }
+        : "None"
+    );
+
     return mostRecent;
   } catch (error) {
     console.error("Failed to load project's most recent report:", error);
@@ -348,14 +404,21 @@ const DailyReport = () => {
   const [machinery, setMachinery] = useState<ResourceRow[]>([]);
 
   // Reference Section state
-  const [referenceSections, setReferenceSections] = useState<Section[]>(createDefaultHSESections());
+  const [referenceSections, setReferenceSections] = useState<Section[]>(
+    createDefaultHSESections()
+  );
   const [tableTitle, setTableTitle] = useState("HSE Toolbox Meeting");
   const [isExportingReference, setIsExportingReference] = useState(false);
 
   // Site Activities Photos state
-  const [siteActivitiesSections, setSiteActivitiesSections] = useState<Section[]>(createDefaultSiteActivitiesSections());
-  const [siteActivitiesTitle, setSiteActivitiesTitle] = useState("Site Activities Photos");
-  const [isExportingSiteActivities, setIsExportingSiteActivities] = useState(false);
+  const [siteActivitiesSections, setSiteActivitiesSections] = useState<
+    Section[]
+  >(createDefaultSiteActivitiesSections());
+  const [siteActivitiesTitle, setSiteActivitiesTitle] = useState(
+    "Site Activities Photos"
+  );
+  const [isExportingSiteActivities, setIsExportingSiteActivities] =
+    useState(false);
 
   // CAR Sheet state
   const [carSheet, setCarSheet] = useState<any>(createEmptyCarSheet());
@@ -369,7 +432,7 @@ const DailyReport = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [reportStatus, setReportStatus] = useState<string>('draft');
+  const [reportStatus, setReportStatus] = useState<string>("draft");
   const [isReadOnly, setIsReadOnly] = useState(false);
 
   // Google Docs-style auto-save state
@@ -407,16 +470,25 @@ const DailyReport = () => {
   };
 
   // Helper to split working team into interior and MEP teams
-  const splitWorkingTeam = (workingTeamInterior: ResourceRow[]): { interior: ResourceRow[]; mep: ResourceRow[] } => {
-    const interiorOptions = ["Site Manager", "Site Engineer", "Foreman", "Skill Workers", "General Workers"];
+  const splitWorkingTeam = (
+    workingTeamInterior: ResourceRow[]
+  ): { interior: ResourceRow[]; mep: ResourceRow[] } => {
+    const interiorOptions = [
+      "Site Manager",
+      "Site Engineer",
+      "Foreman",
+      "Skill Workers",
+      "General Workers",
+    ];
     const mepOptions = ["MEP Engineer", "MEP Workers"];
 
-    const interior = workingTeamInterior.filter(row =>
-      interiorOptions.includes(row.description) ||
-      (!mepOptions.includes(row.description) && row.description !== "")
+    const interior = workingTeamInterior.filter(
+      (row) =>
+        interiorOptions.includes(row.description) ||
+        (!mepOptions.includes(row.description) && row.description !== "")
     );
 
-    const mep = workingTeamInterior.filter(row =>
+    const mep = workingTeamInterior.filter((row) =>
       mepOptions.includes(row.description)
     );
 
@@ -481,7 +553,7 @@ const DailyReport = () => {
 
     // Clear managementTeam rolling totals
     setManagementTeam((prev) =>
-      prev.map(item => ({
+      prev.map((item) => ({
         ...item,
         prev: 0,
         accumulated: 0,
@@ -491,7 +563,7 @@ const DailyReport = () => {
 
     // Clear workingTeam rolling totals (used for workingTeamInterior)
     setWorkingTeam((prev) =>
-      prev.map(item => ({
+      prev.map((item) => ({
         ...item,
         prev: 0,
         accumulated: 0,
@@ -500,7 +572,7 @@ const DailyReport = () => {
 
     // Clear interiorTeam rolling totals
     setInteriorTeam((prev) =>
-      prev.map(item => ({
+      prev.map((item) => ({
         ...item,
         prev: 0,
         accumulated: 0,
@@ -509,7 +581,7 @@ const DailyReport = () => {
 
     // Clear mepTeam rolling totals
     setMepTeam((prev) =>
-      prev.map(item => ({
+      prev.map((item) => ({
         ...item,
         prev: 0,
         accumulated: 0,
@@ -518,7 +590,7 @@ const DailyReport = () => {
 
     // Clear materials rolling totals
     setMaterials((prev) =>
-      prev.map(item => ({
+      prev.map((item) => ({
         ...item,
         prev: 0,
         accumulated: 0,
@@ -527,7 +599,7 @@ const DailyReport = () => {
 
     // Clear machinery rolling totals
     setMachinery((prev) =>
-      prev.map(item => ({
+      prev.map((item) => ({
         ...item,
         prev: 0,
         accumulated: 0,
@@ -539,13 +611,13 @@ const DailyReport = () => {
 
   // Helper function to get current user ID from JWT token
   const getCurrentUserId = () => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem("authToken");
     if (token) {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const payload = JSON.parse(atob(token.split(".")[1]));
         return payload.userId;
       } catch (error) {
-        console.error('Error parsing token:', error);
+        console.error("Error parsing token:", error);
       }
     }
     return null;
@@ -581,21 +653,32 @@ const DailyReport = () => {
         }
 
         if (dbReport) {
-          const isNewReport = await isNewReportCreation(reportIdFromUrl, projectFromUrl, dbReport);
-          
+          const isNewReport = await isNewReportCreation(
+            reportIdFromUrl,
+            projectFromUrl,
+            dbReport
+          );
+
           if (isNewReport) {
             // SMART: Check if we should load project's most recent report
             if (!reportIdFromUrl && projectFromUrl) {
-              console.log("🔧 SMART LOAD: Creating new report for project:", projectFromUrl);
-              const projectRecentReport = await loadMostRecentReportForProject(projectFromUrl);
-              
+              console.log(
+                "🔧 SMART LOAD: Creating new report for project:",
+                projectFromUrl
+              );
+              const projectRecentReport = await loadMostRecentReportForProject(
+                projectFromUrl
+              );
+
               if (projectRecentReport) {
                 // Load project's most recent report as template
-                console.log("🔧 SMART LOAD: Found project report, using as template");
+                console.log(
+                  "🔧 SMART LOAD: Found project report, using as template"
+                );
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
-                setReportStatus('draft');
+                setReportStatus("draft");
 
                 // Load data from project's most recent report
                 setWeatherAM(projectRecentReport.weatherAM || "");
@@ -606,72 +689,125 @@ const DailyReport = () => {
                 // setActivityToday(projectRecentReport.activityToday || "");
                 // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
-                  ensureRowIds(projectRecentReport.managementTeam || []).map(item => ({
-                    ...item,
-                    prev: item.accumulated,  // ← Carry over accumulated to prev
-                    today: 0,                // ← Reset today to 0
-                    accumulated: item.accumulated // ← Keep accumulated same
-                  }))
+                  ensureRowIds(projectRecentReport.managementTeam || []).map(
+                    (item) => ({
+                      ...item,
+                      prev: item.accumulated, // ← Carry over accumulated to prev
+                      today: 0, // ← Reset today to 0
+                      accumulated: item.accumulated, // ← Keep accumulated same
+                    })
+                  )
                 );
-                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
+                setWorkingTeam(
+                  ensureRowIds(projectRecentReport.workingTeam || [])
+                );
 
                 // Handle interior and MEP team migration
-                if (projectRecentReport.workingTeamInterior && projectRecentReport.workingTeamMEP) {
+                if (
+                  projectRecentReport.workingTeamInterior &&
+                  projectRecentReport.workingTeamMEP
+                ) {
                   // If separate interior/MEP exist, apply carry-over to each
                   setInteriorTeam(
-                    ensureRowIds(projectRecentReport.workingTeamInterior).map(item => ({
-                      ...item,
-                      prev: item.accumulated,
-                      today: 0,
-                      accumulated: item.accumulated
-                    }))
+                    ensureRowIds(projectRecentReport.workingTeamInterior).map(
+                      (item) => ({
+                        ...item,
+                        prev: item.accumulated,
+                        today: 0,
+                        accumulated: item.accumulated,
+                      })
+                    )
                   );
                   setMepTeam(
-                    ensureRowIds(projectRecentReport.workingTeamMEP).map(item => ({
-                      ...item,
-                      prev: item.accumulated,
-                      today: 0,
-                      accumulated: item.accumulated
-                    }))
+                    ensureRowIds(projectRecentReport.workingTeamMEP).map(
+                      (item) => ({
+                        ...item,
+                        prev: item.accumulated,
+                        today: 0,
+                        accumulated: item.accumulated,
+                      })
+                    )
                   );
                 } else {
-                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
+                  const { interior, mep } = splitWorkingTeam(
+                    ensureRowIds(projectRecentReport.workingTeam || [])
+                  );
                   setInteriorTeam(interior);
                   setMepTeam(mep);
                 }
 
                 setMaterials(
-                  ensureRowIds(projectRecentReport.materials || []).map(item => ({
-                    ...item,
-                    prev: item.accumulated,  // ← Carry over accumulated to prev
-                    today: 0,                // ← Reset today to 0
-                    accumulated: item.accumulated // ← Keep accumulated same
-                  }))
+                  ensureRowIds(projectRecentReport.materials || []).map(
+                    (item) => ({
+                      ...item,
+                      prev: item.accumulated, // ← Carry over accumulated to prev
+                      today: 0, // ← Reset today to 0
+                      accumulated: item.accumulated, // ← Keep accumulated same
+                    })
+                  )
                 );
                 setMachinery(
-                  ensureRowIds(projectRecentReport.machinery || []).map(item => ({
-                    ...item,
-                    prev: item.accumulated,  // ← Carry over accumulated to prev
-                    today: 0,                // ← Reset today to 0
-                    accumulated: item.accumulated // ← Keep accumulated same
-                  }))
+                  ensureRowIds(projectRecentReport.machinery || []).map(
+                    (item) => ({
+                      ...item,
+                      prev: item.accumulated, // ← Carry over accumulated to prev
+                      today: 0, // ← Reset today to 0
+                      accumulated: item.accumulated, // ← Keep accumulated same
+                    })
+                  )
                 );
-                // setReferenceSections(projectRecentReport.referenceSections || []);
-                // setSiteActivitiesSections(projectRecentReport.siteActivitiesSections || []);
-                setSiteActivitiesTitle(projectRecentReport.siteActivitiesTitle || "Site Activities Photos");
+                setReferenceSections(
+                  projectRecentReport.referenceSections &&
+                    projectRecentReport.referenceSections.length > 0
+                    ? projectRecentReport.referenceSections
+                    : createDefaultHSESections()
+                );
+
+                // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+                if (
+                  projectRecentReport.site_ref &&
+                  projectRecentReport.site_ref.length > 0
+                ) {
+                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                  const convertedSiteActivities = convertFromSiteRefFormat(
+                    projectRecentReport.site_ref
+                  );
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  setSiteActivitiesSections(
+                    projectRecentReport.siteActivitiesSections &&
+                      projectRecentReport.siteActivitiesSections.length > 0
+                      ? projectRecentReport.siteActivitiesSections
+                      : createDefaultSiteActivitiesSections()
+                  );
+                }
+                setSiteActivitiesTitle(
+                  projectRecentReport.siteActivitiesTitle ||
+                    "Site Activities Photos"
+                );
                 // setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
                 setProjectLogo(projectRecentReport.projectLogo || null);
 
                 // Set ownership for new reports (always editable for the creator)
                 const currentUserId = getCurrentUserId();
                 setIsReadOnly(false); // New reports are always editable by the creator
-                console.log("🔧 SMART LOAD: New report created, setting as editable for current user");
-                console.log("🔧 SMART LOAD: Found project report, using as template");
+                console.log(
+                  "🔧 SMART LOAD: New report created, setting as editable for current user"
+                );
+                console.log(
+                  "🔧 SMART LOAD: Found project report, using as template"
+                );
                 // We'll add this in Step 2
               } else {
                 // Fallback to clean state
-                console.log("🔧 SMART LOAD: No project report found, using clean state");
-                const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
+                console.log(
+                  "🔧 SMART LOAD: No project report found, using clean state"
+                );
+                const cleanState = initializeCleanReportState(
+                  projectFromUrl || "",
+                  setProjectName,
+                  setReportStatus
+                );
 
                 setReportId("");
                 setReportDate(new Date());
@@ -696,8 +832,14 @@ const DailyReport = () => {
               }
             } else {
               // Clean state fallback (no project context)
-              console.log("🔧 SMART LOAD: No project context, using clean state");
-              const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
+              console.log(
+                "🔧 SMART LOAD: No project context, using clean state"
+              );
+              const cleanState = initializeCleanReportState(
+                projectFromUrl || "",
+                setProjectName,
+                setReportStatus
+              );
 
               setReportId("");
               setReportDate(new Date());
@@ -723,24 +865,30 @@ const DailyReport = () => {
           } else {
             // EXISTING REPORT EDITING - Load normally
             console.log("🔧 EXISTING REPORT: Loading existing report data");
-            
+
             // Check if current user is the owner
             const currentUserId = getCurrentUserId();
             const isOwner = dbReport.userId === currentUserId;
             setIsReadOnly(!isOwner); // Read-only if not the owner
-            
-            console.log("🔧 OWNERSHIP CHECK:", { 
-              reportUserId: dbReport.userId, 
-              currentUserId, 
-              isOwner, 
-              isReadOnly: !isOwner 
+
+            console.log("🔧 OWNERSHIP CHECK:", {
+              reportUserId: dbReport.userId,
+              currentUserId,
+              isOwner,
+              isReadOnly: !isOwner,
             });
-            
+
             setReportId(dbReport._id || reportIdFromUrl);
-            validateAndSetProjectContext(dbReport.projectName || "", projectFromUrl, setProjectName);
-            setReportDate(dbReport.reportDate ? new Date(dbReport.reportDate) : new Date());
-            setReportStatus(dbReport.status || 'draft');
-            
+            validateAndSetProjectContext(
+              dbReport.projectName || "",
+              projectFromUrl,
+              setProjectName
+            );
+            setReportDate(
+              dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
+            );
+            setReportStatus(dbReport.status || "draft");
+
             // Handle backward compatibility: convert old format to new
             if (dbReport.weatherAM !== undefined) {
               setWeatherAM(dbReport.weatherAM || "");
@@ -770,7 +918,7 @@ const DailyReport = () => {
             setWorkPlanNextDay(dbReport.workPlanNextDay || "");
             setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
             setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
-            
+
             // Handle interior and MEP team migration
             if (dbReport.workingTeamInterior && dbReport.workingTeamMEP) {
               // New format: use separate teams
@@ -778,73 +926,84 @@ const DailyReport = () => {
               setMepTeam(ensureRowIds(dbReport.workingTeamMEP));
             } else {
               // Old format: split working team
-              const { interior, mep } = splitWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
+              const { interior, mep } = splitWorkingTeam(
+                ensureRowIds(dbReport.workingTeam || [])
+              );
               setInteriorTeam(interior);
               setMepTeam(mep);
             }
-            
+
             setMaterials(ensureRowIds(dbReport.materials || []));
             setMachinery(ensureRowIds(dbReport.machinery || []));
             if (dbReport.hse_ref && dbReport.hse_ref.length > 0) {
               // Convert from DB format (hse_ref) to frontend format (referenceSections)
               setReferenceSections(dbReport.hse_ref);
             } else {
-              setReferenceSections(dbReport.referenceSections && dbReport.referenceSections.length > 0 ? dbReport.referenceSections : createDefaultHSESections());
+              setReferenceSections(
+                dbReport.referenceSections &&
+                  dbReport.referenceSections.length > 0
+                  ? dbReport.referenceSections
+                  : createDefaultHSESections()
+              );
             }
             setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
             // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
             if (dbReport.site_ref && dbReport.site_ref.length > 0) {
-              // Convert DB format back to frontend format - FIXED: Create multiple entries
-              const convertedSiteActivities = dbReport.site_ref.map((section: any) => ({
-                id: crypto.randomUUID(),
-                title: section.section_title || "",
-                entries: Array.from({length: Math.ceil(section.images.length / 2)}, (_, entryIndex) => ({
-                  id: crypto.randomUUID(),
-                  slots: [
-                    {
-                      id: crypto.randomUUID(),
-                      image: section.images[entryIndex * 2],
-                      caption: section.footers[entryIndex * 2] || ""
-                    },
-                    ...(section.images[entryIndex * 2 + 1] ? [{
-                      id: crypto.randomUUID(),
-                      image: section.images[entryIndex * 2 + 1],
-                      caption: section.footers[entryIndex * 2 + 1] || ""
-                    }] : [])
-                  ]
-                }))
-              }));
+              // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+              const convertedSiteActivities = convertFromSiteRefFormat(
+                dbReport.site_ref
+              );
               setSiteActivitiesSections(convertedSiteActivities);
             } else {
               setSiteActivitiesSections(createDefaultSiteActivitiesSections());
             }
-            setSiteActivitiesTitle(dbReport.site_title || "Site Activities Photos");
-            setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
-            console.log("🔍 DEBUG: CAR loaded from dbReport:", dbReport.carSheet?.description);
+            setSiteActivitiesTitle(
+              dbReport.site_title || "Site Activities Photos"
+            );
+            setCarSheet(
+              dbReport.carSheet || { description: "", photo_groups: [] }
+            );
+            console.log(
+              "🔍 DEBUG: CAR loaded from dbReport:",
+              dbReport.carSheet?.description
+            );
             setProjectLogo(dbReport.projectLogo || "");
           }
         } else {
           // NO DB REPORT FOUND - Try smart loading for new reports
-          console.log("🔍 DEBUG: No dbReport found, checking for smart loading");
-          
-          const isNewReport = await isNewReportCreation(reportIdFromUrl, projectFromUrl, null);
+          console.log(
+            "🔍 DEBUG: No dbReport found, checking for smart loading"
+          );
+
+          const isNewReport = await isNewReportCreation(
+            reportIdFromUrl,
+            projectFromUrl,
+            null
+          );
           console.log("🔍 DEBUG: isNewReport result:", isNewReport);
-          
+
           if (isNewReport) {
             // SMART: Check if we should load project's most recent report
             if (!reportIdFromUrl && projectFromUrl) {
               // Always try smart loading for new reports with project context
-              console.log("🔧 SMART LOAD: Creating new report for project:", projectFromUrl);
-              const projectRecentReport = await loadMostRecentReportForProject(projectFromUrl);
-              
+              console.log(
+                "🔧 SMART LOAD: Creating new report for project:",
+                projectFromUrl
+              );
+              const projectRecentReport = await loadMostRecentReportForProject(
+                projectFromUrl
+              );
+
               if (projectRecentReport) {
                 // Load project's most recent report as template
-                console.log("🔧 SMART LOAD: Found project report, using as template");
+                console.log(
+                  "🔧 SMART LOAD: Found project report, using as template"
+                );
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
-                setReportStatus('draft');
-                
+                setReportStatus("draft");
+
                 // Load data from project's most recent report
                 setWeatherAM(projectRecentReport.weatherAM || "");
                 setWeatherPM(projectRecentReport.weatherPM || "");
@@ -854,89 +1013,125 @@ const DailyReport = () => {
                 // setActivityToday(projectRecentReport.activityToday || "");
                 // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
-                  ensureRowIds(projectRecentReport.managementTeam || []).map(item => ({
-                    ...item,
-                    prev: item.accumulated,  // ← Carry over accumulated to prev
-                    today: 0,                // ← Reset today to 0
-                    accumulated: item.accumulated // ← Keep accumulated same
-                  }))
+                  ensureRowIds(projectRecentReport.managementTeam || []).map(
+                    (item) => ({
+                      ...item,
+                      prev: item.accumulated, // ← Carry over accumulated to prev
+                      today: 0, // ← Reset today to 0
+                      accumulated: item.accumulated, // ← Keep accumulated same
+                    })
+                  )
                 );
-                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
-            
+                setWorkingTeam(
+                  ensureRowIds(projectRecentReport.workingTeam || [])
+                );
+
                 // Handle interior and MEP team migration
-                if (projectRecentReport.workingTeamInterior && projectRecentReport.workingTeamMEP) {
+                if (
+                  projectRecentReport.workingTeamInterior &&
+                  projectRecentReport.workingTeamMEP
+                ) {
                   // If separate interior/MEP exist, apply carry-over to each
                   setInteriorTeam(
-                    ensureRowIds(projectRecentReport.workingTeamInterior).map(item => ({
-                      ...item,
-                      prev: item.accumulated,
-                      today: 0,
-                      accumulated: item.accumulated
-                    }))
+                    ensureRowIds(projectRecentReport.workingTeamInterior).map(
+                      (item) => ({
+                        ...item,
+                        prev: item.accumulated,
+                        today: 0,
+                        accumulated: item.accumulated,
+                      })
+                    )
                   );
                   setMepTeam(
-                    ensureRowIds(projectRecentReport.workingTeamMEP).map(item => ({
-                      ...item,
-                      prev: item.accumulated,
-                      today: 0,
-                      accumulated: item.accumulated
-                    }))
+                    ensureRowIds(projectRecentReport.workingTeamMEP).map(
+                      (item) => ({
+                        ...item,
+                        prev: item.accumulated,
+                        today: 0,
+                        accumulated: item.accumulated,
+                      })
+                    )
                   );
                 } else {
-                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
+                  const { interior, mep } = splitWorkingTeam(
+                    ensureRowIds(projectRecentReport.workingTeam || [])
+                  );
                   setInteriorTeam(interior);
                   setMepTeam(mep);
                 }
-            
+
                 setMaterials(
-                  ensureRowIds(projectRecentReport.materials || []).map(item => ({
-                    ...item,
-                    prev: item.accumulated,  // ← Carry over accumulated to prev
-                    today: 0,                // ← Reset today to 0
-                    accumulated: item.accumulated // ← Keep accumulated same
-                  }))
+                  ensureRowIds(projectRecentReport.materials || []).map(
+                    (item) => ({
+                      ...item,
+                      prev: item.accumulated, // ← Carry over accumulated to prev
+                      today: 0, // ← Reset today to 0
+                      accumulated: item.accumulated, // ← Keep accumulated same
+                    })
+                  )
                 );
                 setMachinery(
-                  ensureRowIds(projectRecentReport.machinery || []).map(item => ({
-                    ...item,
-                    prev: item.accumulated,  // ← Carry over accumulated to prev
-                    today: 0,                // ← Reset today to 0
-                    accumulated: item.accumulated // ← Keep accumulated same
-                  }))
+                  ensureRowIds(projectRecentReport.machinery || []).map(
+                    (item) => ({
+                      ...item,
+                      prev: item.accumulated, // ← Carry over accumulated to prev
+                      today: 0, // ← Reset today to 0
+                      accumulated: item.accumulated, // ← Keep accumulated same
+                    })
+                  )
                 );
-                // setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
+                setReferenceSections(
+                  projectRecentReport.referenceSections &&
+                    projectRecentReport.referenceSections.length > 0
+                    ? projectRecentReport.referenceSections
+                    : createDefaultHSESections()
+                );
 
-                // // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-                // if (projectRecentReport.site_ref && projectRecentReport.site_ref.length > 0) {
-                //   // Convert DB format back to frontend format
-                //   const convertedSiteActivities = projectRecentReport.site_ref.map((section: any) => ({
-                //     title: section.section_title || "",
-                //     entries: [{
-                //       slots: section.images.map((image: string, index: number) => ({
-                //         image: image,
-                //         caption: section.footers[index] || ""
-                //       }))
-                //     }]
-                //   }));
-                //   setSiteActivitiesSections(convertedSiteActivities);
-                // } else {
-                //   setSiteActivitiesSections(createDefaultSiteActivitiesSections());
-                // }
-                setSiteActivitiesTitle(projectRecentReport.site_title || "Site Activities Photos");
+                // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+                if (
+                  projectRecentReport.site_ref &&
+                  projectRecentReport.site_ref.length > 0
+                ) {
+                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                  const convertedSiteActivities = convertFromSiteRefFormat(
+                    projectRecentReport.site_ref
+                  );
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  setSiteActivitiesSections(
+                    projectRecentReport.siteActivitiesSections &&
+                      projectRecentReport.siteActivitiesSections.length > 0
+                      ? projectRecentReport.siteActivitiesSections
+                      : createDefaultSiteActivitiesSections()
+                  );
+                }
+                setSiteActivitiesTitle(
+                  projectRecentReport.site_title || "Site Activities Photos"
+                );
                 // setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
-                console.log("🔍 DEBUG: CAR loaded from projectRecentReport:", projectRecentReport.carSheet?.description);
+                console.log(
+                  "🔍 DEBUG: CAR loaded from projectRecentReport:",
+                  projectRecentReport.carSheet?.description
+                );
                 setProjectLogo(projectRecentReport.projectLogo || null);
-                
+
                 // Set ownership for new reports (always editable for the creator)
                 const currentUserId = getCurrentUserId();
                 setIsReadOnly(false); // New reports are always editable by the creator
-                console.log("🔧 SMART LOAD: New report created, setting as editable for current user");
-                
+                console.log(
+                  "🔧 SMART LOAD: New report created, setting as editable for current user"
+                );
               } else {
                 // Fallback to clean state
-                console.log("🔧 SMART LOAD: No project report found, using clean state");
-                const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
-                
+                console.log(
+                  "🔧 SMART LOAD: No project report found, using clean state"
+                );
+                const cleanState = initializeCleanReportState(
+                  projectFromUrl || "",
+                  setProjectName,
+                  setReportStatus
+                );
+
                 setReportId("");
                 setReportDate(new Date());
                 setWeatherAM(cleanState.weatherAM);
@@ -960,9 +1155,15 @@ const DailyReport = () => {
               }
             } else {
               // Fallback to clean state (no project context)
-              console.log("🔧 SMART LOAD: No project context, using clean state");
-              const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
-              
+              console.log(
+                "🔧 SMART LOAD: No project context, using clean state"
+              );
+              const cleanState = initializeCleanReportState(
+                projectFromUrl || "",
+                setProjectName,
+                setReportStatus
+              );
+
               setReportId("");
               setReportDate(new Date());
               setWeatherAM(cleanState.weatherAM);
@@ -986,7 +1187,9 @@ const DailyReport = () => {
             }
           } else {
             // We'll add localStorage fallback in Step 4c-2c
-            console.log("🔍 DEBUG: This is an existing report, localStorage fallback will go here");
+            console.log(
+              "🔍 DEBUG: This is an existing report, localStorage fallback will go here"
+            );
           }
         }
       } catch (e) {
@@ -994,13 +1197,23 @@ const DailyReport = () => {
         // Fallback to localStorage if DB fails
         const localDraft = loadDraftLocally(reportDate);
         if (localDraft) {
-          const isNewReport = await isNewReportCreation(reportIdFromUrl, projectFromUrl, null);
-          
+          const isNewReport = await isNewReportCreation(
+            reportIdFromUrl,
+            projectFromUrl,
+            null
+          );
+
           if (isNewReport) {
             // NEW: Initialize clean state for new report (no project history)
-            console.log("🔧 ERROR FALLBACK: Project has no history, using clean state");
-            const cleanState = initializeCleanReportState(projectFromUrl || "", setProjectName, setReportStatus);
-            
+            console.log(
+              "🔧 ERROR FALLBACK: Project has no history, using clean state"
+            );
+            const cleanState = initializeCleanReportState(
+              projectFromUrl || "",
+              setProjectName,
+              setReportStatus
+            );
+
             // Set only project name, ignore localStorage data for new reports
             setReportDate(new Date());
             setWeatherAM(cleanState.weatherAM);
@@ -1021,24 +1234,30 @@ const DailyReport = () => {
             setSiteActivitiesTitle(cleanState.siteActivitiesTitle);
             setCarSheet(cleanState.carSheet);
             setProjectLogo(cleanState.projectLogo);
-            
           } else {
             // SMART: Check if we should load project's most recent report
             if (!reportIdFromUrl && projectFromUrl) {
               // Always try smart loading for new reports with project context
-              console.log("🔧 SMART LOAD: Creating new report for project:", projectFromUrl);
-              const projectRecentReport = await loadMostRecentReportForProject(projectFromUrl);
-              
+              console.log(
+                "🔧 SMART LOAD: Creating new report for project:",
+                projectFromUrl
+              );
+              const projectRecentReport = await loadMostRecentReportForProject(
+                projectFromUrl
+              );
+
               if (projectRecentReport) {
                 // Load project's most recent report as template
-                console.log("🔧 SMART LOAD: Found project report, using as template");
+                console.log(
+                  "🔧 SMART LOAD: Found project report, using as template"
+                );
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
 
                 // ADD THIS: Reset status to draft for new reports based on templates
-                setReportStatus('draft');
-                
+                setReportStatus("draft");
+
                 // Load data from project's most recent report
                 setWeatherAM(projectRecentReport.weatherAM || "");
                 setWeatherPM(projectRecentReport.weatherPM || "");
@@ -1047,31 +1266,64 @@ const DailyReport = () => {
                 setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
                 setActivityToday(projectRecentReport.activityToday || "");
                 setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
-                setManagementTeam(ensureRowIds(projectRecentReport.managementTeam || []));
-                setWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
-                
+                setManagementTeam(
+                  ensureRowIds(projectRecentReport.managementTeam || [])
+                );
+                setWorkingTeam(
+                  ensureRowIds(projectRecentReport.workingTeam || [])
+                );
+
                 // Handle interior and MEP team migration
-                if (projectRecentReport.interiorTeam && projectRecentReport.mepTeam) {
-                  setInteriorTeam(ensureRowIds(projectRecentReport.interiorTeam));
+                if (
+                  projectRecentReport.interiorTeam &&
+                  projectRecentReport.mepTeam
+                ) {
+                  setInteriorTeam(
+                    ensureRowIds(projectRecentReport.interiorTeam)
+                  );
                   setMepTeam(ensureRowIds(projectRecentReport.mepTeam));
                 } else {
-                  const { interior, mep } = splitWorkingTeam(ensureRowIds(projectRecentReport.workingTeam || []));
+                  const { interior, mep } = splitWorkingTeam(
+                    ensureRowIds(projectRecentReport.workingTeam || [])
+                  );
                   setInteriorTeam(interior);
                   setMepTeam(mep);
                 }
-                
+
                 setMaterials(ensureRowIds(projectRecentReport.materials || []));
                 setMachinery(ensureRowIds(projectRecentReport.machinery || []));
-                setReferenceSections(projectRecentReport.referenceSections && projectRecentReport.referenceSections.length > 0 ? projectRecentReport.referenceSections : createDefaultHSESections());
-                setSiteActivitiesSections(projectRecentReport.siteActivitiesSections && projectRecentReport.siteActivitiesSections.length > 0 ? projectRecentReport.siteActivitiesSections : createDefaultSiteActivitiesSections());
-                setSiteActivitiesTitle(projectRecentReport.site_title || "Site Activities Photos");
-                setCarSheet(projectRecentReport.carSheet || { description: "", photo_groups: [] });
+                setReferenceSections(
+                  projectRecentReport.referenceSections &&
+                    projectRecentReport.referenceSections.length > 0
+                    ? projectRecentReport.referenceSections
+                    : createDefaultHSESections()
+                );
+                setSiteActivitiesSections(
+                  projectRecentReport.siteActivitiesSections &&
+                    projectRecentReport.siteActivitiesSections.length > 0
+                    ? projectRecentReport.siteActivitiesSections
+                    : createDefaultSiteActivitiesSections()
+                );
+                setSiteActivitiesTitle(
+                  projectRecentReport.site_title || "Site Activities Photos"
+                );
+                setCarSheet(
+                  projectRecentReport.carSheet || {
+                    description: "",
+                    photo_groups: [],
+                  }
+                );
                 setProjectLogo(projectRecentReport.projectLogo || "");
-                
               } else {
                 // Clean state for projects with no history
-                console.log("🔧 CLEAN STATE: No project history found, using clean state");
-                const cleanState = initializeCleanReportState(projectFromUrl, setProjectName, setReportStatus);
+                console.log(
+                  "🔧 CLEAN STATE: No project history found, using clean state"
+                );
+                const cleanState = initializeCleanReportState(
+                  projectFromUrl,
+                  setProjectName,
+                  setReportStatus
+                );
                 setReportId("");
                 setReportDate(new Date());
                 setWeatherAM(cleanState.weatherAM);
@@ -1095,19 +1347,29 @@ const DailyReport = () => {
               }
             } else {
               // EXISTING REPORT EDITING - Load normally
-              console.log("🔧 EXISTING REPORT: Loading existing report data (localStorage)");
-              
+              console.log(
+                "🔧 EXISTING REPORT: Loading existing report data (localStorage)"
+              );
+
               // For localStorage drafts, assume current user is owner (editable)
               setIsReadOnly(false);
-              
-              console.log("🔧 OWNERSHIP CHECK (Path 3 - localStorage):", { 
+
+              console.log("🔧 OWNERSHIP CHECK (Path 3 - localStorage):", {
                 isReadOnly: false,
-                reason: "localStorage draft - current user is owner"
+                reason: "localStorage draft - current user is owner",
               });
-              
+
               setReportId("");
-              validateAndSetProjectContext(localDraft.projectName || "", projectFromUrl, setProjectName);
-              setReportDate(localDraft.reportDate ? new Date(localDraft.reportDate) : new Date());
+              validateAndSetProjectContext(
+                localDraft.projectName || "",
+                projectFromUrl,
+                setProjectName
+              );
+              setReportDate(
+                localDraft.reportDate
+                  ? new Date(localDraft.reportDate)
+                  : new Date()
+              );
 
               // Handle backward compatibility
               if (localDraft.weatherAM !== undefined) {
@@ -1136,48 +1398,72 @@ const DailyReport = () => {
               setActivityToday(localDraft.activityToday || "");
               setWorkPlanNextDay(localDraft.workPlanNextDay || "");
               setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-              setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
-          
+              setWorkingTeam(
+                ensureRowIds(localDraft.workingTeamInterior || [])
+              );
+
               // Handle interior and MEP teams for fallback localStorage
-              if (localDraft.workingTeamMEP && localDraft.workingTeamMEP.length > 0) {
+              if (
+                localDraft.workingTeamMEP &&
+                localDraft.workingTeamMEP.length > 0
+              ) {
                 // New format: use separate workingTeamMEP from database
                 setMepTeam(ensureRowIds(localDraft.workingTeamMEP));
                 // Also set interiorTeam from workingTeamInterior if available
-                setInteriorTeam(ensureRowIds(localDraft.workingTeamInterior || []));
+                setInteriorTeam(
+                  ensureRowIds(localDraft.workingTeamInterior || [])
+                );
               } else if (localDraft.interiorTeam && localDraft.mepTeam) {
                 // Legacy format: use separate teams
                 setInteriorTeam(ensureRowIds(localDraft.interiorTeam));
                 setMepTeam(ensureRowIds(localDraft.mepTeam));
               } else {
                 // Old format: split working team
-                const { interior, mep } = splitWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
+                const { interior, mep } = splitWorkingTeam(
+                  ensureRowIds(localDraft.workingTeamInterior || [])
+                );
                 setInteriorTeam(interior);
                 setMepTeam(mep);
               }
-          
+
               setMaterials(ensureRowIds(localDraft.materials || []));
               setMachinery(ensureRowIds(localDraft.machinery || []));
-              setReferenceSections(localDraft.referenceSections && localDraft.referenceSections.length > 0 ? localDraft.referenceSections : createDefaultHSESections());
+              setReferenceSections(
+                localDraft.referenceSections &&
+                  localDraft.referenceSections.length > 0
+                  ? localDraft.referenceSections
+                  : createDefaultHSESections()
+              );
               setTableTitle(localDraft.tableTitle || "HSE Toolbox Meeting");
 
-              // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-              if (localDraft.siteActivitiesSections && localDraft.siteActivitiesSections.length > 0) {
-                // Convert DB format back to frontend format
-                const convertedSiteActivities = localDraft.siteActivitiesSections.map((section: any) => ({
-                  title: section.section_title || "",
-                  entries: [{
-                    slots: section.images.map((image: string, index: number) => ({
-                      image: image,
-                      caption: section.footers[index] || ""
-                    }))
-                  }]
-                }));
-                setSiteActivitiesSections(convertedSiteActivities);
+              // Handle site activities - check if it's in DB format (has images/footers) or frontend format (has entries)
+              if (
+                localDraft.siteActivitiesSections &&
+                localDraft.siteActivitiesSections.length > 0
+              ) {
+                // Check if it's in DB format (has images array) or frontend format (has entries)
+                const firstSection = localDraft.siteActivitiesSections[0];
+                if (firstSection.images && Array.isArray(firstSection.images)) {
+                  // DB format - convert using the function that splits into entries of 2 slots each
+                  const convertedSiteActivities = convertFromSiteRefFormat(
+                    localDraft.siteActivitiesSections
+                  );
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  // Already in frontend format - use as-is
+                  setSiteActivitiesSections(localDraft.siteActivitiesSections);
+                }
               } else {
-                setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+                setSiteActivitiesSections(
+                  createDefaultSiteActivitiesSections()
+                );
               }
-              setSiteActivitiesTitle(localDraft.siteActivitiesTitle || "Site Activities Photos");
-              setCarSheet(localDraft.carSheet || { description: "", photo_groups: [] });
+              setSiteActivitiesTitle(
+                localDraft.siteActivitiesTitle || "Site Activities Photos"
+              );
+              setCarSheet(
+                localDraft.carSheet || { description: "", photo_groups: [] }
+              );
               setProjectLogo(localDraft.projectLogo || "");
             }
           }
@@ -1205,9 +1491,9 @@ const DailyReport = () => {
 
   //       // First, try to load by reportId if provided in URL
   //       if (reportIdFromUrl) {
-  //         console.log("🔍 DAILY REPORT: Loading report by ID:", reportIdFromUrl);
+  //         // console.log("🔍 DAILY REPORT: Loading report by ID:", reportIdFromUrl);
   //         dbReport = await loadReportById(reportIdFromUrl);
-  //         console.log("🔍 DAILY REPORT: Report by ID result:", dbReport ? "FOUND" : "NOT FOUND");
+  //         // console.log("🔍 DAILY REPORT: Report by ID result:", dbReport ? "FOUND" : "NOT FOUND");
   //         originalReportDataRef.current = dbReport;
   //       }
 
@@ -1822,8 +2108,9 @@ const DailyReport = () => {
     if (!validateReport()) return;
 
     // Generate default filename
-    const defaultFileName = `${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
-      }`;
+    const defaultFileName = `${projectName || "Report"}_${
+      reportDate?.toISOString().split("T")[0] || "export"
+    }`;
 
     // Show file name dialog
     setPendingExportType("excel");
@@ -1872,8 +2159,9 @@ const DailyReport = () => {
 
   const handleExportReference = async () => {
     // Generate default filename
-    const defaultFileName = `reference_${reportDate?.toISOString().split("T")[0] || "export"
-      }`;
+    const defaultFileName = `reference_${
+      reportDate?.toISOString().split("T")[0] || "export"
+    }`;
 
     // Show file name dialog
     setPendingExportType("reference");
@@ -2045,7 +2333,10 @@ const DailyReport = () => {
         // Process HSE data for database storage (with image processing)
         ...(await processHSEForDB(referenceSections, tableTitle)),
         // Process site activities data for database storage (with image processing)
-        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        ...(await processSiteActivitiesForDB(
+          siteActivitiesSections,
+          siteActivitiesTitle
+        )),
         description: carSheet.description || "",
       };
 
@@ -2100,39 +2391,29 @@ const DailyReport = () => {
       console.log("🔍 DEBUG: Raw HSE data before save:", {
         referenceSections: rawData.referenceSections,
         siteActivitiesSections: rawData.siteActivitiesSections,
-        firstImage: rawData.referenceSections?.[0]?.entries?.[0]?.slots?.[0]?.image
+        firstImage:
+          rawData.referenceSections?.[0]?.entries?.[0]?.slots?.[0]?.image,
       });
 
-      // Process images only if they exist (same optimization as submit)
-      const hasImages = rawData.referenceSections?.some(section => 
-        section.entries?.some(entry => 
-          entry.slots?.some(slot => slot.image)
-        )
-      ) || rawData.siteActivitiesSections?.some(section => 
-        section.entries?.some(entry => 
-          entry.slots?.some(slot => slot.image)
-        )
+      // Process images directly in referenceSections (like captions!)
+      const processedReferenceSections = await processImagesInReferenceSections(
+        rawData.referenceSections
       );
-
-      let processedReferenceSections = rawData.referenceSections;
-      let processedSiteActivitiesSections = rawData.siteActivitiesSections;
-
-      if (hasImages) {
-        // Only process if images exist
-        processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
-        processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
-      }
-      const siteRefData = convertToSiteRefFormat(processedSiteActivitiesSections);
+      const processedSiteActivitiesSections =
+        await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      const siteRefData = convertToSiteRefFormat(
+        processedSiteActivitiesSections
+      );
 
       // ADD THIS right after line 2031 (before the CAR processing):
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
-      
+
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
         if (typeof img === "string") {
           return img;
         }
-      
+
         // Case 2: File object
         if (img instanceof File) {
           return new Promise((resolve, reject) => {
@@ -2142,7 +2423,7 @@ const DailyReport = () => {
             reader.readAsDataURL(img);
           });
         }
-      
+
         return null;
       };
 
@@ -2152,20 +2433,20 @@ const DailyReport = () => {
           ...g,
           images: await Promise.all(
             (g.images || []).map(async (img: any) => {
-              if (img && typeof img === 'object' && img instanceof File) {
+              if (img && typeof img === "object" && img instanceof File) {
                 return await toBase64DataUrl(img);
               }
               return img; // Already base64 or null
             })
-          )
+          ),
         }))
       );
 
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),  // ✅ correct
-        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),            // ✅ correct
+        workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior), // ✅ correct
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP), // ✅ correct
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
         // Override with processed sections (images now base64)
@@ -2173,7 +2454,7 @@ const DailyReport = () => {
         site_ref: siteRefData,
         carSheet: {
           ...rawData.carSheet,
-          photo_groups: processedCar
+          photo_groups: processedCar,
         },
       };
 
@@ -2181,13 +2462,13 @@ const DailyReport = () => {
       console.log("🔍 DEBUG: About to call saveReportToDB with:", {
         hasReferenceSections: !!cleanedData.referenceSections,
         hasSiteActivities: !!cleanedData.siteActivitiesSections,
-        referenceSectionsCount: cleanedData.referenceSections?.length || 0
+        referenceSectionsCount: cleanedData.referenceSections?.length || 0,
       });
 
       // Save to database (keeps status as "draft")
       await saveReportToDB(cleanedData);
       // ADD THIS: Update local status
-      setReportStatus('draft');
+      setReportStatus("draft");
 
       toast({
         title: "Draft Saved",
@@ -2209,8 +2490,9 @@ const DailyReport = () => {
     if (!validateReport()) return;
 
     // Generate default filename
-    const defaultFileName = `combined-${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
-      }`;
+    const defaultFileName = `combined-${projectName || "Report"}_${
+      reportDate?.toISOString().split("T")[0] || "export"
+    }`;
 
     // Show file name dialog
     setPendingExportType("combined");
@@ -2280,7 +2562,9 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(siteActivitiesSections);
+      const processedSiteActivities = await processImages(
+        siteActivitiesSections
+      );
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -2311,7 +2595,10 @@ const DailyReport = () => {
         // Process HSE data for database storage (with image processing)
         ...(await processHSEForDB(referenceSections, tableTitle)),
         // Process site activities data for database storage (with image processing)
-        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        ...(await processSiteActivitiesForDB(
+          siteActivitiesSections,
+          siteActivitiesTitle
+        )),
         description: carSheet.description || "",
       };
 
@@ -2370,7 +2657,7 @@ const DailyReport = () => {
         workingTeamInterior: interiorTeam,
         workingTeamMEP: mepTeam,
         interiorLength: interiorTeam?.length || 0,
-        mepLength: mepTeam?.length || 0
+        mepLength: mepTeam?.length || 0,
       });
 
       await generateCombinedExcel(
@@ -2403,10 +2690,12 @@ const DailyReport = () => {
   const handleExportCombinedPDF = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"
-      }_${reportDate?.toISOString().split("T")[0] ||
+    const defaultFileName = `Combined_Report_${
+      projectName?.replace(/\s+/g, "_") || "Report"
+    }_${
+      reportDate?.toISOString().split("T")[0] ||
       new Date().toISOString().split("T")[0]
-      }`;
+    }`;
 
     setPendingExportType("combined-pdf");
     setDefaultFileName(defaultFileName);
@@ -2471,7 +2760,9 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(siteActivitiesSections);
+      const processedSiteActivities = await processImages(
+        siteActivitiesSections
+      );
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -2502,7 +2793,10 @@ const DailyReport = () => {
         // Process HSE data for database storage (with image processing)
         ...(await processHSEForDB(referenceSections, tableTitle)),
         // Process site activities data for database storage (with image processing)
-        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        ...(await processSiteActivitiesForDB(
+          siteActivitiesSections,
+          siteActivitiesTitle
+        )),
         description: carSheet.description || "",
       };
 
@@ -2612,7 +2906,9 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(siteActivitiesSections);
+      const processedSiteActivities = await processImages(
+        siteActivitiesSections
+      );
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -2655,12 +2951,8 @@ const DailyReport = () => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
-                images: slots
-                  .map((s: any) => s.image)
-                  .filter(Boolean),
-                footers: slots
-                  .map((s: any) => s.caption)
-                  .filter(Boolean),
+                images: slots.map((s: any) => s.image).filter(Boolean),
+                footers: slots.map((s: any) => s.caption).filter(Boolean),
               };
             })
           ),
@@ -2672,12 +2964,8 @@ const DailyReport = () => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
-                images: slots
-                  .map((s: any) => s.image)
-                  .filter(Boolean),
-                footers: slots
-                  .map((s: any) => s.caption)
-                  .filter(Boolean),
+                images: slots.map((s: any) => s.image).filter(Boolean),
+                footers: slots.map((s: any) => s.caption).filter(Boolean),
               };
             })
           ),
@@ -2715,10 +3003,12 @@ const DailyReport = () => {
   const handleExportCombinedZIP = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"
-      }_${reportDate?.toISOString().split("T")[0] ||
+    const defaultFileName = `Combined_Report_${
+      projectName?.replace(/\s+/g, "_") || "Report"
+    }_${
+      reportDate?.toISOString().split("T")[0] ||
       new Date().toISOString().split("T")[0]
-      }`;
+    }`;
 
     setPendingExportType("combined-zip");
     setDefaultFileName(defaultFileName);
@@ -2742,7 +3032,10 @@ const DailyReport = () => {
         // Process HSE data for database storage (with image processing)
         ...(await processHSEForDB(referenceSections, tableTitle)),
         // Process site activities data for database storage (with image processing)
-        ...(await processSiteActivitiesForDB(siteActivitiesSections, siteActivitiesTitle)),
+        ...(await processSiteActivitiesForDB(
+          siteActivitiesSections,
+          siteActivitiesTitle
+        )),
         description: carSheet.description || "",
       };
 
@@ -2801,7 +3094,9 @@ const DailyReport = () => {
       };
 
       const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(siteActivitiesSections);
+      const processedSiteActivities = await processImages(
+        siteActivitiesSections
+      );
 
       // Process CAR data
       const processedCar = await Promise.all(
@@ -2900,12 +3195,8 @@ const DailyReport = () => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
-                images: slots
-                  .map((s: any) => s.image)
-                  .filter(Boolean),
-                footers: slots
-                  .map((s: any) => s.caption)
-                  .filter(Boolean),
+                images: slots.map((s: any) => s.image).filter(Boolean),
+                footers: slots.map((s: any) => s.caption).filter(Boolean),
               };
             })
           ),
@@ -2915,12 +3206,8 @@ const DailyReport = () => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
-                images: slots
-                  .map((s: any) => s.image)
-                  .filter(Boolean),
-                footers: slots
-                  .map((s: any) => s.caption)
-                  .filter(Boolean),
+                images: slots.map((s: any) => s.image).filter(Boolean),
+                footers: slots.map((s: any) => s.caption).filter(Boolean),
               };
             })
           ),
@@ -3073,36 +3360,25 @@ const DailyReport = () => {
     try {
       // Prepare report data and clean empty rows
       const rawData = getReportData();
-      
+
       // Process images directly in referenceSections (like captions!)
-      const hasImages = rawData.referenceSections?.some(section => 
-        section.entries?.some(entry => 
-          entry.slots?.some(slot => slot.image)
-        )
-      ) || rawData.siteActivitiesSections?.some(section => 
-        section.entries?.some(entry => 
-          entry.slots?.some(slot => slot.image)
-        )
+      const processedReferenceSections = await processImagesInReferenceSections(
+        rawData.referenceSections
+      );
+      const processedSiteActivitiesSections =
+        await processImagesInReferenceSections(rawData.siteActivitiesSections);
+      const siteRefData = convertToSiteRefFormat(
+        processedSiteActivitiesSections
       );
 
-      let processedReferenceSections = rawData.referenceSections;
-      let processedSiteActivitiesSections = rawData.siteActivitiesSections;
-
-      if (hasImages) {
-        // Only process if images exist
-        processedReferenceSections = await processImagesInReferenceSections(rawData.referenceSections);
-        processedSiteActivitiesSections = await processImagesInReferenceSections(rawData.siteActivitiesSections);
-      }
-      const siteRefData = convertToSiteRefFormat(processedSiteActivitiesSections);
-      
       // ADD toBase64DataUrl function:
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
-        
+
         if (typeof img === "string") {
           return img;
         }
-        
+
         if (img instanceof File) {
           return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -3111,25 +3387,25 @@ const DailyReport = () => {
             reader.readAsDataURL(img);
           });
         }
-        
+
         return null;
       };
-      
+
       // ADD CAR PROCESSING:
       const processedCar = await Promise.all(
         (rawData.carSheet.photo_groups || []).map(async (g: any) => ({
           ...g,
           images: await Promise.all(
             (g.images || []).map(async (img: any) => {
-              if (img && typeof img === 'object' && img instanceof File) {
+              if (img && typeof img === "object" && img instanceof File) {
                 return await toBase64DataUrl(img);
               }
               return img;
             })
-          )
+          ),
         }))
       );
-      
+
       // REPLACE cleanedData (lines 2987-2994):
       const cleanedData = {
         ...rawData,
@@ -3143,7 +3419,7 @@ const DailyReport = () => {
         site_ref: siteRefData,
         carSheet: {
           ...rawData.carSheet,
-          photo_groups: processedCar
+          photo_groups: processedCar,
         },
       };
 
@@ -3156,7 +3432,7 @@ const DailyReport = () => {
       await saveReportToDB(reportDataWithSubmit);  // 🚀 Single API call
 
       // ADD THIS: Update local status
-      setReportStatus('submitted');
+      setReportStatus("submitted");
 
       // Step 3: Clear localStorage after successful submission
       localStorage.removeItem(dateKey(reportDate));
@@ -3279,7 +3555,8 @@ const DailyReport = () => {
                 <div className="flex items-center bg-background">
                   <div className="ml-3">
                     <p className="text-sm text-yellow-700">
-                      <strong>🔒 View Only Mode:</strong> You are viewing another user's report.
+                      <strong>🔒 View Only Mode:</strong> You are viewing
+                      another user's report.
                     </p>
                   </div>
                 </div>
@@ -3293,31 +3570,39 @@ const DailyReport = () => {
               </div>
             ) : (
               <>
-            {/* Navigation Header */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <SidebarTrigger />
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      if (projectFromUrl) {
-                        navigate(`/dashboard?project=${encodeURIComponent(projectFromUrl)}`);
-                      } else {
-                        navigate("/dashboard");
-                      }
-                    }}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Dashboard
-                  </Button>
-                </div>
+                {/* Navigation Header */}
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <SidebarTrigger />
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          if (projectFromUrl) {
+                            navigate(
+                              `/dashboard?project=${encodeURIComponent(
+                                projectFromUrl
+                              )}`
+                            );
+                          } else {
+                            navigate("/dashboard");
+                          }
+                        }}
+                        className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Dashboard
+                      </Button>
+                    </div>
 
                     {/* Section Filter Tabs */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button
-                        variant={activeTab === "site-activities" ? "default" : "outline"}
+                        variant={
+                          activeTab === "site-activities"
+                            ? "default"
+                            : "outline"
+                        }
                         size="sm"
                         onClick={() => setActiveTab("site-activities")}
                         className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
@@ -3334,7 +3619,9 @@ const DailyReport = () => {
                       </Button>
                       <Button
                         variant={
-                          activeTab === "site-activities-photos" ? "default" : "outline"
+                          activeTab === "site-activities-photos"
+                            ? "default"
+                            : "outline"
                         }
                         size="sm"
                         onClick={() => setActiveTab("site-activities-photos")}
@@ -3426,7 +3713,6 @@ const DailyReport = () => {
                     <>
                       <div className="mt-2 pt-2">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                          
                           <ReferenceSection
                             sections={referenceSections}
                             setSections={setReferenceSections}
@@ -3444,7 +3730,6 @@ const DailyReport = () => {
                     <>
                       <div className="mt-2 pt-2">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                          
                           <ReferenceSection
                             sections={siteActivitiesSections}
                             setSections={setSiteActivitiesSections}
@@ -3463,7 +3748,6 @@ const DailyReport = () => {
                       {/* CAR section */}
                       <div className="mt-2 pt-2">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                          
                           <CARSection car={carSheet} setCar={setCarSheet} />
                         </div>
                       </div>
@@ -3474,10 +3758,14 @@ const DailyReport = () => {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
                         Export combined:{" "}
-                        <span className="font-medium text-foreground">Report</span> =
-                        Sheet 1,{" "}
-                        <span className="font-medium text-foreground">Reference</span> =
-                        Sheet 2,{" "}
+                        <span className="font-medium text-foreground">
+                          Report
+                        </span>{" "}
+                        = Sheet 1,{" "}
+                        <span className="font-medium text-foreground">
+                          Reference
+                        </span>{" "}
+                        = Sheet 2,{" "}
                         <span className="font-medium text-foreground">
                           Corrective Action Request
                         </span>{" "}
@@ -3493,40 +3781,60 @@ const DailyReport = () => {
                               disabled={isSaving || isSubmitting || isReadOnly}
                             >
                               <Save className="w-4 h-4 mr-2" />
-                              {(isSaving || isSubmitting) ? "Processing..." : "Save As..."}
+                              {isSaving || isSubmitting
+                                ? "Processing..."
+                                : "Save As..."}
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[140px]">
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-[140px]"
+                          >
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <DropdownMenuItem 
-                                    onClick={handleSaveAsDraft} 
-                                    disabled={isSaving || reportStatus === 'submitted' || isReadOnly}
-                                    className={reportStatus === 'submitted' || isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}
+                                  <DropdownMenuItem
+                                    onClick={handleSaveAsDraft}
+                                    disabled={
+                                      isSaving ||
+                                      reportStatus === "submitted" ||
+                                      isReadOnly
+                                    }
+                                    className={
+                                      reportStatus === "submitted" || isReadOnly
+                                        ? "opacity-50 cursor-not-allowed"
+                                        : ""
+                                    }
                                   >
                                     <Save className="w-4 h-4 mr-2" />
                                     {isSaving ? "Saving..." : "Draft"}
-                                    {reportStatus === 'submitted' && (
+                                    {reportStatus === "submitted" && (
                                       <Lock className="w-3 h-3 ml-auto" />
                                     )}
                                   </DropdownMenuItem>
                                 </TooltipTrigger>
-                                {reportStatus === 'submitted' && (
+                                {reportStatus === "submitted" && (
                                   <TooltipContent>
-                                    <p>Submitted reports cannot be reverted to draft status</p>
+                                    <p>
+                                      Submitted reports cannot be reverted to
+                                      draft status
+                                    </p>
                                   </TooltipContent>
                                 )}
                               </Tooltip>
                             </TooltipProvider>
-                            <DropdownMenuItem 
-                              onClick={handleSubmit} 
+                            <DropdownMenuItem
+                              onClick={handleSubmit}
                               disabled={isSubmitting}
-                              className={reportStatus === 'submitted' ? 'bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer' : ''}
+                              className={
+                                reportStatus === "submitted"
+                                  ? "bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer"
+                                  : ""
+                              }
                             >
                               <Send className="w-4 h-4 mr-2" />
                               {isSubmitting ? "Submitting..." : "Submitted"}
-                              {reportStatus === 'submitted' && (
+                              {reportStatus === "submitted" && (
                                 <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
                               )}
                             </DropdownMenuItem>
@@ -3539,9 +3847,7 @@ const DailyReport = () => {
                           disabled={isPreviewingCombined}
                         >
                           <Eye className="w-4 h-4 mr-2" />
-                          {isPreviewingCombined
-                            ? "Previewing ..."
-                            : "Preview"}
+                          {isPreviewingCombined ? "Previewing ..." : "Preview"}
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -3550,9 +3856,7 @@ const DailyReport = () => {
                               disabled={isExportingCombined}
                             >
                               <FileDown className="w-4 h-4 mr-2" />
-                              {isExportingCombined
-                                ? "Exporting ..."
-                                : "Export"}
+                              {isExportingCombined ? "Exporting ..." : "Export"}
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -3622,27 +3926,30 @@ const DailyReport = () => {
                     }}
                     defaultFileName={
                       pendingExportType === "combined"
-                        ? `combined-${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
-                        }`
-                        : pendingExportType === "reference"
-                          ? `reference_${reportDate?.toISOString().split("T")[0] || "export"
+                        ? `combined-${projectName || "Report"}_${
+                            reportDate?.toISOString().split("T")[0] || "export"
                           }`
-                          : `${projectName || "Report"}_${reportDate?.toISOString().split("T")[0] || "export"
+                        : pendingExportType === "reference"
+                        ? `reference_${
+                            reportDate?.toISOString().split("T")[0] || "export"
+                          }`
+                        : `${projectName || "Report"}_${
+                            reportDate?.toISOString().split("T")[0] || "export"
                           }`
                     }
                     title={
                       pendingExportType === "combined"
                         ? "Export Combined Excel File"
                         : pendingExportType === "reference"
-                          ? "Export Reference Excel File"
-                          : "Export Excel File"
+                        ? "Export Reference Excel File"
+                        : "Export Excel File"
                     }
                     description={
                       pendingExportType === "combined"
                         ? "Enter a name for your combined Excel export file (Report + Reference)."
                         : pendingExportType === "reference"
-                          ? "Enter a name for your reference Excel export file."
-                          : "Enter a name for your Excel export file."
+                        ? "Enter a name for your reference Excel export file."
+                        : "Enter a name for your Excel export file."
                     }
                   />
                 </main>
