@@ -53,12 +53,12 @@ const EditProfileModal = ({
       setEmail(profile.email || "");
       setProfilePicture(profile.profilePicture || "");
       setPreviewUrl(
-        profile.profilePicture
-          ? constructAuthenticatedImageUrl(
-              profile.profilePicture,
-              getCacheBustingTimestamp(),
-            )
-          : "",
+        profile.profilePicture ?
+          constructAuthenticatedImageUrl(
+            profile.profilePicture,
+            getCacheBustingTimestamp(),
+          )
+        : "",
       );
       setSelectedFile(null);
       setHasChanges(false);
@@ -70,8 +70,9 @@ const EditProfileModal = ({
     if (profile) {
       const nameChanged = fullName !== profile.fullName;
       const emailChanged = email !== profile.email;
-      const currentPreviewUrl = profile.profilePicture
-        ? constructAuthenticatedImageUrl(
+      const currentPreviewUrl =
+        profile.profilePicture ?
+          constructAuthenticatedImageUrl(
             profile.profilePicture,
             getCacheBustingTimestamp(),
           )
@@ -143,7 +144,11 @@ const EditProfileModal = ({
         const result = await uploadProfilePicture(selectedFile);
 
         if (result.success && result.data) {
-          changes.profilePicture = result.data.path; // Store relative path
+          // Store data URL returned by backend
+          changes.profilePicture =
+            result.data.profilePicture ||
+            result.data.path ||
+            result.data.dataUrl;
         } else {
           throw new Error("Failed to upload picture");
         }
@@ -241,11 +246,9 @@ const EditProfileModal = ({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
               >
-                {isUploading ? (
+                {isUploading ?
                   <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Camera className="h-4 w-4" />
-                )}
+                : <Camera className="h-4 w-4" />}
               </Button>
             </div>
 
@@ -311,17 +314,16 @@ const EditProfileModal = ({
             onClick={handleSave}
             disabled={!hasChanges || isSaving || isUploading}
           >
-            {isSaving || isUploading ? (
+            {isSaving || isUploading ?
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 {isUploading ? "Uploading..." : "Saving..."}
               </>
-            ) : (
-              <>
+            : <>
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
               </>
-            )}
+            }
           </Button>
         </div>
       </div>

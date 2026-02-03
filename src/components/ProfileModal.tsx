@@ -56,7 +56,11 @@ interface ProfileModalProps {
   isMobile?: boolean;
 }
 
-const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile = false }) => {
+const ProfileModal: React.FC<ProfileModalProps> = ({
+  isOpen,
+  onClose,
+  isMobile = false,
+}) => {
   // State Management
   const [user, setUser] = useState<UserProfile | null>(null);
   const [accountSettings, setAccountSettings] = useState<AccountSettings>({
@@ -70,7 +74,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<"profile" | "settings">("profile");
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -90,19 +94,19 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/user/profile', {
-        method: 'GET',
-        credentials: 'include',
+      const response = await fetch("/api/user/profile", {
+        method: "GET",
+        credentials: "include",
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch profile');
+        throw new Error("Failed to fetch profile");
       }
-      
+
       const data = await response.json();
       setUser(data.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load profile');
+      setError(err instanceof Error ? err.message : "Failed to load profile");
     } finally {
       setIsLoading(false);
     }
@@ -112,32 +116,32 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
     setIsSaving(true);
     setError(null);
     try {
-      const response = await fetch('/api/user/profile', {
-        method: 'POST',
+      const response = await fetch("/api/user/profile", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify(updates),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        throw new Error("Failed to update profile");
       }
-      
+
       const data = await response.json();
       setUser(data.data);
       setIsEditing(false);
       setTempUser({});
       setSelectedFile(null);
       setPreviewUrl(null);
-      
+
       toast({
         title: "Profile Updated",
         description: "Your profile has been successfully updated.",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile');
+      setError(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
       setIsSaving(false);
     }
@@ -148,22 +152,30 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
     setError(null);
     try {
       const formData = new FormData();
-      formData.append('image', file);
-      
-      const response = await fetch('/api/user/profile-picture', {
-        method: 'POST',
-        credentials: 'include',
+      formData.append("image", file);
+
+      // Use the unified upload endpoint
+      const response = await fetch("/api/images/upload-profile", {
+        method: "POST",
+        credentials: "include",
         body: formData,
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to upload picture');
+        throw new Error("Failed to upload picture");
       }
-      
+
       const data = await response.json();
-      await updateProfile({ profilePicture: data.imageUrl });
+      // Backend returns profilePicture data URL
+      await updateProfile({
+        profilePicture:
+          data.data?.profilePicture ||
+          data.profilePicture ||
+          data.data?.path ||
+          data.imageUrl,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload picture');
+      setError(err instanceof Error ? err.message : "Failed to upload picture");
     } finally {
       setIsUploading(false);
     }
@@ -173,27 +185,29 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
     setIsSaving(true);
     setError(null);
     try {
-      const response = await fetch('/api/user/account-settings', {
-        method: 'POST',
+      const response = await fetch("/api/user/account-settings", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify(settings),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to update settings');
+        throw new Error("Failed to update settings");
       }
-      
-      setAccountSettings(prev => ({ ...prev, ...settings }));
-      
+
+      setAccountSettings((prev) => ({ ...prev, ...settings }));
+
       toast({
         title: "Settings Updated",
         description: "Your account settings have been successfully updated.",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings');
+      setError(
+        err instanceof Error ? err.message : "Failed to update settings",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -201,21 +215,21 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
       });
-      
+
       // Clear local storage and redirect
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error("Logout error:", err);
       // Force logout even on error
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
     }
   };
 
@@ -239,16 +253,16 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
 
   const handleSaveChanges = async () => {
     const updates: Partial<UserProfile> = {};
-    
+
     if (tempUser.fullName !== user?.fullName) {
       updates.fullName = tempUser.fullName;
     }
-    
+
     if (selectedFile) {
       await uploadProfilePicture(selectedFile);
       return;
     }
-    
+
     if (Object.keys(updates).length > 0) {
       await updateProfile(updates);
     } else {
@@ -261,7 +275,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
     const file = event.target.files?.[0];
     if (file) {
       // Validate file
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         toast({
           title: "Invalid File",
           description: "Please select an image file.",
@@ -269,7 +283,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
         });
         return;
       }
-      
+
       if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "File Too Large",
@@ -278,7 +292,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
         });
         return;
       }
-      
+
       setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
@@ -294,7 +308,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
       });
       return;
     }
-    
+
     if (accountSettings.newPassword !== accountSettings.confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -303,27 +317,27 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
       });
       return;
     }
-    
+
     await updateAccountSettings({
       currentPassword: accountSettings.currentPassword,
       newPassword: accountSettings.newPassword,
     });
-    
+
     // Clear password fields
-    setAccountSettings(prev => ({
+    setAccountSettings((prev) => ({
       ...prev,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
     }));
   };
 
   // Utility Functions
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
@@ -331,7 +345,11 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge variant="default" className="bg-green-500">Active</Badge>;
+        return (
+          <Badge variant="default" className="bg-green-500">
+            Active
+          </Badge>
+        );
       case "inactive":
         return <Badge variant="secondary">Inactive</Badge>;
       case "suspended":
@@ -359,11 +377,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
 
   if (!isOpen) return null;
 
-  const currentName = isEditing ? tempUser.fullName || user?.fullName : user?.fullName;
-  const currentPicture = previewUrl || tempUser.profilePicture || user?.profilePicture;
+  const currentName =
+    isEditing ? tempUser.fullName || user?.fullName : user?.fullName;
+  const currentPicture =
+    previewUrl || tempUser.profilePicture || user?.profilePicture;
 
   const ModalContent = () => (
-    <div className={`${isMobile ? 'h-full' : 'max-h-[90vh] overflow-y-auto'}`}>
+    <div className={`${isMobile ? "h-full" : "max-h-[90vh] overflow-y-auto"}`}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="text-xl font-semibold">Profile</h2>
@@ -398,7 +418,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                   {getInitials(currentName)}
                 </AvatarFallback>
               </Avatar>
-              
+
               {isEditing && (
                 <Button
                   size="icon"
@@ -406,32 +426,34 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
                 >
-                  {isUploading ? (
+                  {isUploading ?
                     <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
+                  : <Camera className="h-4 w-4" />}
                 </Button>
               )}
             </div>
-            
+
             <div className="flex-1">
-              {isEditing ? (
+              {isEditing ?
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input
                     id="fullName"
-                    value={tempUser.fullName || ''}
-                    onChange={(e) => setTempUser(prev => ({ ...prev, fullName: e.target.value }))}
+                    value={tempUser.fullName || ""}
+                    onChange={(e) =>
+                      setTempUser((prev) => ({
+                        ...prev,
+                        fullName: e.target.value,
+                      }))
+                    }
                     placeholder="Enter your full name"
                   />
                 </div>
-              ) : (
-                <div>
+              : <div>
                   <h3 className="text-lg font-medium">{currentName}</h3>
                   <p className="text-sm text-muted-foreground">{user.email}</p>
                 </div>
-              )}
+              }
             </div>
           </div>
 
@@ -446,16 +468,16 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
           {/* Tabs */}
           <div className="flex space-x-1 border-b">
             <Button
-              variant={activeTab === 'profile' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('profile')}
+              variant={activeTab === "profile" ? "default" : "ghost"}
+              onClick={() => setActiveTab("profile")}
               className="rounded-b-none"
             >
               <User className="h-4 w-4 mr-2" />
               Profile
             </Button>
             <Button
-              variant={activeTab === 'settings' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('settings')}
+              variant={activeTab === "settings" ? "default" : "ghost"}
+              onClick={() => setActiveTab("settings")}
               className="rounded-b-none"
             >
               <Settings className="h-4 w-4 mr-2" />
@@ -464,22 +486,26 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
           </div>
 
           {/* Tab Content */}
-          {activeTab === 'profile' && (
+          {activeTab === "profile" && (
             <div className="space-y-4">
               {/* Account Information */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Account Information</CardTitle>
+                  <CardTitle className="text-base">
+                    Account Information
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">Email</p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {user.email}
+                      </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
@@ -489,7 +515,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3">
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <div>
@@ -504,18 +530,16 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
 
               {/* Actions */}
               <div className="space-y-2">
-                {isEditing ? (
+                {isEditing ?
                   <div className="flex gap-2">
                     <Button
                       onClick={handleSaveChanges}
                       disabled={isSaving}
                       className="flex-1"
                     >
-                      {isSaving ? (
+                      {isSaving ?
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-2" />
-                      )}
+                      : <Save className="h-4 w-4 mr-2" />}
                       Save Changes
                     </Button>
                     <Button
@@ -527,8 +551,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                       Cancel
                     </Button>
                   </div>
-                ) : (
-                  <Button
+                : <Button
                     onClick={handleEditToggle}
                     className="w-full"
                     variant="outline"
@@ -536,12 +559,12 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                     <Camera className="h-4 w-4 mr-2" />
                     Edit Profile
                   </Button>
-                )}
+                }
               </div>
             </div>
           )}
 
-          {activeTab === 'settings' && (
+          {activeTab === "settings" && (
             <div className="space-y-4">
               {/* Security Settings */}
               <Card>
@@ -555,12 +578,14 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                       <div className="relative">
                         <Input
                           id="currentPassword"
-                          type={showPasswords.current ? 'text' : 'password'}
-                          value={accountSettings.currentPassword || ''}
-                          onChange={(e) => setAccountSettings(prev => ({ 
-                            ...prev, 
-                            currentPassword: e.target.value 
-                          }))}
+                          type={showPasswords.current ? "text" : "password"}
+                          value={accountSettings.currentPassword || ""}
+                          onChange={(e) =>
+                            setAccountSettings((prev) => ({
+                              ...prev,
+                              currentPassword: e.target.value,
+                            }))
+                          }
                           placeholder="Enter current password"
                         />
                         <Button
@@ -568,31 +593,33 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                           variant="ghost"
                           size="icon"
                           className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6"
-                          onClick={() => setShowPasswords(prev => ({ 
-                            ...prev, 
-                            current: !prev.current 
-                          }))}
+                          onClick={() =>
+                            setShowPasswords((prev) => ({
+                              ...prev,
+                              current: !prev.current,
+                            }))
+                          }
                         >
-                          {showPasswords.current ? (
+                          {showPasswords.current ?
                             <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="newPassword">New Password</Label>
                       <div className="relative">
                         <Input
                           id="newPassword"
-                          type={showPasswords.new ? 'text' : 'password'}
-                          value={accountSettings.newPassword || ''}
-                          onChange={(e) => setAccountSettings(prev => ({ 
-                            ...prev, 
-                            newPassword: e.target.value 
-                          }))}
+                          type={showPasswords.new ? "text" : "password"}
+                          value={accountSettings.newPassword || ""}
+                          onChange={(e) =>
+                            setAccountSettings((prev) => ({
+                              ...prev,
+                              newPassword: e.target.value,
+                            }))
+                          }
                           placeholder="Enter new password"
                         />
                         <Button
@@ -600,31 +627,35 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                           variant="ghost"
                           size="icon"
                           className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6"
-                          onClick={() => setShowPasswords(prev => ({ 
-                            ...prev, 
-                            new: !prev.new 
-                          }))}
+                          onClick={() =>
+                            setShowPasswords((prev) => ({
+                              ...prev,
+                              new: !prev.new,
+                            }))
+                          }
                         >
-                          {showPasswords.new ? (
+                          {showPasswords.new ?
                             <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </div>
-                    
+
                     <div>
-                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                      <Label htmlFor="confirmPassword">
+                        Confirm New Password
+                      </Label>
                       <div className="relative">
                         <Input
                           id="confirmPassword"
-                          type={showPasswords.confirm ? 'text' : 'password'}
-                          value={accountSettings.confirmPassword || ''}
-                          onChange={(e) => setAccountSettings(prev => ({ 
-                            ...prev, 
-                            confirmPassword: e.target.value 
-                          }))}
+                          type={showPasswords.confirm ? "text" : "password"}
+                          value={accountSettings.confirmPassword || ""}
+                          onChange={(e) =>
+                            setAccountSettings((prev) => ({
+                              ...prev,
+                              confirmPassword: e.target.value,
+                            }))
+                          }
                           placeholder="Confirm new password"
                         />
                         <Button
@@ -632,30 +663,28 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                           variant="ghost"
                           size="icon"
                           className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6"
-                          onClick={() => setShowPasswords(prev => ({ 
-                            ...prev, 
-                            confirm: !prev.confirm 
-                          }))}
+                          onClick={() =>
+                            setShowPasswords((prev) => ({
+                              ...prev,
+                              confirm: !prev.confirm,
+                            }))
+                          }
                         >
-                          {showPasswords.confirm ? (
+                          {showPasswords.confirm ?
                             <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </div>
-                    
+
                     <Button
                       onClick={handlePasswordChange}
                       disabled={isSaving}
                       className="w-full"
                     >
-                      {isSaving ? (
+                      {isSaving ?
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Lock className="h-4 w-4 mr-2" />
-                      )}
+                      : <Lock className="h-4 w-4 mr-2" />}
                       Update Password
                     </Button>
                   </div>
@@ -676,18 +705,25 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                       </p>
                     </div>
                     <Button
-                      variant={accountSettings.emailNotifications ? 'default' : 'outline'}
+                      variant={
+                        accountSettings.emailNotifications ? "default" : (
+                          "outline"
+                        )
+                      }
                       size="sm"
-                      onClick={() => updateAccountSettings({ 
-                        emailNotifications: !accountSettings.emailNotifications 
-                      })}
+                      onClick={() =>
+                        updateAccountSettings({
+                          emailNotifications:
+                            !accountSettings.emailNotifications,
+                        })
+                      }
                     >
-                      {accountSettings.emailNotifications ? 'On' : 'Off'}
+                      {accountSettings.emailNotifications ? "On" : "Off"}
                     </Button>
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">Push Notifications</p>
@@ -696,13 +732,19 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                       </p>
                     </div>
                     <Button
-                      variant={accountSettings.pushNotifications ? 'default' : 'outline'}
+                      variant={
+                        accountSettings.pushNotifications ? "default" : (
+                          "outline"
+                        )
+                      }
                       size="sm"
-                      onClick={() => updateAccountSettings({ 
-                        pushNotifications: !accountSettings.pushNotifications 
-                      })}
+                      onClick={() =>
+                        updateAccountSettings({
+                          pushNotifications: !accountSettings.pushNotifications,
+                        })
+                      }
                     >
-                      {accountSettings.pushNotifications ? 'On' : 'Off'}
+                      {accountSettings.pushNotifications ? "On" : "Off"}
                     </Button>
                   </div>
                 </CardContent>
@@ -722,33 +764,45 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
                       </p>
                     </div>
                     <Button
-                      variant={accountSettings.profileVisibility ? 'default' : 'outline'}
+                      variant={
+                        accountSettings.profileVisibility ? "default" : (
+                          "outline"
+                        )
+                      }
                       size="sm"
-                      onClick={() => updateAccountSettings({ 
-                        profileVisibility: !accountSettings.profileVisibility 
-                      })}
+                      onClick={() =>
+                        updateAccountSettings({
+                          profileVisibility: !accountSettings.profileVisibility,
+                        })
+                      }
                     >
-                      {accountSettings.profileVisibility ? 'Public' : 'Private'}
+                      {accountSettings.profileVisibility ? "Public" : "Private"}
                     </Button>
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium">Two-Factor Authentication</p>
+                      <p className="text-sm font-medium">
+                        Two-Factor Authentication
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Add an extra layer of security to your account
                       </p>
                     </div>
                     <Button
-                      variant={accountSettings.twoFactorAuth ? 'default' : 'outline'}
+                      variant={
+                        accountSettings.twoFactorAuth ? "default" : "outline"
+                      }
                       size="sm"
-                      onClick={() => updateAccountSettings({ 
-                        twoFactorAuth: !accountSettings.twoFactorAuth 
-                      })}
+                      onClick={() =>
+                        updateAccountSettings({
+                          twoFactorAuth: !accountSettings.twoFactorAuth,
+                        })
+                      }
                     >
-                      {accountSettings.twoFactorAuth ? 'On' : 'Off'}
+                      {accountSettings.twoFactorAuth ? "On" : "Off"}
                     </Button>
                   </div>
                 </CardContent>
@@ -758,7 +812,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, isMobile =
 
           {/* Logout Button */}
           <Separator />
-          
+
           <Button
             variant="destructive"
             onClick={handleLogout}

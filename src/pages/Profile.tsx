@@ -7,7 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { constructAuthenticatedImageUrl, getCacheBustingTimestamp } from '@/utils/imageUtils';
+import {
+  constructAuthenticatedImageUrl,
+  getCacheBustingTimestamp,
+} from "@/utils/imageUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -68,7 +71,7 @@ const Profile = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<"profile" | "settings">("profile");
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -89,19 +92,19 @@ const Profile = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/user/profile', {
-        method: 'GET',
-        credentials: 'include',
+      const response = await fetch("/api/user/profile", {
+        method: "GET",
+        credentials: "include",
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch profile');
+        throw new Error("Failed to fetch profile");
       }
-      
+
       const data = await response.json();
       setUser(data.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load profile');
+      setError(err instanceof Error ? err.message : "Failed to load profile");
     } finally {
       setIsLoading(false);
     }
@@ -111,32 +114,32 @@ const Profile = () => {
     setIsSaving(true);
     setError(null);
     try {
-      const response = await fetch('/api/user/profile', {
-        method: 'POST',
+      const response = await fetch("/api/user/profile", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify(updates),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        throw new Error("Failed to update profile");
       }
-      
+
       const data = await response.json();
       setUser(data.data);
       setIsEditing(false);
       setTempUser({});
       setSelectedFile(null);
       setPreviewUrl(null);
-      
+
       toast({
         title: "Profile Updated",
         description: "Your profile has been successfully updated.",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile');
+      setError(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
       setIsSaving(false);
     }
@@ -147,34 +150,39 @@ const Profile = () => {
     setError(null);
     try {
       const formData = new FormData();
-      formData.append('profilePicture', file);
-      
-      const response = await fetch('/api/user/profile-picture', {
-        method: 'POST',
-        credentials: 'include',
+      formData.append("profilePicture", file);
+
+      const response = await fetch("/api/user/profile-picture", {
+        method: "POST",
+        credentials: "include",
         body: formData,
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to upload picture');
+        throw new Error("Failed to upload picture");
       }
-      
+
       const result = await response.json();
-      console.log('DEBUG: Upload result:', result);
-      
+      console.log("DEBUG: Upload result:", result);
+
       if (result.success && result.data) {
-        // Update database with the new profile picture path
-        await updateProfile({ profilePicture: result.data.path });
-        
+        // Backend now returns a data URL in result.data.profilePicture
+        await updateProfile({
+          profilePicture:
+            result.data.profilePicture ||
+            result.data.path ||
+            result.data.dataUrl,
+        });
+
         toast({
           title: "Picture Uploaded",
           description: "Profile picture updated successfully.",
         });
       } else {
-        throw new Error('Failed to upload picture');
+        throw new Error("Failed to upload picture");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload picture');
+      setError(err instanceof Error ? err.message : "Failed to upload picture");
     } finally {
       setIsUploading(false);
     }
@@ -184,27 +192,29 @@ const Profile = () => {
     setIsSaving(true);
     setError(null);
     try {
-      const response = await fetch('/api/user/account-settings', {
-        method: 'POST',
+      const response = await fetch("/api/user/account-settings", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify(settings),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to update settings');
+        throw new Error("Failed to update settings");
       }
-      
-      setAccountSettings(prev => ({ ...prev, ...settings }));
-      
+
+      setAccountSettings((prev) => ({ ...prev, ...settings }));
+
       toast({
         title: "Settings Updated",
         description: "Your account settings have been successfully updated.",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings');
+      setError(
+        err instanceof Error ? err.message : "Failed to update settings",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -212,21 +222,21 @@ const Profile = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
       });
-      
+
       // Clear local storage and redirect
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/login');
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/login");
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error("Logout error:", err);
       // Force logout even on error
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/login');
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/login");
     }
   };
 
@@ -250,18 +260,18 @@ const Profile = () => {
 
   const handleSaveChanges = async () => {
     const updates: Partial<UserProfile> = {};
-    
+
     if (tempUser.fullName !== user?.fullName) {
       updates.fullName = tempUser.fullName;
     }
-    
+
     if (selectedFile) {
       await uploadProfilePicture(selectedFile);
       // Don't return here - let the function continue to update state
     } else if (tempUser.profilePicture !== user?.profilePicture) {
       updates.profilePicture = tempUser.profilePicture;
     }
-    
+
     if (Object.keys(updates).length > 0) {
       await updateProfile(updates);
     } else if (!selectedFile) {
@@ -275,7 +285,7 @@ const Profile = () => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         toast({
           title: "Invalid File",
           description: "Please select an image file.",
@@ -283,7 +293,7 @@ const Profile = () => {
         });
         return;
       }
-      
+
       if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "File Too Large",
@@ -292,7 +302,7 @@ const Profile = () => {
         });
         return;
       }
-      
+
       setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
@@ -308,7 +318,7 @@ const Profile = () => {
       });
       return;
     }
-    
+
     if (accountSettings.newPassword !== accountSettings.confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -317,27 +327,27 @@ const Profile = () => {
       });
       return;
     }
-    
+
     await updateAccountSettings({
       currentPassword: accountSettings.currentPassword,
       newPassword: accountSettings.newPassword,
     });
-    
+
     // Clear password fields
-    setAccountSettings(prev => ({
+    setAccountSettings((prev) => ({
       ...prev,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
     }));
   };
 
   // Utility Functions
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
@@ -345,7 +355,11 @@ const Profile = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge variant="default" className="bg-green-500">Active</Badge>;
+        return (
+          <Badge variant="default" className="bg-green-500">
+            Active
+          </Badge>
+        );
       case "inactive":
         return <Badge variant="secondary">Inactive</Badge>;
       case "suspended":
@@ -369,8 +383,10 @@ const Profile = () => {
     };
   }, [previewUrl]);
 
-  const currentName = isEditing ? tempUser.fullName || user?.fullName : user?.fullName;
-  const currentPicture = previewUrl || tempUser.profilePicture || user?.profilePicture;
+  const currentName =
+    isEditing ? tempUser.fullName || user?.fullName : user?.fullName;
+  const currentPicture =
+    previewUrl || tempUser.profilePicture || user?.profilePicture;
 
   return (
     <div className="min-h-screen bg-background">
@@ -406,15 +422,22 @@ const Profile = () => {
                 <div className="flex items-center gap-6">
                   <div className="relative">
                     <Avatar className="h-24 w-24">
-                      <AvatarImage 
-                        src={currentPicture ? constructAuthenticatedImageUrl(currentPicture, getCacheBustingTimestamp()) : ''} 
-                        alt={currentName} 
+                      <AvatarImage
+                        src={
+                          currentPicture ?
+                            constructAuthenticatedImageUrl(
+                              currentPicture,
+                              getCacheBustingTimestamp(),
+                            )
+                          : ""
+                        }
+                        alt={currentName}
                       />
                       <AvatarFallback className="text-xl">
                         {getInitials(currentName)}
                       </AvatarFallback>
                     </Avatar>
-                    
+
                     {isEditing && (
                       <Button
                         size="icon"
@@ -422,37 +445,39 @@ const Profile = () => {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
                       >
-                        {isUploading ? (
+                        {isUploading ?
                           <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Camera className="h-5 w-5" />
-                        )}
+                        : <Camera className="h-5 w-5" />}
                       </Button>
                     )}
                   </div>
-                  
+
                   <div className="flex-1">
-                    {isEditing ? (
+                    {isEditing ?
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="fullName">Full Name</Label>
                           <Input
                             id="fullName"
-                            value={tempUser.fullName || ''}
-                            onChange={(e) => setTempUser(prev => ({ ...prev, fullName: e.target.value }))}
+                            value={tempUser.fullName || ""}
+                            onChange={(e) =>
+                              setTempUser((prev) => ({
+                                ...prev,
+                                fullName: e.target.value,
+                              }))
+                            }
                             placeholder="Enter your full name"
                             className="max-w-md"
                           />
                         </div>
                       </div>
-                    ) : (
-                      <div>
+                    : <div>
                         <h2 className="text-2xl font-bold">{currentName}</h2>
                         <p className="text-muted-foreground">{user.email}</p>
                       </div>
-                    )}
+                    }
                   </div>
-                  
+
                   <div className="text-right">
                     {getStatusBadge(user.accountStatus)}
                     <p className="text-sm text-muted-foreground capitalize mt-2">
@@ -466,15 +491,10 @@ const Profile = () => {
             {/* Edit Actions */}
             {isEditing && (
               <div className="flex gap-2">
-                <Button
-                  onClick={handleSaveChanges}
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
+                <Button onClick={handleSaveChanges} disabled={isSaving}>
+                  {isSaving ?
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
+                  : <Save className="h-4 w-4 mr-2" />}
                   Save Changes
                 </Button>
                 <Button
@@ -489,17 +509,19 @@ const Profile = () => {
             )}
 
             {!isEditing && (
-              <Button
-                onClick={handleEditToggle}
-                variant="outline"
-              >
+              <Button onClick={handleEditToggle} variant="outline">
                 <Camera className="h-4 w-4 mr-2" />
                 Edit Profile
               </Button>
             )}
 
             {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'profile' | 'settings')}>
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) =>
+                setActiveTab(value as "profile" | "settings")
+              }
+            >
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="profile">
                   <User className="h-4 w-4 mr-2" />
@@ -522,12 +544,14 @@ const Profile = () => {
                       <Mail className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium">Email</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {user.email}
+                        </p>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     <div className="flex items-center gap-3">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
@@ -537,9 +561,9 @@ const Profile = () => {
                         </p>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     <div className="flex items-center gap-3">
                       <Shield className="h-4 w-4 text-muted-foreground" />
                       <div>
@@ -562,16 +586,20 @@ const Profile = () => {
                   <CardContent className="space-y-4">
                     <div className="space-y-3">
                       <div>
-                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <Label htmlFor="currentPassword">
+                          Current Password
+                        </Label>
                         <div className="relative">
                           <Input
                             id="currentPassword"
-                            type={showPasswords.current ? 'text' : 'password'}
-                            value={accountSettings.currentPassword || ''}
-                            onChange={(e) => setAccountSettings(prev => ({ 
-                              ...prev, 
-                              currentPassword: e.target.value 
-                            }))}
+                            type={showPasswords.current ? "text" : "password"}
+                            value={accountSettings.currentPassword || ""}
+                            onChange={(e) =>
+                              setAccountSettings((prev) => ({
+                                ...prev,
+                                currentPassword: e.target.value,
+                              }))
+                            }
                             placeholder="Enter current password"
                           />
                           <Button
@@ -579,31 +607,33 @@ const Profile = () => {
                             variant="ghost"
                             size="icon"
                             className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6"
-                            onClick={() => setShowPasswords(prev => ({ 
-                              ...prev, 
-                              current: !prev.current 
-                            }))}
+                            onClick={() =>
+                              setShowPasswords((prev) => ({
+                                ...prev,
+                                current: !prev.current,
+                              }))
+                            }
                           >
-                            {showPasswords.current ? (
+                            {showPasswords.current ?
                               <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
+                            : <Eye className="h-4 w-4" />}
                           </Button>
                         </div>
                       </div>
-                      
+
                       <div>
                         <Label htmlFor="newPassword">New Password</Label>
                         <div className="relative">
                           <Input
                             id="newPassword"
-                            type={showPasswords.new ? 'text' : 'password'}
-                            value={accountSettings.newPassword || ''}
-                            onChange={(e) => setAccountSettings(prev => ({ 
-                              ...prev, 
-                              newPassword: e.target.value 
-                            }))}
+                            type={showPasswords.new ? "text" : "password"}
+                            value={accountSettings.newPassword || ""}
+                            onChange={(e) =>
+                              setAccountSettings((prev) => ({
+                                ...prev,
+                                newPassword: e.target.value,
+                              }))
+                            }
                             placeholder="Enter new password"
                           />
                           <Button
@@ -611,31 +641,35 @@ const Profile = () => {
                             variant="ghost"
                             size="icon"
                             className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6"
-                            onClick={() => setShowPasswords(prev => ({ 
-                              ...prev, 
-                              new: !prev.new 
-                            }))}
+                            onClick={() =>
+                              setShowPasswords((prev) => ({
+                                ...prev,
+                                new: !prev.new,
+                              }))
+                            }
                           >
-                            {showPasswords.new ? (
+                            {showPasswords.new ?
                               <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
+                            : <Eye className="h-4 w-4" />}
                           </Button>
                         </div>
                       </div>
-                      
+
                       <div>
-                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                        <Label htmlFor="confirmPassword">
+                          Confirm New Password
+                        </Label>
                         <div className="relative">
                           <Input
                             id="confirmPassword"
-                            type={showPasswords.confirm ? 'text' : 'password'}
-                            value={accountSettings.confirmPassword || ''}
-                            onChange={(e) => setAccountSettings(prev => ({ 
-                              ...prev, 
-                              confirmPassword: e.target.value 
-                            }))}
+                            type={showPasswords.confirm ? "text" : "password"}
+                            value={accountSettings.confirmPassword || ""}
+                            onChange={(e) =>
+                              setAccountSettings((prev) => ({
+                                ...prev,
+                                confirmPassword: e.target.value,
+                              }))
+                            }
                             placeholder="Confirm new password"
                           />
                           <Button
@@ -643,30 +677,28 @@ const Profile = () => {
                             variant="ghost"
                             size="icon"
                             className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6"
-                            onClick={() => setShowPasswords(prev => ({ 
-                              ...prev, 
-                              confirm: !prev.confirm 
-                            }))}
+                            onClick={() =>
+                              setShowPasswords((prev) => ({
+                                ...prev,
+                                confirm: !prev.confirm,
+                              }))
+                            }
                           >
-                            {showPasswords.confirm ? (
+                            {showPasswords.confirm ?
                               <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
+                            : <Eye className="h-4 w-4" />}
                           </Button>
                         </div>
                       </div>
-                      
+
                       <Button
                         onClick={handlePasswordChange}
                         disabled={isSaving}
                         className="w-full"
                       >
-                        {isSaving ? (
+                        {isSaving ?
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Lock className="h-4 w-4 mr-2" />
-                        )}
+                        : <Lock className="h-4 w-4 mr-2" />}
                         Update Password
                       </Button>
                     </div>
@@ -681,39 +713,57 @@ const Profile = () => {
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">Email Notifications</p>
+                        <p className="text-sm font-medium">
+                          Email Notifications
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Receive email updates about your account
                         </p>
                       </div>
                       <Button
-                        variant={accountSettings.emailNotifications ? 'default' : 'outline'}
+                        variant={
+                          accountSettings.emailNotifications ? "default" : (
+                            "outline"
+                          )
+                        }
                         size="sm"
-                        onClick={() => updateAccountSettings({ 
-                          emailNotifications: !accountSettings.emailNotifications 
-                        })}
+                        onClick={() =>
+                          updateAccountSettings({
+                            emailNotifications:
+                              !accountSettings.emailNotifications,
+                          })
+                        }
                       >
-                        {accountSettings.emailNotifications ? 'On' : 'Off'}
+                        {accountSettings.emailNotifications ? "On" : "Off"}
                       </Button>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">Push Notifications</p>
+                        <p className="text-sm font-medium">
+                          Push Notifications
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Receive browser push notifications
                         </p>
                       </div>
                       <Button
-                        variant={accountSettings.pushNotifications ? 'default' : 'outline'}
+                        variant={
+                          accountSettings.pushNotifications ? "default" : (
+                            "outline"
+                          )
+                        }
                         size="sm"
-                        onClick={() => updateAccountSettings({ 
-                          pushNotifications: !accountSettings.pushNotifications 
-                        })}
+                        onClick={() =>
+                          updateAccountSettings({
+                            pushNotifications:
+                              !accountSettings.pushNotifications,
+                          })
+                        }
                       >
-                        {accountSettings.pushNotifications ? 'On' : 'Off'}
+                        {accountSettings.pushNotifications ? "On" : "Off"}
                       </Button>
                     </div>
                   </CardContent>
@@ -727,39 +777,56 @@ const Profile = () => {
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">Profile Visibility</p>
+                        <p className="text-sm font-medium">
+                          Profile Visibility
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Make your profile visible to other users
                         </p>
                       </div>
                       <Button
-                        variant={accountSettings.profileVisibility ? 'default' : 'outline'}
+                        variant={
+                          accountSettings.profileVisibility ? "default" : (
+                            "outline"
+                          )
+                        }
                         size="sm"
-                        onClick={() => updateAccountSettings({ 
-                          profileVisibility: !accountSettings.profileVisibility 
-                        })}
+                        onClick={() =>
+                          updateAccountSettings({
+                            profileVisibility:
+                              !accountSettings.profileVisibility,
+                          })
+                        }
                       >
-                        {accountSettings.profileVisibility ? 'Public' : 'Private'}
+                        {accountSettings.profileVisibility ?
+                          "Public"
+                        : "Private"}
                       </Button>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">Two-Factor Authentication</p>
+                        <p className="text-sm font-medium">
+                          Two-Factor Authentication
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Add an extra layer of security to your account
                         </p>
                       </div>
                       <Button
-                        variant={accountSettings.twoFactorAuth ? 'default' : 'outline'}
+                        variant={
+                          accountSettings.twoFactorAuth ? "default" : "outline"
+                        }
                         size="sm"
-                        onClick={() => updateAccountSettings({ 
-                          twoFactorAuth: !accountSettings.twoFactorAuth 
-                        })}
+                        onClick={() =>
+                          updateAccountSettings({
+                            twoFactorAuth: !accountSettings.twoFactorAuth,
+                          })
+                        }
                       >
-                        {accountSettings.twoFactorAuth ? 'On' : 'Off'}
+                        {accountSettings.twoFactorAuth ? "On" : "Off"}
                       </Button>
                     </div>
                   </CardContent>
@@ -769,7 +836,7 @@ const Profile = () => {
 
             {/* Logout Button */}
             <Separator />
-            
+
             <Button
               variant="destructive"
               onClick={handleLogout}

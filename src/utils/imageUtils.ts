@@ -1,7 +1,7 @@
 // src/utils/imageUtils.ts
 // Utility functions for handling image URLs and fallbacks
 
-import { STATIC_BASE_URL } from '@/config/api';
+import { STATIC_BASE_URL } from "@/config/api";
 
 /**
  * Constructs a full image URL from a relative path
@@ -9,18 +9,30 @@ import { STATIC_BASE_URL } from '@/config/api';
  * @param timestamp - Optional timestamp for cache-busting
  * @returns Full URL to the image
  */
-export const constructImageUrl = (relativePath: string | null | undefined, timestamp?: number): string => {
+export const constructImageUrl = (
+  relativePath: string | null | undefined,
+  timestamp?: number,
+): string => {
   if (!relativePath) {
-    return '';
+    return "";
   }
-  
+
+  // If it's already a data URL or absolute URL, return as-is
+  if (
+    relativePath.startsWith("data:") ||
+    relativePath.startsWith("http") ||
+    relativePath.startsWith("blob:")
+  ) {
+    return relativePath;
+  }
+
   let url = `${STATIC_BASE_URL}/uploads${relativePath}`;
-  
+
   // Add cache-busting timestamp if provided
   if (timestamp) {
     url += `?t=${timestamp}`;
   }
-  
+
   return url;
 };
 
@@ -30,24 +42,36 @@ export const constructImageUrl = (relativePath: string | null | undefined, times
  * @param timestamp - Optional timestamp for cache-busting
  * @returns Full URL with auth token for authenticated image requests
  */
-export const constructAuthenticatedImageUrl = (relativePath: string | null | undefined, timestamp?: number): string => {
+export const constructAuthenticatedImageUrl = (
+  relativePath: string | null | undefined,
+  timestamp?: number,
+): string => {
   if (!relativePath) {
-    return '';
+    return "";
   }
-  
+
+  // If it's already a data URL or absolute URL, return as-is (no token needed)
+  if (
+    relativePath.startsWith("data:") ||
+    relativePath.startsWith("http") ||
+    relativePath.startsWith("blob:")
+  ) {
+    return relativePath;
+  }
+
   let url = `${STATIC_BASE_URL}/uploads${relativePath}`;
-  
+
   // Add authentication token for static file requests
-  const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem("authToken");
   if (token) {
     url += `?token=${encodeURIComponent(token)}`;
   }
-  
+
   // Add cache-busting timestamp if provided
   if (timestamp) {
     url += token ? `&t=${timestamp}` : `?t=${timestamp}`;
   }
-  
+
   return url;
 };
 
@@ -57,14 +81,17 @@ export const constructAuthenticatedImageUrl = (relativePath: string | null | und
  * @param size - Avatar size (default: 200)
  * @returns URL to a generated avatar image
  */
-export const getFallbackAvatarUrl = (name: string, size: number = 200): string => {
+export const getFallbackAvatarUrl = (
+  name: string,
+  size: number = 200,
+): string => {
   const initials = name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
     .toUpperCase()
     .slice(0, 2);
-  
+
   // Using a simple avatar service or return empty string for default
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=${size}&background=6366f1&color=fff`;
 };
@@ -74,7 +101,10 @@ export const getFallbackAvatarUrl = (name: string, size: number = 200): string =
  * @param event - Error event from img element
  * @param name - User's name for fallback avatar
  */
-export const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>, name: string) => {
+export const handleImageError = (
+  event: React.SyntheticEvent<HTMLImageElement, Event>,
+  name: string,
+) => {
   const img = event.currentTarget;
   img.src = getFallbackAvatarUrl(name);
   img.onerror = null; // Prevent infinite loop

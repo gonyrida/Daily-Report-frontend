@@ -76,7 +76,8 @@ const useProfile = () => {
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : "Failed to load profile",
+        error:
+          error instanceof Error ? error.message : "Failed to load profile",
         loading: false,
       }));
     }
@@ -152,7 +153,7 @@ const useProfile = () => {
         }));
       }
     },
-    [toast]
+    [toast],
   );
 
   const uploadProfilePicture = useCallback(
@@ -174,7 +175,11 @@ const useProfile = () => {
         }
 
         const data = await response.json();
-        await updateProfile({ profilePicture: data.imageUrl });
+        // Backend returns data.profilePicture (data URL) for profile uploads
+        await updateProfile({
+          profilePicture:
+            data.profilePicture || data.imageUrl || data.path || data.dataUrl,
+        });
       } catch (error) {
         setState((prev) => ({
           ...prev,
@@ -184,7 +189,7 @@ const useProfile = () => {
         }));
       }
     },
-    [updateProfile, toast]
+    [updateProfile, toast],
   );
 
   const updateAccountSettings = useCallback(
@@ -220,14 +225,14 @@ const useProfile = () => {
         setState((prev) => ({
           ...prev,
           error:
-            error instanceof Error
-              ? error.message
-              : "Failed to update settings",
+            error instanceof Error ?
+              error.message
+            : "Failed to update settings",
           saving: false,
         }));
       }
     },
-    [toast]
+    [toast],
   );
 
   const logout = useCallback(async () => {
