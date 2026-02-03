@@ -6,8 +6,22 @@ const getApiBaseUrl = (): string => {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
-  // If not defined, use production URL in production mode, localhost in development
-  if (import.meta.env.MODE === "production") {
+  // Check for Render-specific environment variables
+  if (import.meta.env.RENDER_SERVICE_URL) {
+    return `${import.meta.env.RENDER_SERVICE_URL}/api`;
+  }
+  
+  if (import.meta.env.RENDER_EXTERNAL_URL) {
+    return `${import.meta.env.RENDER_EXTERNAL_URL}/api`;
+  }
+
+  // Fallback detection based on hostname or explicit production flag
+  const isProduction = 
+    import.meta.env.MODE === "production" || 
+    window.location.hostname !== "localhost" ||
+    import.meta.env.VITE_FORCE_PRODUCTION === "true";
+
+  if (isProduction) {
     return "https://daily-report-backend.onrender.com/api";
   }
 
@@ -21,8 +35,23 @@ const getStaticBaseUrl = (): string => {
     return import.meta.env.VITE_API_BASE_URL.replace('/api', '');
   }
 
-  // If not defined, use production URL in production mode, localhost in development
-  if (import.meta.env.MODE === "production") {
+  // Check for Render-specific environment variables
+  if (import.meta.env.RENDER_SERVICE_URL) {
+    return import.meta.env.RENDER_SERVICE_URL;
+  }
+  
+  if (import.meta.env.RENDER_EXTERNAL_URL) {
+    return import.meta.env.RENDER_EXTERNAL_URL;
+  }
+  
+  // Fallback detection based on hostname or explicit production flag
+  const isProduction = 
+    import.meta.env.MODE === "production" || 
+    window.location.hostname !== "localhost" ||
+    import.meta.env.VITE_FORCE_PRODUCTION === "true";
+
+  if (isProduction) {
+    // Fallback - update this to your actual Render service URL
     return "https://daily-report-backend.onrender.com";
   }
 

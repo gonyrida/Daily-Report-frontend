@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { constructAuthenticatedImageUrl, getCacheBustingTimestamp } from '@/utils/imageUtils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -146,7 +147,7 @@ const Profile = () => {
     setError(null);
     try {
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('profilePicture', file);
       
       const response = await fetch('/api/user/profile-picture', {
         method: 'POST',
@@ -158,8 +159,20 @@ const Profile = () => {
         throw new Error('Failed to upload picture');
       }
       
-      const data = await response.json();
-      await updateProfile({ profilePicture: data.imageUrl });
+      const result = await response.json();
+      console.log('DEBUG: Upload result:', result);
+      
+      if (result.success && result.data) {
+        // Update database with the new profile picture path
+        await updateProfile({ profilePicture: result.data.path });
+        
+        toast({
+          title: "Picture Uploaded",
+          description: "Profile picture updated successfully.",
+        });
+      } else {
+        throw new Error('Failed to upload picture');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload picture');
     } finally {
@@ -244,12 +257,15 @@ const Profile = () => {
     
     if (selectedFile) {
       await uploadProfilePicture(selectedFile);
-      return;
+      // Don't return here - let the function continue to update state
+    } else if (tempUser.profilePicture !== user?.profilePicture) {
+      updates.profilePicture = tempUser.profilePicture;
     }
     
     if (Object.keys(updates).length > 0) {
       await updateProfile(updates);
-    } else {
+    } else if (!selectedFile) {
+      // No changes to save
       setIsEditing(false);
       setTempUser({});
     }
@@ -390,7 +406,10 @@ const Profile = () => {
                 <div className="flex items-center gap-6">
                   <div className="relative">
                     <Avatar className="h-24 w-24">
-                      <AvatarImage src={currentPicture} alt={currentName} />
+                      <AvatarImage 
+                        src={currentPicture ? constructAuthenticatedImageUrl(currentPicture, getCacheBustingTimestamp()) : ''} 
+                        alt={currentName} 
+                      />
                       <AvatarFallback className="text-xl">
                         {getInitials(currentName)}
                       </AvatarFallback>
