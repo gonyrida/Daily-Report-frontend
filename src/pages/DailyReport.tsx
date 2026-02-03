@@ -69,6 +69,7 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from "@/components/ui/tooltip";
+import { apiGet } from '@/lib/apiFetch';
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -233,7 +234,7 @@ const initializeCleanReportState = (projectName: string, setProjectName: (name: 
 const checkIfProjectHasReports = async (projectName: string): Promise<boolean> => {
   try {
     // Use existing API endpoint that actually exists
-    const response = await fetch('/api/daily-reports/company');
+    const response = await apiGet('/daily-reports/company');
     if (!response.ok) return false;
     
     const apiResponse = await response.json();
@@ -252,7 +253,7 @@ const loadMostRecentReportForProject = async (projectName: string): Promise<any>
     console.log("🔍 DEBUG: Loading most recent report for project:", projectName);
     
     // Use company reports API instead of user reports API
-    const response = await fetch('/api/daily-reports/company');
+    const response = await apiGet('/daily-reports/company');
     if (!response.ok) return null;
     
     const apiResponse = await response.json();

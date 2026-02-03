@@ -668,16 +668,7 @@ export const getCompanyReports = async (
       ...(projectFilter && { project: projectFilter }), // ← ADD PROJECT FILTER
     });
 
-    const response = await fetch(
-      `${API_BASE_URL}/company?${queryParams}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    const response = await apiGet(`/daily-reports/company?${queryParams}`);
 
     if (!response.ok) {
       const errorData = await response.json();

@@ -11,6 +11,7 @@ import { saveProfileLocally, loadProfileLocally } from '@/lib/storageUtils';
 import { handleImageError, constructImageUrl, getCacheBustingTimestamp } from '@/utils/imageUtils';
 import { API_BASE_URL } from '@/config/api';
 import { API_ENDPOINTS } from '@/config/api';
+import { apiGet } from '@/lib/apiFetch';
 
 interface UserProfile {
   id: string;
@@ -55,14 +56,7 @@ const ProfileIcon = () => {
       }
       
       // If no cache, fetch from API
-      const response = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Auth-Token': localStorage.getItem('authToken'),
-        },
-      });
+      const response = await apiGet(API_ENDPOINTS.AUTH.PROFILE);
       
       if (!response.ok) {
         throw new Error('Failed to load user data');
