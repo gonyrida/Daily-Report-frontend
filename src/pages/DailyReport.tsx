@@ -263,26 +263,27 @@ const initializeCleanReportState = (
   };
 };
 
+//Comment out checkIfProjectHasReports because it is currently not being used
 // FIXED: Use existing API endpoint instead of non-existent APIs
-const checkIfProjectHasReports = async (
-  projectName: string
-): Promise<boolean> => {
-  try {
-    // Use existing API endpoint that actually exists
-    const response = await apiGet("/daily-reports/company");
-    if (!response.ok) return false;
+// const checkIfProjectHasReports = async (
+//   projectName: string
+// ): Promise<boolean> => {
+//   try {
+//     // Use existing API endpoint that actually exists
+//     const response = await apiGet("/daily-reports/company");
+//     if (!response.ok) return false;
 
-    const apiResponse = await response.json();
-    const allReports = apiResponse.reports || apiResponse.data || [];
-    const projectReports = allReports.filter(
-      (report) => report.projectName === projectName
-    );
-    return projectReports.length > 0;
-  } catch (error) {
-    console.error("Failed to check project reports:", error);
-    return false;
-  }
-};
+//     const apiResponse = await response.json();
+//     const allReports = apiResponse.reports || apiResponse.data || [];
+//     const projectReports = allReports.filter(
+//       (report) => report.projectName === projectName
+//     );
+//     return projectReports.length > 0;
+//   } catch (error) {
+//     console.error("Failed to check project reports:", error);
+//     return false;
+//   }
+// };
 
 // FIXED: Use existing API endpoint instead of non-existent APIs
 const loadMostRecentReportForProject = async (
@@ -294,20 +295,15 @@ const loadMostRecentReportForProject = async (
       projectName
     );
 
-    // Use company reports API instead of user reports API
-    const response = await apiGet("/daily-reports/company");
+    // 🚀 PERFORMANCE FIX: Use existing project filter instead of downloading all reports
+    const response = await apiGet(`/daily-reports/company?project=${encodeURIComponent(projectName)}&limit=10`);
     if (!response.ok) return null;
 
     const apiResponse = await response.json();
     console.log("🔍 DEBUG: API response:", apiResponse);
 
-    // Extract the reports array from the response
-    const allReports = apiResponse.reports || apiResponse.data || [];
-    console.log("🔍 DEBUG: All company reports count:", allReports.length);
-
-    const projectReports = allReports.filter(
-      (report) => report.projectName === projectName
-    );
+    // 🚀 PERFORMANCE FIX: No client-side filtering needed - backend already filtered!
+    const projectReports = apiResponse.reports || [];
     console.log("🔍 DEBUG: Project reports count:", projectReports.length);
     console.log(
       "🔍 DEBUG: Project reports:",
