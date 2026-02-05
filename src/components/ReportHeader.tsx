@@ -139,12 +139,12 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null, projectLogo, s
                 <span>Saved {lastSavedAt.toLocaleTimeString()}</span>
               </div>
             )}
-            {!isAutoSaving && !lastSavedAt && (
+            {/* {!isAutoSaving && !lastSavedAt && (
               <div className="flex items-center space-x-1">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
                 <span>Unsaved changes</span>
               </div>
-            )}
+            )} */}
           </div>
         </div>
 

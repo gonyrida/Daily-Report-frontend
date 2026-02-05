@@ -59,9 +59,9 @@ const ReportActions = ({
 }: ReportActionsProps) => {
   return (
     <div className="flex items-center justify-center py-6 border-t border-border mt-6">
-      <div className="text-sm text-muted-foreground text-center">
+      {/* <div className="text-sm text-muted-foreground text-center">
         Report actions are managed from the dashboard
-      </div>
+      </div> */}
     </div>
   );
 };

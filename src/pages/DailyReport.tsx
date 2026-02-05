@@ -3754,7 +3754,7 @@ const DailyReport = () => {
                   <div className="mt-6 pt-6 border-t border-muted-foreground/20">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
-                        Export combined:{" "}
+                        {/* Export combined:{" "}
                         <span className="font-medium text-foreground">
                           Report
                         </span>{" "}
@@ -3766,7 +3766,7 @@ const DailyReport = () => {
                         <span className="font-medium text-foreground">
                           Corrective Action Request
                         </span>{" "}
-                        = Sheet 3
+                        = Sheet 3 */}
                       </div>
                       <div className="flex items-center gap-3">
                         {/* ADD THIS: Simple Save Button */}
