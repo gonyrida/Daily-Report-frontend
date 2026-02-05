@@ -2615,21 +2615,22 @@ const DailyReport = () => {
       //     : "NO"
       // );
 
+      //Comment out Saving functionality because it is not needed for combined export
       // Save to database
-      try {
-        console.log("🔍 FRONTEND: About to save to DB");
-        await saveReportToDB(basicCleanedData); // Save basic data without large images
-        console.log("🔍 FRONTEND: Save completed successfully");
-      } catch (error) {
-        console.error("🔍 FRONTEND: Save failed:", error);
-        // Don't proceed with export if save failed
-        throw new Error("Database save failed");
-      }
+      // try {
+      //   console.log("🔍 FRONTEND: About to save to DB");
+      //   await saveReportToDB(basicCleanedData); // Save basic data without large images
+      //   console.log("🔍 FRONTEND: Save completed successfully");
+      // } catch (error) {
+      //   console.error("🔍 FRONTEND: Save failed:", error);
+      //   // Don't proceed with export if save failed
+      //   throw new Error("Database save failed");
+      // }
 
       // DEBUG: Confirm save completed
-      console.log(
-        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
-      );
+      // console.log(
+      //   "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
+      // );
 
       const reportPayload = {
         projectName,
