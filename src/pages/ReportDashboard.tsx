@@ -100,7 +100,7 @@ const ReportDashboard: React.FC = () => {
           {
             name: "Weekly Report", 
             icon: <BarChart3 className="h-6 w-6" />,
-            description: "Weekly summaries and progress reports",
+            description: "Weekly summaries and project's progress",
             path: "/weekly-report",
             count: weeklyReports.length,
             lastReportDate: weeklyReports.length > 0 
@@ -260,7 +260,7 @@ const ReportDashboard: React.FC = () => {
               </div>
 
               {/* Quick Actions */}
-              <Card>
+              {/* <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
@@ -296,7 +296,7 @@ const ReportDashboard: React.FC = () => {
                     </Button>
                   </div>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           </main>
         </SidebarInset>

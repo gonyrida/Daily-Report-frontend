@@ -20,6 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { loginUser } from "@/integrations/authApi";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useProfileContext } from "@/contexts/ProfileContext";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -35,6 +36,7 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { refreshProfile } = useProfileContext();
 
   const {
     register,
@@ -74,12 +76,16 @@ const Login = () => {
         localStorage.setItem("rememberMe", "true");
       }
 
+      // 🔧 ADD THIS: Force profile refresh and cache
+      await refreshProfile();
+      console.log("🔧 Profile refreshed and cached after login");
+
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
 
-      navigate("/dashboard");
+      navigate("/reports");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

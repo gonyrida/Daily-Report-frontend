@@ -32,6 +32,13 @@ const LogoutButton = () => {
       // JWT is stored in HttpOnly cookies - no localStorage cleanup needed
       console.log("🔒 LOGOUT: JWT cookies cleared by backend");
 
+      // 🔧 ADD THIS: Clear localStorage data
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("daily-report:profile");
+      console.log("🔒 LOGOUT: localStorage cleared");
+
       toast({
         title: "Logged out successfully",
         description: "You have been signed out of your account.",
@@ -40,6 +47,14 @@ const LogoutButton = () => {
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
+
+      // 🔧 ADD THIS: Clear localStorage even on error
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("daily-report:profile");
+      console.log("🔒 LOGOUT: localStorage cleared on error");
+
       // Still redirect to login even if API call fails
       navigate("/login");
     } finally {
