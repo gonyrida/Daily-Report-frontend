@@ -13,9 +13,10 @@ interface Props {
   isExporting?: boolean;
   tableTitle?: string;
   setTableTitle?: (title: string) => void;
+  hideTitle?: boolean;
 }
 
-export default function ReferenceSection({ sections, setSections, onExportReference, isExporting = false, tableTitle, setTableTitle }: Props) {
+export default function ReferenceSection({ sections, setSections, onExportReference, isExporting = false, tableTitle, setTableTitle, hideTitle }: Props) {
   const updateSection = (updated: any) => setSections(sections.map((s) => (s.id === updated.id ? updated : s)));
 
   const deleteSection = (id: string) => setSections(sections.filter((s) => s.id !== id));
@@ -23,18 +24,22 @@ export default function ReferenceSection({ sections, setSections, onExportRefere
   return (
     <div className="section-card p-6">
       <div className="mb-4">
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-muted-foreground mb-2">Table Title</label>
-          <Input 
-            placeholder="Enter table title (visual only)" 
-            value={tableTitle || ""}
-            onChange={(e) => setTableTitle?.(e.target.value)}
-          />
-        </div>
+        {tableTitle !== undefined && setTableTitle && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">Table Title</label>
+            <Input 
+              placeholder="Enter table title (visual only)" 
+              value={tableTitle || ""}
+              onChange={(e) => setTableTitle?.(e.target.value)}
+            />
+          </div>
+        )}
 
-        <div className="border-t border-muted-foreground/20 mb-4" />
+        {tableTitle !== undefined && setTableTitle && (
+          <div className="border-t border-muted-foreground/20 mb-4" />
+        )}
 
-        <SectionList sections={sections} onUpdate={updateSection} onDelete={deleteSection} />
+        <SectionList sections={sections} onUpdate={updateSection} onDelete={deleteSection} hideTitle={hideTitle} />
       </div>
     </div>
   );

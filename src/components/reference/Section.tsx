@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Trash2, Check, X, ImagePlus, Image, UploadCloud } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export default function Section({ section, onUpdate, onDelete }: any) {
+export default function Section({ section, onUpdate, onDelete, hideTitle = false }: any) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Add a new entry (with slots format)
@@ -134,19 +134,21 @@ export default function Section({ section, onUpdate, onDelete }: any) {
       {/* Section Header */}
       <div className="px-6 py-4 bg-background text-foreground">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex-1">
-            <label htmlFor={`section-title-${section.id}`} className="sr-only">Section Title</label>
-            <Input
-              id={`section-title-${section.id}`}
-              type="text"
-              value={section.title}
-              onChange={(e) => onUpdate({ ...section, title: e.target.value })}
-              placeholder="Enter section title..."
-              className="text-lg font-semibold"
-              aria-label="Section title"
-            />
-          </div>
-          <div className="flex items-center gap-2">
+          {!hideTitle && (
+            <div className="flex-1">
+              <label htmlFor={`section-title-${section.id}`} className="sr-only">Section Title</label>
+              <Input
+                id={`section-title-${section.id}`}
+                type="text"
+                value={section.title}
+                onChange={(e) => onUpdate({ ...section, title: e.target.value })}
+                placeholder="Enter section title..."
+                className="text-lg font-semibold"
+                aria-label="Section title"
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-2 ml-auto">
             {/* Bulk upload input (hidden) */}
             <input ref={fileInputRef} onChange={onFileInputChange} type="file" accept="image/*" multiple className="hidden" />
 
@@ -185,12 +187,6 @@ export default function Section({ section, onUpdate, onDelete }: any) {
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-3 mt-6">
-          <Button onClick={addEntry} className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-white transition-colors"> 
-            <ImagePlus className="w-4 h-4" />
-            Add More Picture
-          </Button>
-        </div>
       </div>
     </div>
   );

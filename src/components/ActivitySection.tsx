@@ -23,7 +23,7 @@ const ActivitySection = ({
             <ClipboardList className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Working Activity Today</h2>
+            <h2 className="text-lg font-semibold text-foreground">Today Activities</h2>
             <p className="text-sm text-muted-foreground">Describe today's completed work</p>
           </div>
         </div>
@@ -41,7 +41,7 @@ const ActivitySection = ({
             <CalendarCheck className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Work Plan for Next Day</h2>
+            <h2 className="text-lg font-semibold text-foreground">Next Day Plan</h2>
             <p className="text-sm text-muted-foreground">Plan tomorrow's activities</p>
           </div>
         </div>

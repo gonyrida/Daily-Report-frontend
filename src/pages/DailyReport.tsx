@@ -3715,8 +3715,6 @@ const DailyReport = () => {
                             setSections={setReferenceSections}
                             onExportReference={handleExportReference}
                             isExporting={isExportingReference}
-                            tableTitle={tableTitle}
-                            setTableTitle={setTableTitle}
                           />
                         </div>
                       </div>
@@ -3734,6 +3732,7 @@ const DailyReport = () => {
                             isExporting={isExportingSiteActivities}
                             tableTitle={siteActivitiesTitle}
                             setTableTitle={setSiteActivitiesTitle}
+                            hideTitle={true}
                           />
                         </div>
                       </div>

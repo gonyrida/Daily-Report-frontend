@@ -376,26 +376,28 @@ const ResourceTable = ({
                     </tr>
                   )
                 )}
-                {/* 2. Update the Total Row key */}
-                <tr
-                  key={`${title}-total-row`} // Change from key="total-row"
-                  className="border-t-2 border-primary/30 bg-primary/5"
-                >
-                  <td className="px-4 py-3 font-semibold text-foreground">
-                    Total
-                  </td>
-                  {showUnit && <td></td>}
-                  <td className="px-3 py-3 text-center font-bold text-foreground">
-                    {rows.reduce((sum, row) => sum + row.prev, 0)}
-                  </td>
-                  <td className="px-3 py-3 text-center font-bold text-foreground">
-                    {rows.reduce((sum, row) => sum + row.today, 0)}
-                  </td>
-                  <td className="px-3 py-3 text-center font-bold text-primary">
-                    {rows.reduce((sum, row) => sum + row.accumulated, 0)}
-                  </td>
-                  <td></td>
-                </tr>
+                {/* Only show total row if not Materials table */}
+                {title !== "Materials" && (
+                  <tr
+                    key={`${title}-total-row`}
+                    className="border-t-2 border-primary/30 bg-primary/5"
+                  >
+                    <td className="px-4 py-3 font-semibold text-foreground">
+                      Total
+                    </td>
+                    {showUnit && <td></td>}
+                    <td className="px-3 py-3 text-center font-bold text-foreground">
+                      {rows.reduce((sum, row) => sum + row.prev, 0)}
+                    </td>
+                    <td className="px-3 py-3 text-center font-bold text-foreground">
+                      {rows.reduce((sum, row) => sum + row.today, 0)}
+                    </td>
+                    <td className="px-3 py-3 text-center font-bold text-primary">
+                      {rows.reduce((sum, row) => sum + row.accumulated, 0)}
+                    </td>
+                    <td></td>
+                  </tr>
+                )}
               </>
             )}
           </tbody>

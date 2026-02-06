@@ -3,11 +3,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Mail,
   Send,
   Paperclip,
@@ -20,7 +32,7 @@ import {
   Bug,
   HelpCircle,
   User,
-  Shield
+  Shield,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,17 +49,20 @@ interface ContactSupportModalProps {
   onClose: () => void;
 }
 
-const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClose }) => {
+const ContactSupportModal: React.FC<ContactSupportModalProps> = ({
+  isOpen,
+  onClose,
+}) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [formData, setFormData] = useState<SupportTicket>({
     subject: "",
     category: "",
     message: "",
-    priority: "medium"
+    priority: "medium",
   });
-  
+
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<SupportTicket>>({});
@@ -57,21 +72,21 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
     { value: "account", label: "Account Problem", icon: User },
     { value: "feature", label: "Feature Request", icon: FileText },
     { value: "security", label: "Security Concern", icon: Shield },
-    { value: "general", label: "General Question", icon: HelpCircle }
+    { value: "general", label: "General Question", icon: HelpCircle },
   ];
 
   const priorities = [
     { value: "low", label: "Low - General inquiry" },
     { value: "medium", label: "Medium - Need assistance" },
     { value: "high", label: "High - Urgent issue" },
-    { value: "critical", label: "Critical - System down" }
+    { value: "critical", label: "Critical - System down" },
   ];
 
   const handleInputChange = (field: keyof SupportTicket, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
@@ -89,7 +104,15 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
       }
 
       // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      const allowedTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "application/pdf",
+        "text/plain",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
       if (!allowedTypes.includes(file.type)) {
         toast({
           title: "Invalid File Type",
@@ -106,7 +129,7 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
   const removeAttachment = () => {
     setAttachment(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -133,7 +156,7 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       toast({
         title: "Validation Error",
@@ -148,31 +171,37 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
     try {
       // Create form data for file upload
       const submitData = new FormData();
-      submitData.append('subject', formData.subject);
-      submitData.append('category', formData.category);
-      submitData.append('message', formData.message);
-      submitData.append('priority', formData.priority);
-      
+      submitData.append("subject", formData.subject);
+      submitData.append("category", formData.category);
+      submitData.append("message", formData.message);
+      submitData.append("priority", formData.priority);
+
       if (attachment) {
-        submitData.append('attachment', attachment);
+        submitData.append("attachment", attachment);
       }
 
       // Send to backend API
-      const response = await fetch('/api/support/contact', {
-        method: 'POST',
-        credentials: 'include',
+      const response = await fetch("/api/support/contact", {
+        method: "POST",
+        credentials: "include",
         body: submitData,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit support request');
+        throw new Error("Failed to submit support request");
       }
 
       const result = await response.json();
+      const ticketId = result?.data?.ticketId || result?.ticketId;
+
+      let description = `Ticket #${ticketId} has been created. We'll respond within 24 hours.`;
+      if (result?.data?.attachment?.url) {
+        description += ` Attachment received: ${result.data.attachment.originalName}`;
+      }
 
       toast({
         title: "Support Request Submitted",
-        description: `Ticket #${result.ticketId} has been created. We'll respond within 24 hours.`,
+        description,
       });
 
       // Reset form
@@ -180,22 +209,22 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
         subject: "",
         category: "",
         message: "",
-        priority: "medium"
+        priority: "medium",
       });
       setAttachment(null);
       setErrors({});
-      
+
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
 
       onClose();
-
     } catch (error) {
-      console.error('Support submission error:', error);
+      console.error("Support submission error:", error);
       toast({
         title: "Submission Failed",
-        description: "Unable to submit your request. Please try again or contact us directly.",
+        description:
+          "Unable to submit your request. Please try again or contact us directly.",
         variant: "destructive",
       });
     } finally {
@@ -233,9 +262,11 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
           <Alert>
             <Clock className="h-4 w-4" />
             <AlertDescription>
-              <strong>Response Time:</strong> {getResponseTime()} 
-              {formData.priority === 'critical' && (
-                <span className="ml-2 text-red-600 font-semibold">• Priority Support</span>
+              <strong>Response Time:</strong> {getResponseTime()}
+              {formData.priority === "critical" && (
+                <span className="ml-2 text-red-600 font-semibold">
+                  • Priority Support
+                </span>
               )}
             </AlertDescription>
           </Alert>
@@ -244,11 +275,13 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
             {/* Category Selection */}
             <div className="space-y-2">
               <Label htmlFor="category">Category *</Label>
-              <Select 
-                value={formData.category} 
-                onValueChange={(value) => handleInputChange('category', value)}
+              <Select
+                value={formData.category}
+                onValueChange={(value) => handleInputChange("category", value)}
               >
-                <SelectTrigger className={errors.category ? "border-red-500" : ""}>
+                <SelectTrigger
+                  className={errors.category ? "border-red-500" : ""}
+                >
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,7 +309,7 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
               <Input
                 id="subject"
                 value={formData.subject}
-                onChange={(e) => handleInputChange('subject', e.target.value)}
+                onChange={(e) => handleInputChange("subject", e.target.value)}
                 placeholder="Brief description of your issue"
                 className={errors.subject ? "border-red-500" : ""}
               />
@@ -288,9 +321,9 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
             {/* Priority */}
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Select 
-                value={formData.priority} 
-                onValueChange={(value) => handleInputChange('priority', value)}
+              <Select
+                value={formData.priority}
+                onValueChange={(value) => handleInputChange("priority", value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
@@ -311,7 +344,7 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
               <Textarea
                 id="message"
                 value={formData.message}
-                onChange={(e) => handleInputChange('message', e.target.value)}
+                onChange={(e) => handleInputChange("message", e.target.value)}
                 placeholder="Please describe your issue in detail. Include any error messages, steps to reproduce, and what you expected to happen."
                 rows={6}
                 className={errors.message ? "border-red-500" : ""}
@@ -338,7 +371,7 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
                   className="hidden"
                   accept="image/*,.pdf,.doc,.docx,.txt"
                 />
-                
+
                 <Button
                   type="button"
                   variant="outline"
@@ -348,7 +381,7 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
                   <Paperclip className="h-4 w-4 mr-2" />
                   {attachment ? attachment.name : "Choose File"}
                 </Button>
-                
+
                 {attachment && (
                   <div className="flex items-center justify-between p-2 bg-muted rounded">
                     <span className="text-sm truncate">{attachment.name}</span>
@@ -362,9 +395,10 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
                     </Button>
                   </div>
                 )}
-                
+
                 <p className="text-xs text-muted-foreground">
-                  Max file size: 10MB. Allowed formats: Images, PDF, Word documents, and text files.
+                  Max file size: 10MB. Allowed formats: Images, PDF, Word
+                  documents, and text files.
                 </p>
               </div>
             </div>
@@ -380,22 +414,17 @@ const ContactSupportModal: React.FC<ContactSupportModalProps> = ({ isOpen, onClo
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                {isSubmitting ? (
+              <Button type="submit" disabled={isSubmitting} className="flex-1">
+                {isSubmitting ?
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Submitting...
                   </>
-                ) : (
-                  <>
+                : <>
                     <Send className="h-4 w-4 mr-2" />
                     Submit Request
                   </>
-                )}
+                }
               </Button>
             </div>
           </form>

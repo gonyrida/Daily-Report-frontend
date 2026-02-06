@@ -35,9 +35,13 @@ import {
   generatePythonExcel,
   generateReferenceExcel,
   generateCombinedExcel,
-  generateCombinedPDF
+  generateCombinedPDF,
 } from "@/integrations/reportsApi";
-import { saveReportToDB, loadReportFromDB, submitReportToDB } from "@/integrations/reportsApi";
+import {
+  saveReportToDB,
+  loadReportFromDB,
+  submitReportToDB,
+} from "@/integrations/reportsApi";
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 
 // // Helper function to get auth headers
@@ -221,6 +225,9 @@ const Index = () => {
 
   // Project Info
   const [projectName, setProjectName] = useState("");
+  const [location, setLocation] = useState("");
+  const [reportCreator, setReportCreator] = useState("");
+
   const [reportDate, setReportDate] = useState<Date | undefined>(new Date());
   const [weatherAM, setWeatherAM] = useState("");
   const [weatherPM, setWeatherPM] = useState("");
@@ -262,7 +269,9 @@ const Index = () => {
   // File name dialog state
   const [showFileNameDialog, setShowFileNameDialog] = useState(false);
   const [defaultFileName, setDefaultFileName] = useState<string>("");
-  const [pendingExportType, setPendingExportType] = useState<"excel" | "combined" | "reference" | "combined-pdf" | "combined-zip" >(null);
+  const [pendingExportType, setPendingExportType] = useState<
+    "excel" | "combined" | "reference" | "combined-pdf" | "combined-zip"
+  >(null);
 
   // Track previous date to detect changes
   const lastDateRef = useRef<string | null>(null);
@@ -310,7 +319,7 @@ const Index = () => {
       materials,
       machinery,
       referenceSections,
-    ]
+    ],
   );
 
   // Load report on mount - Try DB first, fallback to localStorage (only on first mount)
@@ -328,7 +337,7 @@ const Index = () => {
           // Load from database
           setProjectName(dbReport.projectName || "");
           setReportDate(
-            dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
+            dbReport.reportDate ? new Date(dbReport.reportDate) : new Date(),
           );
           // Handle backward compatibility: convert old format to new
           if (dbReport.weatherAM !== undefined) {
@@ -369,7 +378,7 @@ const Index = () => {
             setReportDate(
               localDraft.reportDate
                 ? new Date(localDraft.reportDate)
-                : new Date()
+                : new Date(),
             );
             // Handle backward compatibility
             if (localDraft.weatherAM !== undefined) {
@@ -410,7 +419,9 @@ const Index = () => {
         if (localDraft) {
           setProjectName(localDraft.projectName || "");
           setReportDate(
-            localDraft.reportDate ? new Date(localDraft.reportDate) : new Date()
+            localDraft.reportDate
+              ? new Date(localDraft.reportDate)
+              : new Date(),
           );
           // Handle backward compatibility
           if (localDraft.weatherAM !== undefined) {
@@ -551,7 +562,7 @@ const Index = () => {
                   }));
 
                 setManagementTeam(
-                  mapPrevFromAccum(prevData.managementTeam || [])
+                  mapPrevFromAccum(prevData.managementTeam || []),
                 );
                 setWorkingTeam(mapPrevFromAccum(prevData.workingTeam || []));
                 setMaterials(mapPrevFromAccum(prevData.materials || []));
@@ -701,7 +712,7 @@ const Index = () => {
       }
       setTimeout(() => setIsSaving(false), 500);
     },
-    [reportDate, getReportData, toast]
+    [reportDate, getReportData, toast],
   );
 
   // Auto-save every 30 seconds
@@ -793,7 +804,7 @@ const Index = () => {
           materials,
           machinery,
         },
-        true
+        true,
       )) as string;
 
       setPreviewUrl(url);
@@ -944,13 +955,13 @@ const Index = () => {
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
                     image: await toBase64DataUrl(slot.image),
-                  }))
+                  })),
                 );
                 return { ...entry, slots: newSlots };
-              })
+              }),
             );
             return { ...sec, entries: newEntries };
-          })
+          }),
         );
       };
 
@@ -993,7 +1004,7 @@ const Index = () => {
     try {
       // DEBUG: Add frontend log before saving
       console.log(
-        "DEBUG FRONTEND: About to save report to DB before combined export"
+        "DEBUG FRONTEND: About to save report to DB before combined export",
       );
 
       // Step 1: Save report to database first (same logic as submit)
@@ -1011,7 +1022,7 @@ const Index = () => {
 
       // DEBUG: Confirm save completed
       console.log(
-        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
+        "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export",
       );
 
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
@@ -1055,29 +1066,33 @@ const Index = () => {
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
                     image: await toBase64DataUrl(slot.image),
-                  }))
+                  })),
                 );
                 return { ...entry, slots: newSlots };
-              })
+              }),
             );
             return { ...sec, entries: newEntries };
-          })
+          }),
         );
       };
 
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || "",
+            ),
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        }),
+      );
 
       const reportPayload = {
         projectName,
@@ -1093,14 +1108,14 @@ const Index = () => {
         materials,
         machinery,
         description: carSheet.description || "",
-        photo_groups: processedCar
+        photo_groups: processedCar,
       };
 
       await generateCombinedExcel(
         reportPayload,
         processedSections,
         tableTitle,
-        fileName
+        fileName,
       );
 
       toast({
@@ -1157,8 +1172,8 @@ const Index = () => {
   const handleExportCombinedPDF = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]}`;
-    
+    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]}`;
+
     setPendingExportType("combined-pdf");
     setDefaultFileName(defaultFileName);
     setShowFileNameDialog(true);
@@ -1181,7 +1196,7 @@ const Index = () => {
       await saveReportToDB(cleanedData);
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
         // console.log("DEBUG: Processing image:", typeof img, img);
-        
+
         if (!img) {
           // console.log("DEBUG: No image provided");
           return null;
@@ -1190,12 +1205,12 @@ const Index = () => {
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
         if (typeof img === "string") {
           // console.log("DEBUG: Image is string, starts with:", img.substring(0, 20));
-          
+
           if (img.startsWith("data:")) {
             // console.log("DEBUG: Already data URL, length:", img.length);
             return img;
           }
-          
+
           if (img.startsWith("blob:")) {
             // console.log("DEBUG: Converting blob URL to data URL");
             // Convert blob URL to data URL
@@ -1246,13 +1261,13 @@ const Index = () => {
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
                     image: await toBase64DataUrl(slot.image),
-                  }))
+                  })),
                 );
                 return { ...entry, slots: newSlots };
-              })
+              }),
             );
             return { ...sec, entries: newEntries };
-          })
+          }),
         );
       };
       const processedSections = await processImages(referenceSections);
@@ -1271,16 +1286,20 @@ const Index = () => {
         });
       });
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || "",
+            ),
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        }),
+      );
 
       await generateCombinedPDF(
         {
@@ -1301,12 +1320,13 @@ const Index = () => {
         },
         processedSections,
         tableTitle,
-        fileName
+        fileName,
       );
-      
+
       toast({
         title: "Combined PDF Exported",
-        description: "Your combined report has been exported as PDF successfully.",
+        description:
+          "Your combined report has been exported as PDF successfully.",
       });
     } catch (error) {
       console.error("Combined PDF export error:", error);
@@ -1322,7 +1342,7 @@ const Index = () => {
 
   const handlePreviewCombined = async () => {
     if (!validateReport()) return;
-    setIsPreviewingCombined(true);  // Start loading
+    setIsPreviewingCombined(true); // Start loading
     try {
       // Process images to base64 data URLs (same as export)
       const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
@@ -1369,29 +1389,33 @@ const Index = () => {
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
                     image: await toBase64DataUrl(slot.image),
-                  }))
+                  })),
                 );
                 return { ...entry, slots: newSlots };
-              })
+              }),
             );
             return { ...sec, entries: newEntries };
-          })
+          }),
         );
       };
 
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || "",
+            ),
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        }),
+      );
 
       // Use same payload as export
       const payload = {
@@ -1415,10 +1439,16 @@ const Index = () => {
               const slots = entry.slots ?? [];
               return {
                 section_title: section.title || "",
-                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+                images: slots
+                  .map((s: any) => s.image)
+                  .filter(Boolean)
+                  .slice(0, 2),
+                footers: slots
+                  .map((s: any) => s.caption)
+                  .filter(Boolean)
+                  .slice(0, 2),
               };
-            })
+            }),
           ),
           description: carSheet.description || "",
           photo_groups: processedCar,
@@ -1426,16 +1456,19 @@ const Index = () => {
       };
 
       // Get Excel data as blob
-      const response = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${PYTHON_API_BASE_URL}/generate-combined-pdf`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
 
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');  // This will show PDF in browser
+        window.open(url, "_blank"); // This will show PDF in browser
       }
     } catch (error) {
       toast({
@@ -1444,15 +1477,15 @@ const Index = () => {
         variant: "destructive",
       });
     } finally {
-      setIsPreviewingCombined(false);  // End loading
+      setIsPreviewingCombined(false); // End loading
     }
   };
 
   const handleExportCombinedZIP = async () => {
     if (!validateReport()) return;
 
-    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]}`;
-    
+    const defaultFileName = `Combined_Report_${projectName?.replace(/\s+/g, "_") || "Report"}_${reportDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]}`;
+
     setPendingExportType("combined-zip");
     setDefaultFileName(defaultFileName);
     setShowFileNameDialog(true);
@@ -1515,29 +1548,33 @@ const Index = () => {
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
                     image: await toBase64DataUrl(slot.image),
-                  }))
+                  })),
                 );
                 return { ...entry, slots: newSlots };
-              })
+              }),
             );
             return { ...sec, entries: newEntries };
-          })
+          }),
         );
       };
 
       const processedSections = await processImages(referenceSections);
 
       // Process CAR data
-      const processedCar = await Promise.all((carSheet.photo_groups || []).map(async (g: any) => {
-        const imgs = await Promise.all((g.images || []).map(async (img: any) => 
-          (await toBase64DataUrl(img)) || ""
-        ));
-        return { 
-          date: g.date || "", 
-          images: [imgs[0] || "", imgs[1] || ""], 
-          footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")]
-        };
-      }));
+      const processedCar = await Promise.all(
+        (carSheet.photo_groups || []).map(async (g: any) => {
+          const imgs = await Promise.all(
+            (g.images || []).map(
+              async (img: any) => (await toBase64DataUrl(img)) || "",
+            ),
+          );
+          return {
+            date: g.date || "",
+            images: [imgs[0] || "", imgs[1] || ""],
+            footers: [g.footers?.[0] || "", g.footers?.[1] || ""],
+          };
+        }),
+      );
 
       // Generate both files
       const reportPayload = {
@@ -1558,12 +1595,44 @@ const Index = () => {
       };
 
       // Generate PDF
-      const pdfResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "combined",
-          data: {
+      const pdfResponse = await fetch(
+        `${PYTHON_API_BASE_URL}/generate-combined-pdf`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "combined",
+            data: {
+              ...reportPayload,
+              table_title: tableTitle,
+              reference: processedSections.flatMap((section: any) =>
+                (section.entries ?? []).map((entry: any) => {
+                  const slots = entry.slots ?? [];
+                  return {
+                    section_title: section.title || "",
+                    images: slots
+                      .map((s: any) => s.image)
+                      .filter(Boolean)
+                      .slice(0, 2),
+                    footers: slots
+                      .map((s: any) => s.caption)
+                      .filter(Boolean)
+                      .slice(0, 2),
+                  };
+                }),
+              ),
+            },
+          }),
+        },
+      );
+
+      // Generate Excel
+      const excelResponse = await fetch(
+        `${PYTHON_API_BASE_URL}/generate-combined`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             ...reportPayload,
             table_title: tableTitle,
             reference: processedSections.flatMap((section: any) =>
@@ -1571,41 +1640,27 @@ const Index = () => {
                 const slots = entry.slots ?? [];
                 return {
                   section_title: section.title || "",
-                  images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                  footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
+                  images: slots
+                    .map((s: any) => s.image)
+                    .filter(Boolean)
+                    .slice(0, 2),
+                  footers: slots
+                    .map((s: any) => s.caption)
+                    .filter(Boolean)
+                    .slice(0, 2),
                 };
-              })
+              }),
             ),
-          },
-        }),
-      });
-
-      // Generate Excel
-      const excelResponse = await fetch(`${PYTHON_API_BASE_URL}/generate-combined`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...reportPayload,
-          table_title: tableTitle,
-          reference: processedSections.flatMap((section: any) =>
-            (section.entries ?? []).map((entry: any) => {
-              const slots = entry.slots ?? [];
-              return {
-                section_title: section.title || "",
-                images: slots.map((s: any) => s.image).filter(Boolean).slice(0, 2),
-                footers: slots.map((s: any) => s.caption).filter(Boolean).slice(0, 2),
-              };
-            })
-          ),
-        }),
-      });
+          }),
+        },
+      );
 
       if (!pdfResponse.ok || !excelResponse.ok) {
         throw new Error("Failed to generate files");
       }
 
       // Create ZIP file
-      const JSZip = await import('jszip');
+      const JSZip = await import("jszip");
       const zip = new JSZip.default();
 
       const pdfBlob = await pdfResponse.blob();
@@ -1615,7 +1670,7 @@ const Index = () => {
       zip.file(`${fileName}.xlsm`, excelBlob);
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
-      
+
       // Download ZIP
       const url = window.URL.createObjectURL(zipBlob);
       const link = document.createElement("a");
@@ -1707,7 +1762,7 @@ const Index = () => {
           (r.description && r.description.trim() !== "") ||
           (r.prev && r.prev > 0) ||
           (r.today && r.today > 0) ||
-          (r.accumulated && r.accumulated > 0)
+          (r.accumulated && r.accumulated > 0),
       )
       .map((r) => ({
         id: r.id,
@@ -1740,7 +1795,7 @@ const Index = () => {
       // Step 2: Mark it as submitted (changes status)
       await submitReportToDB(
         cleanedData.projectName,
-        new Date(cleanedData.reportDate!)
+        new Date(cleanedData.reportDate!),
       );
 
       // Step 3: Clear localStorage after successful submission
@@ -1814,6 +1869,10 @@ const Index = () => {
         <ProjectInfo
           projectName={projectName}
           setProjectName={setProjectName}
+          location={location}
+          setLocation={setLocation}
+          reportCreator={reportCreator}
+          setReportCreator={setReportCreator}
           reportDate={reportDate}
           setReportDate={setReportDate}
           weatherAM={weatherAM}
@@ -1884,7 +1943,9 @@ const Index = () => {
         {/* CAR section (Sheet 3) */}
         <div className="mt-8 pt-6 border-t border-muted-foreground/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <h2 className="text-sm font-semibold text-foreground mb-4">Corrective Action Request</h2>
+            <h2 className="text-sm font-semibold text-foreground mb-4">
+              Corrective Action Request
+            </h2>
             <CARSection car={carSheet} setCar={setCarSheet} />
           </div>
         </div>
@@ -1897,13 +1958,22 @@ const Index = () => {
               Sheet 1,{" "}
               <span className="font-medium text-foreground">Reference</span> =
               Sheet 2,{" "}
-              <span className="font-medium text-foreground">Corrective Action Request</span> =
-              Sheet 3
+              <span className="font-medium text-foreground">
+                Corrective Action Request
+              </span>{" "}
+              = Sheet 3
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" className="min-w-[140px]" onClick={handlePreviewCombined} disabled={isPreviewingCombined}>
+              <Button
+                variant="outline"
+                className="min-w-[140px]"
+                onClick={handlePreviewCombined}
+                disabled={isPreviewingCombined}
+              >
                 <Eye className="w-4 h-4 mr-2" />
-                {isPreviewingCombined ? "Previewing Combined..." : "Preview Combined"}
+                {isPreviewingCombined
+                  ? "Previewing Combined..."
+                  : "Preview Combined"}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1918,7 +1988,10 @@ const Index = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleExportCombinedPDF} disabled={isExportingCombined}>
+                  <DropdownMenuItem
+                    onClick={handleExportCombinedPDF}
+                    disabled={isExportingCombined}
+                  >
                     <FileText className="w-4 h-4 mr-2" />
                     Export Combined PDF
                   </DropdownMenuItem>
@@ -1935,7 +2008,10 @@ const Index = () => {
                     Export Combined Docs (Word)
                   </DropdownMenuItem>
                   */}
-                  <DropdownMenuItem onClick={handleExportCombinedZIP} disabled={isExportingCombined}>
+                  <DropdownMenuItem
+                    onClick={handleExportCombinedZIP}
+                    disabled={isExportingCombined}
+                  >
                     <FileDown className="w-4 h-4 mr-2" />
                     Export Combined (ZIP)
                   </DropdownMenuItem>
@@ -1982,26 +2058,26 @@ const Index = () => {
                   reportDate?.toISOString().split("T")[0] || "export"
                 }`
               : pendingExportType === "reference"
-              ? `reference_${
-                  reportDate?.toISOString().split("T")[0] || "export"
-                }`
-              : `${projectName || "Report"}_${
-                  reportDate?.toISOString().split("T")[0] || "export"
-                }`
+                ? `reference_${
+                    reportDate?.toISOString().split("T")[0] || "export"
+                  }`
+                : `${projectName || "Report"}_${
+                    reportDate?.toISOString().split("T")[0] || "export"
+                  }`
           }
           title={
             pendingExportType === "combined"
               ? "Export Combined Excel File"
               : pendingExportType === "reference"
-              ? "Export Reference Excel File"
-              : "Export Excel File"
+                ? "Export Reference Excel File"
+                : "Export Excel File"
           }
           description={
             pendingExportType === "combined"
               ? "Enter a name for your combined Excel export file (Report + Reference)."
               : pendingExportType === "reference"
-              ? "Enter a name for your reference Excel export file."
-              : "Enter a name for your Excel export file."
+                ? "Enter a name for your reference Excel export file."
+                : "Enter a name for your Excel export file."
           }
         />
       </main>

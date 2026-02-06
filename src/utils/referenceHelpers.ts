@@ -23,7 +23,6 @@ export function createDefaultHSESections() {
 
 export function createDefaultSiteActivitiesSections() {
   return [
-    createReferenceSection("Site Activity Toolbox Meeting "),
     createReferenceSection("Site Activity Photos ")
   ];
 }

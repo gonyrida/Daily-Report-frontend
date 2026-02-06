@@ -1,6 +1,7 @@
 import { Users, Package, Truck } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import SiteWorkingTeamGroup from "./SiteWorkingTeamGroup";
+import ManagementTeamGroup from "./ManagementTeamGroup";
 
 interface ResourcesSectionProps {
   managementTeam: ResourceRow[];
@@ -15,7 +16,7 @@ interface ResourcesSectionProps {
   setMachinery: (rows: ResourceRow[]) => void;
 }
 // add more options as needed
-const MANAGEMENT_OPTIONS = [
+export const MANAGEMENT_OPTIONS = [
   "Project Manager",
   "Construction Manager",
   "Site Engineer",
@@ -120,28 +121,24 @@ const ResourcesSection = ({
     <div className="space-y-4">
       <h2 className="text-md font-semibold text-foreground flex items-center gap-2">
         <div className="w-1 h-5 bg-accent rounded-full" />
-        Resources Employed
+        Man Power
       </h2>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <ResourceTable
-          title="Site Management Team"
-          icon={<Users className="w-5 h-5 text-primary" />}
-          rows={managementTeam}
-          setRows={setManagementTeam}
-          useDropdown={true}
-          dropdownOptions={MANAGEMENT_OPTIONS}
-        />
-
-        <SiteWorkingTeamGroup
-          interiorTeam={interiorTeam}
-          setInteriorTeam={setInteriorTeam}
+        <ManagementTeamGroup
+          managementTeam={managementTeam}
+          setManagementTeam={setManagementTeam}
           mepTeam={mepTeam}
           setMepTeam={setMepTeam}
         />
+        
+        <SiteWorkingTeamGroup
+          interiorTeam={interiorTeam}
+          setInteriorTeam={setInteriorTeam}
+        />
 
         <ResourceTable
-          title="Materials Deliveries"
+          title="Materials"
           icon={<Package className="w-5 h-5 text-warning" />}
           rows={materials}
           setRows={setMaterials}
@@ -152,7 +149,7 @@ const ResourcesSection = ({
         />
 
         <ResourceTable
-          title="Machinery & Equipment"
+          title="Equipment"
           icon={<Truck className="w-5 h-5 text-success" />}
           rows={machinery}
           setRows={setMachinery}

@@ -22,6 +22,13 @@ import { cn } from "@/lib/utils";
 interface ProjectInfoProps {
   projectName: string;
   setProjectName: (name: string) => void;
+
+  location: string;
+  setLocation: (location: string) => void;
+
+  reportCreator: string;
+  setReportCreator: (name: string) => void;
+  
   reportDate: Date | undefined;
   setReportDate: (date: Date | undefined) => void;
   weatherAM: string;
@@ -32,6 +39,7 @@ interface ProjectInfoProps {
   setTempAM: (temp: string) => void;
   tempPM: string;
   setTempPM: (temp: string) => void;
+
   currentPeriod: "AM" | "PM";
   setCurrentPeriod: (period: "AM" | "PM") => void;
 }
@@ -39,6 +47,10 @@ interface ProjectInfoProps {
 const ProjectInfo = ({
   projectName,
   setProjectName,
+  location,
+  setLocation,
+  reportCreator,
+  setReportCreator,
   reportDate,
   setReportDate,
   weatherAM,
@@ -90,6 +102,7 @@ const ProjectInfo = ({
     <div className="section-card p-6 animate-fade-in">
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-4">
+          {/* Project Name */}
           <div>
             <Label
               htmlFor="projectName"
@@ -104,8 +117,22 @@ const ProjectInfo = ({
               placeholder="Enter project name..."
               className="mt-1.5"
             />
-          </div>
 
+            
+          </div>
+{/* Location */}
+  <div>
+    <Label htmlFor="location" className="text-sm font-medium text-foreground">
+      Location
+    </Label>
+    <Input
+      id="location"
+      value={location}
+      onChange={(e) => setLocation(e.target.value)}
+      placeholder="Enter site/location..."
+      className="mt-1.5"
+    />
+  </div>
           <div>
             <Label className="text-sm font-medium text-foreground">
               Report Date *
