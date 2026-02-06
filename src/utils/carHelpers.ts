@@ -2,7 +2,8 @@ export function createCarGroup() {
   return {
     id: crypto.randomUUID(),
     date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
-    images: ["", ""],
+    images: [null, null],
+    descriptions: ["", ""],
     footers: ["", ""],
     collapsed: false,
   };

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from "react";
-import CarBulkDropZone from "./car/CarBulkDropZone";
 import CarGroupCard from "./car/CarGroupCard";
 import { createCarGroup, createEmptyCarSheet } from "@/utils/carHelpers";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateCarExcel } from "@/integrations/reportsApi";
+import { Upload } from "lucide-react";
 
 
 interface Props {
@@ -13,36 +13,83 @@ interface Props {
 
 export default function CARSection({ car, setCar }: Props) {
   const refs = useRef<Record<string, HTMLDivElement | null>>({});
+  const beforeFileInputRef = useRef<HTMLInputElement>(null);
+  const afterFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Ensure at least one group exists
+    // Ensure at least one default group exists
     if (!car || !Array.isArray(car.photo_groups) || car.photo_groups.length === 0) {
       setCar(prev => ({
         ...prev,
-        photo_groups: []
+        photo_groups: [createCarGroup()]
       }));
     }
-  }, []);
+  }, [car, setCar]);
 
-  const addGroup = () => setCar({ ...car, photo_groups: [...car.photo_groups, createCarGroup()] });
-
-  const onFiles = (files: File[] | FileList) => {
-    // Type-guard helper: narrow unknowns to File
-    const isImageFile = (f: unknown): f is File => f instanceof File && typeof f.type === "string" && f.type.startsWith("image/");
-
-    const items = Array.from(files as any);
-    const flat: File[] = items.filter(isImageFile);
-    if (flat.length === 0) return;
-
-    // Chunk into pairs and append groups sequentially
-    const newGroups: any[] = [];
-    for (let i = 0; i < flat.length; i += 2) {
-      const a = flat[i];
-      const b = flat[i + 1] || "";
-      newGroups.push({ id: crypto.randomUUID(), date: new Date().toISOString().split("T")[0], images: [a, b], footers: ["", ""], collapsed: false });
+  const handleBeforeImageUpload = (files: File[]) => {
+    if (files.length === 0) return;
+    
+    const updatedGroups = [...car.photo_groups];
+    let fileIndex = 0;
+    
+    // First, try to fill empty before slots in existing groups (including default)
+    for (let i = 0; i < updatedGroups.length && fileIndex < files.length; i++) {
+      if (!updatedGroups[i].images?.[0]) {
+        updatedGroups[i] = {
+          ...updatedGroups[i],
+          images: [files[fileIndex], updatedGroups[i].images?.[1] || null]
+        };
+        fileIndex++;
+      }
     }
+    
+    // Create new groups for remaining files
+    const newGroups: any[] = [];
+    for (let i = fileIndex; i < files.length; i++) {
+      newGroups.push({ 
+        id: crypto.randomUUID(), 
+        date: new Date().toISOString().split("T")[0], 
+        images: [files[i], null], // Before slot only
+        descriptions: ["", ""],
+        footers: ["", ""], 
+        collapsed: false 
+      });
+    }
+    
+    setCar({ ...car, photo_groups: [...updatedGroups, ...newGroups] });
+  };
 
-    setCar({ ...car, photo_groups: [...car.photo_groups, ...newGroups] });
+  const handleAfterImageUpload = (files: File[]) => {
+    if (files.length === 0) return;
+    
+    const updatedGroups = [...car.photo_groups];
+    let fileIndex = 0;
+    
+    // First, try to fill empty after slots in existing groups
+    for (let i = 0; i < updatedGroups.length && fileIndex < files.length; i++) {
+      if (!updatedGroups[i].images?.[1]) {
+        updatedGroups[i] = {
+          ...updatedGroups[i],
+          images: [updatedGroups[i].images?.[0] || null, files[fileIndex]]
+        };
+        fileIndex++;
+      }
+    }
+    
+    // Create new groups for remaining files (starting from current fileIndex)
+    const newGroups: any[] = [];
+    for (let i = fileIndex; i < files.length; i++) {
+      newGroups.push({ 
+        id: crypto.randomUUID(), 
+        date: new Date().toISOString().split("T")[0], 
+        images: [null, files[i]], // After slot only
+        descriptions: ["", ""],
+        footers: ["", ""], 
+        collapsed: false 
+      });
+    }
+    
+    setCar({ ...car, photo_groups: [...updatedGroups, ...newGroups] });
   };
 
   const updateGroup = (updated: any) => {
@@ -84,12 +131,81 @@ export default function CARSection({ car, setCar }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Description of Required Condition:</label>
-        <textarea value={car.description} onChange={(e) => setCar({ ...car, description: e.target.value })} className="w-full p-3 border rounded-md bg-background text-foreground" rows={4} placeholder="Enter global description for CAR sheet" />
-      </div>
+      {/* Modern upload buttons with enhanced UX */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-slate-200/60 dark:border-slate-700/60 shadow-lg backdrop-blur-sm">
+        {/* Decorative top gradient */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500 opacity-80"></div>
+        
+        <div className="p-8">
+          {/* Instruction text */}
+          <div className="text-center mb-6">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">Upload Images</h3>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 w-full px-4">
+            {/* Before Upload Button */}
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={() => beforeFileInputRef.current?.click()}
+                className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-2 border-blue-200 dark:border-blue-700 rounded-2xl hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-blue-400/10 transform hover:-translate-y-1 transition-all duration-300 w-full"
+              >
+                <div className="relative">
+                  <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                  <div className="relative bg-blue-500 p-3 rounded-full shadow-lg">
+                    <Upload className="w-5 h-5 text-white group-hover:scale-110 transition-transform duration-300" />
+                  </div>
+                </div>
+                <div className="text-center">
+                  <span className="font-semibold text-blue-700 dark:text-blue-300 text-sm">BEFORE</span>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Initial state</p>
+                </div>
+                <div className="absolute top-2 right-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                </div>
+              </button>
+              {/* Tooltip hint */}
+              <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">Click to upload</span>
+              </div>
+            </div>
 
-      <CarBulkDropZone onFiles={onFiles} />
+            {/* After Upload Button */}
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={() => afterFileInputRef.current?.click()}
+                className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-2 border-emerald-200 dark:border-emerald-700 rounded-2xl hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/10 dark:hover:shadow-emerald-400/10 transform hover:-translate-y-1 transition-all duration-300 w-full"
+              >
+                <div className="relative">
+                  <div className="absolute inset-0 bg-emerald-500 rounded-full blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                  <div className="relative bg-emerald-500 p-3 rounded-full shadow-lg">
+                    <Upload className="w-5 h-5 text-white group-hover:scale-110 transition-transform duration-300" />
+                  </div>
+                </div>
+                <div className="text-center">
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">AFTER</span>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Final result</p>
+                </div>
+                <div className="absolute top-2 right-2">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                </div>
+              </button>
+              {/* Tooltip hint */}
+              <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">Click to upload</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Help text */}
+          <div className="text-center mt-6">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              💡 <span className="font-medium">Tip:</span> Upload multiple images at once to create multiple CAR groups automatically
+            </p>
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-3">
         <AnimatePresence>
@@ -119,39 +235,23 @@ export default function CARSection({ car, setCar }: Props) {
         </AnimatePresence>
       </div>
 
-      <div className="flex items-center justify-end gap-3">
-        <button onClick={addGroup} className="px-4 py-2 bg-primary text-white rounded-md">Add Group</button>
-        {/* <button onClick={async () => {
-          // Prepare payload and call API
-          const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
-            if (!img) return null;
-            if (typeof img === "string") return img || null;
-
-            if (img instanceof File) {
-              return await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(String(reader.result));
-                reader.onerror = reject;
-                reader.readAsDataURL(img);
-              });
-            }
-
-            return null;
-          };
-
-          const processed = await Promise.all((car.photo_groups || []).map(async (g: any) => {
-            const imgs = await Promise.all((g.images || []).map(async (img: any) => (await toBase64DataUrl(img)) || ""));
-            return { date: g.date || "", images: [imgs[0] || "", imgs[1] || ""], footers: [(g.footers?.[0] || ""), (g.footers?.[1] || "")] };
-          }));
-
-          try {
-            await generateCarExcel({ description: car.description || "", photo_groups: processed });
-            // TODO: show toast on success
-          } catch (e) {
-            console.error("CAR export failed", e);
-          }
-        }} className="px-4 py-2 border rounded-md">Export CAR</button> */}
-      </div>
+      {/* Hidden file inputs */}
+      <input
+        ref={beforeFileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={(e) => handleBeforeImageUpload(Array.from(e.target.files || []))}
+        className="hidden"
+      />
+      <input
+        ref={afterFileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={(e) => handleAfterImageUpload(Array.from(e.target.files || []))}
+        className="hidden"
+      />
     </div>
   );
 }
