@@ -111,11 +111,13 @@ const ProjectInfo = ({
               Project Name *
             </Label>
             <Input
+              inputSize="md"
               id="projectName"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               placeholder="Enter project name..."
               className="mt-1.5"
+              showIndicator={false}
             />
 
             
@@ -126,11 +128,13 @@ const ProjectInfo = ({
       Location
     </Label>
     <Input
+    inputSize="md"
       id="location"
       value={location}
       onChange={(e) => setLocation(e.target.value)}
       placeholder="Enter site/location..."
       className="mt-1.5"
+      showIndicator={false}
     />
   </div>
           <div>
@@ -213,10 +217,12 @@ const ProjectInfo = ({
                     Temperature
                   </Label>
                   <Input
+                    inputSize="sm"
                     id="temperature"
                     value={currentTemp}
                     onChange={(e) => handleTempChange(e.target.value)}
                     placeholder="°C"
+                    showIndicator={false}
                   />
                 </div>
               </div>
