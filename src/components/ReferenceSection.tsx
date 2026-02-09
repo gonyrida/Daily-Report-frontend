@@ -27,11 +27,17 @@ export default function ReferenceSection({ sections, setSections, onExportRefere
         {tableTitle !== undefined && setTableTitle && (
           <div className="mb-6">
             <label className="block text-sm font-medium text-muted-foreground mb-2">Table Title</label>
-            <Input 
-              placeholder="Enter table title (visual only)" 
-              value={tableTitle || ""}
-              onChange={(e) => setTableTitle?.(e.target.value)}
-            />
+            <div className="relative">
+              <Input 
+                placeholder="Enter table title (visual only)" 
+                value={tableTitle || ""}
+                onChange={(e) => setTableTitle?.(e.target.value)}
+                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-700 rounded-xl text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+              <div className="absolute top-2 right-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+              </div>
+            </div>
           </div>
         )}
 

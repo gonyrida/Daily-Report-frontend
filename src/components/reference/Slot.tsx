@@ -42,14 +42,14 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
         onDragOver={logic.handleDrag}
         onDrop={logic.handleDrop}
         onPaste={handlePaste}
-        className={`relative w-full aspect-[4/3] overflow-hidden rounded-lg border border-border bg-card transition-all duration-150 ${logic.dragActive ? "scale-[1.02] shadow-md" : "shadow-sm"} cursor-pointer`}
+        className={`relative group w-full aspect-[4/3] overflow-hidden rounded-2xl border-2 ${logic.imageUrl ? "border-blue-300 dark:border-blue-600 p-0" : "border-dashed border-blue-300 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6"} flex items-center justify-center transition-all duration-300 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10 dark:hover:shadow-blue-400/10`}
         role="button"
         tabIndex={0}
         aria-label={`Upload photo ${slotIndex + 1}`}
       >
         {logic.imageUrl ? (
           <div className="relative w-full h-full group/image">
-            <img src={logic.imageUrl} alt={`Preview`} className="w-full h-full object-cover rounded-lg" />
+            <img src={logic.imageUrl} alt={`Preview`} className="w-full h-full object-cover rounded-2xl" />
             <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center gap-3">
               <button type="button" onClick={(e) => logic.removeImage(e)} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors" title="Remove Image" aria-label={`Remove image ${slotIndex + 1}`}>
                 <Trash2 className="w-4 h-4" />
@@ -58,8 +58,8 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
           </div>
         ) : (
           <div className="absolute inset-0 flex flex-col justify-center items-center">
-            <div className="bg-gray-100 rounded-full p-4 mb-3 group-hover:scale-110 transition-transform duration-150">
-              <Image className={`text-4xl transition-colors ${logic.dragActive ? "text-indigo-600" : "text-gray-400"}`} />
+            <div className="mb-3 group-hover:scale-110 transition-transform duration-150">
+              <Image className="lucide lucide-image w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <p className="text-sm font-medium text-muted-foreground">Upload Image</p>
             <p className="text-xs text-muted-foreground mt-1">Click, drag, or paste files</p>
@@ -70,7 +70,7 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
       </div>
 
       <div className="mt-3">
-        <Input id={`caption-${entryId}-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full text-center" aria-label={`Caption for image ${slotIndex + 1}`} />
+        <input id={`caption-${entryId}-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-700 rounded-xl text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" aria-label={`Caption for image ${slotIndex + 1}`} />
       </div>
     </div>
   );

@@ -61,9 +61,15 @@ export default function Entry({ entry, onUpdate, onDelete, entryNumber, onBulkUp
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-700">Entry {entryNumber}</h3>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={() => onDelete(entry.id)} className="text-red-500 hover:text-red-600">
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <button
+            type="button"
+            onClick={() => onDelete(entry.id)}
+            className="group relative px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2 text-sm"
+          >
+            <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+            <span>Delete</span>
+            <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-200"></div>
+          </button>
         </div>
       </div>
 

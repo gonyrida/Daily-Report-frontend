@@ -130,10 +130,10 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
   };
 
   return (
-    <div className="rounded-lg shadow-sm overflow-hidden transition-shadow hover:shadow-md bg-background text-foreground">
+    <div className="rounded-lg shadow-sm overflow-hidden transition-shadow text-foreground">
       {/* Section Header */}
-      <div className="px-6 py-4 bg-background text-foreground">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="px-6 py-4 text-foreground">
+        <div className="flex flex-col gap-4">
           {!hideTitle && (
             <div className="flex-1">
               <label htmlFor={`section-title-${section.id}`} className="sr-only">Section Title</label>
@@ -148,14 +148,25 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
               />
             </div>
           )}
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="w-full">
             {/* Bulk upload input (hidden) */}
             <input ref={fileInputRef} onChange={onFileInputChange} type="file" accept="image/*" multiple className="hidden" />
 
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2">
-              <UploadCloud className="w-4 h-4" />
-              Upload Images
-            </Button>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-2 border-blue-200 dark:border-blue-700 rounded-2xl hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-blue-400/10 transform hover:-translate-y-1 transition-all duration-300 w-full">
+              <div className="relative">
+                <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                <div className="relative bg-blue-500 p-3 rounded-full shadow-lg">
+                  <UploadCloud className="w-5 h-5 text-white group-hover:scale-110 transition-transform duration-300" />
+                </div>
+              </div>
+              <div className="text-center">
+                <span className="font-semibold text-blue-700 dark:text-blue-300 text-sm">UPLOAD IMAGES</span>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Bulk upload multiple images</p>
+              </div>
+              <div className="absolute top-2 right-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+              </div>
+            </button>
 
             {/* DISABLED: Delete Section button - commented out as requested
             {showDeleteConfirm ? (
