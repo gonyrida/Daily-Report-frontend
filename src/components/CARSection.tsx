@@ -132,7 +132,7 @@ export default function CARSection({ car, setCar }: Props) {
   return (
     <div className="space-y-4">
       {/* Modern upload buttons with enhanced UX */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-slate-200/60 dark:border-slate-700/60 shadow-lg backdrop-blur-sm">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-slate-200/60 dark:border-slate-700/60 ">
         {/* Decorative top gradient */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500 opacity-80"></div>
         
@@ -148,11 +148,11 @@ export default function CARSection({ car, setCar }: Props) {
               <button
                 type="button"
                 onClick={() => beforeFileInputRef.current?.click()}
-                className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-2 border-blue-200 dark:border-blue-700 rounded-2xl hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-blue-400/10 transform hover:-translate-y-1 transition-all duration-300 w-full"
+                className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-2 border-blue-200 dark:border-blue-700 rounded-2xl hover:border-blue-400 dark:hover:border-blue-500 transform hover:-translate-y-1 transition-all duration-300 w-full"
               >
                 <div className="relative">
                   <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                  <div className="relative bg-blue-500 p-3 rounded-full shadow-lg">
+                  <div className="relative bg-blue-500 p-3 rounded-full">
                     <Upload className="w-5 h-5 text-white group-hover:scale-110 transition-transform duration-300" />
                   </div>
                 </div>
@@ -175,11 +175,11 @@ export default function CARSection({ car, setCar }: Props) {
               <button
                 type="button"
                 onClick={() => afterFileInputRef.current?.click()}
-                className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-2 border-emerald-200 dark:border-emerald-700 rounded-2xl hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/10 dark:hover:shadow-emerald-400/10 transform hover:-translate-y-1 transition-all duration-300 w-full"
+                className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-2 border-emerald-200 dark:border-emerald-700 rounded-2xl hover:border-emerald-400 dark:hover:border-emerald-500 transform hover:-translate-y-1 transition-all duration-300 w-full"
               >
                 <div className="relative">
                   <div className="absolute inset-0 bg-emerald-500 rounded-full blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                  <div className="relative bg-emerald-500 p-3 rounded-full shadow-lg">
+                  <div className="relative bg-emerald-500 p-3 rounded-full ">
                     <Upload className="w-5 h-5 text-white group-hover:scale-110 transition-transform duration-300" />
                   </div>
                 </div>
