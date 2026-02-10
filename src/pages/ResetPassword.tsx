@@ -165,7 +165,7 @@ const ResetPassword = () => {
   //   // Verify token
   //   const verifyToken = async () => {
   //     try {
-  //       const response = await fetch("https://daily-report-backend.onrender.com/api/auth/verify", {
+  //       const response = await fetch("https://daily-report-backend.officemuckup.com/api/auth/verify", {
   //         method: "GET",
   //         headers: {
   //           Authorization: `Bearer ${token}`,

@@ -8,7 +8,7 @@ Set the following environment variables in your Render dashboard:
 
 1. **VITE_API_BASE_URL**
    - Your backend API URL
-   - Example: `https://your-backend.onrender.com/api`
+   - Example: `https://your-backend.officemuckup.com/api`
    - **Important**: Do NOT include a trailing slash
 
 ### Optional Variables (if using Supabase)
