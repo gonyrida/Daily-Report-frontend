@@ -67,10 +67,10 @@ export const constructImageUrl = (
 };
 
 /**
- * Constructs a full image URL with authentication token for img tags
+ * Constructs a full image URL with authentication
  * @param relativePath - The relative path stored in database
  * @param timestamp - Optional timestamp for cache-busting
- * @returns Full URL with auth token for authenticated image requests
+ * @returns Full URL - authentication handled by HTTP-only cookies
  */
 export const constructAuthenticatedImageUrl = (
   relativePath: string | null | undefined,
@@ -78,7 +78,7 @@ export const constructAuthenticatedImageUrl = (
 ): string => {
   if (!relativePath) return "";
 
-  // If it's already a data URL or absolute URL, return as-is (no token needed)
+  // If it's already a data URL or absolute URL, return as-is (no auth needed)
   if (
     relativePath.startsWith("data:") ||
     relativePath.startsWith("http") ||
@@ -87,41 +87,59 @@ export const constructAuthenticatedImageUrl = (
     return relativePath;
   }
 
-  const token = localStorage.getItem("authToken");
+  //  const token = localStorage.getItem("authToken");
+  
+  // For uploads/images paths - cookies provide authentication automatically
+  // No localStorage token needed - backend authenticateToken middleware reads HTTP-only cookies
+  if (
+    relativePath.startsWith("/uploads") ||
+    relativePath.startsWith("uploads")
+  ) {
+    let url = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
+    if (timestamp) url += `?t=${timestamp}`;
+    return url;
+  }
 
   // If it's a GridFS file id
   if (/^[a-fA-F0-9]{24}$/.test(relativePath)) {
     let url = `${API_BASE_URL}/files/${relativePath}`;
-    if (token) url += `?token=${encodeURIComponent(token)}`;
-    if (timestamp) url += token ? `&t=${timestamp}` : `?t=${timestamp}`;
+    //  if (token) url += `?token=${encodeURIComponent(token)}`;
+    // if (timestamp) url += token ? `&t=${timestamp}` : `?t=${timestamp}`;
+    if (timestamp) url += `?t=${timestamp}`;
     return url;
   }
 
   // If it's an API path (starts with /api)
   if (relativePath.startsWith("/api")) {
-    let url = `${STATIC_BASE_URL}${relativePath}`;
-    if (token) url += `?token=${encodeURIComponent(token)}`;
-    if (timestamp) url += token ? `&t=${timestamp}` : `?t=${timestamp}`;
+    // let url = `${STATIC_BASE_URL}${relativePath}`;
+    // if (token) url += `?token=${encodeURIComponent(token)}`;
+    // if (timestamp) url += token ? `&t=${timestamp}` : `?t=${timestamp}`;
+    let url = `${relativePath.startsWith("/api") ? relativePath : `/api${relativePath}`}`;
+    // Prepend host if missing
+    if (url.startsWith("/api"))
+      url = `${API_BASE_URL}${url.replace(/^\/api/, "")}`;
+    if (timestamp) url += `?t=${timestamp}`;
     return url;
   }
 
-  // Legacy paths
+  // Legacy local paths like /images/...
   if (
-    relativePath.startsWith("/uploads") ||
-    relativePath.startsWith("/images") ||
-    relativePath.startsWith("uploads")
+    // relativePath.startsWith("/uploads") ||
+    // relativePath.startsWith("/images") ||
+    // relativePath.startsWith("uploads")
+    relativePath.startsWith("/images")
   ) {
     let url = `${API_BASE_URL}/files?path=${encodeURIComponent(relativePath)}`;
-    if (token) url += `&token=${encodeURIComponent(token)}`;
+    // if (token) url += `&token=${encodeURIComponent(token)}`;
     if (timestamp) url += `&t=${timestamp}`;
     return url;
   }
 
-  // Fallback by filename
+  // As a last resort, construct a files query by filename
   const filename = relativePath.split("/").pop();
   if (filename) {
     let url = `${API_BASE_URL}/files?filename=${encodeURIComponent(filename)}`;
-    if (token) url += `&token=${encodeURIComponent(token)}`;
+    // if (token) url += `&token=${encodeURIComponent(token)}`;
     if (timestamp) url += `&t=${timestamp}`;
     return url;
   }

@@ -105,7 +105,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
       const { logoutUser } = await import("@/integrations/authApi");
       await logoutUser();
       
-      localStorage.removeItem("token");
+      // localStorage.removeItem("token");
       localStorage.removeItem("rememberMe");
       localStorage.removeItem("user");
       
@@ -122,7 +122,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
       onClose();
     } catch (err) {
       console.error("Logout error:", err);
-      localStorage.removeItem("token");
+      // localStorage.removeItem("token");
       localStorage.removeItem("rememberMe");
       localStorage.removeItem("user");
       

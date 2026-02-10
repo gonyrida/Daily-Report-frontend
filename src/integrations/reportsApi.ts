@@ -656,16 +656,16 @@ export const getCompanyReports = async (
   projectFilter?: string
 ) => {
   try {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
-
+    // const token = localStorage.getItem("authToken");
+    // if (!token) {
+    //   throw new Error("No authentication token found");
+    // }
+    // Cookie-based authentication - no localStorage token needed
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
       ...(search && { search }),
-      ...(projectFilter && { project: projectFilter }), // ← ADD PROJECT FILTER
+      ...(projectFilter && { project: projectFilter }),
     });
 
     const response = await apiGet(`/daily-reports/company?${queryParams}`);
@@ -695,20 +695,24 @@ export const getCompanyReports = async (
 
 export const getCompanyProjects = async () => {
   try {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
+    // const token = localStorage.getItem("authToken");
+    // if (!token) {
+    //   throw new Error("No authentication token found");
+    // }
 
-    const response = await fetch(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/projects`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    // const response = await fetch(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/projects`,
+    //   {
+    //     method: "GET",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //       Authorization: `Bearer ${token}`,
+    //     },
+    //   }
+    // );
+    
+    // Cookie-based authentication - use apiGet instead of manual fetch
+    const response = await apiGet(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/projects`);
+
 
     if (!response.ok) {
       const errorData = await response.json();

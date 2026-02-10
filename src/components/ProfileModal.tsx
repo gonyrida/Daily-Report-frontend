@@ -221,13 +221,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({
       });
 
       // Clear local storage and redirect
-      localStorage.removeItem("token");
+      // localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
     } catch (err) {
       console.error("Logout error:", err);
       // Force logout even on error
-      localStorage.removeItem("token");
+      // localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
     }

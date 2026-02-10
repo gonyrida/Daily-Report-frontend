@@ -44,7 +44,7 @@ const UserProfileDropdown = () => {
       const { logoutUser } = await import("@/integrations/authApi");
       await logoutUser();
 
-      localStorage.removeItem("token");
+      // localStorage.removeItem("token");
       localStorage.removeItem("rememberMe");
       localStorage.removeItem("user");
 
@@ -56,7 +56,7 @@ const UserProfileDropdown = () => {
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
-      localStorage.removeItem("token");
+      // localStorage.removeItem("token");
       localStorage.removeItem("rememberMe");
       localStorage.removeItem("user");
       navigate("/login");

@@ -605,15 +605,23 @@ const DailyReport = () => {
     console.log("✅ Rolling totals cleared - backend will recalculate on save");
   };
 
-  // Helper function to get current user ID from JWT token
+  // Helper function to get current user ID from user context
+  // No localStorage needed - user info comes from authentication context
   const getCurrentUserId = () => {
-    const token = localStorage.getItem("authToken");
-    if (token) {
+    // const token = localStorage.getItem("authToken");
+    // if (token) {
+
+    // Get user ID from localStorage user data (not auth token)
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
       try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        return payload.userId;
+        //  const payload = JSON.parse(atob(token.split(".")[1]));
+        // return payload.userId;
+
+        const user = JSON.parse(userStr);
+        return user.id || user.userId;
       } catch (error) {
-        console.error("Error parsing token:", error);
+        console.error('Error parsing user data:', error);
       }
     }
     return null;

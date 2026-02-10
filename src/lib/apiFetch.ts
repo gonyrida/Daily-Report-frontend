@@ -34,23 +34,26 @@ export const apiFetch = async (url: string, options: ApiFetchOptions = {}): Prom
   //   delete headers.Authorization;
   // }
 
+
+  // Cookie-only authentication - no localStorage fallback needed
+  // Tokens are automatically sent via HTTP-only cookies
   // Add localStorage token as fallback
-  const token = localStorage.getItem('authToken');
-  if (token && !headers['X-Auth-Token']) {
-    headers['X-Auth-Token'] = token;
-    console.log('🔑 Adding localStorage token to X-Auth-Token header');
-  }
-  if (token) {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      console.log('Token payload:', payload);
-      console.log('Has companyId:', !!payload.companyId);
-    } catch (e) {
-      console.log('Invalid token format');
-    }
-  } else {
-    console.log('No token found - user not logged in');
-  }
+  // const token = localStorage.getItem('authToken');
+  // if (token && !headers['X-Auth-Token']) {
+  //   headers['X-Auth-Token'] = token;
+  //   console.log('🔑 Adding localStorage token to X-Auth-Token header');
+  // }
+  // if (token) {
+  //   try {
+  //     const payload = JSON.parse(atob(token.split('.')[1]));
+  //     console.log('Token payload:', payload);
+  //     console.log('Has companyId:', !!payload.companyId);
+  //   } catch (e) {
+  //     console.log('Invalid token format');
+  //   }
+  // } else {
+  //   console.log('No token found - user not logged in');
+  // }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);

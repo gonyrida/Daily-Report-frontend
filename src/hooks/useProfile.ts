@@ -244,7 +244,7 @@ const useProfile = () => {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      localStorage.removeItem("token");
+      // localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
     }

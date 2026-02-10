@@ -251,7 +251,7 @@ const Settings = () => {
   // Handle logout
   const handleLogout = () => {
     // Clear local storage
-    localStorage.removeItem('token');
+    // localStorage.removeItem('token');
     localStorage.removeItem('user');
     
     // Navigate to login
