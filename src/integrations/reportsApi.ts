@@ -656,16 +656,16 @@ export const getCompanyReports = async (
   projectFilter?: string
 ) => {
   try {
-    // const token = localStorage.getItem("authToken");
-    // if (!token) {
-    //   throw new Error("No authentication token found");
-    // }
-    // Cookie-based authentication - no localStorage token needed
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
       ...(search && { search }),
-      ...(projectFilter && { project: projectFilter }),
+      ...(projectFilter && { project: projectFilter }), // ← ADD PROJECT FILTER
     });
 
     const response = await apiGet(`/daily-reports/company?${queryParams}`);

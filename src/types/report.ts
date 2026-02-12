@@ -3,6 +3,8 @@ import { ResourceRow } from "@/components/ResourceTable";
 export interface ReportData {
   projectName: string;
   reportDate: string | null;
+  location: string;
+  createdBy: string;
   weatherAM: string;
   weatherPM: string;
   tempAM: string;

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useProfileContext } from "@/contexts/ProfileContext";
 import ReportHeader from "@/components/ReportHeader";
 import ProjectInfo from "@/components/ProjectInfo";
 import ActivitySection from "@/components/ActivitySection";
@@ -123,6 +124,8 @@ interface Section {
 interface ReportData {
   projectName: string;
   reportDate: string | null;
+  location: string;
+  createdBy: string;
   weatherAM?: string;
   weatherPM?: string;
   tempAM?: string;
@@ -226,14 +229,16 @@ const isNewReportCreation = async (
 const initializeCleanReportState = (
   projectName: string,
   setProjectName: (name: string) => void,
+  setLocation: (location: string) => void,
   setReportStatus: (status: string) => void
 ) => {
   console.log(
-    `🔧 CLEAN STATE: Initializing new report for project "${projectName}"`
+    `🔧 CLEAN STATE: Initializing new report with project "${projectName}"`
   );
 
   // Set project name from URL context
   setProjectName(projectName);
+  setLocation(""); // Reset location for new reports
   // ADD THIS: Reset status to draft for new reports
   setReportStatus("draft");
 
@@ -352,6 +357,7 @@ const loadMostRecentReportForProject = async (
 const DailyReport = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { profile } = useProfileContext();
   const [searchParams] = useSearchParams();
   const reportIdFromUrl = searchParams.get("reportId");
   const projectFromUrl = searchParams.get("project");
@@ -359,12 +365,23 @@ const DailyReport = () => {
   // Project Info
   const [projectLogo, setProjectLogo] = useState<string>("");
   const [projectName, setProjectName] = useState("");
+  const [location, setLocation] = useState("");
+  const [createdBy, setCreatedBy] = useState("");
   const [reportDate, setReportDate] = useState<Date | undefined>(new Date());
   const [weatherAM, setWeatherAM] = useState("");
   const [weatherPM, setWeatherPM] = useState("");
   const [tempAM, setTempAM] = useState("");
   const [tempPM, setTempPM] = useState("");
   const [currentPeriod, setCurrentPeriod] = useState<"AM" | "PM">("AM");
+
+  // Auto-populate createdBy from user profile
+  useEffect(() => {
+    if (profile?.fullName) {
+      setCreatedBy(profile.fullName);
+    } else if (profile?.email) {
+      setCreatedBy(profile.email.split('@')[0]);
+    }
+  }, [profile]);
 
   // Activities
   const [activityToday, setActivityToday] = useState("");
@@ -495,6 +512,8 @@ const DailyReport = () => {
   const getReportData = useCallback(
     (): ReportData => ({
       projectName,
+      location,
+      createdBy,
       reportDate: reportDate?.toISOString() || null,
       weatherAM,
       weatherPM,
@@ -517,6 +536,8 @@ const DailyReport = () => {
     }),
     [
       projectName,
+      location,
+      createdBy,
       reportDate,
       weatherAM,
       weatherPM,
@@ -888,6 +909,7 @@ const DailyReport = () => {
               projectFromUrl,
               setProjectName
             );
+            setLocation(dbReport.location || ""); // Load location from DB
             setReportDate(
               dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
             );
@@ -1215,6 +1237,7 @@ const DailyReport = () => {
             const cleanState = initializeCleanReportState(
               projectFromUrl || "",
               setProjectName,
+              setLocation,
               setReportStatus
             );
 
@@ -1257,6 +1280,7 @@ const DailyReport = () => {
                 );
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
+                setLocation(""); // Reset location for new reports
                 setReportDate(new Date());
 
                 // ADD THIS: Reset status to draft for new reports based on templates
@@ -1326,6 +1350,7 @@ const DailyReport = () => {
                 const cleanState = initializeCleanReportState(
                   projectFromUrl,
                   setProjectName,
+                  setLocation,
                   setReportStatus
                 );
                 setReportId("");
@@ -1369,6 +1394,7 @@ const DailyReport = () => {
                 projectFromUrl,
                 setProjectName
               );
+              setLocation(localDraft.location || ""); // Load location from localStorage
               setReportDate(
                 localDraft.reportDate
                   ? new Date(localDraft.reportDate)
@@ -1475,6 +1501,7 @@ const DailyReport = () => {
           // NEW: Set project name from URL context for new reports (error fallback)
           if (projectFromUrl) {
             setProjectName(projectFromUrl);
+            setLocation(""); // Reset location for new reports
           }
         }
       }
@@ -2128,6 +2155,8 @@ const DailyReport = () => {
       const payload = {
         projectName,
         reportDate: reportDate?.toISOString(),
+        location,
+        createdBy,
         weatherAM,
         weatherPM,
         tempAM,
@@ -3657,6 +3686,10 @@ const DailyReport = () => {
                       <ProjectInfo
                         projectName={projectName}
                         setProjectName={setProjectName}
+                        location={location}
+                        setLocation={setLocation}
+                        createdBy={createdBy}
+                        setCreatedBy={setCreatedBy}
                         reportDate={reportDate}
                         setReportDate={setReportDate}
                         weatherAM={weatherAM}
@@ -3794,39 +3827,25 @@ const DailyReport = () => {
                             align="end"
                             className="w-[140px]"
                           >
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <DropdownMenuItem
-                                    onClick={handleSaveAsDraft}
-                                    disabled={
-                                      isSaving ||
-                                      reportStatus === "submitted" ||
-                                      isReadOnly
-                                    }
-                                    className={
-                                      reportStatus === "submitted" || isReadOnly
-                                        ? "opacity-50 cursor-not-allowed"
-                                        : ""
-                                    }
-                                  >
-                                    <Save className="w-4 h-4 mr-2" />
-                                    {isSaving ? "Saving..." : "Draft"}
-                                    {reportStatus === "submitted" && (
-                                      <Lock className="w-3 h-3 ml-auto" />
-                                    )}
-                                  </DropdownMenuItem>
-                                </TooltipTrigger>
-                                {reportStatus === "submitted" && (
-                                  <TooltipContent>
-                                    <p>
-                                      Submitted reports cannot be reverted to
-                                      draft status
-                                    </p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
+                            <DropdownMenuItem
+                              onClick={handleSaveAsDraft}
+                              disabled={
+                                isSaving ||
+                                reportStatus === "submitted" ||
+                                isReadOnly
+                              }
+                              className={
+                                reportStatus === "submitted" || isReadOnly
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : ""
+                              }
+                            >
+                              <Save className="w-4 h-4 mr-2" />
+                              {isSaving ? "Saving..." : "Draft"}
+                              {reportStatus === "submitted" && (
+                                <Lock className="w-3 h-3 ml-auto" />
+                              )}
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={handleSubmit}
                               disabled={isSubmitting}

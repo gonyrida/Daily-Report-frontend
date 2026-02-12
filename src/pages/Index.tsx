@@ -10,6 +10,7 @@ import CARSection from "@/components/CARSection";
 import { createEmptyCarSheet } from "@/utils/carHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import { Button } from "@/components/ui/button";
+import { useProfileContext } from "@/contexts/ProfileContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -200,6 +201,8 @@ interface Section {
 
 interface ReportData {
   projectName: string;
+  location: string;
+  createdBy: string;
   reportDate: string | null;
   weatherAM?: string;
   weatherPM?: string;
@@ -222,11 +225,54 @@ interface ReportData {
 
 const Index = () => {
   const { toast } = useToast();
+  const { profile, refreshProfile } = useProfileContext();
+  const { profile, isLoading, refreshProfile } = useProfileContext();
 
+  // Refresh profile on component mount to ensure latest data
+  useEffect(() => {
+    console.log('Refreshing profile on mount');
+    refreshProfile();
+
+  }, [refreshProfile]);
+useEffect(() => {
+  if (isLoading) return; // Wait for loading to complete
+  
+  if (!profile) {
+    console.log('No profile available');
+    return;
+  }
+  
+  if (profile.fullName) {
+    setCreatedBy(profile.fullName);
+  } else if (profile.email) {
+    setCreatedBy(profile.email.split('@')[0]);
+  }
+}, [profile, isLoading]); // Watch both!
   // Project Info
   const [projectName, setProjectName] = useState("");
   const [location, setLocation] = useState("");
-  const [reportCreator, setReportCreator] = useState("");
+  const [createdBy, setCreatedBy] = useState("");
+
+  // Auto-fill createdBy from logged-in user profile
+  useEffect(() => {
+  console.log('=== PROFILE DEBUG START ===');
+  console.log('Profile object:', profile);
+  console.log('Profile fullName:', profile?.fullName);
+  console.log('Profile email:', profile?.email);
+  console.log('Profile _id:', profile?._id);
+  console.log('=== PROFILE DEBUG END ===');
+  
+  if (profile?.fullName) {
+    console.log('✅ Setting createdBy from fullName:', profile.fullName);
+    setCreatedBy(profile.fullName);
+  } else if (profile?.email) {
+    const emailName = profile.email.split('@')[0];
+    console.log('⚠️ Setting createdBy from email:', emailName);
+    setCreatedBy(emailName);
+  } else {
+    console.log('❌ No profile data available');
+  }
+}, [profile]);
 
   const [reportDate, setReportDate] = useState<Date | undefined>(new Date());
   const [weatherAM, setWeatherAM] = useState("");
@@ -291,6 +337,8 @@ const Index = () => {
   const getReportData = useCallback(
     (): ReportData => ({
       projectName,
+      location,
+      createdBy,
       reportDate: reportDate?.toISOString() || null,
       weatherAM,
       weatherPM,
@@ -302,11 +350,13 @@ const Index = () => {
       workingTeam,
       materials,
       machinery,
-      // Keep reference sections in the object for future export mapping (no export logic changed yet)
+      // Keep reference sections in object for future export mapping (no export logic changed yet)
       referenceSections,
     }),
     [
       projectName,
+      location,
+      createdBy,
       reportDate,
       weatherAM,
       weatherPM,
@@ -336,6 +386,8 @@ const Index = () => {
         if (dbReport) {
           // Load from database
           setProjectName(dbReport.projectName || "");
+          setLocation(dbReport.location || "");
+          setCreatedBy(dbReport.createdBy || "");
           setReportDate(
             dbReport.reportDate ? new Date(dbReport.reportDate) : new Date(),
           );
@@ -375,6 +427,8 @@ const Index = () => {
           const localDraft = loadDraftLocally(reportDate);
           if (localDraft) {
             setProjectName(localDraft.projectName || "");
+            setLocation(localDraft.location || "");
+            setCreatedBy(localDraft.createdBy || "");
             setReportDate(
               localDraft.reportDate
                 ? new Date(localDraft.reportDate)
@@ -418,6 +472,7 @@ const Index = () => {
         const localDraft = loadDraftLocally(reportDate);
         if (localDraft) {
           setProjectName(localDraft.projectName || "");
+          setLocation(localDraft.location || "");
           setReportDate(
             localDraft.reportDate
               ? new Date(localDraft.reportDate)
@@ -478,6 +533,8 @@ const Index = () => {
           if (dbReport) {
             // Found report in database
             setProjectName(dbReport.projectName || "");
+            setLocation(dbReport.location || "");
+            setCreatedBy(dbReport.createdBy || "");
             // Handle backward compatibility: convert old format to new
             if (dbReport.weatherAM !== undefined) {
               setWeatherAM(dbReport.weatherAM || "");
@@ -516,6 +573,8 @@ const Index = () => {
             if (localDraft) {
               // Found local draft
               setProjectName(localDraft.projectName || "");
+              setLocation(localDraft.location || "");
+              setCreatedBy(localDraft.createdBy || "");
               // Handle backward compatibility
               if (localDraft.weatherAM !== undefined) {
                 setWeatherAM(localDraft.weatherAM || "");
@@ -570,6 +629,7 @@ const Index = () => {
 
                 // Reset other fields for new day
                 setProjectName("");
+                setLocation("");
                 setWeatherAM("");
                 setWeatherPM("");
                 setTempAM("");
@@ -594,6 +654,7 @@ const Index = () => {
           const dbReport = await loadReportFromDB(reportDate!);
           if (dbReport) {
             setProjectName(dbReport.projectName || "");
+            setLocation(dbReport.location || "");
             // Handle backward compatibility: convert old format to new
             if (dbReport.weatherAM !== undefined) {
               setWeatherAM(dbReport.weatherAM || "");
@@ -632,6 +693,7 @@ const Index = () => {
           const localDraft = loadDraftLocally(reportDate);
           if (localDraft) {
             setProjectName(localDraft.projectName || "");
+            setLocation(localDraft.location || "");
             // Handle backward compatibility
             if (localDraft.weatherAM !== undefined) {
               setWeatherAM(localDraft.weatherAM || "");
@@ -670,6 +732,7 @@ const Index = () => {
 
         // No existing data: clear form to defaults
         setProjectName("");
+        setLocation("");
         setWeatherAM("");
         setWeatherPM("");
         setTempAM("");
@@ -1009,6 +1072,7 @@ const Index = () => {
 
       // Step 1: Save report to database first (same logic as submit)
       const rawData = getReportData();
+      console.log("🔍 FRONTEND: Sending location in payload:", rawData.location);
       const cleanedData = {
         ...rawData,
         managementTeam: cleanResourceRows(rawData.managementTeam),
@@ -1734,6 +1798,7 @@ const Index = () => {
 
   const handleClear = () => {
     setProjectName("");
+    setLocation("");
     setReportDate(new Date());
     setWeatherAM("");
     setWeatherPM("");
@@ -1805,6 +1870,8 @@ const Index = () => {
       const nextDay = new Date(reportDate!.getTime() + 86400000);
       const carryForwardData = {
         projectName: cleanedData.projectName,
+        location: cleanedData.location,
+        createdBy: cleanedData.createdBy,
         reportDate: nextDay.toISOString(),
         weatherAM: "",
         weatherPM: "",
@@ -1871,8 +1938,8 @@ const Index = () => {
           setProjectName={setProjectName}
           location={location}
           setLocation={setLocation}
-          reportCreator={reportCreator}
-          setReportCreator={setReportCreator}
+          createdBy={createdBy}
+          setCreatedBy={setCreatedBy}
           reportDate={reportDate}
           setReportDate={setReportDate}
           weatherAM={weatherAM}

@@ -26,9 +26,9 @@ interface ProjectInfoProps {
   location: string;
   setLocation: (location: string) => void;
 
-  reportCreator: string;
-  setReportCreator: (name: string) => void;
-  
+  createdBy: string;
+  setCreatedBy: (name: string) => void;
+
   reportDate: Date | undefined;
   setReportDate: (date: Date | undefined) => void;
   weatherAM: string;
@@ -49,8 +49,8 @@ const ProjectInfo = ({
   setProjectName,
   location,
   setLocation,
-  reportCreator,
-  setReportCreator,
+  createdBy,
+  setCreatedBy,
   reportDate,
   setReportDate,
   weatherAM,
@@ -65,11 +65,11 @@ const ProjectInfo = ({
   setCurrentPeriod,
 }: ProjectInfoProps) => {
   const weatherOptions = ["Sunny", "Cloudy", "Rainy"];
-  
+
   // Get current period's values
   const currentWeather = currentPeriod === "AM" ? weatherAM : weatherPM;
   const currentTemp = currentPeriod === "AM" ? tempAM : tempPM;
-  
+
   // Handlers for current period
   const handleWeatherChange = (value: string) => {
     if (currentPeriod === "AM") {
@@ -78,7 +78,7 @@ const ProjectInfo = ({
       setWeatherPM(value);
     }
   };
-  
+
   const handleTempChange = (value: string) => {
     if (currentPeriod === "AM") {
       setTempAM(value);
@@ -119,24 +119,39 @@ const ProjectInfo = ({
               className="mt-1.5"
               showIndicator={false}
             />
-
-            
           </div>
-{/* Location */}
-  <div>
-    <Label htmlFor="location" className="text-sm font-medium text-foreground">
-      Location
-    </Label>
-    <Input
-    inputSize="md"
-      id="location"
-      value={location}
-      onChange={(e) => setLocation(e.target.value)}
-      placeholder="Enter site/location..."
-      className="mt-1.5"
-      showIndicator={false}
-    />
-  </div>
+
+          {/* Created By Display (Read-only) */}
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-foreground">
+              Created By :
+            </span>
+            <span className="ml-2 text-sm text-muted-foreground">
+              {createdBy}
+            </span>
+          </div>
+
+          {/* Location */}
+          <div>
+            <Label
+              htmlFor="location"
+              className="text-sm font-medium text-foreground"
+            >
+              Location
+            </Label>
+            <Input
+              inputSize="md"
+              id="location"
+              value={location}
+              // onChange={(e) => setLocation(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setLocation(e.target.value)
+              }
+              placeholder="Enter site/location..."
+              className="mt-1.5"
+              showIndicator={false}
+            />
+          </div>
           <div>
             <Label className="text-sm font-medium text-foreground">
               Report Date *
@@ -147,7 +162,7 @@ const ProjectInfo = ({
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal mt-1.5",
-                    !reportDate && "text-muted-foreground"
+                    !reportDate && "text-muted-foreground",
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -160,7 +175,7 @@ const ProjectInfo = ({
                   selected={reportDate}
                   onSelect={(date) => {
                     setReportDate(date);
-                    setIsOpen(false);  // ✅ Close the picker
+                    setIsOpen(false); // ✅ Close the picker
                   }}
                   initialFocus
                   defaultMonth={new Date()}
@@ -180,10 +195,18 @@ const ProjectInfo = ({
               {/* Input Row: Period, Weather Condition, Temperature */}
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <Label htmlFor="period" className="text-xs text-muted-foreground mb-1 block">
+                  <Label
+                    htmlFor="period"
+                    className="text-xs text-muted-foreground mb-1 block"
+                  >
                     Period
                   </Label>
-                  <Select value={currentPeriod} onValueChange={(value: "AM" | "PM") => setCurrentPeriod(value)}>
+                  <Select
+                    value={currentPeriod}
+                    onValueChange={(value: "AM" | "PM") =>
+                      setCurrentPeriod(value)
+                    }
+                  >
                     <SelectTrigger id="period">
                       <SelectValue />
                     </SelectTrigger>
@@ -193,12 +216,18 @@ const ProjectInfo = ({
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="flex-1">
-                  <Label htmlFor="weather-condition" className="text-xs text-muted-foreground mb-1 block">
+                  <Label
+                    htmlFor="weather-condition"
+                    className="text-xs text-muted-foreground mb-1 block"
+                  >
                     Weather Condition
                   </Label>
-                  <Select value={currentWeather || ""} onValueChange={handleWeatherChange}>
+                  <Select
+                    value={currentWeather || ""}
+                    onValueChange={handleWeatherChange}
+                  >
                     <SelectTrigger id="weather-condition">
                       <SelectValue placeholder="Select condition" />
                     </SelectTrigger>
@@ -211,9 +240,12 @@ const ProjectInfo = ({
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="w-24">
-                  <Label htmlFor="temperature" className="text-xs text-muted-foreground mb-1 block">
+                  <Label
+                    htmlFor="temperature"
+                    className="text-xs text-muted-foreground mb-1 block"
+                  >
                     Temperature
                   </Label>
                   <Input

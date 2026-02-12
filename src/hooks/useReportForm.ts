@@ -14,14 +14,21 @@ import { saveReportToDB, submitReportToDB, createBlankReport, autoSaveReport } f
 import { generateCombinedExcel } from "@/integrations/reportsApi";
 import { apiGet } from "@/lib/apiFetch";
 import { getAutoSavePreference } from "@/lib/notificationUtils";
+import { useProfileContext } from "@/contexts/ProfileContext";
 
 export const useReportForm = () => {
+  const { profile } = useProfileContext();
+  const { toast } = useToast();
+  
   // Project Info
   const [projectName, setProjectName] = useState("");
+  const [location, setLocation] = useState("");
+  const [createdBy, setCreatedBy] = useState("");
   const [reportDate, setReportDate] = useState<Date | undefined>(undefined);
-  const [weather, setWeather] = useState("Sunny");
-  const [weatherPeriod, setWeatherPeriod] = useState<"AM" | "PM">("AM");
-  const [temperature, setTemperature] = useState("");
+  const [weatherAM, setWeatherAM] = useState("");
+  const [weatherPM, setWeatherPM] = useState("");
+  const [tempAM, setTempAM] = useState("");
+  const [tempPM, setTempPM] = useState("");
 
   // Activities
   const [activityToday, setActivityToday] = useState("");
@@ -29,7 +36,8 @@ export const useReportForm = () => {
 
   // Resources
   const [managementTeam, setManagementTeam] = useState<ResourceRow[]>([]);
-  const [workingTeam, setWorkingTeam] = useState<ResourceRow[]>([]);
+  const [workingTeamInterior, setWorkingTeamInterior] = useState<ResourceRow[]>([]);
+  const [workingTeamMEP, setWorkingTeamMEP] = useState<ResourceRow[]>([]);
   const [materials, setMaterials] = useState<ResourceRow[]>([]);
   const [machinery, setMachinery] = useState<ResourceRow[]>([]);
 
@@ -44,34 +52,54 @@ export const useReportForm = () => {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
 
+  // Auto-fill createdBy from logged-in user profile
+  useEffect(() => {
+    if (!profile) return;
+
+    if (profile?.fullName) {
+      setCreatedBy(profile.fullName);
+    } else if (profile?.email) {
+      setCreatedBy(profile.email.split('@')[0]);
+    }
+  }, [profile]);
+
+
   // Helper to package all state into the ReportData format
   const getReportData = useCallback(
     (): ReportData => ({
       projectName,
+      location,
+      createdBy,
       // Fixed logic: ensures we return a string or null as per your Interface
       reportDate: reportDate
         ? reportDate.toISOString()
         : new Date().toISOString(),
-      weather,
-      weatherPeriod,
-      temperature,
+      weatherAM,
+      weatherPM,
+      tempAM,
+      tempPM,
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
+      workingTeamInterior,
+      workingTeamMEP,
       materials,
       machinery,
     }),
     [
       projectName,
+      location,
+      createdBy,
       reportDate,
-      weather,
-      weatherPeriod,
-      temperature,
+      weatherAM,
+      weatherPM,
+      tempAM,
+      tempPM,
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
+      workingTeamInterior,
+      workingTeamMEP,
       materials,
       machinery,
     ]
@@ -82,14 +110,18 @@ export const useReportForm = () => {
   // Helper to fill all fields at once
   const fillForm = useCallback((data: Partial<ReportData>) => {
     setProjectName(data.projectName || "");
+    setLocation(data.location || "");
+    setCreatedBy(data.createdBy || "");
     setReportDate(data.reportDate ? new Date(data.reportDate) : new Date());
-    setWeather(data.weather || "Sunny");
-    setWeatherPeriod(data.weatherPeriod || "AM");
-    setTemperature(data.temperature || "");
+    setWeatherAM(data.weatherAM || "");
+    setWeatherPM(data.weatherPM || "");
+    setTempAM(data.tempAM || "");
+    setTempPM(data.tempPM || "");
     setActivityToday(data.activityToday || "");
     setWorkPlanNextDay(data.workPlanNextDay || "");
     setManagementTeam(data.managementTeam || []);
-    setWorkingTeam(data.workingTeam || []);
+    setWorkingTeamInterior(data.workingTeamInterior || []);
+    setWorkingTeamMEP(data.workingTeamMEP || []);
     setMaterials(data.materials || []);
     setMachinery(data.machinery || []);
   }, []);
@@ -131,16 +163,21 @@ export const useReportForm = () => {
 
   const lastDateRef = useRef<string | null>(null);
 
-  // Helper to clear the form to defaults
+  // Helper to clear the form to defaults (but preserve createdBy since it's auto-populated from profile)
   const clearForm = useCallback(() => {
     setProjectName("");
-    setWeather("Sunny");
-    setWeatherPeriod("AM");
-    setTemperature("");
+    setLocation("");
+    // Don't reset createdBy - it should come from the user profile
+    // setCreatedBy("");
+    setWeatherAM("");
+    setWeatherPM("");
+    setTempAM("");
+    setTempPM("");
     setActivityToday("");
     setWorkPlanNextDay("");
     setManagementTeam([]);
-    setWorkingTeam([]);
+    setWorkingTeamInterior([]);
+    setWorkingTeamMEP([]);
     setMaterials([]);
     setMachinery([]);
     setReportId(null);
@@ -221,14 +258,18 @@ export const useReportForm = () => {
 
     const currentData = {
       projectName,
+      location,
+      createdBy,
       reportDate: reportDate?.toISOString(),
-      weather,
-      weatherPeriod,
-      temperature,
+      weatherAM,
+      weatherPM,
+      tempAM,
+      tempPM,
       activityToday,
       workPlanNextDay,
       managementTeam,
-      workingTeam,
+      workingTeamInterior,
+      workingTeamMEP,
       materials,
       machinery,
     };
@@ -236,14 +277,18 @@ export const useReportForm = () => {
     triggerAutoSave(currentData);
   }, [
     projectName,
+    location,
+    createdBy,
     reportDate,
-    weather,
-    weatherPeriod,
-    temperature,
+    weatherAM,
+    weatherPM,
+    tempAM,
+    tempPM,
     activityToday,
     workPlanNextDay,
     managementTeam,
-    workingTeam,
+    workingTeamInterior,
+    workingTeamMEP,
     materials,
     machinery,
     triggerAutoSave,
@@ -269,7 +314,8 @@ export const useReportForm = () => {
         }));
 
       setManagementTeam(carryForward(prevReport.managementTeam));
-      setWorkingTeam(carryForward(prevReport.workingTeam));
+      setWorkingTeamInterior(carryForward(prevReport.workingTeamInterior || []));
+      setWorkingTeamMEP(carryForward(prevReport.workingTeamMEP || []));
       setMaterials(carryForward(prevReport.materials));
       setMachinery(carryForward(prevReport.machinery));
     } else if (newDateStr && !prevDateStr) {
@@ -308,7 +354,6 @@ export const useReportForm = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  const { toast } = useToast();
   const saveDraft = useCallback(
     (silent = false) => {
       setIsSaving(true);
@@ -380,7 +425,7 @@ export const useReportForm = () => {
 
   useEffect(() => {
     debouncedSaveDraft();
-  }, [managementTeam, workingTeam, materials, machinery, debouncedSaveDraft]);
+  }, [managementTeam, workingTeamInterior, workingTeamMEP, materials, machinery, debouncedSaveDraft]);
 
   // 2. Validation logic
   const validateReport = useCallback((): boolean => {
@@ -525,7 +570,7 @@ export const useReportForm = () => {
           ...rawData,
           reportDate: perfectDateStr, // Use the clean string here!
           managementTeam: cleanResourceRows(rawData.managementTeam),
-          workingTeam: cleanResourceRows(rawData.workingTeam),
+          workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
           materials: cleanResourceRows(rawData.materials),
           machinery: cleanResourceRows(rawData.machinery),
         };
@@ -542,10 +587,10 @@ export const useReportForm = () => {
           reportDate: rawData.reportDate
             ? new Date(rawData.reportDate)
             : new Date(),
-          weatherAM: rawData.weatherPeriod === "AM" ? rawData.weather : "",
-          weatherPM: rawData.weatherPeriod === "PM" ? rawData.weather : "",
-          tempAM: rawData.weatherPeriod === "AM" ? rawData.temperature : "",
-          tempPM: rawData.weatherPeriod === "PM" ? rawData.temperature : "",
+          weatherAM: rawData.weatherAM || "",
+          weatherPM: rawData.weatherPM || "",
+          tempAM: rawData.tempAM || "",
+          tempPM: rawData.tempPM || "",
         };
 
         await exportFunction(dataForExport as any);
@@ -598,7 +643,7 @@ export const useReportForm = () => {
           ...rawData,
           reportDate: perfectDateStr, // Use the clean string here!
           managementTeam: cleanResourceRows(rawData.managementTeam),
-          workingTeam: cleanResourceRows(rawData.workingTeam),
+          workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
           materials: cleanResourceRows(rawData.materials),
           machinery: cleanResourceRows(rawData.machinery),
         };
@@ -613,14 +658,15 @@ export const useReportForm = () => {
           reportDate: rawData.reportDate
             ? new Date(rawData.reportDate)
             : new Date(),
-          weatherAM: rawData.weatherPeriod === "AM" ? rawData.weather : "",
-          weatherPM: rawData.weatherPeriod === "PM" ? rawData.weather : "",
-          tempAM: rawData.weatherPeriod === "AM" ? rawData.temperature : "",
-          tempPM: rawData.weatherPeriod === "PM" ? rawData.temperature : "",
+          weatherAM: rawData.weatherAM || "",
+          weatherPM: rawData.weatherPM || "",
+          tempAM: rawData.tempAM || "",
+          tempPM: rawData.tempPM || "",
           activityToday: rawData.activityToday,
           workPlanNextDay: rawData.workPlanNextDay,
           managementTeam: rawData.managementTeam,
-          workingTeam: rawData.workingTeam,
+          workingTeamInterior: rawData.workingTeamInterior,
+          workingTeamMEP: rawData.workingTeamMEP,
           materials: rawData.materials,
           machinery: rawData.machinery,
         };
@@ -686,6 +732,8 @@ export const useReportForm = () => {
           dataForExport,
           processedSections,
           tableTitle,
+          [], // siteActivitiesSections - empty array for now
+          "Site Activities Photos", // siteActivitiesTitle
           fileName
         );
 
@@ -723,14 +771,17 @@ export const useReportForm = () => {
   const handleClear = useCallback(() => {
     // Reset all states
     setProjectName("");
+    setLocation("");
     setReportDate(new Date());
-    setWeather("Sunny");
-    setWeatherPeriod("AM");
-    setTemperature("");
+    setWeatherAM("");
+    setWeatherPM("");
+    setTempAM("");
+    setTempPM("");
     setActivityToday("");
     setWorkPlanNextDay("");
     setManagementTeam([]);
-    setWorkingTeam([]);
+    setWorkingTeamInterior([]);
+    setWorkingTeamMEP([]);
     setMaterials([]);
     setMachinery([]);
 
@@ -764,7 +815,7 @@ export const useReportForm = () => {
         ...rawData,
         reportDate: perfectDateStr, // Use the clean string here!
         managementTeam: cleanResourceRows(rawData.managementTeam),
-        workingTeam: cleanResourceRows(rawData.workingTeam),
+        workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
       };
@@ -787,10 +838,13 @@ export const useReportForm = () => {
 
       const carryForwardData = {
         projectName: cleanedData.projectName,
+        location: cleanedData.location,
+        createdBy: cleanedData.createdBy || "",
         reportDate: nextDay.toISOString(), // Cleanly formatted for tomorrow
-        weather: "Sunny" as const,
-        weatherPeriod: "AM" as "AM" | "PM",
-        temperature: "",
+        weatherAM: "",
+        weatherPM: "",
+        tempAM: "",
+        tempPM: "",
         activityToday: "",
         workPlanNextDay: "",
         managementTeam: cleanedData.managementTeam.map((r: any) => ({
@@ -799,12 +853,14 @@ export const useReportForm = () => {
           today: 0,
           accumulated: r.accumulated,
         })),
-        workingTeam: cleanedData.workingTeam.map((r: any) => ({
+        workingTeamInterior: cleanedData.workingTeamInterior || [],
+        workingTeamMEP: cleanedData.workingTeamMEP || [],
+        workingTeam: (cleanedData as any).workingTeam?.map((r: any) => ({
           ...r,
           prev: r.accumulated,
           today: 0,
           accumulated: r.accumulated,
-        })),
+        })) || [],
         materials: cleanedData.materials.map((r: any) => ({
           ...r,
           prev: r.accumulated,
@@ -843,22 +899,30 @@ export const useReportForm = () => {
     // Data State
     projectName,
     setProjectName,
+    location,
+    setLocation,
+    createdBy,
+    setCreatedBy,
     reportDate,
     setReportDate,
-    weather,
-    setWeather,
-    weatherPeriod,
-    setWeatherPeriod,
-    temperature,
-    setTemperature,
+    weatherAM,
+    setWeatherAM,
+    weatherPM,
+    setWeatherPM,
+    tempAM,
+    setTempAM,
+    tempPM,
+    setTempPM,
     activityToday,
     setActivityToday,
     workPlanNextDay,
     setWorkPlanNextDay,
     managementTeam,
     setManagementTeam,
-    workingTeam,
-    setWorkingTeam,
+    workingTeamInterior,
+    setWorkingTeamInterior,
+    workingTeamMEP,
+    setWorkingTeamMEP,
     materials,
     setMaterials,
     machinery,
