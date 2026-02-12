@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import CarGroupCard from "./car/CarGroupCard";
 import { createCarGroup, createEmptyCarSheet } from "@/utils/carHelpers";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateCarExcel } from "@/integrations/reportsApi";
-import { Upload } from "lucide-react";
+import { Upload, Eye, EyeOff, CheckCircle } from "lucide-react";
 
 
 interface Props {
@@ -15,6 +15,23 @@ export default function CARSection({ car, setCar }: Props) {
   const refs = useRef<Record<string, HTMLDivElement | null>>({});
   const beforeFileInputRef = useRef<HTMLInputElement>(null);
   const afterFileInputRef = useRef<HTMLInputElement>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  // Helper function to check if a group is complete (has both before and after images)
+  const isGroupComplete = (group: any) => {
+    return group.images?.[0] && group.images?.[1];
+  };
+
+  // Filter groups based on completion status and visibility setting
+  const visibleGroups = car.photo_groups?.filter((group: any) => {
+    const isComplete = isGroupComplete(group);
+    // Show group if: it's not complete, OR it's complete but not hidden, OR we're showing all completed
+    return !isComplete || !group.hiddenAfterSubmission || showCompleted;
+  }) || [];
+
+  // Count completed and hidden groups for stats
+  const completedCount = car.photo_groups?.filter(isGroupComplete).length || 0;
+  const hiddenCount = car.photo_groups?.filter((g: any) => isGroupComplete(g) && g.hiddenAfterSubmission).length || 0;
 
   useEffect(() => {
     // Ensure at least one default group exists
@@ -129,6 +146,53 @@ export default function CARSection({ car, setCar }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Completed Rows Toggle Section */}
+      {completedCount > 0 && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 via-white to-amber-100 dark:from-amber-900/20 dark:via-slate-800 dark:to-amber-900/20 border border-amber-200/60 dark:border-amber-700/60">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 opacity-80"></div>
+          
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                      Completed Actions
+                    </h3>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      {hiddenCount} of {completedCount} completed rows hidden
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCompleted(!showCompleted)}
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-600 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all duration-200"
+              >
+                {showCompleted ? (
+                  <>
+                    <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                      Hide Completed
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                      Show Completed ({hiddenCount})
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modern upload buttons with enhanced UX */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-slate-200/60 dark:border-slate-700/60 ">
         {/* Decorative top gradient */}
@@ -207,17 +271,20 @@ export default function CARSection({ car, setCar }: Props) {
 
       <div className="space-y-3">
         <AnimatePresence>
-          {car.photo_groups.map((g: any, idx: number) => {
-            const prev = car.photo_groups[idx - 1];
-            const next = car.photo_groups[idx + 1];
+          {visibleGroups.map((g: any, idx: number) => {
+            // Find the original index for proper linking logic
+            const originalIdx = car.photo_groups.findIndex((group: any) => group.id === g.id);
+            const prev = car.photo_groups[originalIdx - 1];
+            const next = car.photo_groups[originalIdx + 1];
             const isTopLinked = !!prev && prev.date === g.date;
             const isBottomLinked = !!next && next.date === g.date;
+            
             return (
               <motion.div key={g.id} layout ref={(el) => (refs.current[g.id] = el)}>
                 <CarGroupCard
                   group={g}
                   index={idx}
-                  total={car.photo_groups.length}
+                  total={visibleGroups.length}
                   onUpdate={updateGroup}
                   onRemove={removeGroup}
                   moveUp={moveUp}

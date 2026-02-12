@@ -987,7 +987,13 @@ const DailyReport = () => {
               dbReport.site_title || "Site Activities Photos"
             );
             setCarSheet(
-              dbReport.carSheet || { description: "", photo_groups: [] }
+              dbReport.carSheet ? {
+                ...dbReport.carSheet,
+                photo_groups: (dbReport.carSheet.photo_groups || []).map((g: any) => ({
+                  ...g,
+                  hiddenAfterSubmission: g.hiddenAfterSubmission || false
+                }))
+              } : { description: "", photo_groups: [] }
             );
             console.log(
               "🔍 DEBUG: CAR loaded from dbReport:",
@@ -3445,17 +3451,24 @@ const DailyReport = () => {
 
       // ADD CAR PROCESSING:
       const processedCar = await Promise.all(
-        (rawData.carSheet.photo_groups || []).map(async (g: any) => ({
-          ...g,
-          images: await Promise.all(
-            (g.images || []).map(async (img: any) => {
-              if (img && typeof img === "object" && img instanceof File) {
-                return await toBase64DataUrl(img);
-              }
-              return img;
-            })
-          ),
-        }))
+        (rawData.carSheet.photo_groups || []).map(async (g: any) => {
+          // Check if group is complete (has both before and after images)
+          const isComplete = g.images?.[0] && g.images?.[1];
+          
+          return {
+            ...g,
+            // Mark complete groups as hidden after submission
+            hiddenAfterSubmission: isComplete ? true : (g.hiddenAfterSubmission || false),
+            images: await Promise.all(
+              (g.images || []).map(async (img: any) => {
+                if (img && typeof img === "object" && img instanceof File) {
+                  return await toBase64DataUrl(img);
+                }
+                return img;
+              })
+            ),
+          };
+        })
       );
 
       // REPLACE cleanedData (lines 2987-2994):
@@ -3485,6 +3498,19 @@ const DailyReport = () => {
 
       // ADD THIS: Update local status
       setReportStatus("submitted");
+      
+      // Update local CAR state to reflect hidden completed rows
+      const updatedCarSheet = {
+        ...rawData.carSheet,
+        photo_groups: rawData.carSheet.photo_groups.map((g: any) => {
+          const isComplete = g.images?.[0] && g.images?.[1];
+          return {
+            ...g,
+            hiddenAfterSubmission: isComplete ? true : (g.hiddenAfterSubmission || false),
+          };
+        })
+      };
+      setCarSheet(updatedCarSheet);
 
       // Step 3: Clear localStorage after successful submission
       localStorage.removeItem(dateKey(reportDate));

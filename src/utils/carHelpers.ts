@@ -5,6 +5,7 @@ export function createCarGroup() {
     images: [null, null],
     footers: ["", ""],
     collapsed: false,
+    hiddenAfterSubmission: false, // New field to track visibility after submission
   };
 }
 
