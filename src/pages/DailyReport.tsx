@@ -910,6 +910,12 @@ const DailyReport = () => {
               setProjectName
             );
             setLocation(dbReport.location || ""); // Load location from DB
+            // Load createdBy from the report, fallback to current user for new reports
+            setCreatedBy(dbReport.createdBy || 
+              (profile?.fullName) || 
+              (profile?.email?.split('@')[0]) || 
+              ""
+            );
             setReportDate(
               dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
             );
@@ -1035,13 +1041,14 @@ const DailyReport = () => {
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
                 setReportStatus("draft");
+                setLocation(projectRecentReport.location); // Keep location for smart loaded report
 
                 // Load data from project's most recent report
-                setWeatherAM(projectRecentReport.weatherAM || "");
-                setWeatherPM(projectRecentReport.weatherPM || "");
-                setTempAM(projectRecentReport.tempAM || "");
-                setTempPM(projectRecentReport.tempPM || "");
-                setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
+                // setWeatherAM(projectRecentReport.weatherAM || "");
+                // setWeatherPM(projectRecentReport.weatherPM || "");
+                // setTempAM(projectRecentReport.tempAM || "");
+                // setTempPM(projectRecentReport.tempPM || "");
+                // setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
                 // setActivityToday(projectRecentReport.activityToday || "");
                 // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
@@ -1112,39 +1119,39 @@ const DailyReport = () => {
                     })
                   )
                 );
-                setReferenceSections(
-                  projectRecentReport.referenceSections &&
-                    projectRecentReport.referenceSections.length > 0
-                    ? projectRecentReport.referenceSections
-                    : createDefaultHSESections()
-                );
+                // setReferenceSections(
+                //   projectRecentReport.referenceSections &&
+                //     projectRecentReport.referenceSections.length > 0
+                //     ? projectRecentReport.referenceSections
+                //     : createDefaultHSESections()
+                // );
 
                 // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-                if (
-                  projectRecentReport.site_ref &&
-                  projectRecentReport.site_ref.length > 0
-                ) {
-                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
-                  const convertedSiteActivities = convertFromSiteRefFormat(
-                    projectRecentReport.site_ref
-                  );
-                  setSiteActivitiesSections(convertedSiteActivities);
-                } else {
-                  setSiteActivitiesSections(
-                    projectRecentReport.siteActivitiesSections &&
-                      projectRecentReport.siteActivitiesSections.length > 0
-                      ? projectRecentReport.siteActivitiesSections
-                      : createDefaultSiteActivitiesSections()
-                  );
-                }
+                // if (
+                //   projectRecentReport.site_ref &&
+                //   projectRecentReport.site_ref.length > 0
+                // ) {
+                //   // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                //   const convertedSiteActivities = convertFromSiteRefFormat(
+                //     projectRecentReport.site_ref
+                //   );
+                //   setSiteActivitiesSections(convertedSiteActivities);
+                // } else {
+                //   setSiteActivitiesSections(
+                //     projectRecentReport.siteActivitiesSections &&
+                //       projectRecentReport.siteActivitiesSections.length > 0
+                //       ? projectRecentReport.siteActivitiesSections
+                //       : createDefaultSiteActivitiesSections()
+                //   );
+                // }
                 setSiteActivitiesTitle(
                   projectRecentReport.site_title || "Site Activities Photos"
                 );
-                // setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
-                console.log(
-                  "🔍 DEBUG: CAR loaded from projectRecentReport:",
-                  projectRecentReport.carSheet?.description
-                );
+                setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                // console.log(
+                //   "🔍 DEBUG: CAR loaded from projectRecentReport:",
+                //   projectRecentReport.carSheet?.description
+                // );
                 setProjectLogo(projectRecentReport.projectLogo || null);
 
                 // Set ownership for new reports (always editable for the creator)

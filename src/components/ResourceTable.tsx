@@ -346,7 +346,7 @@ const ResourceTable = ({
                               );
                             }}
                             placeholder="0"
-                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1"
+                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1 min-w-[65px]"
                           />
                         ) : (
                           <Input
@@ -380,7 +380,7 @@ const ResourceTable = ({
                               );
                             }}
                             placeholder="0"
-                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1"
+                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1 min-w-[65px]"
                           />
                         ) : (
                           <Input

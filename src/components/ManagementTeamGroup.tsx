@@ -54,10 +54,10 @@ const ManagementTeamGroup = ({
                   <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
                     Description
                   </th>
-                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
                     Prev
                   </th>
-                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
                     Today
                   </th>
                   <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
@@ -249,10 +249,10 @@ const ManagementTeamGroup = ({
                   <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
                     Description
                   </th>
-                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
                     Prev
                   </th>
-                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
                     Today
                   </th>
                   <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
