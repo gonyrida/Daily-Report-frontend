@@ -19,6 +19,7 @@ const SiteWorkingTeamGroup = ({
       setRows={setInteriorTeam}
       useDropdown={true}
       dropdownOptions={INTERIOR_TEAM_OPTIONS}
+      inputNumberOnly={true}
     />
   );
 };

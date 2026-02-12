@@ -29,6 +29,7 @@ interface ResourceTableProps {
   useDropdown?: boolean; // New prop to enable dropdown
   dropdownOptions?: string[]; // Options for dropdown
   unitOptions?: string[]; // Options for unit dropdown
+  inputNumberOnly?: boolean; // New prop to use custom number input logic like ManagementTeamGroup
 }
 
 const ResourceTable = ({
@@ -40,6 +41,7 @@ const ResourceTable = ({
   useDropdown = false,
   dropdownOptions = [],
   unitOptions = [],
+  inputNumberOnly = false,
 }: ResourceTableProps) => {
   const addRow = () => {
     const newRow: ResourceRow = {
@@ -329,34 +331,72 @@ const ResourceTable = ({
                         </td>
                       )}
                       <td className="px-3 py-2">
-                        <Input
-                          type="number"
-                          value={row.prev || ""}
-                          onChange={(e) =>
-                            updateRow(
-                              row.id,
-                              "prev",
-                              Number(e.target.value) || 0
-                            )
-                          }
-                          placeholder="0"
-                          className="border-0 bg-transparent text-center focus-visible:ring-1 w-full min-w-[60px]"
-                        />
+                        {inputNumberOnly ? (
+                          <input
+                            type="number"
+                            value={row.prev || ""}
+                            onChange={(e) => {
+                              const value = Number(e.target.value) || 0;
+                              setRows(
+                                rows.map((r) =>
+                                  r.id === row.id
+                                    ? { ...r, prev: value, accumulated: value + r.today }
+                                    : r
+                                )
+                              );
+                            }}
+                            placeholder="0"
+                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1"
+                          />
+                        ) : (
+                          <Input
+                            type="number"
+                            value={row.prev || ""}
+                            onChange={(e) =>
+                              updateRow(
+                                row.id,
+                                "prev",
+                                Number(e.target.value) || 0
+                              )
+                            }
+                            placeholder="0"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1 w-full min-w-[60px]"
+                          />
+                        )}
                       </td>
                       <td className="px-3 py-2">
-                        <Input
-                          type="number"
-                          value={row.today || ""}
-                          onChange={(e) =>
-                            updateRow(
-                              row.id,
-                              "today",
-                              Number(e.target.value) || 0
-                            )
-                          }
-                          placeholder="0"
-                          className="border-0 bg-transparent text-center focus-visible:ring-1"
-                        />
+                        {inputNumberOnly ? (
+                          <input
+                            type="number"
+                            value={row.today || ""}
+                            onChange={(e) => {
+                              const value = Number(e.target.value) || 0;
+                              setRows(
+                                rows.map((r) =>
+                                  r.id === row.id
+                                    ? { ...r, today: value, accumulated: r.prev + value }
+                                    : r
+                                )
+                              );
+                            }}
+                            placeholder="0"
+                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1"
+                          />
+                        ) : (
+                          <Input
+                            type="number"
+                            value={row.today || ""}
+                            onChange={(e) =>
+                              updateRow(
+                                row.id,
+                                "today",
+                                Number(e.target.value) || 0
+                              )
+                            }
+                            placeholder="0"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                          />
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <div className="text-center font-semibold text-primary">

@@ -146,6 +146,7 @@ const ResourcesSection = ({
           dropdownOptions={MATERIAL_OPTIONS}
           showUnit
           unitOptions={Units}
+          inputNumberOnly={true}
         />
 
         <ResourceTable
@@ -157,6 +158,7 @@ const ResourcesSection = ({
           dropdownOptions={MACHINERY_OPTIONS}
           showUnit
           unitOptions={Units}
+          inputNumberOnly={true}
         />
       </div>
     </div>
