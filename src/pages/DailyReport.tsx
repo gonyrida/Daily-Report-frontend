@@ -2042,6 +2042,8 @@ const DailyReport = () => {
     try {
       await exportToPDF({
         projectName,
+        location,
+        createdBy,
         reportDate,
         weatherAM,
         weatherPM,
@@ -2077,6 +2079,8 @@ const DailyReport = () => {
       const url = (await exportToPDF(
         {
           projectName,
+          location,
+          createdBy,
           reportDate,
           weatherAM,
           weatherPM,
@@ -2109,6 +2113,8 @@ const DailyReport = () => {
     try {
       await exportToPDF({
         projectName,
+        location,
+        createdBy,
         reportDate,
         weatherAM,
         weatherPM,
@@ -2671,6 +2677,8 @@ const DailyReport = () => {
 
       const reportPayload = {
         projectName,
+        location,
+        createdBy,
         reportDate: reportDate?.toISOString(),
         weatherAM,
         weatherPM,
@@ -2840,6 +2848,8 @@ const DailyReport = () => {
       await generateCombinedPDF(
         {
           projectName,
+          location,
+          createdBy,
           reportDate,
           weatherAM,
           weatherPM,
@@ -2967,6 +2977,8 @@ const DailyReport = () => {
         mode: "combined",
         data: {
           projectName,
+          location,
+          createdBy,
           reportDate,
           weatherAM,
           weatherPM,
@@ -3153,6 +3165,8 @@ const DailyReport = () => {
       // Generate both files
       const reportPayload = {
         projectName,
+        location,
+        createdBy,
         reportDate,
         weatherAM,
         weatherPM,
@@ -3301,6 +3315,8 @@ const DailyReport = () => {
     try {
       await exportToWord({
         projectName,
+        location,
+        createdBy,
         reportDate,
         weatherAM,
         weatherPM,
@@ -3336,6 +3352,8 @@ const DailyReport = () => {
     try {
       await exportToZIP({
         projectName,
+        location,
+        createdBy,
         reportDate,
         weatherAM,
         weatherPM,

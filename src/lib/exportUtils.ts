@@ -19,6 +19,8 @@ import { ResourceRow } from "@/components/ResourceTable";
 
 interface ReportData {
   projectName: string;
+  location: string;
+  createdBy: string;
   reportDate: Date | undefined;
   weatherAM: string;
   weatherPM: string;
@@ -143,6 +145,10 @@ const exportToPDFAsBlob = async (data: ReportData): Promise<Blob> => {
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.text(`Project Name : ${data.projectName || ""}`, margin, y);
+  y += 6;
+  doc.text(`Location     : ${data.location || ""}`, margin, y);
+  y += 6;
+  doc.text(`Created By   : ${data.createdBy || ""}`, margin, y);
   y += 6;
 
   // Weather Summary in the format: Weather: AM Cloudy | PM Cloudy (row 8)
