@@ -50,7 +50,6 @@ export default function CARSection({ car, setCar }: Props) {
         id: crypto.randomUUID(), 
         date: new Date().toISOString().split("T")[0], 
         images: [files[i], null], // Before slot only
-        descriptions: ["", ""],
         footers: ["", ""], 
         collapsed: false 
       });
@@ -83,7 +82,6 @@ export default function CARSection({ car, setCar }: Props) {
         id: crypto.randomUUID(), 
         date: new Date().toISOString().split("T")[0], 
         images: [null, files[i]], // After slot only
-        descriptions: ["", ""],
         footers: ["", ""], 
         collapsed: false 
       });

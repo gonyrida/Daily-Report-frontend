@@ -119,7 +119,7 @@ const ResourcesSection = ({
 }: ResourcesSectionProps) => {
   return (
     <div className="space-y-4">
-      <h2 className="text-md font-semibold text-foreground flex items-center gap-2">
+      <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
         <div className="w-1 h-5 bg-accent rounded-full" />
         Man Power
       </h2>
