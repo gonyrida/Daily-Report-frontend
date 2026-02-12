@@ -656,10 +656,10 @@ export const getCompanyReports = async (
   projectFilter?: string
 ) => {
   try {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
+    // const token = localStorage.getItem("authToken");
+    // if (!token) {
+    //   throw new Error("No authentication token found");
+    // }
 
     const queryParams = new URLSearchParams({
       page: page.toString(),
