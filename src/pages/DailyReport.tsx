@@ -4000,7 +4000,7 @@ const DailyReport = () => {
                     }}
                     defaultFileName={
                       pendingExportType === "combined"
-                        ? `combined-${projectName || "Report"}_${
+                        ? `${projectName || "Report"}_${
                             reportDate?.toISOString().split("T")[0] || "export"
                           }`
                         : pendingExportType === "reference"
@@ -4013,17 +4013,17 @@ const DailyReport = () => {
                     }
                     title={
                       pendingExportType === "combined"
-                        ? "Export Combined Excel File"
-                        : pendingExportType === "reference"
-                        ? "Export Reference Excel File"
-                        : "Export Excel File"
+                        ? "Exporting Excel File"
+                        : pendingExportType === "combined-pdf"
+                        ? "Exporting PDF File"
+                        : "Exporting ZIP File"
                     }
                     description={
                       pendingExportType === "combined"
-                        ? "Enter a name for your combined Excel export file (Report + Reference)."
-                        : pendingExportType === "reference"
-                        ? "Enter a name for your reference Excel export file."
-                        : "Enter a name for your Excel export file."
+                        ? "Enter a name for your excel file."
+                        : pendingExportType === "combined-pdf"
+                        ? "Enter a name for your PDF file."
+                        : "Enter a name for your ZIP file."
                     }
                   />
                 </main>

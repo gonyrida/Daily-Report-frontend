@@ -56,8 +56,8 @@ const FileNameDialog: React.FC<FileNameDialogProps> = ({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="filename" className="text-right">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="filename" className="text-left">
               File Name
             </Label>
             <Input
@@ -65,7 +65,6 @@ const FileNameDialog: React.FC<FileNameDialogProps> = ({
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="col-span-3"
               placeholder={defaultFileName}
             />
           </div>
