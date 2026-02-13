@@ -304,10 +304,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ isOpen, onClose }) =>
                           id="email"
                           type="email"
                           value={tempProfile.email || profile.email || ''}
-                          onChange={(e) => {
-                            updateTempProfile({ email: e.target.value });
-                            console.log('Email changed:', e.target.value);
-                          }}
+                          disabled
                           placeholder="Enter your email"
                           className="text-base"
                           aria-label="Email"

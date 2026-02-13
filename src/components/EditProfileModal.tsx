@@ -293,9 +293,8 @@ const EditProfileModal = ({
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                disabled
                 placeholder="Enter your email"
-                disabled={isSaving || isUploading}
               />
             </div>
           </div>
