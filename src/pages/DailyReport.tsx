@@ -2618,9 +2618,14 @@ const DailyReport = () => {
         siteActivitiesSections
       );
 
+      // Filter CAR groups - only send non-hidden ones
+      const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
+        !g.hiddenAfterSubmission
+      );
+
       // Process CAR data
       const processedCar = await Promise.all(
-        (carSheet.photo_groups || []).map(async (g: any) => {
+        visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
               async (img: any) => (await toBase64DataUrl(img)) || ""
@@ -2819,9 +2824,14 @@ const DailyReport = () => {
         siteActivitiesSections
       );
 
+      // Filter CAR groups - only send non-hidden ones
+      const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
+        !g.hiddenAfterSubmission
+      );
+
       // Process CAR data
       const processedCar = await Promise.all(
-        (carSheet.photo_groups || []).map(async (g: any) => {
+        visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
               async (img: any) => (await toBase64DataUrl(img)) || ""
@@ -2967,9 +2977,14 @@ const DailyReport = () => {
         siteActivitiesSections
       );
 
+      // Filter CAR groups - only send non-hidden ones
+      const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
+        !g.hiddenAfterSubmission
+      );
+
       // Process CAR data
       const processedCar = await Promise.all(
-        (carSheet.photo_groups || []).map(async (g: any) => {
+        visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
               async (img: any) => (await toBase64DataUrl(img)) || ""
@@ -3157,9 +3172,14 @@ const DailyReport = () => {
         siteActivitiesSections
       );
 
+      // Filter CAR groups - only send non-hidden ones
+      const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
+        !g.hiddenAfterSubmission
+      );
+
       // Process CAR data
       const processedCar = await Promise.all(
-        (carSheet.photo_groups || []).map(async (g: any) => {
+        visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
               async (img: any) => (await toBase64DataUrl(img)) || ""
