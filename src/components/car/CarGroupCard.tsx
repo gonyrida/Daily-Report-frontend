@@ -25,6 +25,8 @@ function imagePreviewSrc(img: any) {
 
 export default function CarGroupCard({ group, index, total, onUpdate, onRemove, moveUp, moveDown, isTopLinked = false, isBottomLinked = false, car, setCar }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const beforeFileInputRef = useRef<HTMLInputElement>(null);
+  const afterFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (file: File, slotIndex: number) => {
     const images = [...(group.images || [null, null])];
@@ -121,7 +123,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
           </div>
           
           <div 
-            className={`relative group w-full aspect-[4/3] overflow-hidden rounded-2xl border-2 ${imagePreviewSrc(group.images?.[0]) ? "border-blue-300 dark:border-blue-600 p-0" : "border-dashed border-blue-300 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6"} flex items-center justify-center transition-all duration-300 hover:border-blue-400 dark:hover:border-blue-500`}
+            className={`relative group w-full aspect-[4/3] overflow-hidden rounded-2xl border-2 ${imagePreviewSrc(group.images?.[0]) ? "border-blue-300 dark:border-blue-600 p-0" : "border-dashed border-blue-300 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6"} flex items-center justify-center transition-all duration-300 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer`}
             onPaste={(e) => handlePaste(e, 0)}
             onDrop={(e) => {
               e.preventDefault();
@@ -129,6 +131,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
               if (files.length > 0) handleImageUpload(files[0], 0);
             }}
             onDragOver={(e) => e.preventDefault()}
+            onClick={() => beforeFileInputRef.current?.click()}
           >
             {imagePreviewSrc(group.images?.[0]) ? (
               <div className="relative w-full h-full">
@@ -180,7 +183,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
           </div>
           
           <div 
-            className={`relative group w-full aspect-[4/3] overflow-hidden rounded-2xl border-2 ${imagePreviewSrc(group.images?.[1]) ? "border-emerald-300 dark:border-emerald-600 p-0" : "border-dashed border-emerald-300 dark:border-emerald-600 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 p-6"} flex items-center justify-center transition-all duration-300 hover:border-emerald-400 dark:hover:border-emerald-500`}
+            className={`relative group w-full aspect-[4/3] overflow-hidden rounded-2xl border-2 ${imagePreviewSrc(group.images?.[1]) ? "border-emerald-300 dark:border-emerald-600 p-0" : "border-dashed border-emerald-300 dark:border-emerald-600 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 p-6"} flex items-center justify-center transition-all duration-300 hover:border-emerald-400 dark:hover:border-emerald-500 cursor-pointer`}
             onPaste={(e) => handlePaste(e, 1)}
             onDrop={(e) => {
               e.preventDefault();
@@ -188,6 +191,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
               if (files.length > 0) handleImageUpload(files[0], 1);
             }}
             onDragOver={(e) => e.preventDefault()}
+            onClick={() => afterFileInputRef.current?.click()}
           >
             {imagePreviewSrc(group.images?.[1]) ? (
               <div className="relative w-full h-full">
@@ -219,6 +223,32 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
           </div>
         </div>
       </div>
+      
+      {/* Hidden file inputs for click-to-upload */}
+      <input
+        ref={beforeFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            handleImageUpload(files[0], 0);
+          }
+        }}
+        className="hidden"
+      />
+      <input
+        ref={afterFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            handleImageUpload(files[0], 1);
+          }
+        }}
+        className="hidden"
+      />
     </motion.div>
   );
 }
