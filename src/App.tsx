@@ -17,6 +17,7 @@ import DailyReport from "./pages/DailyReport";
 import DailyReportProjects from "./pages/DailyReportProjects";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import WeeklyReport from "./pages/WeeklyReport";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import FloatingScrollButton from './components/FloatingScrollButton';
@@ -101,6 +102,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <DailyReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/weekly-report"
+                element={
+                  <ProtectedRoute>
+                    <WeeklyReport />
                   </ProtectedRoute>
                 }
               />
