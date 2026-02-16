@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import ReportHeader from "@/components/ReportHeader";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import WeeklyReportCover from "@/components/weekly/WeeklyReportCover";
+import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,15 @@ const WeeklyReport = () => {
   const [activeTab, setActiveTab] = useState<
     "cover" | "letter" | "table-of-content"
   >("cover");
+
+  // Shared data state between tabs
+  const [sharedData, setSharedData] = useState({
+    weekNumber: "",
+    refNoPrefix: "ICT-CPM-LETTER",
+    dateRange: "",
+    projectName: "Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia",
+    employer: "Client Name",
+  });
 
   return (
     <SidebarProvider>
@@ -102,20 +112,19 @@ const WeeklyReport = () => {
               {/* Tab-based content rendering */}
               {activeTab === "cover" && (
                 <>
-                  <WeeklyReportCover />
+                  <WeeklyReportCover 
+                    data={sharedData}
+                    onDataChange={(data) => setSharedData(prev => ({ ...prev, ...data }))}
+                  />
                 </>
               )}
 
               {activeTab === "letter" && (
                 <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <h2 className="text-lg font-semibold mb-4">
-                      Letter Content
-                    </h2>
-                    <p className="text-muted-foreground">
-                      This is where the letter content will be displayed.
-                    </p>
-                  </div>
+                  <WeeklyReportLetter 
+                    data={sharedData}
+                    onDataChange={(data) => setSharedData(prev => ({ ...prev, ...data }))}
+                  />
                 </>
               )}
 
