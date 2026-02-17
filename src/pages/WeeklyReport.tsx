@@ -18,7 +18,7 @@ const WeeklyReport = () => {
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
-    "cover" | "letter" | "table-of-content" | "overall-progress"
+    "cover" | "letter" | "table-of-content" | "overall-progress" | "activities"
   >("cover");
 
   // Debug logging for activeTab changes
@@ -155,8 +155,8 @@ const WeeklyReport = () => {
               </div>
             </div>
 
-            {/* Second Navigation Bar - Only shows when Table of Content is active and toggled, or when showing overall-progress */}
-            {(activeTab === "table-of-content" || activeTab === "overall-progress") && showSecondNav && (
+            {/* Second Navigation Bar - Only shows when Table of Content is active and toggled, or when showing overall-progress or activities */}
+            {(activeTab === "table-of-content" || activeTab === "overall-progress" || activeTab === "activities") && showSecondNav && (
               <div className="w-full px-4 sm:px-6 py-3 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
                 <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                   {tableOfContentSections.map((section) => (
@@ -174,6 +174,11 @@ const WeeklyReport = () => {
                           console.log("Setting overall-progress tab");
                           setShowIntroduction(false);
                           debugSetActiveTab("overall-progress");
+                          if (setShowSecondNav) setShowSecondNav(true);
+                        } else if (section.id === 3) {
+                          console.log("Setting activities tab");
+                          setShowIntroduction(false);
+                          debugSetActiveTab("activities");
                           if (setShowSecondNav) setShowSecondNav(true);
                         } else {
                           console.log("Scrolling to section:", section.href);
@@ -220,6 +225,21 @@ const WeeklyReport = () => {
               )}
 
               {activeTab === "table-of-content" && (
+                <>
+                  <div className="bg-card rounded-lg border p-6">
+                    <WeeklyReportContent
+                      showIntroduction={showIntroduction}
+                      setShowIntroduction={setShowIntroduction}
+                      projectLogo={sharedData.coverImage}
+                      setActiveTab={debugSetActiveTab}
+                      setShowSecondNav={setShowSecondNav}
+                      activeTab={activeTab}
+                    />
+                  </div>
+                </>
+              )}
+
+              {activeTab === "activities" && (
                 <>
                   <div className="bg-card rounded-lg border p-6">
                     <WeeklyReportContent

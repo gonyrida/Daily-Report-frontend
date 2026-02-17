@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import Introduction from "./content/Intoduction";
 import OverallProgress from "./content/OverallProgress";
+import Activities from "./content/Activities";
 
-type TabType = "cover" | "letter" | "table-of-content" | "overall-progress";
+type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities";
 interface WeeklyReportContentProps {
   showIntroduction?: boolean;
   setShowIntroduction?: React.Dispatch<React.SetStateAction<boolean>>;
@@ -23,6 +24,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
 
+  // State for activities
+  const [weeklyActivities, setWeeklyActivities] = useState([]);
+  const [nextWeekPlan, setNextWeekPlan] = useState([]);
+
   const showIntroduction = externalShowIntroduction ?? internalShowIntroduction;
   const setShowIntroduction =
     externalSetShowIntroduction ?? setInternalShowIntroduction;
@@ -42,6 +47,24 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           1. INTRODUCTION
         </h2>
         <Introduction projectLogo={projectLogo} />
+      </div>
+    );
+  }
+
+  // Handle activities tab
+  if (activeTab === "activities") {
+    console.log("WeeklyReportContent: Showing Activities, activeTab:", activeTab);
+    return (
+      <div className="bg-card p-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+          3. ACTIVITIES OF WORK DONE / NEXT WEEK PLAN
+        </h2>
+        <Activities 
+          weeklyActivities={weeklyActivities}
+          setWeeklyActivities={setWeeklyActivities}
+          nextWeekPlan={nextWeekPlan}
+          setNextWeekPlan={setNextWeekPlan}
+        />
       </div>
     );
   }
@@ -131,7 +154,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             href="#activities-of-work-done--next-week-plan"
             className="text-blue-600 hover:underline"
             onClick={(e) => {
-              if (setActiveTab) setActiveTab("table-of-content");
+              e.preventDefault();
+              if (setActiveTab) setActiveTab("activities");
               if (setShowSecondNav) setShowSecondNav(true);
             }}
           >
