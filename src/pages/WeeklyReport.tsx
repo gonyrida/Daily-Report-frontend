@@ -3,6 +3,7 @@ import ReportHeader from "@/components/ReportHeader";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import WeeklyReportCover from "@/components/weekly/WeeklyReportCover";
 import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
+import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,19 +14,56 @@ import {
 
 const WeeklyReport = () => {
   const [projectLogo, setProjectLogo] = useState<string>("/koica_logo.png");
+  const [showIntroduction, setShowIntroduction] = useState(false);
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
-    "cover" | "letter" | "table-of-content"
+    "cover" | "letter" | "table-of-content" | "overall-progress"
   >("cover");
+
+  // Debug logging for activeTab changes
+  const debugSetActiveTab = (tab: any) => {
+    console.log("ActiveTab changing from", activeTab, "to", tab);
+    setActiveTab(tab);
+  };
+
+  // State for second navigation bar visibility
+  const [showSecondNav, setShowSecondNav] = useState(false);
+
+  // Table of content sections for second navigation
+  const tableOfContentSections = [
+    { id: 1, name: "Intro", href: "#introduction" },
+    {
+      id: 2,
+      name: "O.progress",
+      href: "#overall-progress-of-this-week-and-next-week",
+    },
+    {
+      id: 3,
+      name: "Activities",
+      href: "#activities-of-work-done--next-week-plan",
+    },
+    { id: 4, name: "QAQC", href: "#qaqc-status" },
+    {
+      id: 5,
+      name: "HSES",
+      href: "#health-safety-environmental--security-hses",
+    },
+    { id: 6, name: "Resources", href: "#resources-status" },
+    { id: 7, name: "Photos", href: "#site-activity-photos" },
+    { id: 8, name: "Issues", href: "#construction-issue" },
+    { id: 9, name: "Schedule", href: "#master-schedule" },
+  ];
 
   // Shared data state between tabs
   const [sharedData, setSharedData] = useState({
     weekNumber: "",
     refNoPrefix: "ICT-CPM-LETTER",
     dateRange: "",
-    projectName: "Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia",
+    projectName:
+      "Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia",
     employer: "Client Name",
+    coverImage: "",
   });
 
   return (
@@ -77,7 +115,10 @@ const WeeklyReport = () => {
                   <Button
                     variant={activeTab === "cover" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setActiveTab("cover")}
+                    onClick={() => {
+                      setActiveTab("cover");
+                      setShowSecondNav(false);
+                    }}
                     className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                   >
                     Cover
@@ -85,7 +126,10 @@ const WeeklyReport = () => {
                   <Button
                     variant={activeTab === "letter" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setActiveTab("letter")}
+                    onClick={() => {
+                      setActiveTab("letter");
+                      setShowSecondNav(false);
+                    }}
                     className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                   >
                     Letter
@@ -95,7 +139,11 @@ const WeeklyReport = () => {
                       activeTab === "table-of-content" ? "default" : "outline"
                     }
                     size="sm"
-                    onClick={() => setActiveTab("table-of-content")}
+                    onClick={() => {
+                      debugSetActiveTab("table-of-content");
+                      setShowSecondNav(true);
+                      setShowIntroduction(false); // Always reset intro view when switching to TOC tab
+                    }}
                     className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                   >
                     Table of Content
@@ -107,23 +155,66 @@ const WeeklyReport = () => {
               </div>
             </div>
 
+            {/* Second Navigation Bar - Only shows when Table of Content is active and toggled, or when showing overall-progress */}
+            {(activeTab === "table-of-content" || activeTab === "overall-progress") && showSecondNav && (
+              <div className="w-full px-4 sm:px-6 py-3 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
+                <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                  {tableOfContentSections.map((section) => (
+                    <Button
+                      key={section.id}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        console.log("Second nav button clicked, section.id:", section.id);
+                        if (section.id === 1) {
+                          console.log("Setting introduction to true");
+                          setShowIntroduction(true);
+                          debugSetActiveTab("table-of-content");
+                        } else if (section.id === 2) {
+                          console.log("Setting overall-progress tab");
+                          setShowIntroduction(false);
+                          debugSetActiveTab("overall-progress");
+                          if (setShowSecondNav) setShowSecondNav(true);
+                        } else {
+                          console.log("Scrolling to section:", section.href);
+                          setShowIntroduction(false);
+                          debugSetActiveTab("table-of-content");
+                          const element = document.querySelector(section.href);
+                          if (element) {
+                            element.scrollIntoView({ behavior: "smooth" });
+                          }
+                        }
+                      }}
+                      className="rounded-full text-sm transition-all duration-200 hover:scale-105 flex-shrink-0"
+                    >
+                      {section.id}. {section.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Main Content */}
             <main className="w-full px-4 sm:px-6 pt-4 pb-6 space-y-6 overflow-x-hidden">
               {/* Tab-based content rendering */}
               {activeTab === "cover" && (
                 <>
-                  <WeeklyReportCover 
+                  <WeeklyReportCover
                     data={sharedData}
-                    onDataChange={(data) => setSharedData(prev => ({ ...prev, ...data }))}
+                    onDataChange={(data) =>
+                      setSharedData((prev) => ({ ...prev, ...data }))
+                    }
                   />
                 </>
               )}
 
               {activeTab === "letter" && (
                 <>
-                  <WeeklyReportLetter 
+                  <WeeklyReportLetter
                     data={sharedData}
-                    onDataChange={(data) => setSharedData(prev => ({ ...prev, ...data }))}
+                    onDataChange={(data) =>
+                      setSharedData((prev) => ({ ...prev, ...data }))
+                    }
                   />
                 </>
               )}
@@ -131,12 +222,29 @@ const WeeklyReport = () => {
               {activeTab === "table-of-content" && (
                 <>
                   <div className="bg-card rounded-lg border p-6">
-                    <h2 className="text-lg font-semibold mb-4">
-                      Table of Content
-                    </h2>
-                    <p className="text-muted-foreground">
-                      This is where the table of content will be displayed.
-                    </p>
+                    <WeeklyReportContent
+                      showIntroduction={showIntroduction}
+                      setShowIntroduction={setShowIntroduction}
+                      projectLogo={sharedData.coverImage}
+                      setActiveTab={debugSetActiveTab}
+                      setShowSecondNav={setShowSecondNav}
+                      activeTab={activeTab}
+                    />
+                  </div>
+                </>
+              )}
+
+              {activeTab === "overall-progress" && (
+                <>
+                  <div className="bg-card rounded-lg border p-6">
+                    <WeeklyReportContent
+                      showIntroduction={showIntroduction}
+                      setShowIntroduction={setShowIntroduction}
+                      projectLogo={sharedData.coverImage}
+                      setActiveTab={debugSetActiveTab}
+                      setShowSecondNav={setShowSecondNav}
+                      activeTab={activeTab}
+                    />
                   </div>
                 </>
               )}

@@ -20,7 +20,7 @@ import Settings from "./pages/Settings";
 import WeeklyReport from "./pages/WeeklyReport";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
-import FloatingScrollButton from './components/FloatingScrollButton';
+import FloatingScrollButton from "./components/FloatingScrollButton";
 // import SecureTokenInitializer from "./components/SecureTokenInitializer";
 
 const queryClient = new QueryClient();

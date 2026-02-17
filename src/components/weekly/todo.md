@@ -1,108 +1,46 @@
-Design a professional, modern cover page UI for a Weekly Progress Report, following the layout and structure from @template.xlsx, but visually enhanced and clean.
+Create a Table of Contents that links to each section and subsection in this structure using Markdown anchor links:
 
-Style & Tone
+1. INTRODUCTION
+2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
+3. ACTIVITIES OF WORK DONE / NEXT WEEK PLAN
+4. QA/QC STATUS
+   4.1 Non-Conformity Report (NCR)
+   4.2 Corrective Action Request (CAR)
+   4.3 Safety Corrective Action Request (SCAR)
+   4.4 PM Site Instruction (SI)
+   4.5 Client Site Instruction (SI)
+   4.6 Inspection Request (IR)
+   4.7 Material for Approval (MFA)
+   4.8 Request for Information (RFI)
+   4.9 Request for Approval (RFA)
+   4.10 Field Change Request (FCR)
+   4.11 Variation Order (VO)
+   4.12 Transmittal (TR)
+5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
+   5.1 HSES Training / Introduction / Toolbox Meeting
+   5.2 HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist
+   5.3 Permit to Work
+   5.4 First Aid / Accident / Incident / Near Miss / Fatalities (if Any)
+   5.5 Other HSES Actities Concerns
+   5.6 HSES Photo Reference
+6. RESOURCES STATUS
+   6.1 Manpower Status
+   6.2 Material Delivery Status
+   6.3 Machinery / Equipment Status
+7. SITE ACTIVITY PHOTOS
+8. CONSTRUCTION ISSUE
+9. MASTER SCHEDULE
 
-Corporate, construction/engineering report style
+**Instructions:**
 
-Professional, formal, and well-structured
+- Convert each line into a Markdown link, using the format: `[Section Title](#anchor-text)`
+- For anchor text, use lowercase and replace spaces and special characters with hyphens, as is standard in GitHub-flavored Markdown.
+  - **Example:** `# 4. QA/QC STATUS` becomes `[QA/QC STATUS](#4-qaqc-status)`
+  - **Subsections:** Use heading numbers for uniqueness, e.g., `[4.1 Non-Conformity Report (NCR)](#41-non-conformity-report-ncr)`
 
-Clean typography, strong hierarchy
+**Example output for one line:**
 
-Suitable for PDF export and print
+- `[INTRODUCTION](#1-introduction)`
 
-Use neutral colors (white, light gray) with construction accent colors (dark blue / navy / muted orange)
+Generate the full Table of Contents in Markdown with working internal links to each section.
 
-Layout
-
-Portrait (A4) layout
-
-Center-aligned main content
-
-Balanced spacing with clear visual sections
-
-Header-focused design with strong first impression
-
-Cover Page Content
-
-Main Title
-
-Text: “WEEKLY PROGRESS REPORT”
-
-Large, bold, uppercase
-
-Centered at the top
-
-Project Week Number
-
-Label: Project Week
-
-Value: “Week – No”
-
-Medium font size, placed under the title
-
-Project Date Range
-
-Example: “30-Jan-26 ~ 5-Feb-26”
-
-Smaller than week number
-
-Clean, readable format
-
-Cover Image
-
-Large rectangular image section
-
-Centered
-
-Represents construction / project site
-
-Rounded corners or subtle shadow
-
-Project Name
-
-Text example:
-“Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia”
-
-Prominent but readable
-
-Multi-line text with good line spacing
-
-Center aligned
-
-Project Details Section
-
-Structured as labeled rows or cards
-
-Left-aligned labels, right-aligned values
-
-Employer:
-“Client Name”
-
-Contractor:
-“Cambodian Advanced Construction Project Management (CACPM) Co., Ltd”
-
-Typography
-
-Title: Sans-serif, bold (e.g., Inter / Roboto / SF Pro)
-
-Body text: Regular, high readability
-
-Clear font size hierarchy
-
-UI Details
-
-Subtle dividers between sections
-
-Consistent margins and padding
-
-No clutter, no excessive decoration
-
-Feels like an official engineering report cover
-
-Output
-
-High-fidelity UI design
-
-Ready for PDF export
-
-Matches the structure of @template.xlsx but looks more modern and polished

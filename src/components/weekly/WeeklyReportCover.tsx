@@ -58,7 +58,7 @@ const WeeklyReportCover: React.FC<WeeklyReportCoverProps> = ({
     contractor:
       data.contractor ||
       "Cambodian Advanced Construction Project Management (CACPM) Co., Ltd",
-    coverImage: data.coverImage || "/placeholder-construction.jpg",
+    coverImage: data.coverImage || "",
   });
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {

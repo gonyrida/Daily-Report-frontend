@@ -1,6 +1,7 @@
-import { Plus, Trash2, ChevronLeft, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
 import {
   Select,
   SelectContent,
@@ -8,8 +9,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useEffect } from "react";
-import { Cancel } from "@radix-ui/react-alert-dialog";
+import { useEffect, useState } from "react";
+
+const toRoman = (num: number): string => {
+  const romanNumerals = [
+    { value: 1000, numeral: "M" },
+    { value: 900, numeral: "CM" },
+    { value: 500, numeral: "D" },
+    { value: 400, numeral: "CD" },
+    { value: 100, numeral: "C" },
+    { value: 90, numeral: "XC" },
+    { value: 50, numeral: "L" },
+    { value: 40, numeral: "XL" },
+    { value: 10, numeral: "X" },
+    { value: 9, numeral: "IX" },
+    { value: 5, numeral: "V" },
+    { value: 4, numeral: "IV" },
+    { value: 1, numeral: "I" },
+  ];
+
+  let result = "";
+  let remaining = num;
+
+  for (const { value, numeral } of romanNumerals) {
+    while (remaining >= value) {
+      result += numeral;
+      remaining -= value;
+    }
+  }
+
+  return result;
+};
 
 export interface ResourceRow {
   id: string;
@@ -18,6 +48,11 @@ export interface ResourceRow {
   prev: number;
   today: number;
   accumulated: number;
+  rowType?: "title" | "detail";
+  nextWeekPlan?: number;
+  upNextWeekPlan?: number;
+  searchTerm?: string;
+  isCustomInput?: boolean;
 }
 
 interface ResourceTableProps {
@@ -26,10 +61,29 @@ interface ResourceTableProps {
   rows: ResourceRow[];
   setRows: (rows: ResourceRow[]) => void;
   showUnit?: boolean;
-  useDropdown?: boolean; // New prop to enable dropdown
-  dropdownOptions?: string[]; // Options for dropdown
-  unitOptions?: string[]; // Options for unit dropdown
-  inputNumberOnly?: boolean; // New prop to use custom number input logic like ManagementTeamGroup
+  useDropdown?: boolean;
+  dropdownOptions?: string[];
+  unitOptions?: string[];
+  inputNumberOnly?: boolean;
+  showAddButtons?: boolean;
+  addTitleRow?: () => void;
+  addDetailRow?: () => void;
+  showExtraColumns?: boolean;
+  customHeaders?: {
+    description?: string;
+    unit?: string;
+    prev?: string;
+    today?: string;
+    accumulated?: string;
+    nextWeekPlan?: string;
+    upNextWeekPlan?: string;
+  };
+  customUpdateRow?: (
+    id: string,
+    field: keyof ResourceRow,
+    value: string | number
+  ) => void;
+  unitNumberOnly?: boolean;
 }
 
 const ResourceTable = ({
@@ -42,7 +96,15 @@ const ResourceTable = ({
   dropdownOptions = [],
   unitOptions = [],
   inputNumberOnly = false,
+  showAddButtons = false,
+  addTitleRow,
+  addDetailRow,
+  showExtraColumns = false,
+  customHeaders = {},
+  customUpdateRow,
+  unitNumberOnly = false,
 }: ResourceTableProps) => {
+
   const addRow = () => {
     const newRow: ResourceRow = {
       id: crypto.randomUUID(),
@@ -51,6 +113,10 @@ const ResourceTable = ({
       prev: 0,
       today: 0,
       accumulated: 0,
+      nextWeekPlan: 0,
+      upNextWeekPlan: 0,
+      searchTerm: "",
+      isCustomInput: false,
     };
     setRows([...rows, newRow]);
   };
@@ -64,44 +130,39 @@ const ResourceTable = ({
     field: keyof ResourceRow,
     value: string | number
   ) => {
-    setRows(
-      rows.map((row) => {
-        if (row.id === id) {
-          // Handle custom entry selection
-          if (field === "description" && value === "__custom__") {
-            return { ...row, description: "__custom_input__" }; // Special marker for custom input
+    if (customUpdateRow) {
+      customUpdateRow(id, field, value);
+    } else {
+      setRows(
+        rows.map((row) => {
+          if (row.id === id) {
+            if (field === "description" && value === "__custom__") {
+              return { ...row, description: "", isCustomInput: true };
+            }
+            if (field === "unit" && value === "__custom_unit__") {
+              return { ...row, unit: "__custom_unit_input__" };
+            }
+            const updatedRow = { ...row, [field]: value };
+            if (field === "prev" || field === "today") {
+              const prev = field === "prev" ? Number(value) || 0 : row.prev;
+              const today = field === "today" ? Number(value) || 0 : row.today;
+              updatedRow.accumulated = prev + today;
+            }
+            return updatedRow;
           }
-          
-          // Handle custom unit selection
-          if (field === "unit" && value === "__custom_unit__") {
-            return { ...row, unit: "__custom_unit_input__" }; // Special marker for custom unit input
-          }
-
-          const updatedRow = { ...row, [field]: value };
-          if (field === "prev" || field === "today") {
-            const prev = field === "prev" ? Number(value) || 0 : row.prev;
-            const today = field === "today" ? Number(value) || 0 : row.today;
-            updatedRow.accumulated = prev + today;
-          }
-          return updatedRow;
-        }
-        return row;
-      })
-    );
+          return row;
+        })
+      );
+    }
   };
 
   useEffect(() => {
-    // 🔹 Check row IDs
-    if (rows && rows.length > 0) {
-      const rowIds = rows.map((row) => row.id);
-      const uniqueRowIds = new Set(rowIds);
-      if (uniqueRowIds.size !== rowIds.length) {
-        console.warn("Duplicate row IDs found!", rows);
-      }
+    const ids = rows.map((r) => r.id);
+    if (new Set(ids).size !== ids.length) {
+      console.error(`Duplicate IDs found in ${title} table:`, ids);
     }
 
-    // 🔹 Check dropdown options
-    if (dropdownOptions && dropdownOptions.length > 0) {
+    if (dropdownOptions.length > 0) {
       const duplicates = dropdownOptions.filter(
         (item, index) => dropdownOptions.indexOf(item) !== index
       );
@@ -111,131 +172,268 @@ const ResourceTable = ({
     }
   }, [rows, dropdownOptions]);
 
-  const ids = rows.map((r) => r.id);
-  const hasDuplicates = new Set(ids).size !== ids.length;
-  if (hasDuplicates) {
-    console.error(`Duplicate IDs found in ${title} table:`, ids);
-  }
-
   return (
     <div className="section-card overflow-hidden animate-fade-in">
-      <div className="bg-table-header px-4 py-3 border-b border-table-border flex items-center justify-between">
+      {/* Header */}
+      <div className="bg-white px-4 py-3 border-b border-table-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           {icon}
           <h3 className="font-semibold text-foreground">{title}</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={addRow}
-          className="text-primary hover:text-primary hover:bg-primary/10"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Add Row
-        </Button>
+        {showAddButtons ? (
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={addTitleRow}
+              className="text-primary hover:text-primary hover:bg-primary/10"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Title
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={addDetailRow}
+              className="text-primary hover:text-primary hover:bg-primary/10"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Rows
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={addRow}
+            className="text-primary hover:text-primary hover:bg-primary/10"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Row
+          </Button>
+        )}
       </div>
 
+      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-muted/50">
-              <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
-                Description
-              </th>
-              {showUnit && (
-                <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
-                  Unit
+            <tr className="bg-blue-100">
+              {showAddButtons && (
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[8%]">
+                  No
                 </th>
               )}
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
-                Prev
+              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[25%]">
+                {customHeaders.description || "Description"}
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
-                Today
+              {showUnit && (
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                  {customHeaders.unit || "Unit"}
+                </th>
+              )}
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+                {customHeaders.prev || "Prev"}
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[12%]">
-                Accum
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+                {customHeaders.today || "Today"}
               </th>
-              <th className="w-[8%]"></th>
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+                {customHeaders.accumulated || "Accum"}
+              </th>
+              {showExtraColumns && (
+                <>
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+                    {customHeaders.nextWeekPlan || "% Next Week Plan"}
+                  </th>
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+                    {customHeaders.upNextWeekPlan || "% Up Next Week Plan"}
+                  </th>
+                </>
+              )}
+              <th className="w-[5%]"></th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr key="empty-row">
                 <td
-                  colSpan={showUnit ? 6 : 5}
+                  colSpan={
+                    showAddButtons
+                      ? showUnit
+                        ? showExtraColumns
+                          ? 9
+                          : 7
+                        : showExtraColumns
+                        ? 8
+                        : 6
+                      : showUnit
+                      ? showExtraColumns
+                        ? 8
+                        : 6
+                      : showExtraColumns
+                      ? 7
+                      : 5
+                  }
                   className="text-center py-8 text-muted-foreground"
                 >
                   No entries yet. Click "Add Row" to begin.
                 </td>
               </tr>
             ) : (
-              <>
-                {rows.map(
-                  (
-                    row // 1. Update the row map key
-                  ) => (
-                    <tr
-                      key={`${title}-${row.id}`} // Change from key={row.id}
-                      className="border-t border-table-border hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-3 py-2">
-                        {useDropdown && dropdownOptions.length > 0 ? (
-                          (row.description === "" || dropdownOptions.includes(row.description)) && row.description !== "__custom_input__" ? (
-                            // Show dropdown if description is empty or exists in options (but not custom input)
-                            <Select
+              rows.map((row) => {
+                const filteredOptions = dropdownOptions.filter((option) =>
+                  option.toLowerCase().includes((row.searchTerm || "").toLowerCase())
+                );
+
+                return (
+                  <tr
+                    key={`${title}-${row.id}`}
+                    className={`border-t border-table-border hover:bg-muted/30 transition-colors ${
+                      row.rowType === "title" ? "bg-gray-100" : ""
+                    }`}
+                  >
+                    {showAddButtons && (
+                      <td className="px-3 py-2 text-center font-medium text-muted-foreground">
+                        {row.rowType === "title"
+                          ? toRoman(
+                              rows.filter((r) => r.rowType === "title").indexOf(row) +
+                                1
+                            )
+                          : rows.filter((r) => r.rowType !== "title").indexOf(row) + 1}
+                      </td>
+                    )}
+                    {/* Description / Dropdown */}
+                    <td className="px-3 py-2">
+                      {useDropdown && dropdownOptions.length > 0 ? (
+                        !row.isCustomInput ? (
+                          <Select
+                            value={row.description}
+                            onValueChange={(value) =>
+                              updateRow(row.id, "description", value)
+                            }
+                          >
+                            <SelectTrigger className="border-0 bg-transparent focus:ring-1">
+                              <SelectValue placeholder="Select..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <div className="p-2">
+                                <Input
+                                  placeholder="Search..."
+                                  value={row.searchTerm || ""}
+                                  onChange={(e) =>
+                                    updateRow(row.id, "searchTerm", e.target.value)
+                                  }
+                                  className="h-8"
+                                />
+                              </div>
+                              {filteredOptions.map((option, index) => (
+                                <SelectItem
+                                  key={`${title}-opt-${option}-${index}`}
+                                  value={option}
+                                >
+                                  {option}
+                                </SelectItem>
+                              ))}
+                              <SelectItem key="custom-entry" value="__custom__">
+                                <span className="text-primary">+ Custom Entry</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Input
                               value={row.description}
+                              onChange={(e) =>
+                                updateRow(row.id, "description", e.target.value)
+                              }
+                              placeholder="Enter custom..."
+                              className="border-0 bg-transparent focus-visible:ring-1"
+                              autoFocus
+                              showIndicator={false}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                updateRow(row.id, "isCustomInput", false)
+                              }
+                              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )
+                      ) : (
+                        <Input
+                          value={row.description}
+                          onChange={(e) =>
+                            updateRow(
+                              row.id,
+                              "description",
+                              row.rowType === "title"
+                                ? e.target.value.toUpperCase()
+                                : e.target.value
+                            )
+                          }
+                          placeholder="Enter description..."
+                          className={`border-0 bg-transparent focus-visible:ring-1 ${
+                            row.rowType === "title" ? "font-bold text-foreground" : ""
+                          }`}
+                          showIndicator={false}
+                        />
+                      )}
+                    </td>
+
+                    {/* Unit */}
+                    {showUnit && (
+                      <td className="px-3 py-2">
+                        {unitOptions.length > 0 ? (
+                          row.unit !== "__custom_unit_input__" ? (
+                            <Select
+                              value={row.unit}
                               onValueChange={(value) =>
-                                updateRow(row.id, "description", value)
+                                updateRow(row.id, "unit", value)
                               }
                             >
-                              <SelectTrigger className="border-0 bg-transparent focus:ring-1">
-                                <SelectValue placeholder="Select position..." />
+                              <SelectTrigger
+                                className={`border-0 bg-transparent focus:ring-1 ${
+                                  row.rowType === "title" ? "font-bold text-foreground" : ""
+                                }`}
+                              >
+                                <SelectValue placeholder="Select unit..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {dropdownOptions.map((option, index) => (
+                                {unitOptions.map((unit, index) => (
                                   <SelectItem
-                                    key={`${title}-opt-${option}-${index}`} // Adds table title and index for safety
-                                    value={option}
+                                    key={`${title}-unit-${unit}-${index}`}
+                                    value={unit}
                                   >
-                                    {option}
+                                    {unit}
                                   </SelectItem>
                                 ))}
-                                <SelectItem
-                                  key="custom-entry"
-                                  value="__custom__"
-                                >
-                                  <span className="text-primary">
-                                    + Custom Entry
-                                  </span>
+                                <SelectItem key="custom-unit" value="__custom_unit__">
+                                  <span className="text-primary">+ Custom Unit</span>
                                 </SelectItem>
                               </SelectContent>
                             </Select>
                           ) : (
-                            // If empty or custom value, show input field with back button
                             <div className="flex items-center gap-1">
                               <Input
-                                value={row.description === "__custom_input__" ? "" : row.description}
+                                value=""
                                 onChange={(e) =>
-                                  updateRow(
-                                    row.id,
-                                    "description",
-                                    e.target.value
-                                  )
+                                  updateRow(row.id, "unit", e.target.value)
                                 }
-                                placeholder="Enter custom position..."
+                                placeholder="Enter custom unit..."
                                 className="border-0 bg-transparent focus-visible:ring-1"
                                 autoFocus
+                                showIndicator={false}
                               />
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() =>
-                                  updateRow(
-                                    row.id,
-                                    "description",
-                                    dropdownOptions[0] || ""
-                                  )
+                                  updateRow(row.id, "unit", unitOptions[0] || "")
                                 }
                                 className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                               >
@@ -243,202 +441,116 @@ const ResourceTable = ({
                               </Button>
                             </div>
                           )
-                        ) : (
-                          // Regular input for materials and machinery
+                        ) : unitNumberOnly ? (
                           <Input
-                            value={row.description}
+                            type="number"
+                            value={row.unit || ""}
                             onChange={(e) =>
-                              updateRow(row.id, "description", e.target.value)
+                              updateRow(row.id, "unit", Number(e.target.value) || 0)
                             }
-                            placeholder="Enter description..."
-                            className="border-0 bg-transparent focus-visible:ring-1"
+                            placeholder="0"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            showIndicator={false}
+                          />
+                        ) : (
+                          <Input
+                            value={row.unit || ""}
+                            onChange={(e) =>
+                              updateRow(row.id, "unit", e.target.value)
+                            }
+                            placeholder="Unit"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            showIndicator={false}
                           />
                         )}
                       </td>
-                      {showUnit && (
+                    )}
+
+                    {/* Prev */}
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        value={row.prev || ""}
+                        onChange={(e) =>
+                          updateRow(row.id, "prev", Number(e.target.value) || 0)
+                        }
+                        placeholder="0"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1"
+                        showIndicator={false}
+                      />
+                    </td>
+
+                    {/* Today */}
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        value={row.today || ""}
+                        onChange={(e) =>
+                          updateRow(row.id, "today", Number(e.target.value) || 0)
+                        }
+                        placeholder="0"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1"
+                        showIndicator={false}
+                      />
+                    </td>
+
+                    {/* Accumulated */}
+                    <td className="px-3 py-2 text-center font-semibold text-primary">
+                      {row.accumulated}
+                    </td>
+
+                    {/* Extra Columns */}
+                    {showExtraColumns && (
+                      <>
                         <td className="px-3 py-2">
-                          {unitOptions.length > 0 ? (
-                            (row.unit === "" || unitOptions.includes(row.unit)) && row.unit !== "__custom_unit_input__" ? (
-                              <Select
-                                value={row.unit}
-                                onValueChange={(value) =>
-                                  updateRow(row.id, "unit", value)
-                                }
-                              >
-                                <SelectTrigger className="border-0 bg-transparent focus:ring-1">
-                                  <SelectValue placeholder="Select unit..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {unitOptions.map((unit, index) => (
-                                    <SelectItem
-                                      key={`${title}-unit-${unit}-${index}`}
-                                      value={unit}
-                                    >
-                                      {unit}
-                                    </SelectItem>
-                                  ))}
-                                  <SelectItem
-                                    key="custom-unit"
-                                    value="__custom_unit__"
-                                  >
-                                    <span className="text-primary">
-                                      + Custom Unit
-                                    </span>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  value={row.unit === "__custom_unit_input__" ? "" : row.unit}
-                                  onChange={(e) =>
-                                    updateRow(
-                                      row.id,
-                                      "unit",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Enter custom unit..."
-                                  className="border-0 bg-transparent focus-visible:ring-1"
-                                  autoFocus
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    updateRow(
-                                      row.id,
-                                      "unit",
-                                      unitOptions[0] || ""
-                                    )
-                                  }
-                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            )
-                          ) : (
-                            <Input
-                              value={row.unit || ""}
-                              onChange={(e) =>
-                                updateRow(row.id, "unit", e.target.value)
-                              }
-                              placeholder="Unit"
-                              className="border-0 bg-transparent text-center focus-visible:ring-1"
-                            />
-                          )}
-                        </td>
-                      )}
-                      <td className="px-3 py-2">
-                        {inputNumberOnly ? (
-                          <input
-                            type="number"
-                            value={row.prev || ""}
-                            onChange={(e) => {
-                              const value = Number(e.target.value) || 0;
-                              setRows(
-                                rows.map((r) =>
-                                  r.id === row.id
-                                    ? { ...r, prev: value, accumulated: value + r.today }
-                                    : r
-                                )
-                              );
-                            }}
-                            placeholder="0"
-                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1 min-w-[65px]"
-                          />
-                        ) : (
                           <Input
                             type="number"
-                            value={row.prev || ""}
+                            value={row.nextWeekPlan || ""}
                             onChange={(e) =>
                               updateRow(
                                 row.id,
-                                "prev",
-                                Number(e.target.value) || 0
-                              )
-                            }
-                            placeholder="0"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1 w-full min-w-[60px]"
-                          />
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {inputNumberOnly ? (
-                          <input
-                            type="number"
-                            value={row.today || ""}
-                            onChange={(e) => {
-                              const value = Number(e.target.value) || 0;
-                              setRows(
-                                rows.map((r) =>
-                                  r.id === row.id
-                                    ? { ...r, today: value, accumulated: r.prev + value }
-                                    : r
-                                )
-                              );
-                            }}
-                            placeholder="0"
-                            className="w-full border-0 bg-transparent text-center focus-visible:ring-1 rounded px-2 py-1 min-w-[65px]"
-                          />
-                        ) : (
-                          <Input
-                            type="number"
-                            value={row.today || ""}
-                            onChange={(e) =>
-                              updateRow(
-                                row.id,
-                                "today",
+                                "nextWeekPlan",
                                 Number(e.target.value) || 0
                               )
                             }
                             placeholder="0"
                             className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            showIndicator={false}
                           />
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="text-center font-semibold text-primary">
-                          {row.accumulated}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeRow(row.id)}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                )}
-                {/* Only show total row if not Materials table */}
-                {title !== "Materials" && (
-                  <tr
-                    key={`${title}-total-row`}
-                    className="border-t-2 border-primary/30 bg-primary/5"
-                  >
-                    <td className="px-4 py-3 font-semibold text-foreground">
-                      Total
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="number"
+                            value={row.upNextWeekPlan || ""}
+                            onChange={(e) =>
+                              updateRow(
+                                row.id,
+                                "upNextWeekPlan",
+                                Number(e.target.value) || 0
+                              )
+                            }
+                            placeholder="0"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            showIndicator={false}
+                          />
+                        </td>
+                      </>
+                    )}
+
+                    {/* Delete button */}
+                    <td className="px-2 py-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeRow(row.id)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </td>
-                    {showUnit && <td></td>}
-                    <td className="px-3 py-3 text-center font-bold text-foreground">
-                      {rows.reduce((sum, row) => sum + row.prev, 0)}
-                    </td>
-                    <td className="px-3 py-3 text-center font-bold text-foreground">
-                      {rows.reduce((sum, row) => sum + row.today, 0)}
-                    </td>
-                    <td className="px-3 py-3 text-center font-bold text-primary">
-                      {rows.reduce((sum, row) => sum + row.accumulated, 0)}
-                    </td>
-                    <td></td>
                   </tr>
-                )}
-              </>
+                );
+              })
             )}
           </tbody>
         </table>
