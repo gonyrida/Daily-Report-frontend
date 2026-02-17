@@ -2,8 +2,29 @@ import React, { useState } from "react";
 import Introduction from "./content/Intoduction";
 import OverallProgress from "./content/OverallProgress";
 import Activities from "./content/Activities";
+import QaqcStatusNew from "./content/QaqcStatusNew";
 
-type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities";
+interface Section {
+  id: string;
+  title: string;
+}
+
+const SECTIONS: Section[] = [
+  { id: "4.1", title: "Non-Conformity Report (NCR)" },
+  { id: "4.2", title: "Corrective Action Request (CAR)" },
+  { id: "4.3", title: "Safety Corrective Action Request (SCAR)" },
+  { id: "4.4", title: "PM Site Instruction (SI)" },
+  { id: "4.5", title: "Client Site Instruction (SI)" },
+  { id: "4.6", title: "Inspection Request (IR)" },
+  { id: "4.7", title: "Material for Approval (MFA)" },
+  { id: "4.8", title: "Request for Information (RFI)" },
+  { id: "4.9", title: "Request for Approval (RFA)" },
+  { id: "4.10", title: "Field Change Request (FCR)" },
+  { id: "4.11", title: "Variation Order (VO)" },
+  { id: "4.12", title: "Transmittal (TR)" },
+];
+
+type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status";
 interface WeeklyReportContentProps {
   showIntroduction?: boolean;
   setShowIntroduction?: React.Dispatch<React.SetStateAction<boolean>>;
@@ -65,6 +86,19 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           nextWeekPlan={nextWeekPlan}
           setNextWeekPlan={setNextWeekPlan}
         />
+      </div>
+    );
+  }
+
+  // Handle qaqc-status tab
+  if (activeTab === "qaqc-status") {
+    console.log("WeeklyReportContent: Showing QAQC Status, activeTab:", activeTab);
+    return (
+      <div className="bg-card p-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+          4. QA/QC STATUS
+        </h2>
+        <QaqcStatusNew sections={SECTIONS} />
       </div>
     );
   }
@@ -167,7 +201,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             href="#qaqc-status"
             className="text-blue-600 hover:underline"
             onClick={(e) => {
-              if (setActiveTab) setActiveTab("table-of-content");
+              e.preventDefault();
+              if (setActiveTab) setActiveTab("qaqc-status");
               if (setShowSecondNav) setShowSecondNav(true);
             }}
           >
@@ -179,8 +214,13 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#non-conformity-report-ncr"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  // Scroll to section after a short delay to allow component to render
+                  setTimeout(() => {
+                    document.getElementById("section-4.1")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Non-Conformity Report (NCR)
@@ -191,8 +231,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#corrective-action-request-car"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.2")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Corrective Action Request (CAR)
@@ -203,8 +247,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#safety-corrective-action-request-scar"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.3")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Safety Corrective Action Request (SCAR)
@@ -215,8 +263,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#pm-site-instruction-si"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.4")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 PM Site Instruction (SI)
@@ -227,8 +279,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#client-site-instruction-si"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.5")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Client Site Instruction (SI)
@@ -239,8 +295,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#inspection-request-ir"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.6")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Inspection Request (IR)
@@ -251,8 +311,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#material-for-approval-mfa"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.7")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Material for Approval (MFA)
@@ -263,8 +327,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#request-for-information-rfi"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.8")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Request for Information (RFI)
@@ -275,8 +343,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#request-for-approval-rfa"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.9")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Request for Approval (RFA)
@@ -287,8 +359,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#field-change-request-fcr"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.10")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Field Change Request (FCR)
@@ -299,8 +375,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#variation-order-vo"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.11")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Variation Order (VO)
@@ -311,8 +391,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#transmittal-tr"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.12")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Transmittal (TR)

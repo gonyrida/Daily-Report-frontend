@@ -18,7 +18,7 @@ const WeeklyReport = () => {
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
-    "cover" | "letter" | "table-of-content" | "overall-progress" | "activities"
+    "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status"
   >("cover");
 
   // Debug logging for activeTab changes
@@ -180,6 +180,11 @@ const WeeklyReport = () => {
                           setShowIntroduction(false);
                           debugSetActiveTab("activities");
                           if (setShowSecondNav) setShowSecondNav(true);
+                        } else if (section.id === 4) {
+                          console.log("Setting qaqc-status tab");
+                          setShowIntroduction(false);
+                          debugSetActiveTab("qaqc-status");
+                          if (setShowSecondNav) setShowSecondNav(true);
                         } else {
                           console.log("Scrolling to section:", section.href);
                           setShowIntroduction(false);
@@ -255,6 +260,21 @@ const WeeklyReport = () => {
               )}
 
               {activeTab === "overall-progress" && (
+                <>
+                  <div className="bg-card rounded-lg border p-6">
+                    <WeeklyReportContent
+                      showIntroduction={showIntroduction}
+                      setShowIntroduction={setShowIntroduction}
+                      projectLogo={sharedData.coverImage}
+                      setActiveTab={debugSetActiveTab}
+                      setShowSecondNav={setShowSecondNav}
+                      activeTab={activeTab}
+                    />
+                  </div>
+                </>
+              )}
+
+              {activeTab === "qaqc-status" && (
                 <>
                   <div className="bg-card rounded-lg border p-6">
                     <WeeklyReportContent
