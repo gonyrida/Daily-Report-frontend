@@ -25,6 +25,7 @@ const WeeklyReport = () => {
     | "activities"
     | "qaqc-status"
     | "hses"
+    | "resource"
   >("cover");
 
   // Debug logging for activeTab changes
@@ -166,7 +167,8 @@ const WeeklyReport = () => {
               activeTab === "overall-progress" ||
               activeTab === "activities" ||
               activeTab === "hses" ||
-              activeTab === "qaqc-status") &&
+              activeTab === "qaqc-status" ||
+              activeTab === "resource") &&
               showSecondNav && (
                 <div className="w-full px-4 sm:px-6 py-3 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
                   <div className="flex items-center justify-center gap-2 whitespace-nowrap">
@@ -198,6 +200,10 @@ const WeeklyReport = () => {
                           } else if (section.id === 5) {
                             setShowIntroduction(false);
                             debugSetActiveTab("hses");
+                            setShowSecondNav(true);
+                          } else if (section.id === 6) {
+                            setShowIntroduction(false);
+                            debugSetActiveTab("resource");
                             setShowSecondNav(true);
                           } else {
                             setShowIntroduction(false);
@@ -254,6 +260,7 @@ const WeeklyReport = () => {
                       setActiveTab={debugSetActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
+                      sharedData={sharedData}
                     />
                   </div>
                 </>
@@ -269,6 +276,7 @@ const WeeklyReport = () => {
                       setActiveTab={debugSetActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
+                      sharedData={sharedData}
                     />
                   </div>
                 </>
@@ -284,6 +292,7 @@ const WeeklyReport = () => {
                       setActiveTab={debugSetActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
+                      sharedData={sharedData}
                     />
                   </div>
                 </>
@@ -299,6 +308,7 @@ const WeeklyReport = () => {
                       setActiveTab={debugSetActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
+                      sharedData={sharedData}
                     />
                   </div>
                 </>
@@ -314,6 +324,23 @@ const WeeklyReport = () => {
                       setActiveTab={debugSetActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
+                      sharedData={sharedData}
+                    />
+                  </div>
+                </>
+              )}
+
+              {activeTab === "resource" && (
+                <>
+                  <div className="bg-card rounded-lg border p-6">
+                    <WeeklyReportContent
+                      showIntroduction={showIntroduction}
+                      setShowIntroduction={setShowIntroduction}
+                      projectLogo={sharedData.coverImage}
+                      setActiveTab={debugSetActiveTab}
+                      setShowSecondNav={setShowSecondNav}
+                      activeTab={activeTab}
+                      sharedData={sharedData}
                     />
                   </div>
                 </>

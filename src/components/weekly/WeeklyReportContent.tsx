@@ -4,6 +4,7 @@ import OverallProgress from "./content/OverallProgress";
 import Activities from "./content/Activities";
 import QaqcStatusNew from "./content/QaqcStatusNew";
 import Hses from "./content/Hses";
+import Resource from "./content/Resource";
 
 interface Section {
   id: string;
@@ -25,7 +26,7 @@ const SECTIONS: Section[] = [
   { id: "4.12", title: "Transmittal (TR)" },
 ];
 
-type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses";
+type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource";
 interface WeeklyReportContentProps {
   showIntroduction?: boolean;
   setShowIntroduction?: React.Dispatch<React.SetStateAction<boolean>>;
@@ -33,6 +34,7 @@ interface WeeklyReportContentProps {
   setActiveTab?: (tab: TabType) => void;
   setShowSecondNav?: (show: boolean) => void;
   activeTab?: TabType;
+  sharedData?: any;
 }
 
 const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
@@ -42,6 +44,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   setActiveTab,
   setShowSecondNav,
   activeTab,
+  sharedData,
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -113,6 +116,19 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
         </h2>
         <Hses isEditing={true} />
+      </div>
+    );
+  }
+
+  // Handle resource tab
+  if (activeTab === "resource") {
+    console.log("WeeklyReportContent: Showing Resource, activeTab:", activeTab);
+    return (
+      <div className="bg-card p-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+          6. RESOURCES STATUS
+        </h2>
+        <Resource sharedData={sharedData} />
       </div>
     );
   }
@@ -518,7 +534,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             href="#resources-status"
             className="text-blue-600 hover:underline"
             onClick={(e) => {
-              if (setActiveTab) setActiveTab("table-of-content");
+              e.preventDefault();
+              if (setActiveTab) setActiveTab("resource");
               if (setShowSecondNav) setShowSecondNav(true);
             }}
           >
@@ -530,8 +547,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#manpower-status"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("resource");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-6.1")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Manpower Status
@@ -542,8 +563,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#material-delivery-status"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("resource");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-6.2")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Material Delivery Status
@@ -554,8 +579,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 href="#machinery--equipment-status"
                 className="text-blue-600 hover:underline"
                 onClick={(e) => {
-                  if (setActiveTab) setActiveTab("table-of-content");
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("resource");
                   if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-6.3")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
                 }}
               >
                 Machinery / Equipment Status
