@@ -10,9 +10,10 @@ interface Props {
   onUpdateSlot: (s: any) => void;
   onDeleteSlot: (slotId: string) => void;
   onBulkUpload?: (files: FileList | File[], entryId?: string, slotId?: string) => void;
+  showCaption?: boolean;
 }
 
-export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteSlot, onBulkUpload }: Props) {
+export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteSlot, onBulkUpload, showCaption = true }: Props) {
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     
@@ -78,9 +79,11 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
         <input id={`slot-file-${entryId}-${slot.id}`} ref={logic.fileInputRef} type="file" accept="image/*" multiple onChange={(e) => logic.handleImageChange(e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label={`Upload image ${slotIndex + 1}`} />
       </div>
 
-      <div className="mt-3">
-        <input id={`caption-${entryId}-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-700 rounded-xl text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" aria-label={`Caption for image ${slotIndex + 1}`} />
-      </div>
+      {showCaption && (
+        <div className="mt-3">
+          <input id={`caption-${entryId}-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-700 rounded-xl text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" aria-label={`Caption for image ${slotIndex + 1}`} />
+        </div>
+      )}
     </div>
   );
 }
