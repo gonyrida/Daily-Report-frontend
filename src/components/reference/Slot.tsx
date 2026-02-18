@@ -48,13 +48,22 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
         aria-label={`Upload photo ${slotIndex + 1}`}
       >
         {logic.imageUrl ? (
-          <div className="relative w-full h-full group/image">
+          <div className="relative w-full h-full group">
             <img src={logic.imageUrl} alt={`Preview`} className="w-full h-full object-cover rounded-2xl" />
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center gap-3">
-              <button type="button" onClick={(e) => logic.removeImage(e)} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors" title="Remove Image" aria-label={`Remove image ${slotIndex + 1}`}>
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Remove button clicked for slot:', slot.id);
+                logic.removeImage(e);
+              }}
+              className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600 z-30"
+              title="Remove Image"
+              aria-label={`Remove image ${slotIndex + 1}`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         ) : (
           <div className="absolute inset-0 flex flex-col justify-center items-center">

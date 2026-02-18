@@ -18,7 +18,13 @@ const WeeklyReport = () => {
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
-    "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status"
+    | "cover"
+    | "letter"
+    | "table-of-content"
+    | "overall-progress"
+    | "activities"
+    | "qaqc-status"
+    | "hses"
   >("cover");
 
   // Debug logging for activeTab changes
@@ -156,53 +162,62 @@ const WeeklyReport = () => {
             </div>
 
             {/* Second Navigation Bar - Only shows when Table of Content is active and toggled, or when showing overall-progress or activities */}
-            {(activeTab === "table-of-content" || activeTab === "overall-progress" || activeTab === "activities") && showSecondNav && (
-              <div className="w-full px-4 sm:px-6 py-3 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
-                <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                  {tableOfContentSections.map((section) => (
-                    <Button
-                      key={section.id}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        console.log("Second nav button clicked, section.id:", section.id);
-                        if (section.id === 1) {
-                          console.log("Setting introduction to true");
-                          setShowIntroduction(true);
-                          debugSetActiveTab("table-of-content");
-                        } else if (section.id === 2) {
-                          console.log("Setting overall-progress tab");
-                          setShowIntroduction(false);
-                          debugSetActiveTab("overall-progress");
-                          if (setShowSecondNav) setShowSecondNav(true);
-                        } else if (section.id === 3) {
-                          console.log("Setting activities tab");
-                          setShowIntroduction(false);
-                          debugSetActiveTab("activities");
-                          if (setShowSecondNav) setShowSecondNav(true);
-                        } else if (section.id === 4) {
-                          console.log("Setting qaqc-status tab");
-                          setShowIntroduction(false);
-                          debugSetActiveTab("qaqc-status");
-                          if (setShowSecondNav) setShowSecondNav(true);
-                        } else {
-                          console.log("Scrolling to section:", section.href);
-                          setShowIntroduction(false);
-                          debugSetActiveTab("table-of-content");
-                          const element = document.querySelector(section.href);
-                          if (element) {
-                            element.scrollIntoView({ behavior: "smooth" });
+            {(activeTab === "table-of-content" ||
+              activeTab === "overall-progress" ||
+              activeTab === "activities" ||
+              activeTab === "hses" ||
+              activeTab === "qaqc-status") &&
+              showSecondNav && (
+                <div className="w-full px-4 sm:px-6 py-3 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
+                  <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                    {tableOfContentSections.map((section) => (
+                      <Button
+                        key={section.id}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          console.log(
+                            "Second nav button clicked, section.id:",
+                            section.id,
+                          );
+                          if (section.id === 1) {
+                            setShowIntroduction(true);
+                            debugSetActiveTab("table-of-content");
+                          } else if (section.id === 2) {
+                            setShowIntroduction(false);
+                            debugSetActiveTab("overall-progress");
+                            if (setShowSecondNav) setShowSecondNav(true);
+                          } else if (section.id === 3) {
+                            setShowIntroduction(false);
+                            debugSetActiveTab("activities");
+                            if (setShowSecondNav) setShowSecondNav(true);
+                          } else if (section.id === 4) {
+                            setShowIntroduction(false);
+                            debugSetActiveTab("qaqc-status");
+                            if (setShowSecondNav) setShowSecondNav(true);
+                          } else if (section.id === 5) {
+                            setShowIntroduction(false);
+                            debugSetActiveTab("hses");
+                            setShowSecondNav(true);
+                          } else {
+                            setShowIntroduction(false);
+                            debugSetActiveTab("table-of-content");
+                            const element = document.querySelector(
+                              section.href,
+                            );
+                            if (element) {
+                              element.scrollIntoView({ behavior: "smooth" });
+                            }
                           }
-                        }
-                      }}
-                      className="rounded-full text-sm transition-all duration-200 hover:scale-105 flex-shrink-0"
-                    >
-                      {section.id}. {section.name}
-                    </Button>
-                  ))}
+                        }}
+                        className="rounded-full text-sm transition-all duration-200 hover:scale-105 flex-shrink-0"
+                      >
+                        {section.id}. {section.name}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Main Content */}
             <main className="w-full px-4 sm:px-6 pt-4 pb-6 space-y-6 overflow-x-hidden">
@@ -275,6 +290,21 @@ const WeeklyReport = () => {
               )}
 
               {activeTab === "qaqc-status" && (
+                <>
+                  <div className="bg-card rounded-lg border p-6">
+                    <WeeklyReportContent
+                      showIntroduction={showIntroduction}
+                      setShowIntroduction={setShowIntroduction}
+                      projectLogo={sharedData.coverImage}
+                      setActiveTab={debugSetActiveTab}
+                      setShowSecondNav={setShowSecondNav}
+                      activeTab={activeTab}
+                    />
+                  </div>
+                </>
+              )}
+
+              {activeTab === "hses" && (
                 <>
                   <div className="bg-card rounded-lg border p-6">
                     <WeeklyReportContent

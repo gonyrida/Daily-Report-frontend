@@ -1,11 +1,11 @@
 import React from "react";
 import Section from "./Section";
 
-export default function SectionList({ sections, onUpdate, onDelete, hideTitle = false }: any) {
+export default function SectionList({ sections, onUpdate, onDelete, hideTitle = false, hideShadow = false }: any) {
   return (
     <div className="space-y-6 mb-8">
       {sections.map((section: any) => (
-        <Section key={section.id} section={section} onUpdate={onUpdate} onDelete={onDelete} hideTitle={hideTitle} />
+        <Section key={section.id} section={section} onUpdate={onUpdate} onDelete={onDelete} hideTitle={hideTitle} hideShadow={hideShadow} />
       ))}
     </div>
   );
