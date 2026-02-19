@@ -18,6 +18,8 @@ import DailyReportProjects from "./pages/DailyReportProjects";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/AdminDashboard";
+import UserManagement from "./components/admin_dashboard/UserManagement";
 import ProtectedRoute from "./components/ProtectedRoute";
 import FloatingScrollButton from './components/FloatingScrollButton';
 // import SecureTokenInitializer from "./components/SecureTokenInitializer";
@@ -52,6 +54,22 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/user-management"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <UserManagement />
                   </ProtectedRoute>
                 }
               />

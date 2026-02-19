@@ -44,6 +44,7 @@ import {
   Trash2,
   Copy,
   Settings,
+  Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
@@ -62,6 +63,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 
 interface HierarchicalSidebarProps {
   className?: string;
@@ -77,10 +79,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   const [dailyReportOpen, setDailyReportOpen] = useState(true);
   const [weeklyReportOpen, setWeeklyReportOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [renameConfirmOpen, setRenameConfirmOpen] = useState(false);
   const [renameData, setRenameData] = useState<{ oldName: string; newName: string } | null>(null);
+  const [viewMode, setViewMode] = useState<'admin' | 'all'>('all');
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   
   // State for project list
   const [projects, setProjects] = useState<Project[]>([]);
@@ -122,6 +127,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
         if (data.success && data.user?._id) {
           console.log("DEBUG: Setting currentUserId to:", data.user._id);
           setCurrentUserId(data.user._id);  // ← Use _id instead of userId
+          setUserRole(data.user.role); // ← Get user's role
         }
       } catch (error) {
         console.error('Failed to get user info:', error);
@@ -396,297 +402,373 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
           </div>
         </SidebarHeader>
 
-        <SidebarContent className="flex-1">
-          {/* Report Section */}
-          <SidebarGroup>
-            <Collapsible open={reportSectionOpen} onOpenChange={setReportSectionOpen}>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton 
-                  className="w-full justify-between px-4 py-2 font-medium"
-                  onClick={() => navigate('/reports')}
-                >
-                  <span className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Report
-                  </span>
-                  {reportSectionOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu className="px-2">
-                    {/* Daily Report Subsection */}
-                    <Collapsible open={dailyReportOpen} onOpenChange={setDailyReportOpen}>
+        {/* View Mode Toggle - Admin Only */}
+        {userRole === 'admin' && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <div className="flex items-center justify-between w-full px-2 py-2">
+                      <span className="text-sm font-medium">View Mode</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">All</span>
+                        <Switch
+                          checked={viewMode === 'admin'}
+                          onCheckedChange={(checked) => setViewMode(checked ? 'admin' : 'all')}
+                          className="scale-75"
+                        />
+                        <span className="text-xs text-muted-foreground">Admin Only</span>
+                      </div>
+                    </div>
+                  </SidebarMenuItem>
+
+                  <SidebarMenu>
+                    <Collapsible open={adminMenuOpen} onOpenChange={setAdminMenuOpen}>
                       <CollapsibleTrigger asChild>
-                        <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
+                        <SidebarMenuButton 
+                          className="w-full justify-between px-4 py-2 font-medium"
+                          onClick={() => navigate('/admin')}
+                        >
                           <span 
                             className="flex items-center gap-2 flex-1"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate('/daily-report-projects');
+                              navigate('/admin');
                             }}
                           >
-                            <Calendar className="h-3 w-3" />
-                            Daily Report
+                            <UserCheck className="h-4 w-4" />
+                            <span>Admin Dashboard</span>
                           </span>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!dailyReportOpen) {
-                                  setDailyReportOpen(true); // Auto-expand if collapsed
-                                }
-                                setShowAddProject(true);   // Always show input
-                              }}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                            {dailyReportOpen ? (
-                              <ChevronDown className="h-3 w-3" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3" />
-                            )}
-                          </div>
+                          {adminMenuOpen ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {/* Add Project Input */}
-                          {showAddProject && (
-                            <SidebarMenuSubItem>
-                              <div className="flex items-center gap-1 px-1 py-1">
-                                <Input
-                                  placeholder="Project name..."
-                                  value={newProjectName}
-                                  onChange={(e) => setNewProjectName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleAddProject();
-                                    } else if (e.key === 'Escape') {
-                                      setShowAddProject(false);
-                                      setNewProjectName("");
-                                    }
-                                  }}
-                                  className="h-7 text-xs"
-                                  autoFocus
-                                />
+                        <SidebarGroupContent>
+                          <SidebarMenu className="px-2">
+                            <SidebarMenuSub>
+                              <SidebarMenuSubItem>
+                                <SidebarMenuSubButton asChild>
+                                  <Link to="/admin/user-management" className="flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    <span>User Management</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            </SidebarMenuSub>
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </SidebarMenu>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarSeparator />
+          </>
+        )}
+
+
+        <SidebarContent className="flex-1">
+          {(userRole !== 'admin' || viewMode === 'all') && (
+            <>
+              {/* Report Section */}
+              <SidebarGroup>
+                <Collapsible open={reportSectionOpen} onOpenChange={setReportSectionOpen}>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton 
+                      className="w-full justify-between px-4 py-2 font-medium"
+                      onClick={() => navigate('/reports')}
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Report
+                      </span>
+                      {reportSectionOpen ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarGroupContent>
+                      <SidebarMenu className="px-2">
+                        {/* Daily Report Subsection */}
+                        <Collapsible open={dailyReportOpen} onOpenChange={setDailyReportOpen}>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
+                              <span 
+                                className="flex items-center gap-2 flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/daily-report-projects');
+                                }}
+                              >
+                                <Calendar className="h-3 w-3" />
+                                Daily Report
+                              </span>
+                              <div className="flex items-center gap-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-5 w-5 p-0"
-                                  onClick={handleAddProject}
+                                  className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!dailyReportOpen) {
+                                      setDailyReportOpen(true); // Auto-expand if collapsed
+                                    }
+                                    setShowAddProject(true);   // Always show input
+                                  }}
                                 >
                                   <Plus className="h-3 w-3" />
                                 </Button>
+                                {dailyReportOpen ? (
+                                  <ChevronDown className="h-3 w-3" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3" />
+                                )}
                               </div>
-                            </SidebarMenuSubItem>
-                          )}
-                          
-                          {/* Project List */}
-                          {projects.map((project) => (
-                            <SidebarMenuSubItem key={project._id}>
-                              <div className="flex items-center justify-between w-full px-2 py-1 group">
-                                {editingProject === project.name ? (
-                                  <div className="flex items-center gap-1 flex-1">
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {/* Add Project Input */}
+                              {showAddProject && (
+                                <SidebarMenuSubItem>
+                                  <div className="flex items-center gap-1 px-1 py-1">
                                     <Input
-                                      value={editProjectName}
-                                      onChange={(e) => setEditProjectName(e.target.value)}
+                                      placeholder="Project name..."
+                                      value={newProjectName}
+                                      onChange={(e) => setNewProjectName(e.target.value)}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleSaveEdit(); // Show dialog - user still needs to click Confirm
+                                          handleAddProject();
                                         } else if (e.key === 'Escape') {
-                                          handleCancelEdit();
+                                          setShowAddProject(false);
+                                          setNewProjectName("");
                                         }
                                       }}
-                                      className="h-6 text-xs flex-1"
+                                      className="h-7 text-xs"
                                       autoFocus
                                     />
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-5 w-5 p-0"
-                                      onClick={handleCancelEdit}
+                                      onClick={handleAddProject}
                                     >
-                                      ×
+                                      <Plus className="h-3 w-3" />
                                     </Button>
                                   </div>
-                                ) : (
-                                  <>
-                                    <SidebarMenuSubButton
-                                      onClick={() => handleProjectClick(project.name, 'daily')}
-                                      isActive={isActive('/daily-report') && new URLSearchParams(location.search).get('project') === project.name}
-                                      className="flex-1 text-xs cursor-pointer"
-                                    >
-                                      {project.name}
-                                    </SidebarMenuSubButton>
-                                    {/* DEBUG: Add this logging */}
-                                    {/* {console.log(`DEBUG: Project ${project.name} - createdBy: ${project.createdBy}, currentUserId: ${currentUserId}, match: ${project.createdBy === currentUserId}`)} */}
-                                      {project.createdBy === currentUserId && (
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                              <MoreVertical className="h-3 w-3" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end" className="w-32">
-                                            <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
-                                              <Edit className="h-3 w-3 mr-2" />
-                                              Rename
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
-                                              <Copy className="h-3 w-3 mr-2" />
-                                              Duplicate
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <AlertDialog>
-                                              <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem 
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setProjectToDelete(project.name);
-                                                  }}
-                                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                  onSelect={(e) => {
-                                                    e.preventDefault();
-                                                    setDeleteConfirmOpen(true);
-                                                  }}
+                                </SidebarMenuSubItem>
+                              )}
+                              
+                              {/* Project List */}
+                              {projects.map((project) => (
+                                <SidebarMenuSubItem key={project._id}>
+                                  <div className="flex items-center justify-between w-full px-2 py-1 group">
+                                    {editingProject === project.name ? (
+                                      <div className="flex items-center gap-1 flex-1">
+                                        <Input
+                                          value={editProjectName}
+                                          onChange={(e) => setEditProjectName(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              handleSaveEdit(); // Show dialog - user still needs to click Confirm
+                                            } else if (e.key === 'Escape') {
+                                              handleCancelEdit();
+                                            }
+                                          }}
+                                          className="h-6 text-xs flex-1"
+                                          autoFocus
+                                        />
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 w-5 p-0"
+                                          onClick={handleCancelEdit}
+                                        >
+                                          ×
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <SidebarMenuSubButton
+                                          onClick={() => handleProjectClick(project.name, 'daily')}
+                                          isActive={isActive('/daily-report') && new URLSearchParams(location.search).get('project') === project.name}
+                                          className="flex-1 text-xs cursor-pointer"
+                                        >
+                                          {project.name}
+                                        </SidebarMenuSubButton>
+                                        {/* DEBUG: Add this logging */}
+                                        {/* {console.log(`DEBUG: Project ${project.name} - createdBy: ${project.createdBy}, currentUserId: ${currentUserId}, match: ${project.createdBy === currentUserId}`)} */}
+                                          {project.createdBy === currentUserId && (
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
-                                                  <Trash2 className="h-3 w-3 mr-2" />
-                                                  Delete
+                                                  <MoreVertical className="h-3 w-3" />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end" className="w-32">
+                                                <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
+                                                  <Edit className="h-3 w-3 mr-2" />
+                                                  Rename
                                                 </DropdownMenuItem>
-                                              </AlertDialogTrigger>
-                                              <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                  <AlertDialogTitle>
-                                                    Are you sure you want to delete this project?
-                                                  </AlertDialogTitle>
-                                                  <AlertDialogDescription>
-                                                    This action will permanently delete "{project.name}" and <strong>ALL its reports.</strong> This cannot be undone.
-                                                  </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                  <AlertDialogCancel onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setDeleteConfirmOpen(false);
-                                                  }}>
-                                                    Cancel
-                                                  </AlertDialogCancel>
-                                                  <AlertDialogAction 
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleDeleteProject(project.name);
-                                                      setDeleteConfirmOpen(false);
-                                                    }}
-                                                    className="bg-red-600 hover:bg-red-700"
-                                                  >
-                                                    Delete
-                                                  </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                              </AlertDialogContent>
-                                            </AlertDialog>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      )}
-                                  </>
-                                )}
-                              </div>
-                            </SidebarMenuSubItem>
-                          ))}
-                          
-                          {projects.length === 0 && !showAddProject && (
-                            <SidebarMenuSubItem>
-                              <div className="px-3 py-1 text-xs text-muted-foreground italic">
-                                No projects yet. Click + to add one.
-                              </div>
-                            </SidebarMenuSubItem>
-                          )}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </Collapsible>
+                                                <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
+                                                  <Copy className="h-3 w-3 mr-2" />
+                                                  Duplicate
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <AlertDialog>
+                                                  <AlertDialogTrigger asChild>
+                                                    <DropdownMenuItem 
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setProjectToDelete(project.name);
+                                                      }}
+                                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                      onSelect={(e) => {
+                                                        e.preventDefault();
+                                                        setDeleteConfirmOpen(true);
+                                                      }}
+                                                    >
+                                                      <Trash2 className="h-3 w-3 mr-2" />
+                                                      Delete
+                                                    </DropdownMenuItem>
+                                                  </AlertDialogTrigger>
+                                                  <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                      <AlertDialogTitle>
+                                                        Are you sure you want to delete this project?
+                                                      </AlertDialogTitle>
+                                                      <AlertDialogDescription>
+                                                        This action will permanently delete "{project.name}" and <strong>ALL its reports.</strong> This cannot be undone.
+                                                      </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                      <AlertDialogCancel onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setDeleteConfirmOpen(false);
+                                                      }}>
+                                                        Cancel
+                                                      </AlertDialogCancel>
+                                                      <AlertDialogAction 
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleDeleteProject(project.name);
+                                                          setDeleteConfirmOpen(false);
+                                                        }}
+                                                        className="bg-red-600 hover:bg-red-700"
+                                                      >
+                                                        Delete
+                                                      </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                  </AlertDialogContent>
+                                                </AlertDialog>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          )}
+                                      </>
+                                    )}
+                                  </div>
+                                </SidebarMenuSubItem>
+                              ))}
+                              
+                              {projects.length === 0 && !showAddProject && (
+                                <SidebarMenuSubItem>
+                                  <div className="px-3 py-1 text-xs text-muted-foreground italic">
+                                    No projects yet. Click + to add one.
+                                  </div>
+                                </SidebarMenuSubItem>
+                              )}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </Collapsible>
 
-                    {/* Weekly Report Subsection */}
-                    <Collapsible open={weeklyReportOpen} onOpenChange={setWeeklyReportOpen}>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
-                          <span className="flex items-center gap-2">
-                            <Calendar className="h-3 w-3" />
-                            Weekly Report
-                          </span>
-                          {weeklyReportOpen ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {/* Same project list as Daily Report (read-only) */}
-                          {projects.map((project) => (
-                            <SidebarMenuSubItem key={`weekly-${project}`}>
-                              <SidebarMenuSubButton
-                                onClick={() => handleProjectClick(project.name, 'weekly')}
-                                className="text-muted-foreground"
-                              >
-                                <span className="text-xs">{project.name}</span>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                          
-                          {projects.length === 0 && (
-                            <SidebarMenuSubItem>
-                              <div className="px-3 py-1 text-xs text-muted-foreground italic">
-                                No projects available
-                              </div>
-                            </SidebarMenuSubItem>
-                          )}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </Collapsible>
+                        {/* Weekly Report Subsection */}
+                        <Collapsible open={weeklyReportOpen} onOpenChange={setWeeklyReportOpen}>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
+                              <span className="flex items-center gap-2">
+                                <Calendar className="h-3 w-3" />
+                                Weekly Report
+                              </span>
+                              {weeklyReportOpen ? (
+                                <ChevronDown className="h-3 w-3" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3" />
+                              )}
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {/* Same project list as Daily Report (read-only) */}
+                              {projects.map((project) => (
+                                <SidebarMenuSubItem key={`weekly-${project}`}>
+                                  <SidebarMenuSubButton
+                                    onClick={() => handleProjectClick(project.name, 'weekly')}
+                                    className="text-muted-foreground"
+                                  >
+                                    <span className="text-xs">{project.name}</span>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                              
+                              {projects.length === 0 && (
+                                <SidebarMenuSubItem>
+                                  <div className="px-3 py-1 text-xs text-muted-foreground italic">
+                                    No projects available
+                                  </div>
+                                </SidebarMenuSubItem>
+                              )}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </CollapsibleContent>
+                </Collapsible>
+              </SidebarGroup>
+
+              <SidebarSeparator />
+
+              {/* Other Forms Section */}
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link to="/request-form" className="flex items-center gap-2">
+                          <ClipboardList className="h-4 w-4" />
+                          <span>Request Form</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link to="/admin-form" className="flex items-center gap-2">
+                          <ClipboardList className="h-4 w-4" />
+                          <span>Other Form</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </SidebarGroup>
-
-          <SidebarSeparator />
-
-          {/* Other Forms Section */}
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link to="/request-form" className="flex items-center gap-2">
-                      <ClipboardList className="h-4 w-4" />
-                      <span>Request Form</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link to="/admin-form" className="flex items-center gap-2">
-                      <UserCheck className="h-4 w-4" />
-                      <span>Admin Form</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+              </SidebarGroup>
+            </>
+          )}
         </SidebarContent>
 
         {/* Settings & Logout Section */}
