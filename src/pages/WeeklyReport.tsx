@@ -471,7 +471,7 @@ const WeeklyReport = () => {
                   <div className="bg-card rounded-lg border p-6">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6">
                       <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">7. {siteActivitiesTitle}</h2>
+                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">7. {siteActivitiesTitle}</h2>
                         <Button
                           onClick={() => {
                             const newSection = {
@@ -518,7 +518,7 @@ const WeeklyReport = () => {
                   <div className="bg-card rounded-lg border p-6">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6">
                       <div className="mb-6">
-                        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">8. Construction Issues</h2>
+                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">8. Construction Issues</h2>
                         <div className="flex justify-end">
                           <Button
                             onClick={() => {
@@ -567,7 +567,7 @@ const WeeklyReport = () => {
                   <div className="bg-card rounded-lg border p-6">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6">
                       <div className="mb-6">
-                        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">9. Master Schedule</h2>
+                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
                         
                         {/* Upload Section */}
                         <div className="mb-6">

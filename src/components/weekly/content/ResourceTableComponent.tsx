@@ -1,28 +1,20 @@
 import React, { useState, useEffect } from "react";
+import { SubRow, Section, ResourceTableComponentProps } from "@/types/resourceTable.types";
+import { DAY_NAMES } from "@/constants/dayNames";
+import { calculateGrandTotal } from "@/utils/calculationUtils";
+import { generateWeekDates } from "@/lib/weekDateUtils";
 
-interface SubRow {
-  description: string;
-  dailyData: string[];
-  previousWeek: string;
-  thisWeek: string;
-  upToThisWeek: string;
-}
-
-interface Section {
-  title: string;
-  subtitle: string;
-  subRows: SubRow[];
-}
-
-interface ResourceTableComponentProps {
-  sharedData?: {
-    dateRange?: string;
-  };
-  showTitles?: boolean;
-}
-
-const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedData, showTitles = true }) => {
-  const [sections, setSections] = useState<Section[]>([
+const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ 
+  sharedData, 
+  showTitles = true, 
+  sections: passedSections,
+  setSections: passedSetSections,
+  handleInputChange: passedHandleInputChange,
+  removeSubRow: passedRemoveSubRow,
+  monthYearDisplay: passedMonthYearDisplay,
+  dates: passedDates
+}) => {
+  const [localSections, setLocalSections] = useState<Section[]>(passedSections || [
     {
       title: "I. Site Management Team",
       subtitle: "",
@@ -64,76 +56,9 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
     },
   ]);
 
-  const dayNames = ["Fri", "Sat", "Sun", "Mon", "Tue", "Wed", "Thu"];
-  
-  // Generate month-year display and dates from sharedData dateRange
-  const [monthYearDisplay, setMonthYearDisplay] = useState<string>("Feb-26");
-  const [dates, setDates] = useState<string[]>(["-", "-", "-", "-", "-", "-", "-"]);
-
-  useEffect(() => {
-    if (sharedData?.dateRange) {
-      // Parse dateRange to extract month-year and generate dates
-      // dateRange format: "DD-MMM-YY ~ DD-MMM-YY"
-      const dateRangeMatch = sharedData.dateRange.match(/(\d{1,2}-[A-Za-z]{3}-\d{2})\s*~\s*(\d{1,2}-[A-Za-z]{3}-\d{2})/);
-      
-      if (dateRangeMatch) {
-        const startDateStr = dateRangeMatch[1];
-        const endDateStr = dateRangeMatch[2];
-        
-        // Parse start date
-        const [startDay, startMonth, startYear] = startDateStr.split('-');
-        
-        // Set month-year display (using start date's month and year)
-        setMonthYearDisplay(`${startMonth}-${startYear}`);
-        
-        // Generate dates for the week based on actual day of week
-        const startDate = new Date(`${startMonth} ${startDay}, 20${startYear}`);
-        const startDayOfWeek = startDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-        
-        // Initialize all dates with "-"
-        const weekDates = ["-", "-", "-", "-", "-", "-", "-"];
-        
-        // Map day index to our day names array
-        // dayNames: ["Fri", "Sat", "Sun", "Mon", "Tue", "Wed", "Thu"]
-        // JavaScript getDay(): 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-        const dayMapping = {
-          0: 2, // Sunday -> index 2 in dayNames
-          1: 3, // Monday -> index 3
-          2: 4, // Tuesday -> index 4
-          3: 5, // Wednesday -> index 5
-          4: 6, // Thursday -> index 6
-          5: 0, // Friday -> index 0
-          6: 1, // Saturday -> index 1
-        };
-        
-        // Place the start date in the correct column
-        const correctColumnIndex = dayMapping[startDayOfWeek as keyof typeof dayMapping];
-        if (correctColumnIndex !== undefined) {
-          // Fill dates starting from the start date, but only up to Thursday (index 6)
-          for (let i = 0; i < 7; i++) {
-            const targetColumnIndex = (correctColumnIndex + i) % 7;
-            
-            // Stop if we've reached Thursday (index 6) and are about to wrap to Friday (index 0)
-            if (targetColumnIndex === 0 && i > 0) break;
-            
-            const currentDate = new Date(startDate);
-            currentDate.setDate(startDate.getDate() + i);
-            weekDates[targetColumnIndex] = currentDate.getDate().toString();
-          }
-        }
-        
-        setDates(weekDates);
-      }
-    }
-  }, [sharedData?.dateRange]);
-
-  const handleInputChange = (
-    sectionIndex: number,
-    rowIndex: number,
-    field: keyof SubRow,
-    value: string,
-    dayIndex?: number,
-  ) => {
+  const sections = passedSections || localSections;
+  const setSections = passedSetSections || setLocalSections;
+  const handleInputChange = passedHandleInputChange || ((sectionIndex, rowIndex, field, value, dayIndex) => {
     const newSections = [...sections];
     if (dayIndex !== undefined && field === "dailyData") {
       newSections[sectionIndex].subRows[rowIndex].dailyData[dayIndex] = value;
@@ -159,25 +84,37 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
       }
     }
     setSections(newSections);
-  };
+  });
 
-  const removeSubRow = (sectionIndex: number, rowIndex: number) => {
+  const removeSubRow = passedRemoveSubRow || ((sectionIndex, rowIndex) => {
     if (sections[sectionIndex].subRows.length > 1) {
       const newSections = [...sections];
       newSections[sectionIndex].subRows = newSections[sectionIndex].subRows.filter((_, i) => i !== rowIndex);
       setSections(newSections);
     }
+  });
+
+  const monthYearDisplay = passedMonthYearDisplay || "Feb-26";
+  const dates = passedDates || ["-", "-", "-", "-", "-", "-", "-"];
+
+  const dayNames = DAY_NAMES;
+
+  useEffect(() => {
+    if (sharedData?.dateRange && !passedMonthYearDisplay) {
+      const { monthYearDisplay: newMonthYearDisplay, dates: newDates } = generateWeekDates(sharedData.dateRange);
+      setLocalSections(prev => ({ ...prev, monthYearDisplay: newMonthYearDisplay, dates: newDates }));
+    }
+  }, [sharedData?.dateRange, passedMonthYearDisplay]);
+
+  const grandTotal = {
+    description: "Grand Total",
+    dailyData: ["", "", "", "", "", "", ""],
+    previousWeek: "0",
+    thisWeek: "0",
+    upToThisWeek: "0",
   };
 
   const calculateGrandTotal = () => {
-    const grandTotal = {
-      description: "Grand Total",
-      dailyData: ["", "", "", "", "", "", ""],
-      previousWeek: "0",
-      thisWeek: "0",
-      upToThisWeek: "0",
-    };
-
     let totalPreviousWeek = 0;
     let totalThisWeek = 0;
 
@@ -208,39 +145,39 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse border border-gray-300">
+      <table className="w-full border-collapse border border-border">
         <thead>
           <tr>
             <th
               rowSpan={3}
-              className="border border-gray-300 bg-blue-100 px-4 py-2 text-left font-semibold"
+              className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-left font-semibold"
               style={{ verticalAlign: "middle" }}
             >
               Description
             </th>
             <th
               colSpan={7}
-              className="border border-gray-300 bg-blue-100 px-4 py-2 text-center font-semibold"
+              className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
             >
               {monthYearDisplay}
             </th>
             <th
               rowSpan={3}
-              className="border border-gray-300 bg-blue-100 px-4 py-2 text-center font-semibold"
+              className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
               style={{ verticalAlign: "middle" }}
             >
               Previous Week
             </th>
             <th
               rowSpan={3}
-              className="border border-gray-300 bg-blue-100 px-4 py-2 text-center font-semibold"
+              className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
               style={{ verticalAlign: "middle" }}
             >
               This Week
             </th>
             <th
               rowSpan={3}
-              className="border border-gray-300 bg-blue-100 px-4 py-2 text-center font-semibold"
+              className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
               style={{ verticalAlign: "middle" }}
             >
               Up to This Week
@@ -250,7 +187,7 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
             {dayNames.map((day, index) => (
               <th
                 key={index}
-                className="border border-gray-300 bg-blue-100 px-4 py-2 text-center font-medium"
+                className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-medium"
               >
                 {day}
               </th>
@@ -260,7 +197,7 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
             {dates.map((date, index) => (
               <th
                 key={index}
-                className="border border-gray-300 bg-blue-100 px-4 py-2 text-center font-medium"
+                className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-medium"
               >
                 {date}
               </th>
@@ -275,7 +212,7 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
                 <tr>
                   <td
                     colSpan={11}
-                    className="border border-gray-300 bg-gray-100 px-4 py-2 font-bold text-left"
+                    className="border border-border bg-gray-100 dark:bg-gray-800 px-4 py-2 font-bold text-left"
                   >
                     {section.title} {section.subtitle}
                   </td>
@@ -285,21 +222,21 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
               {/* Sub-rows */}
               {section.subRows.map((row, rowIndex) => (
                 <tr key={rowIndex}>
-                  <td className="border border-gray-300 px-4 py-2">
+                  <td className="border border-border px-4 py-2">
                     <input
                       type="text"
                       value={row.description}
                       onChange={(e) =>
                         handleInputChange(sectionIndex, rowIndex, "description", e.target.value)
                       }
-                      className="w-full px-2 py-1 border-none outline-none bg-transparent"
+                      className="w-full px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                       placeholder="Enter description"
                     />
                   </td>
                   {row.dailyData.map((value, dayIndex) => (
                     <td
                       key={dayIndex}
-                      className="border border-gray-300 px-4 py-2 text-center"
+                      className="border border-border px-4 py-2 text-center"
                     >
                       <input
                         type="text"
@@ -313,41 +250,41 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
                             dayIndex,
                           )
                         }
-                        className="w-full text-center px-2 py-1 border-none outline-none bg-transparent"
+                        className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                         placeholder="0"
                       />
                     </td>
                   ))}
-                  <td className="border border-gray-300 px-4 py-2 text-center">
+                  <td className="border border-border px-4 py-2 text-center">
                     <input
                       type="text"
                       value={row.previousWeek}
                       onChange={(e) =>
                         handleInputChange(sectionIndex, rowIndex, "previousWeek", e.target.value)
                       }
-                      className="w-full text-center px-2 py-1 border-none outline-none bg-transparent"
+                      className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                       placeholder="0"
                     />
                   </td>
-                  <td className="border border-gray-300 px-4 py-2 text-center">
+                  <td className="border border-border px-4 py-2 text-center">
                     <input
                       type="text"
                       value={row.thisWeek}
                       onChange={(e) =>
                         handleInputChange(sectionIndex, rowIndex, "thisWeek", e.target.value)
                       }
-                      className="w-full text-center px-2 py-1 border-none outline-none bg-transparent"
+                      className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                       placeholder="0"
                     />
                   </td>
-                  <td className="border border-gray-300 px-4 py-2 text-center">
+                  <td className="border border-border px-4 py-2 text-center">
                     <input
                       type="text"
                       value={row.upToThisWeek}
                       onChange={(e) =>
                         handleInputChange(sectionIndex, rowIndex, "upToThisWeek", e.target.value)
                       }
-                      className="w-full text-center px-2 py-1 border-none outline-none bg-transparent"
+                      className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                       placeholder="0"
                     />
                   </td>
@@ -358,25 +295,25 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ sharedD
           
           {/* Grand Total Row */}
           <tr>
-            <td className="border border-gray-300 px-4 py-2 bg-blue-50 font-bold">
-              {calculateGrandTotal().description}
+            <td className="border border-border px-4 py-2 bg-blue-50 dark:bg-blue-900/20 font-bold">
+              {calculateGrandTotal(sections).description}
             </td>
-            {calculateGrandTotal().dailyData.map((value, dayIndex) => (
+            {calculateGrandTotal(sections).dailyData.map((value, dayIndex) => (
               <td
                 key={dayIndex}
-                className="border border-gray-300 px-4 py-2 text-center bg-blue-50 font-bold"
+                className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold"
               >
                 {value}
               </td>
             ))}
-            <td className="border border-gray-300 px-4 py-2 text-center bg-blue-50 font-bold">
-              {calculateGrandTotal().previousWeek}
+            <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
+              {calculateGrandTotal(sections).previousWeek}
             </td>
-            <td className="border border-gray-300 px-4 py-2 text-center bg-blue-50 font-bold">
-              {calculateGrandTotal().thisWeek}
+            <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
+              {calculateGrandTotal(sections).thisWeek}
             </td>
-            <td className="border border-gray-300 px-4 py-2 text-center bg-blue-50 font-bold">
-              {calculateGrandTotal().upToThisWeek}
+            <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
+              {calculateGrandTotal(sections).upToThisWeek}
             </td>
           </tr>
         </tbody>

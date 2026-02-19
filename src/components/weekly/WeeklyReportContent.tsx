@@ -5,37 +5,15 @@ import Activities from "./content/Activities";
 import QaqcStatusNew from "./content/QaqcStatusNew";
 import Hses from "./content/Hses";
 import Resource from "./content/Resource";
-
-interface Section {
-  id: string;
-  title: string;
-}
-
-const SECTIONS: Section[] = [
-  { id: "4.1", title: "Non-Conformity Report (NCR)" },
-  { id: "4.2", title: "Corrective Action Request (CAR)" },
-  { id: "4.3", title: "Safety Corrective Action Request (SCAR)" },
-  { id: "4.4", title: "PM Site Instruction (SI)" },
-  { id: "4.5", title: "Client Site Instruction (SI)" },
-  { id: "4.6", title: "Inspection Request (IR)" },
-  { id: "4.7", title: "Material for Approval (MFA)" },
-  { id: "4.8", title: "Request for Information (RFI)" },
-  { id: "4.9", title: "Request for Approval (RFA)" },
-  { id: "4.10", title: "Field Change Request (FCR)" },
-  { id: "4.11", title: "Variation Order (VO)" },
-  { id: "4.12", title: "Transmittal (TR)" },
-];
-
-type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource";
-interface WeeklyReportContentProps {
-  showIntroduction?: boolean;
-  setShowIntroduction?: React.Dispatch<React.SetStateAction<boolean>>;
-  projectLogo?: string;
-  setActiveTab?: (tab: TabType) => void;
-  setShowSecondNav?: (show: boolean) => void;
-  activeTab?: TabType;
-  sharedData?: any;
-}
+import { Section, TabType, WeeklyReportContentProps } from "@/types/weeklyReportContent.types";
+import { QAQC_SECTIONS } from "@/constants/qaqcSections";
+import { useActivities } from "@/hooks/useActivities";
+import { useConstructionIssue } from "@/hooks/useConstructionIssue";
+import { useHsesData } from "@/hooks/useHsesData";
+import { useIntroductionText } from "@/hooks/useIntroductionText";
+import { useOverallProgress } from "@/hooks/useOverallProgress";
+import { useQaqcTable } from "@/hooks/useQaqcTable";
+import { useResourceTable } from "@/hooks/useResourceTable";
 
 const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   showIntroduction: externalShowIntroduction,
@@ -49,9 +27,14 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
 
-  // State for activities
-  const [weeklyActivities, setWeeklyActivities] = useState([]);
-  const [nextWeekPlan, setNextWeekPlan] = useState([]);
+  // Initialize all hooks at parent level
+  const activitiesHook = useActivities([], []);
+  const constructionIssueHook = useConstructionIssue({});
+  const hsesDataHook = useHsesData();
+  const introductionTextHook = useIntroductionText(projectLogo);
+  const overallProgressHook = useOverallProgress();
+  const qaqcTableHook = useQaqcTable(QAQC_SECTIONS);
+  const resourceTableHook = useResourceTable(sharedData, true);
 
   const showIntroduction = externalShowIntroduction ?? internalShowIntroduction;
   const setShowIntroduction =
@@ -68,10 +51,24 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     console.log("WeeklyReportContent: Showing Introduction");
     return (
       <div className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           1. INTRODUCTION
         </h2>
-        <Introduction projectLogo={projectLogo} />
+        <Introduction 
+          projectLogo={projectLogo}
+          projectOverview={introductionTextHook.projectOverview}
+          setProjectOverview={introductionTextHook.setProjectOverview}
+          designConstruction={introductionTextHook.designConstruction}
+          setDesignConstruction={introductionTextHook.setDesignConstruction}
+          designList={introductionTextHook.designList}
+          setDesignList={introductionTextHook.setDesignList}
+          handleTextChange={introductionTextHook.handleTextChangeWrapper}
+          handleTabKey={introductionTextHook.handleTabKeyWrapper}
+          handleBold={introductionTextHook.handleBoldWrapper}
+          handleListChange={introductionTextHook.handleListChange}
+          addListItem={introductionTextHook.addListItem}
+          removeListItem={introductionTextHook.removeListItem}
+        />
       </div>
     );
   }
@@ -81,14 +78,14 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     console.log("WeeklyReportContent: Showing Activities, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           3. ACTIVITIES OF WORK DONE / NEXT WEEK PLAN
         </h2>
         <Activities 
-          weeklyActivities={weeklyActivities}
-          setWeeklyActivities={setWeeklyActivities}
-          nextWeekPlan={nextWeekPlan}
-          setNextWeekPlan={setNextWeekPlan}
+          weeklyActivities={activitiesHook.weeklyActivities}
+          setWeeklyActivities={activitiesHook.setWeeklyActivities}
+          nextWeekPlan={activitiesHook.nextWeekPlan}
+          setNextWeekPlan={activitiesHook.setNextWeekPlan}
         />
       </div>
     );
@@ -99,10 +96,22 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     console.log("WeeklyReportContent: Showing QAQC Status, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           4. QA/QC STATUS
         </h2>
-        <QaqcStatusNew sections={SECTIONS} />
+        <QaqcStatusNew 
+          sections={qaqcTableHook.filteredSections}
+          tableData={qaqcTableHook.tableData}
+          setTableData={qaqcTableHook.setTableData}
+          search={qaqcTableHook.search}
+          setSearch={qaqcTableHook.setSearch}
+          handleAddRow={qaqcTableHook.handleAddRow}
+          handleDeleteRow={qaqcTableHook.handleDeleteRow}
+          handleCellChange={qaqcTableHook.handleCellChange}
+          totalRows={qaqcTableHook.totalRows}
+          openRows={qaqcTableHook.openRows}
+          filteredSections={qaqcTableHook.filteredSections}
+        />
       </div>
     );
   }
@@ -112,10 +121,14 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     console.log("WeeklyReportContent: Showing HSES, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
         </h2>
-        <Hses isEditing={true} />
+        <Hses 
+          isEditing={true}
+          data={hsesDataHook.hsesData}
+          onChange={hsesDataHook.setHsesData}
+        />
       </div>
     );
   }
@@ -125,10 +138,18 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     console.log("WeeklyReportContent: Showing Resource, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           6. RESOURCES STATUS
         </h2>
-        <Resource sharedData={sharedData} />
+        <Resource 
+          sharedData={sharedData}
+          sections={resourceTableHook.sections}
+          setSections={resourceTableHook.setSections}
+          handleInputChange={resourceTableHook.handleInputChange}
+          removeSubRow={resourceTableHook.removeSubRow}
+          monthYearDisplay={resourceTableHook.monthYearDisplay}
+          dates={resourceTableHook.dates}
+        />
       </div>
     );
   }
@@ -138,10 +159,16 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     console.log("WeeklyReportContent: Showing OverallProgress, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-blue-100 border-b rounded-t-lg mb-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
-        <OverallProgress />
+        <OverallProgress 
+          rows={overallProgressHook.rows}
+          setRows={overallProgressHook.setRows}
+          updateRows={overallProgressHook.updateRows}
+          addTitleRow={overallProgressHook.addTitleRow}
+          addDetailRow={overallProgressHook.addDetailRow}
+        />
       </div>
     );
   }
@@ -191,19 +218,19 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 `}</style>
 
       <ol className="hierarchical list-none ml-6 space-y-2">
-        <li className="text-blue-600">
+        <li className="text-blue-600 dark:text-blue-400">
           <a
             href="#introduction"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={handleIntroductionClick}
           >
             INTRODUCTION
           </a>
         </li>
-        <li className="text-blue-600">
+        <li className="text-blue-600 dark:text-blue-400">
           <a
             href="#overall-progress-of-this-week-and-next-week"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               if (setActiveTab) setActiveTab("overall-progress");
@@ -213,10 +240,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
           </a>
         </li>
-        <li className="text-blue-600">
+        <li className="text-blue-600 dark:text-blue-400">
           <a
             href="#activities-of-work-done--next-week-plan"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               if (setActiveTab) setActiveTab("activities");
@@ -226,10 +253,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             ACTIVITIES OF WORK DONE / NEXT WEEK PLAN
           </a>
         </li>
-        <li className="text-blue-600">
+        <li className="text-primary dark:text-primary">
           <a
             href="#qaqc-status"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               if (setActiveTab) setActiveTab("qaqc-status");
@@ -239,10 +266,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             QA/QC STATUS
           </a>
           <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#non-conformity-report-ncr"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -256,10 +283,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Non-Conformity Report (NCR)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#corrective-action-request-car"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -272,10 +299,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Corrective Action Request (CAR)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#safety-corrective-action-request-scar"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -288,10 +315,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Safety Corrective Action Request (SCAR)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#pm-site-instruction-si"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -304,10 +331,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 PM Site Instruction (SI)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#client-site-instruction-si"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -320,10 +347,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Client Site Instruction (SI)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#inspection-request-ir"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -336,10 +363,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Inspection Request (IR)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#material-for-approval-mfa"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -352,10 +379,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Material for Approval (MFA)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#request-for-information-rfi"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -368,10 +395,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Request for Information (RFI)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#request-for-approval-rfa"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -384,10 +411,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Request for Approval (RFA)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#field-change-request-fcr"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -400,10 +427,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Field Change Request (FCR)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#variation-order-vo"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -416,10 +443,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Variation Order (VO)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#transmittal-tr"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("qaqc-status");
@@ -434,10 +461,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             </li>
           </ol>
         </li>
-        <li className="text-blue-600">
+        <li className="text-primary dark:text-primary">
           <a
             href="#health-safety-environmental--security-hses"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               if (setActiveTab) setActiveTab("hses");
@@ -447,10 +474,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
           </a>
           <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#hses-training--introduction--toolbox-meeting"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("hses");
@@ -460,10 +487,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 HSES Training / Introduction / Toolbox Meeting
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#hses-inspection--audit--heavy-equipment--handpower-tool-checklist"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("hses");
@@ -474,10 +501,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Checklist
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#permit-to-work"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("hses");
@@ -487,10 +514,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Permit to Work
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#first-aid--accident--incident--near-miss--fatalities-if-any"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("hses");
@@ -501,10 +528,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Any)
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#other-hses-actities-concerns"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("hses");
@@ -514,10 +541,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Other HSES Actities Concerns
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#hses-photo-reference"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("hses");
@@ -529,10 +556,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             </li>
           </ol>
         </li>
-        <li className="text-blue-600">
+        <li className="text-primary dark:text-primary">
           <a
             href="#resources-status"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               if (setActiveTab) setActiveTab("resource");
@@ -542,10 +569,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             RESOURCES STATUS
           </a>
           <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#manpower-status"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("resource");
@@ -558,10 +585,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Manpower Status
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#material-delivery-status"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("resource");
@@ -574,10 +601,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 Material Delivery Status
               </a>
             </li>
-            <li className="text-blue-600">
+            <li className="text-primary dark:text-primary">
               <a
                 href="#machinery--equipment-status"
-                className="text-blue-600 hover:underline"
+                className="text-primary dark:text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   if (setActiveTab) setActiveTab("resource");
@@ -592,10 +619,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             </li>
           </ol>
         </li>
-        <li className="text-blue-600">
+        <li className="text-primary dark:text-primary">
           <a
             href="#site-activity-photos"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               if (setActiveTab) setActiveTab("table-of-content");
               if (setShowSecondNav) setShowSecondNav(true);
@@ -604,10 +631,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             SITE ACTIVITY PHOTOS
           </a>
         </li>
-        <li className="text-blue-600">
+        <li className="text-primary dark:text-primary">
           <a
             href="#construction-issue"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               if (setActiveTab) setActiveTab("table-of-content");
               if (setShowSecondNav) setShowSecondNav(true);
@@ -616,10 +643,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
             CONSTRUCTION ISSUE
           </a>
         </li>
-        <li className="text-blue-600">
+        <li className="text-primary dark:text-primary">
           <a
             href="#master-schedule"
-            className="text-blue-600 hover:underline"
+            className="text-primary dark:text-primary hover:underline"
             onClick={(e) => {
               if (setActiveTab) setActiveTab("table-of-content");
               if (setShowSecondNav) setShowSecondNav(true);

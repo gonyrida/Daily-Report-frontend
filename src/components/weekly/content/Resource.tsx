@@ -3,7 +3,23 @@ import ResourceTableComponent from "./ResourceTableComponent";
 import ResourceTable, { ResourceRow } from "../../ResourceTable";
 import { Package } from "lucide-react";
 
-const Resource: React.FC<{ sharedData?: any }> = ({ sharedData }) => {
+const Resource: React.FC<{ 
+  sharedData?: any;
+  sections?: any[];
+  setSections?: any;
+  handleInputChange?: any;
+  removeSubRow?: any;
+  monthYearDisplay?: string;
+  dates?: string[];
+}> = ({ 
+  sharedData,
+  sections,
+  setSections,
+  handleInputChange,
+  removeSubRow,
+  monthYearDisplay,
+  dates
+}) => {
   // Material delivery status data
   const [materials, setMaterials] = React.useState<ResourceRow[]>([]);
 
@@ -11,7 +27,15 @@ const Resource: React.FC<{ sharedData?: any }> = ({ sharedData }) => {
     <div className="space-y-6">
       <div id="section-6.1">
         <h3 className="text-lg font-semibold mb-4">6.1 Manpower Status</h3>
-        <ResourceTableComponent sharedData={sharedData} />
+        <ResourceTableComponent 
+          sharedData={sharedData}
+          sections={sections}
+          setSections={setSections}
+          handleInputChange={handleInputChange}
+          removeSubRow={removeSubRow}
+          monthYearDisplay={monthYearDisplay}
+          dates={dates}
+        />
       </div>
       <div id="section-6.2">
         <h3 className="text-lg font-semibold mb-4">6.2 Material Delivery Status</h3>

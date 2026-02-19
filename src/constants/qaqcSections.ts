@@ -1,0 +1,14 @@
+export const QAQC_SECTIONS = [
+  { id: "4.1", title: "Non-Conformity Report (NCR)" },
+  { id: "4.2", title: "Corrective Action Request (CAR)" },
+  { id: "4.3", title: "Safety Corrective Action Request (SCAR)" },
+  { id: "4.4", title: "PM Site Instruction (SI)" },
+  { id: "4.5", title: "Client Site Instruction (SI)" },
+  { id: "4.6", title: "Inspection Request (IR)" },
+  { id: "4.7", title: "Material for Approval (MFA)" },
+  { id: "4.8", title: "Request for Information (RFI)" },
+  { id: "4.9", title: "Request for Approval (RFA)" },
+  { id: "4.10", title: "Field Change Request (FCR)" },
+  { id: "4.11", title: "Variation Order (VO)" },
+  { id: "4.12", title: "Transmittal (TR)" },
+];

@@ -1,36 +1,9 @@
 import React, { useState } from "react";
 import { CheckCircle, AlertCircle, Clock, XCircle, FileText, Plus, Trash2, MessageSquare } from "lucide-react";
-
-type StatusKey = "Open" | "In Review" | "Pending" | "Approved" | "Issued" | "Closed" | "Rejected" | "";
-
-interface QaqcRow {
-  id: string;
-  code: string;
-  description: string;
-  status: StatusKey;
-  dateResponse: string;
-  comment: string;
-}
-
-interface Section {
-  id: string;
-  title: string;
-}
-
-type TableData = Record<string, QaqcRow[]>;
-
-const STATUS_OPTIONS: StatusKey[] = [
-  "Open", "In Review", "Pending", "Approved", "Issued", "Closed", "Rejected",
-];
-
-const makeRow = (): QaqcRow => ({
-  id: crypto.randomUUID(),
-  code: "",
-  description: "",
-  status: "",
-  dateResponse: "",
-  comment: "",
-});
+import { StatusKey, QaqcRow, Section, TableData, QaqcTableProps, QaqcStatusNewProps } from "@/types/qaqc.types";
+import { STATUS_OPTIONS } from "@/constants/qaqcStatus";
+import { makeRow } from "@/utils/rowFactory";
+import { handleCommentChange } from "@/lib/tableUtils";
 
 const StatusIcon: React.FC<{ status: StatusKey }> = ({ status }) => {
   switch (status) {
@@ -52,14 +25,6 @@ const StatusIcon: React.FC<{ status: StatusKey }> = ({ status }) => {
       return <div className="w-4 h-4 text-gray-400" />;
   }
 };
-
-interface QaqcTableProps {
-  section: Section;
-  rows: QaqcRow[];
-  onAddRow: (sectionId: string) => void;
-  onDeleteRow: (sectionId: string, rowId: string) => void;
-  onCellChange: (sectionId: string, rowId: string, field: keyof QaqcRow, value: string) => void;
-}
 
 const QaqcTable: React.FC<QaqcTableProps> = ({
   section,
@@ -116,7 +81,7 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                       value={row.code}
                       onChange={(e) => onCellChange(section.id, row.id, "code", e.target.value)}
                       placeholder="e.g. NCR-001"
-                      className="w-full border rounded px-2 py-1 text-sm"
+                      className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
                     />
                   </td>
                   <td className="py-2 px-2">
@@ -125,22 +90,22 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                       value={row.description}
                       onChange={(e) => onCellChange(section.id, row.id, "description", e.target.value)}
                       placeholder="Enter description"
-                      className="w-full border rounded px-2 py-1 text-sm"
+                      className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
                     />
                   </td>
                   <td className="py-2 px-2">
                     <select
                       value={row.status}
                       onChange={(e) => onCellChange(section.id, row.id, "status", e.target.value as StatusKey)}
-                      className={`w-full border rounded px-2 py-1 text-sm font-medium ${
-                        row.status === "Open" ? "bg-yellow-50 text-yellow-800 border-yellow-200" :
-                        row.status === "In Review" ? "bg-purple-50 text-purple-800 border-purple-200" :
-                        row.status === "Pending" ? "bg-blue-50 text-blue-800 border-blue-200" :
-                        row.status === "Approved" ? "bg-green-50 text-green-800 border-green-200" :
-                        row.status === "Issued" ? "bg-cyan-50 text-cyan-800 border-cyan-200" :
-                        row.status === "Closed" ? "bg-gray-50 text-gray-800 border-gray-200" :
-                        row.status === "Rejected" ? "bg-red-50 text-red-800 border-red-200" :
-                        "bg-gray-50 text-gray-600 border-gray-200"
+                      className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${
+                        row.status === "Open" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
+                        row.status === "In Review" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
+                        row.status === "Pending" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
+                        row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
+                        row.status === "Issued" ? "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 border-cyan-200 dark:border-cyan-700" :
+                        row.status === "Closed" ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700" :
+                        row.status === "Rejected" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
+                        "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                       }`}
                     >
                       <option value="">— Select —</option>
@@ -156,13 +121,13 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                       type="date"
                       value={row.dateResponse}
                       onChange={(e) => onCellChange(section.id, row.id, "dateResponse", e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-sm"
+                      className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
                     />
                   </td>
                   <td className="py-2 px-2">
                     <button
                       onClick={() => onDeleteRow(section.id, row.id)}
-                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                       title="Delete row"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -183,27 +148,11 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                             <textarea
                               value={rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n')}
                               onChange={(e) => {
-                                const newValue = e.target.value;
-                                if (newValue.trim() === '') {
-                                  // Clear all comments if textarea is empty
-                                  rows.forEach((row) => {
-                                    onCellChange(section.id, row.id, "comment", "");
-                                  });
-                                } else {
-                                  // Split and assign comments normally
-                                  const comments = newValue.split('\n\n---\n\n');
-                                  rows.forEach((row, idx) => {
-                                    if (comments[idx] && comments[idx].trim()) {
-                                      onCellChange(section.id, row.id, "comment", comments[idx]);
-                                    } else {
-                                      onCellChange(section.id, row.id, "comment", "");
-                                    }
-                                  });
-                                }
+                                handleCommentChange(e.target.value, rows, onCellChange, section.id);
                               }}
                               placeholder="Add comments for all rows here... "
                               rows={3}
-                              className="w-full border rounded px-2 py-1 text-sm resize-none"
+                              className="w-full border rounded px-2 py-1 text-sm resize-none dark:bg-card dark:border-border"
                             />
                           </td>
                         </tr>
@@ -219,37 +168,47 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
   );
 };
 
-interface QaqcStatusNewProps {
-  sections: Section[];
-}
+export default function QaqcStatusNew({
+  sections,
+  tableData,
+  setTableData,
+  search,
+  setSearch,
+  handleAddRow,
+  handleDeleteRow,
+  handleCellChange,
+  totalRows,
+  openRows,
+  filteredSections = sections
+}: QaqcStatusNewProps) {
+  const initialData: TableData = Object.fromEntries(
+    sections.map((s) => [s.id, Array(5).fill(null).map(() => makeRow())])
+  );
 
-export default function QaqcStatusNew({ sections }: QaqcStatusNewProps) {
-  const initialData: TableData = Object.fromEntries(sections.map((s) => [s.id, Array(5).fill(null).map(() => makeRow())]));
-  
-  const [tableData, setTableData] = useState<TableData>(initialData);
-  const [search, setSearch] = useState<string>("");
+  const [localTableData, setLocalTableData] = useState<TableData>(tableData || initialData);
+  const [localSearch, setLocalSearch] = useState<string>(search || "");
 
-  const handleAddRow = (sectionId: string): void => {
-    setTableData((prev) => ({
+  const handleAddRowLocal = (sectionId: string): void => {
+    setLocalTableData((prev) => ({
       ...prev,
       [sectionId]: [...prev[sectionId], makeRow()],
     }));
   };
 
-  const handleDeleteRow = (sectionId: string, rowId: string): void => {
-    setTableData((prev) => ({
+  const handleDeleteRowLocal = (sectionId: string, rowId: string): void => {
+    setLocalTableData((prev) => ({
       ...prev,
       [sectionId]: prev[sectionId].filter((r) => r.id !== rowId),
     }));
   };
 
-  const handleCellChange = (
+  const handleCellChangeLocal = (
     sectionId: string,
     rowId: string,
     field: keyof QaqcRow,
     value: string
   ): void => {
-    setTableData((prev) => ({
+    setLocalTableData((prev) => ({
       ...prev,
       [sectionId]: prev[sectionId].map((r) =>
         r.id === rowId ? { ...r, [field]: value } : r
@@ -257,14 +216,19 @@ export default function QaqcStatusNew({ sections }: QaqcStatusNewProps) {
     }));
   };
 
-  const totalRows = Object.values(tableData).reduce((a, r) => a + r.length, 0);
-  const openRows = Object.values(tableData).flat().filter((r) => r.status === "Open").length;
+  const totalRowsCount = Object.values(localTableData).reduce((a, r) => a + r.length, 0);
+  const openRowsCount = Object.values(localTableData).flat().filter((r) => r.status === "Open").length;
 
-  const filteredSections = sections.filter(
+  const filteredSectionsList = sections.filter(
     (s) =>
-      s.title.toLowerCase().includes(search.toLowerCase()) ||
-      s.id.includes(search)
+      s.title.toLowerCase().includes(localSearch.toLowerCase()) ||
+      s.id.includes(localSearch)
   );
+
+  // Use passed handlers if available, otherwise use local ones
+  const onAddRowHandler = handleAddRow || handleAddRowLocal;
+  const onDeleteRowHandler = handleDeleteRow || handleDeleteRowLocal;
+  const onCellChangeHandler = handleCellChange || handleCellChangeLocal;
 
   return (
     <div className="space-y-6">
@@ -296,7 +260,7 @@ export default function QaqcStatusNew({ sections }: QaqcStatusNewProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search sections here..."
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-card dark:border-border"
           />
         </div>
       </div>

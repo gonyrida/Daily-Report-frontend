@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,16 +13,13 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useCoverData } from "@/hooks/useCoverData";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { useFieldChange } from "@/hooks/useFieldChange";
+import { WeeklyReportData } from "@/types/coverData";
 
 interface WeeklyReportCoverProps {
-  data?: {
-    weekNumber?: string;
-    dateRange?: string;
-    projectName?: string;
-    employer?: string;
-    contractor?: string;
-    coverImage?: string;
-  };
+  data?: WeeklyReportData;
   onDataChange?: (data: any) => void;
 }
 
@@ -32,66 +29,10 @@ const WeeklyReportCover: React.FC<WeeklyReportCoverProps> = ({
 }) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === "dark";
-  // Helper to format date as 'DD-MMM-YY'
-  const formatDate = (date: Date) => {
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = date.toLocaleString("en-US", { month: "short" });
-    const year = date.getFullYear().toString().slice(-2);
-    return `${day}-${month}-${year}`;
-  };
-
-  // Parse initial start date from data.dateRange if possible
-  let initialStartDate: string = "";
-  if (data.dateRange) {
-    const match = data.dateRange.match(/(\d{1,2}-[A-Za-z]{3}-\d{2})/);
-    if (match) initialStartDate = match[1].split("-").reverse().join("-"); // fallback, not robust
-  }
-
-  const [coverData, setCoverData] = useState({
-    weekNumber: data.weekNumber || "",
-    startDate: initialStartDate || "",
-    dateRange: data.dateRange || "",
-    projectName:
-      data.projectName ||
-      "Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia",
-    employer: data.employer || "Client Name",
-    contractor:
-      data.contractor ||
-      "Cambodian Advanced Construction Project Management (CACPM) Co., Ltd",
-    coverImage: data.coverImage || "",
-  });
-
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const newImageData = e.target?.result as string;
-        const updatedData = { ...coverData, coverImage: newImageData };
-        setCoverData(updatedData);
-        onDataChange?.(updatedData);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleFieldChange = (field: string, value: string) => {
-    let updatedData = { ...coverData, [field]: value };
-    // If startDate changes, auto-calculate dateRange
-    if (field === "startDate") {
-      if (value) {
-        const start = new Date(value);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        const formattedRange = `${formatDate(start)} ~ ${formatDate(end)}`;
-        updatedData = { ...updatedData, dateRange: formattedRange };
-      } else {
-        updatedData = { ...updatedData, dateRange: "" };
-      }
-    }
-    setCoverData(updatedData);
-    onDataChange?.(updatedData);
-  };
+  
+  const { coverData, setCoverData } = useCoverData(data);
+  const { handleImageUpload } = useImageUpload({ coverData, setCoverData, onDataChange });
+  const { handleFieldChange } = useFieldChange({ coverData, setCoverData, onDataChange });
 
   return (
     <div className={`w-full ${isDark ? "bg-slate-950" : "bg-white"}`}>

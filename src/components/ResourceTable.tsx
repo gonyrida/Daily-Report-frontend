@@ -81,7 +81,7 @@ interface ResourceTableProps {
   customUpdateRow?: (
     id: string,
     field: keyof ResourceRow,
-    value: string | number
+    value: string | number,
   ) => void;
   unitNumberOnly?: boolean;
 }
@@ -104,7 +104,6 @@ const ResourceTable = ({
   customUpdateRow,
   unitNumberOnly = false,
 }: ResourceTableProps) => {
-
   const addRow = () => {
     const newRow: ResourceRow = {
       id: crypto.randomUUID(),
@@ -128,7 +127,7 @@ const ResourceTable = ({
   const updateRow = (
     id: string,
     field: keyof ResourceRow,
-    value: string | number
+    value: string | number,
   ) => {
     if (customUpdateRow) {
       customUpdateRow(id, field, value);
@@ -151,7 +150,7 @@ const ResourceTable = ({
             return updatedRow;
           }
           return row;
-        })
+        }),
       );
     }
   };
@@ -164,7 +163,7 @@ const ResourceTable = ({
 
     if (dropdownOptions.length > 0) {
       const duplicates = dropdownOptions.filter(
-        (item, index) => dropdownOptions.indexOf(item) !== index
+        (item, index) => dropdownOptions.indexOf(item) !== index,
       );
       if (duplicates.length > 0) {
         console.warn("Duplicate dropdown options found!", duplicates);
@@ -175,7 +174,7 @@ const ResourceTable = ({
   return (
     <div className="section-card overflow-hidden animate-fade-in">
       {/* Header */}
-      <div className="bg-white px-4 py-3 border-b border-table-border flex items-center justify-between">
+      <div className="bg-card dark:bg-card px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           {icon}
           <h3 className="font-semibold text-foreground">{title}</h3>
@@ -218,7 +217,7 @@ const ResourceTable = ({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-blue-100">
+            <tr className="bg-muted dark:bg-muted">
               {showAddButtons && (
                 <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[8%]">
                   No
@@ -265,15 +264,15 @@ const ResourceTable = ({
                           ? 9
                           : 7
                         : showExtraColumns
-                        ? 8
-                        : 6
+                          ? 8
+                          : 6
                       : showUnit
-                      ? showExtraColumns
-                        ? 8
-                        : 6
-                      : showExtraColumns
-                      ? 7
-                      : 5
+                        ? showExtraColumns
+                          ? 8
+                          : 6
+                        : showExtraColumns
+                          ? 7
+                          : 5
                   }
                   className="text-center py-8 text-muted-foreground"
                 >
@@ -283,24 +282,43 @@ const ResourceTable = ({
             ) : (
               rows.map((row) => {
                 const filteredOptions = dropdownOptions.filter((option) =>
-                  option.toLowerCase().includes((row.searchTerm || "").toLowerCase())
+                  option
+                    .toLowerCase()
+                    .includes((row.searchTerm || "").toLowerCase()),
                 );
 
                 return (
                   <tr
                     key={`${title}-${row.id}`}
-                    className={`border-t border-table-border hover:bg-muted/30 transition-colors ${
-                      row.rowType === "title" ? "bg-gray-100" : ""
+                    className={`border-t border-border hover:bg-muted/30 transition-colors ${
+                      row.rowType === "title" ? "bg-muted dark:bg-muted" : ""
                     }`}
                   >
                     {showAddButtons && (
                       <td className="px-3 py-2 text-center font-medium text-muted-foreground">
-                        {row.rowType === "title"
-                          ? toRoman(
-                              rows.filter((r) => r.rowType === "title").indexOf(row) +
-                                1
-                            )
-                          : rows.filter((r) => r.rowType !== "title").indexOf(row) + 1}
+                        {(() => {
+                          let titleCount = 0;
+                          let detailCount = 0;
+
+                          for (let i = 0; i < rows.length; i++) {
+                            if (rows[i].rowType === "title") {
+                              titleCount++;
+                              detailCount = 0;
+
+                              if (rows[i].id === row.id) {
+                                return toRoman(titleCount);
+                              }
+                            } else {
+                              detailCount++;
+
+                              if (rows[i].id === row.id) {
+                                return detailCount;
+                              }
+                            }
+                          }
+
+                          return "";
+                        })()}
                       </td>
                     )}
                     {/* Description / Dropdown */}
@@ -322,7 +340,11 @@ const ResourceTable = ({
                                   placeholder="Search..."
                                   value={row.searchTerm || ""}
                                   onChange={(e) =>
-                                    updateRow(row.id, "searchTerm", e.target.value)
+                                    updateRow(
+                                      row.id,
+                                      "searchTerm",
+                                      e.target.value,
+                                    )
                                   }
                                   className="h-8"
                                 />
@@ -336,7 +358,9 @@ const ResourceTable = ({
                                 </SelectItem>
                               ))}
                               <SelectItem key="custom-entry" value="__custom__">
-                                <span className="text-primary">+ Custom Entry</span>
+                                <span className="text-primary">
+                                  + Custom Entry
+                                </span>
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -356,7 +380,7 @@ const ResourceTable = ({
                               variant="ghost"
                               size="icon"
                               onClick={() =>
-                                updateRow(row.id, "isCustomInput", false)
+                                updateRow(row.id, "isCustomInput", "false")
                               }
                               className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                             >
@@ -373,12 +397,14 @@ const ResourceTable = ({
                               "description",
                               row.rowType === "title"
                                 ? e.target.value.toUpperCase()
-                                : e.target.value
+                                : e.target.value,
                             )
                           }
                           placeholder="Enter description..."
                           className={`border-0 bg-transparent focus-visible:ring-1 ${
-                            row.rowType === "title" ? "font-bold text-foreground" : ""
+                            row.rowType === "title"
+                              ? "font-bold text-foreground"
+                              : ""
                           }`}
                           showIndicator={false}
                         />
@@ -398,7 +424,9 @@ const ResourceTable = ({
                             >
                               <SelectTrigger
                                 className={`border-0 bg-transparent focus:ring-1 ${
-                                  row.rowType === "title" ? "font-bold text-foreground" : ""
+                                  row.rowType === "title"
+                                    ? "font-bold text-foreground"
+                                    : ""
                                 }`}
                               >
                                 <SelectValue placeholder="Select unit..." />
@@ -412,8 +440,13 @@ const ResourceTable = ({
                                     {unit}
                                   </SelectItem>
                                 ))}
-                                <SelectItem key="custom-unit" value="__custom_unit__">
-                                  <span className="text-primary">+ Custom Unit</span>
+                                <SelectItem
+                                  key="custom-unit"
+                                  value="__custom_unit__"
+                                >
+                                  <span className="text-primary">
+                                    + Custom Unit
+                                  </span>
                                 </SelectItem>
                               </SelectContent>
                             </Select>
@@ -433,7 +466,11 @@ const ResourceTable = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() =>
-                                  updateRow(row.id, "unit", unitOptions[0] || "")
+                                  updateRow(
+                                    row.id,
+                                    "unit",
+                                    unitOptions[0] || "",
+                                  )
                                 }
                                 className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                               >
@@ -446,7 +483,11 @@ const ResourceTable = ({
                             type="number"
                             value={row.unit || ""}
                             onChange={(e) =>
-                              updateRow(row.id, "unit", Number(e.target.value) || 0)
+                              updateRow(
+                                row.id,
+                                "unit",
+                                Number(e.target.value) || 0,
+                              )
                             }
                             placeholder="0"
                             className="border-0 bg-transparent text-center focus-visible:ring-1"
@@ -486,7 +527,11 @@ const ResourceTable = ({
                         type="number"
                         value={row.today || ""}
                         onChange={(e) =>
-                          updateRow(row.id, "today", Number(e.target.value) || 0)
+                          updateRow(
+                            row.id,
+                            "today",
+                            Number(e.target.value) || 0,
+                          )
                         }
                         placeholder="0"
                         className="border-0 bg-transparent text-center focus-visible:ring-1"
@@ -495,8 +540,21 @@ const ResourceTable = ({
                     </td>
 
                     {/* Accumulated */}
-                    <td className="px-3 py-2 text-center font-semibold text-primary">
-                      {row.accumulated}
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        showIndicator={false}
+                        value={row.accumulated || ""}
+                        onChange={(e) =>
+                          updateRow(
+                            row.id,
+                            "accumulated",
+                            Number(e.target.value) || 0,
+                          )
+                        }
+                        placeholder="0"
+                        className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1"
+                      />
                     </td>
 
                     {/* Extra Columns */}
@@ -510,7 +568,7 @@ const ResourceTable = ({
                               updateRow(
                                 row.id,
                                 "nextWeekPlan",
-                                Number(e.target.value) || 0
+                                Number(e.target.value) || 0,
                               )
                             }
                             placeholder="0"
@@ -526,7 +584,7 @@ const ResourceTable = ({
                               updateRow(
                                 row.id,
                                 "upNextWeekPlan",
-                                Number(e.target.value) || 0
+                                Number(e.target.value) || 0,
                               )
                             }
                             placeholder="0"

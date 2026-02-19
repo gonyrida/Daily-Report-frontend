@@ -1,22 +1,6 @@
 import React, { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-
-interface ColumnConfig {
-  key: string;
-  label: string;
-  type: 'text' | 'date';
-  placeholder?: string;
-  width?: string;
-}
-
-interface HsesTableComponentProps {
-  data?: any[];
-  onChange?: (data: any[]) => void;
-  isEditing?: boolean;
-  columns: ColumnConfig[];
-  emptyMessage: string;
-  addButtonText?: string;
-}
+import { ColumnConfig, HsesTableComponentProps } from "@/types/hsesTable.types";
 
 const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
   data = [],
@@ -55,13 +39,13 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
   if (!isEditing) {
     return (
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse border border-gray-300">
+        <table className="min-w-full border-collapse border border-border">
           <thead>
-            <tr className="bg-gray-50">
+            <tr className="bg-muted/50">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-700"
+                  className="border border-border px-4 py-2 text-left text-sm font-medium text-foreground"
                 >
                   {column.label}
                 </th>
@@ -74,7 +58,7 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className="border border-gray-300 px-4 py-2 text-sm text-gray-900"
+                    className="border border-border px-4 py-2 text-sm text-muted-foreground"
                     style={{ width: column.width || 'auto' }}
                   >
                     {row[column.key] || "-"}
@@ -85,7 +69,7 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
           </tbody>
         </table>
         {tableData.length === 0 && (
-          <div className="text-center py-4 text-gray-500 text-sm">
+          <div className="text-center py-4 text-muted-foreground text-sm">
             {emptyMessage}
           </div>
         )}
@@ -99,20 +83,20 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
         <div></div>
         <button
           onClick={addRow}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors text-sm font-medium"
         >
           <Plus size={16} />
           {addButtonText}
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse border border-gray-300">
+        <table className="min-w-full border-collapse border border-border">
           <thead>
-            <tr className="bg-gray-50">
+            <tr className="bg-muted/50">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-700"
+                  className="border border-border px-4 py-2 text-left text-sm font-medium text-foreground"
                   style={{ width: column.width || 'auto' }}
                 >
                   {column.label}
@@ -124,20 +108,20 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
             {tableData.map((row, index) => (
               <tr key={index}>
                 {columns.map((column) => (
-                  <td key={column.key} className="border border-gray-300 px-2 py-1" style={{ width: column.width || 'auto' }}>
+                  <td key={column.key} className="border border-border px-2 py-1" style={{ width: column.width || 'auto' }}>
                     {column.type === 'date' ? (
                       <input
                         type="date"
                         value={row[column.key]}
                         onChange={(e) => updateRow(index, column.key, e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring dark:bg-card dark:border-border"
                       />
                     ) : (
                       <input
                         type="text"
                         value={row[column.key]}
                         onChange={(e) => updateRow(index, column.key, e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring dark:bg-card dark:border-border"
                         placeholder={column.placeholder}
                       />
                     )}

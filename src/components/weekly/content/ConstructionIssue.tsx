@@ -1,15 +1,7 @@
 import React, { useState } from "react";
 import Slot from "@/components/reference/Slot";
 import { Trash2 } from "lucide-react";
-
-interface ConstructionIssueProps {
-  issueNumber?: number;
-  siteLocation?: string;
-  photoReference?: string;
-  problems?: string;
-  actionBy?: string;
-  onRemove?: () => void;
-}
+import { ConstructionIssueProps } from "@/types/constructionIssue.types";
 
 const ConstructionIssue = ({
   issueNumber = 1,
@@ -49,7 +41,7 @@ const ConstructionIssue = ({
   return (
     <div className="w-full bg-card border rounded-2xl border-muted-foreground/20 mb-4">
       {/* Issue Number Bar - Above Columns */}
-      <div className="border-border p-3 bg-blue-300 text-sm font-bold tracking-wide text-foreground">
+      <div className="border-border p-3 bg-blue-500 dark:bg-blue-600 text-sm font-bold tracking-wide text-foreground">
         ISSUE NO. <span className="text-xl ml-2">{issueNumber}</span>
       </div>
 
@@ -67,7 +59,7 @@ const ConstructionIssue = ({
               value={fields.siteLocation}
               onChange={update("siteLocation")}
               placeholder="Enter site location..."
-              className="flex-1 bg-transparent border-0 border-input p-1 text-sm text-foreground outline-none "
+              className="flex-1 bg-transparent border-0 border-input p-1 text-sm text-foreground outline-none dark:bg-card"
             />
           </div>
 
@@ -81,7 +73,7 @@ const ConstructionIssue = ({
               value={fields.problems}
               onChange={update("problems")}
               placeholder="Describe the issue in detail..."
-              className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none dark:bg-card"
 
             />
           </div>
@@ -95,7 +87,7 @@ const ConstructionIssue = ({
               value={fields.actionBy}
               onChange={update("actionBy")}
               placeholder="Responsible party..."
-              className="flex-1 bg-transparent border-0 border-input p-1 text-sm text-foreground outline-none box-border transition-colors focus:border-primary"
+              className="flex-1 bg-transparent border-0 border-input p-1 text-sm text-foreground outline-none box-border transition-colors focus:border-primary dark:bg-card"
             />
           </div>
         </div>

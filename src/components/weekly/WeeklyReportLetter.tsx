@@ -18,32 +18,10 @@ import {
   MapPin,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
-
-interface WeeklyReportLetterProps {
-  data?: {
-    weekNumber?: string;
-    dateRange?: string;
-    projectName?: string;
-    reportDate?: string;
-    recipientCompany?: string;
-    recipientLocation?: string;
-    recipientName?: string;
-    ccList?: string[];
-    letterBody?: string;
-    signatureImage?: string;
-    signatoryName?: string;
-    signatoryPosition?: string;
-    constructorName?: string;
-    companyLocation?: string;
-    companyPhone1?: string;
-    companyPhone2?: string;
-    companyEmail1?: string;
-    companyEmail2?: string;
-    refNoPrefix?: string;
-    employer?: string;
-  };
-  onDataChange?: (data: any) => void;
-}
+import { WeeklyReportLetterProps } from "@/types/weeklyReportLetter.types";
+import { formatDate } from "@/lib/dateUtils";
+import { handleSignatureUpload } from "@/lib/fileUploadUtils";
+import { handleFieldChange } from "@/lib/fieldUtils";
 
 const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
   data = {},
@@ -75,14 +53,42 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
     companyEmail2: "info@cacpm.com.kh",
     refNoPrefix: data.refNoPrefix || "ICT-CPM-LETTER",
   });
-
-  // Auto-generate letter body when key fields change
   useEffect(() => {
-    const generatedBody = `Dear Sir,\nWe are pleased to submit Weekly Progress Report No. ${letterData.weekNumber} from ${letterData.dateRange} for ${letterData.projectName}.`;
+    // Parse date range to get start and end dates
+    let dateRangeText = letterData.dateRange;
+    if (letterData.dateRange && letterData.dateRange.includes("~")) {
+      const dates = letterData.dateRange.split("~");
+      if (dates.length === 2) {
+        dateRangeText = `from ${dates[0].trim()} to ${dates[1].trim()}`;
+      }
+    }
+
+    const generatedBody = `Dear Sir,<br>We are pleased to submit Weekly Progress Report No-${letterData.weekNumber} ${dateRangeText} for ${letterData.projectName}.<br><br>Sincerely Yours,`;
     if (generatedBody !== letterData.letterBody) {
       setLetterData((prev) => ({ ...prev, letterBody: generatedBody }));
     }
   }, [letterData.weekNumber, letterData.dateRange, letterData.projectName]);
+
+  const handleCCChange = (index: number, value: string) => {
+    const updatedCCList = [...letterData.ccList];
+    updatedCCList[index] = value;
+    setLetterData((prev) => ({ ...prev, ccList: updatedCCList }));
+    onDataChange?.({ ...letterData, ccList: updatedCCList });
+  };
+
+  const addCCRow = () => {
+    const updatedCCList = [...letterData.ccList, ""];
+    setLetterData((prev) => ({ ...prev, ccList: updatedCCList }));
+    onDataChange?.({ ...letterData, ccList: updatedCCList });
+  };
+
+  const removeCCRow = (index: number) => {
+    if (letterData.ccList.length > 1) {
+      const updatedCCList = letterData.ccList.filter((_, i) => i !== index);
+      setLetterData((prev) => ({ ...prev, ccList: updatedCCList }));
+      onDataChange?.({ ...letterData, ccList: updatedCCList });
+    }
+  };
 
   // Sync with shared data from parent
   useEffect(() => {
@@ -157,59 +163,6 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
     }
   }, [letterData.dateRange]);
 
-  const handleFieldChange = (field: string, value: string) => {
-    const updatedData = { ...letterData, [field]: value };
-    setLetterData(updatedData);
-    onDataChange?.(updatedData);
-  };
-
-  const handleCCChange = (index: number, value: string) => {
-    const updatedCCList = [...letterData.ccList];
-    updatedCCList[index] = value;
-    setLetterData((prev) => ({ ...prev, ccList: updatedCCList }));
-    onDataChange?.({ ...letterData, ccList: updatedCCList });
-  };
-
-  const addCCRow = () => {
-    const updatedCCList = [...letterData.ccList, ""];
-    setLetterData((prev) => ({ ...prev, ccList: updatedCCList }));
-    onDataChange?.({ ...letterData, ccList: updatedCCList });
-  };
-
-  const removeCCRow = (index: number) => {
-    if (letterData.ccList.length > 1) {
-      const updatedCCList = letterData.ccList.filter((_, i) => i !== index);
-      setLetterData((prev) => ({ ...prev, ccList: updatedCCList }));
-      onDataChange?.({ ...letterData, ccList: updatedCCList });
-    }
-  };
-
-  const handleSignatureUpload = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const newSignatureData = e.target?.result as string;
-        const updatedData = { ...letterData, signatureImage: newSignatureData };
-        setLetterData(updatedData);
-        onDataChange?.(updatedData);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
   return (
     <div
       className={`w-full ${isDark ? "bg-slate-950" : "bg-white"} min-h-screen`}
@@ -242,7 +195,7 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                     value={letterData.refNoPrefix}
                     showIndicator={false}
                     onChange={(e) =>
-                      handleFieldChange("refNoPrefix", e.target.value)
+                      handleFieldChange("refNoPrefix", e.target.value, letterData, setLetterData, onDataChange)
                     }
                     placeholder="Prefix"
                     className={`flex-1 border-2 focus:border-blue-500 focus:outline-none transition-colors ${isDark ? "bg-slate-800/50 border-slate-600/50 text-white" : "bg-white/80 border-slate-200/60 text-slate-900"}`}
@@ -322,7 +275,7 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                   value={letterData.recipientCompany}
                   showIndicator={false}
                   onChange={(e) =>
-                    handleFieldChange("recipientCompany", e.target.value)
+                    handleFieldChange("recipientCompany", e.target.value, letterData, setLetterData, onDataChange)
                   }
                   placeholder="Client company name"
                   className={`mt-1 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
@@ -334,7 +287,7 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                   value={letterData.recipientLocation}
                   showIndicator={false}
                   onChange={(e) =>
-                    handleFieldChange("recipientLocation", e.target.value)
+                    handleFieldChange("recipientLocation", e.target.value, letterData, setLetterData, onDataChange)
                   }
                   placeholder="Client location"
                   className={`focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
@@ -351,7 +304,7 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                   value={letterData.recipientName}
                   showIndicator={false}
                   onChange={(e) =>
-                    handleFieldChange("recipientName", e.target.value)
+                    handleFieldChange("recipientName", e.target.value, letterData, setLetterData, onDataChange)
                   }
                   placeholder="Recipient name"
                   className={`mt-1 font-bold focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
@@ -377,20 +330,20 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                 </div>
 
                 {letterData.ccList.map((cc, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
+                  <div key={index} className="mb-2 flex gap-2">
                     <Input
                       showIndicator={false}
                       value={cc}
                       onChange={(e) => handleCCChange(index, e.target.value)}
                       placeholder={`CC ${index + 1}`}
-                      className={`flex-1 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
+                      className={`flex-1 font-semibold w-96 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
                     />
                     {letterData.ccList.length > 1 && (
                       <Button
                         onClick={() => removeCCRow(index)}
                         variant="outline"
                         size="sm"
-                        className={`px-2 border-2 hover:bg-red-50 transition-colors ${isDark ? "border-blue-600/30 text-red-400 hover:bg-red-900/20" : "border-blue-200/60 text-red-600"}`}
+                        className={`px-2 border-2 hover:bg-red-50 transition-colors flex-shrink-0 ${isDark ? "border-blue-600/30 text-red-400 hover:bg-red-900/20" : "border-blue-200/60 text-red-600"}`}
                       >
                         <X className="w-3 h-3" />
                       </Button>
@@ -424,15 +377,23 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
               <Label
                 className={`text-sm font-semibold ${isDark ? "text-blue-300" : "text-blue-700"}`}
               >
-                <span className="text-base">Message Body</span>
+                {/* <span className="text-base">Message Body</span> */}
               </Label>
-              <Textarea
-                value={letterData.letterBody}
-                onChange={(e) =>
-                  handleFieldChange("letterBody", e.target.value)
-                }
-                className={`min-h-[150px] border-2 focus:border-blue-500 focus:outline-none transition-colors resize-none ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
-                placeholder="Enter your letter content here..."
+              <div
+                contentEditable
+                suppressContentEditableWarning={true}
+                onInput={(e) => {
+                  handleFieldChange("letterBody", e.currentTarget.innerHTML, letterData, setLetterData, onDataChange);
+                }}
+                className={`min-h-[150px] border-2 focus:border-blue-500 focus:outline-none transition-colors resize-none p-3 rounded-md ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"} ${!letterData.letterBody || letterData.letterBody === "<br>" ? "before:content-[attr(data-placeholder)] before:text-gray-400 before: pointer-events-none" : ""}`}
+                data-placeholder="Enter your letter content here..."
+                dangerouslySetInnerHTML={{
+                  __html:
+                    letterData.letterBody.replace(
+                      /Dear Sir/g,
+                      '<span style="font-weight: 500;">Dear Sir</span>',
+                    ) || "Enter your letter content here...",
+                }}
               />
             </div>
           </div>
@@ -466,18 +427,19 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                 </Label>
                 <div
                   className={`mt-1 relative group w-64 h-32 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer transition-all ${
-                    letterData.signatureImage ?
-                      isDark ? "border-blue-600 bg-blue-800/30"
-                      : "border-blue-400 bg-blue-50/60"
-                    : isDark ?
-                      "border-blue-600/30 bg-blue-800/20 hover:border-blue-500/60"
-                    : "border-blue-300/60 bg-blue-50/40 hover:border-blue-400/80"
+                    letterData.signatureImage
+                      ? isDark
+                        ? "border-blue-600 bg-blue-800/30"
+                        : "border-blue-400 bg-blue-50/60"
+                      : isDark
+                        ? "border-blue-600/30 bg-blue-800/20 hover:border-blue-500/60"
+                        : "border-blue-300/60 bg-blue-50/40 hover:border-blue-400/80"
                   }`}
                   onClick={() =>
                     document.getElementById("signature-upload")?.click()
                   }
                 >
-                  {letterData.signatureImage ?
+                  {letterData.signatureImage ? (
                     <div className="relative w-full h-full">
                       <img
                         src={letterData.signatureImage}
@@ -487,14 +449,15 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleFieldChange("signatureImage", "");
+                          handleFieldChange("signatureImage", null, letterData, setLetterData, onDataChange);
                         }}
                         className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X className="w-3 h-3" />
                       </button>
                     </div>
-                  : <div className="text-center">
+                  ) : (
+                    <div className="text-center">
                       <ImageIcon
                         className={`w-8 h-8 mx-auto mb-2 ${isDark ? "text-blue-400" : "text-blue-500"}`}
                       />
@@ -504,13 +467,15 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                         Click to upload signature
                       </p>
                     </div>
-                  }
+                  )}
                 </div>
                 <input
                   id="signature-upload"
                   type="file"
                   accept="image/*"
-                  onChange={handleSignatureUpload}
+                  onChange={(e) => {
+                    handleSignatureUpload(e, letterData, setLetterData, onDataChange);
+                  }}
                   className="hidden"
                 />
 
@@ -520,10 +485,10 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                       value={letterData.signatoryName}
                       showIndicator={false}
                       onChange={(e) =>
-                        handleFieldChange("signatoryName", e.target.value)
+                        handleFieldChange("signatoryName", e.target.value, letterData, setLetterData, onDataChange)
                       }
                       placeholder="Signatory name"
-                      className={`flex-1 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
+                      className={`flex-1 font-semibold focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
                     />
                     <span
                       className={`text-sm font-medium ${isDark ? "text-blue-400" : "text-blue-600"}`}
@@ -592,15 +557,30 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                         <Phone className="w-4 h-4 mr-1 flex-shrink-0" />
                         <span className="text-base">Phone 2</span>
                       </Label>
-                      <Input
-                        value={letterData.companyPhone2}
-                        showIndicator={false}
-                        onChange={(e) =>
-                          handleFieldChange("companyPhone2", e.target.value)
-                        }
-                        placeholder="Additional phone"
-                        className={`mt-1 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}
-                      />
+                      <div className="flex items-center mt-1">
+                        <span
+                          className={`px-3 py-2 border-2 border-r-0 rounded-l-md font-medium h-10 flex items-center ${isDark ? "bg-slate-700/50 border-blue-600/30 text-blue-200" : "bg-slate-100/60 border-blue-200/60 text-blue-700"}`}
+                        >
+                          +855 (0)
+                        </span>
+                        <Input
+                          value={letterData.companyPhone2}
+                          showIndicator={false}
+                          onChange={(e) =>
+                            handleFieldChange("companyPhone2", e.target.value, letterData, setLetterData, onDataChange)
+                          }
+                          placeholder="23 123 456"
+                          className={`flex-1 rounded-l-none border-2 h-10 ${
+                            isDark
+                              ? "bg-slate-800/50 text-white border-blue-600/30"
+                              : "bg-white/80 text-slate-900 border-blue-200/60"
+                          }`}
+                          style={{
+                            outline: "none",
+                            boxShadow: "none",
+                          }}
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -614,7 +594,7 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                         value={letterData.companyEmail1}
                         showIndicator={false}
                         onChange={(e) =>
-                          handleFieldChange("companyEmail1", e.target.value)
+                          handleFieldChange("companyEmail1", e.target.value, letterData, setLetterData, onDataChange)
                         }
                         placeholder="Primary email"
                         className={`mt-1 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none border-2 focus:border-blue-500 ${isDark ? "bg-slate-800/50 border-blue-600/30 text-white" : "bg-white/80 border-blue-200/60 text-slate-900"}`}

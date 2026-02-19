@@ -1,68 +1,22 @@
-import { useState } from "react";
 import { ClipboardList, CalendarCheck, Plus, Trash2 } from "lucide-react";
+import { ActivityRow, ActivitiesProps } from "@/types/activity.types";
+import { adjustHeight } from "@/utils/autoResizeTextarea";
+import { useActivities } from "@/hooks/useActivities";
 
-interface ActivityRow {
-  description: string;
-  percent: number;
-}
-
-interface ActivitiesProps {
-  weeklyActivities?: ActivityRow[];
-  setWeeklyActivities?: (rows: ActivityRow[]) => void;
-  nextWeekPlan?: ActivityRow[];
-  setNextWeekPlan?: (rows: ActivityRow[]) => void;
-}
-
-const Activities = ({
-  weeklyActivities = [],
-  setWeeklyActivities = () => {},
-  nextWeekPlan = [],
-  setNextWeekPlan = () => {},
-}: ActivitiesProps) => {
-
-  // Add a new empty row
-  const addRow = (type: "weekly" | "next") => {
-    const newRow: ActivityRow = { description: "", percent: 0 };
-    if (type === "weekly") {
-      setWeeklyActivities([...weeklyActivities, newRow]);
-    } else {
-      setNextWeekPlan([...nextWeekPlan, newRow]);
-    }
-  };
-
-  // Delete a row
-  const deleteRow = (type: "weekly" | "next", index: number) => {
-    if (type === "weekly") {
-      const updated = weeklyActivities.filter((_, idx) => idx !== index);
-      setWeeklyActivities(updated);
-    } else {
-      const updated = nextWeekPlan.filter((_, idx) => idx !== index);
-      setNextWeekPlan(updated);
-    }
-  };
-
-  // Update a specific row
-  const updateRow = (
-    type: "weekly" | "next",
-    index: number,
-    field: "description" | "percent",
-    value: string
-  ) => {
-    const target = type === "weekly" ? [...weeklyActivities] : [...nextWeekPlan];
-    if (field === "percent") {
-      // Handle empty string as 0, otherwise convert to number
-      target[index][field] = value === "" ? 0 : Number(value);
-    } else {
-      target[index][field] = value;
-    }
-    type === "weekly" ? setWeeklyActivities(target) : setNextWeekPlan(target);
-  };
+const Activities = (props: ActivitiesProps) => {
+  const {
+    weeklyActivities,
+    setWeeklyActivities,
+    nextWeekPlan,
+    setNextWeekPlan,
+    addRow,
+    deleteRow,
+    updateRow,
+  } = useActivities(props.weeklyActivities, props.nextWeekPlan);
 
   // Auto-resize textarea in table
-  const adjustHeight = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const textarea = e.target;
-    textarea.style.height = "auto";
-    textarea.style.height = textarea.scrollHeight + "px";
+  const adjustHeightWrapper = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    adjustHeight(e);
   };
 
   return (
@@ -104,8 +58,9 @@ const Activities = ({
                     value={row.description}
                     onChange={(e) => {
                       updateRow("weekly", idx, "description", e.target.value);
+                      adjustHeightWrapper(e);
                     }}
-                    className="w-full border rounded px-2 py-1 resize-none overflow-hidden h-8"
+                    className="w-full border rounded px-2 py-1 resize-none overflow-hidden h-8 dark:bg-card dark:border-border dark:text-foreground"
                     placeholder="Enter description"
                     rows={1}
                   />
@@ -113,17 +68,17 @@ const Activities = ({
                 <td className="py-2 px-2 align-top">
                   <div className="relative w-full">
                     <div 
-                      className="absolute inset-0 bg-yellow-100 rounded transition-all duration-300"
+                      className="absolute inset-0 bg-yellow-200 dark:bg-yellow-300 rounded transition-all duration-300"
                       style={{ width: `${Math.min(row.percent, 100)}%` }}
                     />
                     <input
                       type="number"
                       value={row.percent || ""}
                       onChange={(e) => updateRow("weekly", idx, "percent", e.target.value)}
-                      className={`relative w-full border rounded px-2 py-1 h-8 bg-transparent z-10 ${
+                      className={`relative w-full border rounded px-2 py-1 h-8 bg-transparent z-10 dark:bg-yellow-800/40 dark:border-border dark:text-foreground ${
                         row.percent === 100 
-                          ? 'border-green-400 text-green-800 font-semibold' 
-                          : 'border-yellow-300'
+                          ? 'border-green-400 text-green-800 dark:text-green-300 dark:border-green-400 font-semibold' 
+                          : 'border-yellow-300 text-yellow-800 dark:text-yellow-300 dark:border-yellow-400'
                       }`}
                       placeholder="%"
                       min={0}
@@ -134,7 +89,7 @@ const Activities = ({
                 <td className="py-2 px-2 align-top">
                   <button
                     onClick={() => deleteRow("weekly", idx)}
-                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-red-400 dark:hover:text-red-300 rounded transition-colors"
                     title="Delete row"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -182,8 +137,9 @@ const Activities = ({
                     value={row.description}
                     onChange={(e) => {
                       updateRow("next", idx, "description", e.target.value);
+                      adjustHeightWrapper(e);
                     }}
-                    className="w-full border rounded px-2 py-1 resize-none overflow-hidden h-8"
+                    className="w-full border rounded px-2 py-1 resize-none overflow-hidden h-8 dark:bg-yellow-800/40 dark:border-border dark:text-foreground"
                     placeholder="Enter description"
                     rows={1}
                   />
@@ -191,17 +147,17 @@ const Activities = ({
                 <td className="py-2 px-2 align-top">
                   <div className="relative w-full">
                     <div 
-                      className="absolute inset-0 bg-yellow-100 rounded transition-all duration-300"
+                      className="absolute inset-0 bg-yellow-200 dark:bg-yellow-400/70 rounded transition-all duration-300"
                       style={{ width: `${Math.min(row.percent, 100)}%` }}
                     />
                     <input
                       type="number"
                       value={row.percent || ""}
                       onChange={(e) => updateRow("next", idx, "percent", e.target.value)}
-                      className={`relative w-full border rounded px-2 py-1 h-8 bg-transparent z-10 ${
+                      className={`relative w-full border rounded px-2 py-1 h-8 bg-transparent z-10 dark:bg-yellow-800/40 dark:border-border dark:text-foreground ${
                         row.percent === 100 
-                          ? 'border-green-400 text-green-800 font-semibold' 
-                          : 'border-yellow-300'
+                          ? 'border-green-400 text-green-800 dark:text-green-300 dark:border-green-400 font-semibold' 
+                          : 'border-yellow-300 text-yellow-800 dark:text-yellow-300 dark:border-yellow-400'
                       }`}
                       placeholder="%"
                       min={0}
@@ -212,7 +168,7 @@ const Activities = ({
                 <td className="py-2 px-2 align-top">
                   <button
                     onClick={() => deleteRow("next", idx)}
-                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-red-400 dark:hover:text-red-300 rounded transition-colors"
                     title="Delete row"
                   >
                     <Trash2 className="w-4 h-4" />

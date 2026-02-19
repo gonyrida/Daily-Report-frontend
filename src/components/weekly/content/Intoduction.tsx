@@ -1,13 +1,35 @@
 import React, { useState, useRef, useEffect } from "react";
+import { IntroductionProps } from "@/types/introduction.types";
+import { autoResize, handleTextChange, handleTabKey, handleBold } from "@/lib/textareaUtils";
 
-interface IntroductionProps {
-  projectLogo?: string;
-}
+const Introduction = ({
+  projectLogo,
+  projectOverview = "",
+  setProjectOverview = () => {},
+  designConstruction = "",
+  setDesignConstruction = () => {},
+  designList = [""],
+  setDesignList = () => {},
+  handleTextChange: handleTextChangeProp = () => {},
+  handleTabKey: handleTabKeyProp = () => {},
+  handleBold: handleBoldProp = () => {},
+  handleListChange: handleListChangeProp = () => {},
+  addListItem: addListItemProp = () => {},
+  removeListItem: removeListItemProp = () => {}
+}: IntroductionProps) => {
+  const [localProjectOverview, setLocalProjectOverview] = useState(projectOverview);
+  const [localDesignConstruction, setLocalDesignConstruction] = useState(designConstruction);
+  const [localDesignList, setLocalDesignList] = useState<string[]>(designList);
 
-const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
-  const [projectOverview, setProjectOverview] = useState("");
-  const [designConstruction, setDesignConstruction] = useState("");
-  const [designList, setDesignList] = useState<string[]>([""]);
+  // Log component mount and initial props
+  useEffect(() => {
+    console.log('[Introduction] Component mounted with props:', {
+      projectOverview,
+      designConstruction,
+      designList,
+      projectLogo
+    });
+  }, []);
 
   // Use project logo from Cover tab
   const coverImageUrl = projectLogo;
@@ -16,20 +38,14 @@ const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
   const projectOverviewRef = useRef<HTMLTextAreaElement>(null);
   const designConstructionRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea function
-  const autoResize = (ref: React.RefObject<HTMLTextAreaElement>) => {
-    if (ref.current) {
-      ref.current.style.height = "auto";
-      ref.current.style.height = ref.current.scrollHeight + "px";
-    }
-  };
-
   // Auto-resize on content change
   useEffect(() => {
+    console.log('[Introduction] Project Overview changed:', projectOverview);
     autoResize(projectOverviewRef);
   }, [projectOverview]);
 
   useEffect(() => {
+    console.log('[Introduction] Design Construction changed:', designConstruction);
     autoResize(designConstructionRef);
   }, [designConstruction]);
 
@@ -40,98 +56,28 @@ const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
   }, []);
 
   // Handle text input - simplified to allow Ctrl+Z to work
-  const handleTextChange = (
+  const handleTextChangeWrapper = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
     setter: React.Dispatch<React.SetStateAction<string>>,
+    fieldName: string
   ) => {
-    setter(e.target.value);
+    console.log(`[Introduction] ${fieldName} text change:`, {
+      newValue: e.target.value,
+      previousValue: fieldName === 'projectOverview' ? projectOverview : designConstruction
+    });
+    handleTextChange(e, setter);
   };
 
   // Handle Tab key for list indentation
-  const handleTabKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-
-      // Insert tab character (4 spaces for better visual)
-      const newValue =
-        target.value.substring(0, start) + "    " + target.value.substring(end);
-
-      // Update the textarea value
-      if (target === projectOverviewRef.current) {
-        setProjectOverview(newValue);
-        // Set cursor position after the inserted tab
-        setTimeout(() => {
-          target.selectionStart = target.selectionEnd = start + 4;
-        }, 0);
-      } else if (target === designConstructionRef.current) {
-        setDesignConstruction(newValue);
-        // Set cursor position after the inserted tab
-        setTimeout(() => {
-          target.selectionStart = target.selectionEnd = start + 4;
-        }, 0);
-      }
-    }
+  const handleTabKeyWrapper = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    console.log('[Introduction] Tab key pressed:', { key: e.key, target: e.currentTarget.name || 'unnamed textarea' });
+    handleTabKey(e, setProjectOverview, setDesignConstruction, projectOverviewRef, designConstructionRef);
   };
 
   // Handle Alt+B for bold text (to avoid browser Ctrl+B conflict)
-  const handleBold = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.altKey && e.key === "b") {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const text = target.value;
-
-      let boldText = "";
-      let cursorPosition = start;
-
-      if (start === end) {
-        // No text selected, find word at cursor
-        const wordStart = text.lastIndexOf(" ", start - 1) + 1;
-        const wordEnd = text.indexOf(" ", start);
-        const actualWordEnd = wordEnd === -1 ? text.length : wordEnd;
-        const word = text.substring(wordStart, actualWordEnd);
-
-        if (word.length > 0) {
-          boldText =
-            text.substring(0, wordStart) +
-            "**" +
-            word +
-            "**" +
-            text.substring(actualWordEnd);
-          cursorPosition = actualWordEnd + 4; // Position after **word**
-        } else {
-          // No word at cursor, insert ** ** for user to type
-          boldText = text.substring(0, start) + "****" + text.substring(end);
-          cursorPosition = start + 2; // Position between the **
-        }
-      } else {
-        // Text selected, wrap it in **
-        const selectedText = text.substring(start, end);
-        boldText =
-          text.substring(0, start) +
-          "**" +
-          selectedText +
-          "**" +
-          text.substring(end);
-        cursorPosition = end + 4; // Position after **selectedText**
-      }
-
-      // Update the textarea value
-      if (target === projectOverviewRef.current) {
-        setProjectOverview(boldText);
-      } else if (target === designConstructionRef.current) {
-        setDesignConstruction(boldText);
-      }
-
-      // Set cursor position
-      setTimeout(() => {
-        target.selectionStart = target.selectionEnd = cursorPosition;
-      }, 0);
-    }
+  const handleBoldWrapper = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    console.log('[Introduction] Key pressed for bold:', { key: e.key, altKey: e.altKey, target: e.currentTarget.name || 'unnamed textarea' });
+    handleBold(e, setProjectOverview, setDesignConstruction, projectOverviewRef, designConstructionRef);
   };
 
   const handleListChange = (index: number, value: string) => {
@@ -154,17 +100,18 @@ const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
       {/* Project Overview */}
       <section className="mb-8">
         <div className="mb-2">
-          <h2 className="text-lg font-semibold">Project Overview</h2>
+          <h2 className="text-lg font-semibold text-foreground">Project Overview</h2>
         </div>
         <textarea
           ref={projectOverviewRef}
-          className="w-full border rounded p-2 min-h-[80px] resize-none focus:outline-blue-400 overflow-hidden"
+          name="projectOverview"
+          className="w-full border rounded p-2 min-h-[80px] resize-none focus:outline-blue-400 overflow-hidden dark:bg-card dark:border-border dark:focus:outline-primary"
           placeholder="Enter project overview..."
           value={projectOverview}
-          onChange={(e) => handleTextChange(e, setProjectOverview)}
+          onChange={(e) => handleTextChangeWrapper(e, setProjectOverview, 'projectOverview')}
           onKeyDown={(e) => {
-            handleTabKey(e);
-            handleBold(e);
+            handleTabKeyWrapper(e);
+            handleBoldWrapper(e);
           }}
         />
       </section>
@@ -172,17 +119,18 @@ const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
       {/* Design & Construction */}
       <section className="mb-8">
         <div className="mb-2">
-          <h2 className="text-lg font-semibold">Design & Construction</h2>
+          <h2 className="text-lg font-semibold text-foreground">Design & Construction</h2>
         </div>
         <textarea
           ref={designConstructionRef}
-          className="w-full border rounded p-2 min-h-[80px] resize-none focus:outline-blue-400 overflow-hidden mb-4"
+          name="designConstruction"
+          className="w-full border rounded p-2 min-h-[80px] resize-none focus:outline-blue-400 overflow-hidden mb-4 dark:bg-card dark:border-border dark:focus:outline-primary"
           placeholder="Enter design & construction details..."
           value={designConstruction}
-          onChange={(e) => handleTextChange(e, setDesignConstruction)}
+          onChange={(e) => handleTextChangeWrapper(e, setDesignConstruction, 'designConstruction')}
           onKeyDown={(e) => {
-            handleTabKey(e);
-            handleBold(e);
+            handleTabKeyWrapper(e);
+            handleBoldWrapper(e);
           }}
         />
       </section>
@@ -199,7 +147,7 @@ const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
                 alt="Cover image"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute bottom-2 left-2 px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded-lg">
+              <div className="absolute bottom-2 left-2 px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-lg">
                 COVER
               </div>
             </div>
@@ -207,9 +155,9 @@ const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
               <div className="flex justify-center mb-3">
                 <div className="relative">
                   <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-20"></div>
-                  <div className="relative bg-blue-100 dark:bg-blue-800 p-3 rounded-full">
+                  <div className="relative bg-muted dark:bg-muted p-3 rounded-full">
                     <svg
-                      className="w-6 h-6 text-blue-600 dark:text-blue-400"
+                      className="w-6 h-6 text-primary dark:text-primary"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
@@ -224,10 +172,10 @@ const Introduction: React.FC<IntroductionProps> = ({ projectLogo = "" }) => {
                   </div>
                 </div>
               </div>
-              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+              <p className="text-sm font-medium text-foreground dark:text-foreground mb-1">
                 Drop or paste cover image
               </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                 or click to browse
               </p>
             </div>
