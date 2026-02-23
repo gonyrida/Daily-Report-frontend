@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import ReportHeader from "@/components/ReportHeader";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import WeeklyReportCover from "@/components/weekly/WeeklyReportCover";
@@ -16,8 +17,26 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Save,
+  Eye,
+  FileDown,
+  FileText,
+  FileSpreadsheet,
+  Send,
+  CheckCircle,
+  Lock,
+} from "lucide-react";
 
 const WeeklyReport = () => {
+  const [searchParams] = useSearchParams();
+  const selectedProject = searchParams.get('project');
   const [projectLogo, setProjectLogo] = useState<string>("/koica_logo.png");
   const [showIntroduction, setShowIntroduction] = useState(false);
 
@@ -75,8 +94,7 @@ const WeeklyReport = () => {
     weekNumber: "",
     refNoPrefix: "ICT-CPM-LETTER",
     dateRange: "",
-    projectName:
-      "Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia",
+    projectName: selectedProject || "Default Project Name",
     employer: "Client Name",
     coverImage: "",
   });
@@ -102,6 +120,144 @@ const WeeklyReport = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Save, Preview, Export states
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [reportStatus, setReportStatus] = useState<string>("draft");
+
+  // Update projectName when selectedProject changes
+  useEffect(() => {
+    if (selectedProject) {
+      setSharedData(prev => ({
+        ...prev,
+        projectName: selectedProject
+      }));
+    }
+  }, [selectedProject]);
+
+  // Handler functions
+  const handleSaveAsDraft = async () => {
+    setIsSaving(true);
+    try {
+      // TODO: Implement save functionality
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate save
+      toast({
+        title: "Saved",
+        description: "Weekly report saved as draft successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Could not save weekly report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsSaving(true);
+    try {
+      // TODO: Implement submit functionality
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate submit
+      setReportStatus("submitted");
+      toast({
+        title: "Submitted",
+        description: "Weekly report submitted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Submit Failed",
+        description: "Could not submit weekly report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePreview = async () => {
+    setIsPreviewing(true);
+    try {
+      // TODO: Implement preview functionality
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate preview
+      toast({
+        title: "Preview Generated",
+        description: "Weekly report preview is ready.",
+      });
+    } catch (error) {
+      toast({
+        title: "Preview Failed",
+        description: "Could not generate preview. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      // TODO: Implement PDF export functionality
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate export
+      toast({
+        title: "PDF Exported",
+        description: "Weekly report exported as PDF successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not export PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      // TODO: Implement Excel export functionality
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate export
+      toast({
+        title: "Excel Exported",
+        description: "Weekly report exported as Excel successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not export Excel. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportZIP = async () => {
+    setIsExporting(true);
+    try {
+      // TODO: Implement ZIP export functionality
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate ZIP creation
+      toast({
+        title: "ZIP Exported",
+        description: "Weekly report exported as ZIP containing both PDF and Excel files.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not export ZIP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Schedule upload functionality
   const handleScheduleUpload = (files: FileList | null) => {
@@ -180,16 +336,16 @@ const WeeklyReport = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full overflow-x-hidden">
+      <div className="flex min-h-screen w-full">
         <HierarchicalSidebar />
 
         <SidebarInset>
-          <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden">
+          <div className="min-h-screen bg-background">
             {/* Report Header with Company and Client Logos */}
             <ReportHeader
               projectLogo={projectLogo}
               setProjectLogo={setProjectLogo}
-              title="WEEKLY REPORT"
+              title={`WEEKLY REPORT - ${selectedProject || 'No Project Selected'}`}
             />
 
             {/* Navigation Bar */}
@@ -230,6 +386,7 @@ const WeeklyReport = () => {
                     onClick={() => {
                       setActiveTab("cover");
                       setShowSecondNav(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                   >
@@ -241,6 +398,7 @@ const WeeklyReport = () => {
                     onClick={() => {
                       setActiveTab("letter");
                       setShowSecondNav(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                   >
@@ -255,6 +413,7 @@ const WeeklyReport = () => {
                       debugSetActiveTab("table-of-content");
                       setShowSecondNav(true);
                       setShowIntroduction(false); // Always reset intro view when switching to TOC tab
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
                   >
@@ -278,12 +437,25 @@ const WeeklyReport = () => {
               activeTab === "issues" ||
               activeTab === "schedule") &&
               showSecondNav && (
-                <div className="w-full px-4 sm:px-6 py-3 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
+                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-40 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
                   <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                    {tableOfContentSections.map((section) => (
+                    {tableOfContentSections.map((section) => {
+                      // Determine if this section is currently active
+                      const isActiveSection = 
+                        (section.id === 1 && activeTab === "table-of-content" && showIntroduction) ||
+                        (section.id === 2 && activeTab === "overall-progress") ||
+                        (section.id === 3 && activeTab === "activities") ||
+                        (section.id === 4 && activeTab === "qaqc-status") ||
+                        (section.id === 5 && activeTab === "hses") ||
+                        (section.id === 6 && activeTab === "resource") ||
+                        (section.id === 7 && activeTab === "photos") ||
+                        (section.id === 8 && activeTab === "issues") ||
+                        (section.id === 9 && activeTab === "schedule");
+                      
+                      return (
                       <Button
                         key={section.id}
-                        variant="outline"
+                        variant={isActiveSection ? "default" : "outline"}
                         size="sm"
                         onClick={() => {
                           console.log(
@@ -293,38 +465,47 @@ const WeeklyReport = () => {
                           if (section.id === 1) {
                             setShowIntroduction(true);
                             debugSetActiveTab("table-of-content");
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 2) {
                             setShowIntroduction(false);
                             debugSetActiveTab("overall-progress");
                             if (setShowSecondNav) setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 3) {
                             setShowIntroduction(false);
                             debugSetActiveTab("activities");
                             if (setShowSecondNav) setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 4) {
                             setShowIntroduction(false);
                             debugSetActiveTab("qaqc-status");
                             if (setShowSecondNav) setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 5) {
                             setShowIntroduction(false);
                             debugSetActiveTab("hses");
                             setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 6) {
                             setShowIntroduction(false);
                             debugSetActiveTab("resource");
                             setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 7) {
                             setShowIntroduction(false);
                             debugSetActiveTab("photos");
                             setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 8) {
                             setShowIntroduction(false);
                             debugSetActiveTab("issues");
                             setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else if (section.id === 9) {
                             setShowIntroduction(false);
                             debugSetActiveTab("schedule");
                             setShowSecondNav(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else {
                             setShowIntroduction(false);
                             debugSetActiveTab("table-of-content");
@@ -340,7 +521,8 @@ const WeeklyReport = () => {
                       >
                         {section.id}. {section.name}
                       </Button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -686,6 +868,107 @@ const WeeklyReport = () => {
                 </>
               )}
             </main>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-center py-6 border-t border-border mt-6">
+              <div className="flex items-center gap-3">
+                {/* Save As Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="min-w-[140px]"
+                      disabled={isSaving}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {isSaving ? "Processing..." : "Save As..."}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-[140px]"
+                  >
+                    <DropdownMenuItem
+                      onClick={handleSaveAsDraft}
+                      disabled={isSaving}
+                      className={
+                        reportStatus === "submitted"
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {isSaving ? "Saving..." : "Draft"}
+                      {reportStatus === "submitted" && (
+                        <Lock className="w-3 h-3 ml-auto" />
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleSubmit}
+                      disabled={isSaving}
+                      className={
+                        reportStatus === "submitted"
+                          ? "bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer"
+                          : ""
+                      }
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      {isSaving ? "Submitting..." : "Submitted"}
+                      {reportStatus === "submitted" && (
+                        <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Preview Button */}
+                <Button
+                  variant="outline"
+                  className="min-w-[140px]"
+                  onClick={handlePreview}
+                  disabled={isPreviewing}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  {isPreviewing ? "Previewing..." : "Preview"}
+                </Button>
+
+                {/* Export Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      className="min-w-[160px] bg-primary hover:bg-primary/90"
+                      disabled={isExporting}
+                    >
+                      <FileDown className="w-4 h-4 mr-2" />
+                      {isExporting ? "Exporting..." : "Export"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={handleExportPDF}
+                      disabled={isExporting}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Export As PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleExportExcel}
+                      disabled={isExporting}
+                    >
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
+                      Export As Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleExportZIP}
+                      disabled={isExporting}
+                    >
+                      <FileDown className="w-4 h-4 mr-2" />
+                      Export As ZIP
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </div>
         </SidebarInset>
       </div>

@@ -75,7 +75,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   // State for expand/collapse
   const [reportSectionOpen, setReportSectionOpen] = useState(true);
   const [dailyReportOpen, setDailyReportOpen] = useState(true);
-  const [weeklyReportOpen, setWeeklyReportOpen] = useState(false);
+  const [weeklyReportOpen, setWeeklyReportOpen] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -365,11 +365,8 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     if (reportType === 'daily') {
       navigate(`/dashboard?project=${encodeURIComponent(projectName)}`);
     } else {
-      // For weekly report, we'll navigate to a weekly report page (to be implemented)
-      toast({
-        title: "Weekly Report",
-        description: `Weekly report for ${projectName} will be available soon.`,
-      });
+      // For weekly report, navigate to weekly reports dashboard with project parameter
+      navigate(`/weekly-reports?project=${encodeURIComponent(projectName)}`);
     }
   };
 
