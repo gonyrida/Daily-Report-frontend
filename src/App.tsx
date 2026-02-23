@@ -19,6 +19,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
+import PurchaseRequest from "./pages/PurchaseRequest";
 import UserManagement from "./components/admin_dashboard/UserManagement";
 import ProtectedRoute from "./components/ProtectedRoute";
 import FloatingScrollButton from './components/FloatingScrollButton';
@@ -119,6 +120,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <DailyReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/request-form"
+                element={
+                  <ProtectedRoute>  
+                    <PurchaseRequest />
                   </ProtectedRoute>
                 }
               />
