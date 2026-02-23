@@ -54,8 +54,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import HierarchicalSidebar from '@/components/HierarchicalSidebar';
-import { apiGet } from '@/lib/apiFetch';
-import { cn } from "@/lib/utils";
+import { apiGet, apiPost, apiPut } from '@/lib/apiFetch';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -66,6 +65,9 @@ const UserManagement = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [showAddUser, setShowAddUser] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false); // Status for loading state
+  const [editingUser, setEditingUser] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Select dropdown states
   const [positionOpen, setPositionOpen] = useState(false);
@@ -87,7 +89,6 @@ const UserManagement = () => {
     firstName: '',
     lastName: '',
     email: '',
-    password: '',
     position: '',
     department: '',
     orgLevel: undefined,
@@ -168,6 +169,82 @@ const UserManagement = () => {
     toast({ title: "Export started", description: "User data will be downloaded" });
   };
 
+  // Add before return statement
+  const handleCreateUser = async () => {
+    try {
+      setIsCreatingUser(true); // Start loading      
+
+      let response;
+      if (isEditMode && editingUser) {
+        response = await apiPut(`/admin/users/${editingUser._id}`, newUser);
+      } else {
+        response = await apiPost('/admin/users', newUser);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({ 
+          title: "Success", 
+          description: isEditMode ? "User updated successfully" : "User created successfully"
+        });
+        setShowAddUser(false);
+        setNewUser({
+          firstName: '',
+          lastName: '',
+          email: '',
+          position: '',
+          department: '',
+          orgLevel: undefined,
+          role: 'user'
+        });
+        fetchUsers(); // Refresh user list
+      } else {
+        toast({ 
+          title: "Error", 
+          description: result.message || "Failed to create user" 
+        });
+      }
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to create user" 
+      });
+    } finally {
+      setIsCreatingUser(false); // Stop loading
+    }
+  };
+
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+    setNewUser({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      position: user.position || '',
+      department: user.department || '',
+      orgLevel: user.orgLevel,
+      role: user.role
+    });
+    setIsEditMode(true);
+    setShowAddUser(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowAddUser(false);
+    setIsEditMode(false);
+    setEditingUser(null);
+    setNewUser({
+      firstName: '',
+      lastName: '',
+      email: '',
+      position: '',
+      department: '',
+      orgLevel: undefined,
+      role: 'user'
+    });
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -239,7 +316,7 @@ const UserManagement = () => {
                     </SelectContent>
                   </Select>
 
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  {/* <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
@@ -248,7 +325,7 @@ const UserManagement = () => {
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
-                  </Select>
+                  </Select> */}
 
                   <div className="text-sm text-muted-foreground flex items-center">
                     {filteredUsers.length} users found
@@ -285,9 +362,10 @@ const UserManagement = () => {
                         <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                           Role
                         </th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                        {/* Comment out Status Column */}
+                        {/* <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                           Status
-                        </th>
+                        </th> */}
                         <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">
                           Actions
                         </th>
@@ -327,11 +405,12 @@ const UserManagement = () => {
                               {user.role}
                             </Badge>
                           </td>
-                          <td className="p-4 align-middle">
+                          {/* Comment out Status */}
+                          {/* <td className="p-4 align-middle">
                             <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
                               {user.status}
                             </Badge>
-                          </td>
+                          </td> */}
                           <td className="p-4 align-middle">
                             <div className="flex items-center justify-center gap-2">
                               <DropdownMenu>
@@ -341,7 +420,7 @@ const UserManagement = () => {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEditUser(user)}>
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                   </DropdownMenuItem>
@@ -349,10 +428,10 @@ const UserManagement = () => {
                                     <Shield className="mr-2 h-4 w-4" />
                                     Toggle Role
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  {/* <DropdownMenuItem>
                                     <Power className="mr-2 h-4 w-4" />
                                     Toggle Status
-                                  </DropdownMenuItem>
+                                  </DropdownMenuItem> */}
                                   <DropdownMenuItem>
                                     <Mail className="mr-2 h-4 w-4" />
                                     Resend Verification
@@ -419,16 +498,41 @@ const UserManagement = () => {
             <Dialog open={showAddUser} onOpenChange={setShowAddUser}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add New User</DialogTitle>
+                  <DialogTitle>{isEditMode ? "Edit User" : "Add New User"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <Input placeholder="First Name" />
-                  <Input placeholder="Last Name" />
-                  <Input type="email" placeholder="Email" />
-                  <Input type="position" placeholder="Position" />
-                  <Input type="department" placeholder="Department" />
+                  <Input 
+                    placeholder="First Name" 
+                    value={newUser.firstName}
+                    onChange={(e) => setNewUser({...newUser, firstName: e.target.value})}
+                  />
+                  <Input 
+                    placeholder="Last Name" 
+                    value={newUser.lastName}
+                    onChange={(e) => setNewUser({...newUser, lastName: e.target.value})}
+                  />
+                  <Input 
+                    type="email" 
+                    placeholder="Email" 
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                  />
+                  <Input 
+                    placeholder="Position" 
+                    value={newUser.position}
+                    onChange={(e) => setNewUser({...newUser, position: e.target.value})}
+                  />
+                  <Input 
+                    type="department" 
+                    placeholder="Department" 
+                    value={newUser.department}
+                    onChange={(e) => setNewUser({...newUser, department: e.target.value})}
+                  />
                   
-                  <Select>
+                  <Select 
+                    value={newUser.orgLevel?.toString()}
+                    onValueChange={(value) => setNewUser({...newUser, orgLevel: parseInt(value)})}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select Organization Level" />
                     </SelectTrigger>
@@ -440,7 +544,10 @@ const UserManagement = () => {
                     </SelectContent>
                   </Select>
 
-                  <Select>
+                  <Select 
+                    value={newUser.role}
+                    onValueChange={(value) => setNewUser({...newUser, role: value})}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select Role" />
                     </SelectTrigger>
@@ -451,11 +558,17 @@ const UserManagement = () => {
                     </SelectContent>
                   </Select>
                   <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowAddUser(false)}>
+                    <Button variant="outline" onClick={handleCloseModal}>
                       Cancel
                     </Button>
-                    <Button onClick={() => setShowAddUser(false)}>
-                      Add User
+                    <Button 
+                      onClick={handleCreateUser}
+                      disabled={isCreatingUser} // ✅ Disable during loading
+                    >
+                      {isCreatingUser 
+                        ? (isEditMode ? "Updating User..." : "Adding User...") 
+                        : (isEditMode ? "Update User" : "Add User")
+                      }
                     </Button>
                   </div>
                 </div>
