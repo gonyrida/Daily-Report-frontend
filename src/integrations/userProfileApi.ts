@@ -9,6 +9,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   role: string;
+  department?: string; // Add department field
   accountStatus: "active" | "inactive" | "suspended";
   profilePicture?: string;
   createdAt: string;
