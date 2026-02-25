@@ -13,4 +13,7 @@ export interface WeeklyReportContentProps {
   setShowSecondNav?: (show: boolean) => void;
   activeTab?: TabType;
   sharedData?: any;
+  setSharedData?: React.Dispatch<React.SetStateAction<any>>;
+  overallProgressData?: any;
+  setOverallProgressData?: React.Dispatch<React.SetStateAction<any>>;
 }

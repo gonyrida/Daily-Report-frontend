@@ -632,7 +632,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                         <SidebarMenuSub>
                           {/* Same project list as Daily Report (read-only) */}
                           {projects.map((project) => (
-                            <SidebarMenuSubItem key={`weekly-${project}`}>
+                            <SidebarMenuSubItem key={`weekly-${project.name}`}>
                               <SidebarMenuSubButton
                                 onClick={() => handleProjectClick(project.name, 'weekly')}
                                 className="text-muted-foreground"

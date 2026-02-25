@@ -30,17 +30,8 @@ import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
-interface WeeklyReport {
-  _id: string;
-  projectName: string;
-  weekNumber: string;
-  dateRange: string;
-  status: "draft" | "submitted";
-  createdAt: string;
-  updatedAt: string;
-  submittedAt?: string;
-}
+import { getWeeklyReports } from "@/services/weeklyReportService";
+import type { WeeklyReport } from "@/types/weeklyReport.types";
 
 const WeeklyReportDashboard = () => {
   const { toast } = useToast();
@@ -53,38 +44,29 @@ const WeeklyReportDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
 
-  // Mock data for now - replace with actual API call
+  // Load weekly reports from API
   useEffect(() => {
     const loadWeeklyReports = async () => {
       try {
         setIsLoading(true);
-        // TODO: Replace with actual API call
-        // const response = await getWeeklyReports(projectFilter);
         
-        // Mock data for demonstration
-        const mockReports: WeeklyReport[] = [
-          {
-            _id: "1",
-            projectName: projectFilter || "Default Project",
-            weekNumber: "Week 1",
-            dateRange: "Jan 1-7, 2024",
-            status: "submitted",
-            createdAt: "2024-01-01T00:00:00Z",
-            updatedAt: "2024-01-07T23:59:59Z",
-            submittedAt: "2024-01-07T23:59:59Z",
-          },
-          {
-            _id: "2",
-            projectName: projectFilter || "Default Project",
-            weekNumber: "Week 2",
-            dateRange: "Jan 8-14, 2024",
-            status: "draft",
-            createdAt: "2024-01-08T00:00:00Z",
-            updatedAt: "2024-01-10T15:30:00Z",
-          },
-        ];
+        const params: any = {};
+        if (projectFilter) {
+          params.projectName = projectFilter;
+        }
         
-        setWeeklyReports(mockReports);
+        const response = await getWeeklyReports(params);
+        
+        if (response.success && response.data) {
+          setWeeklyReports(response.data);
+        } else {
+          console.error("Failed to load weekly reports:", response.error);
+          toast({
+            title: "Error",
+            description: response.error || "Failed to load weekly reports",
+            variant: "destructive",
+          });
+        }
       } catch (error) {
         console.error("Failed to load weekly reports:", error);
         toast({
@@ -102,10 +84,17 @@ const WeeklyReportDashboard = () => {
 
   // Filter reports based on search term
   useEffect(() => {
-    const filtered = weeklyReports.filter(report =>
-      report.weekNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.dateRange.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = weeklyReports.filter(report => {
+      const weekStr = report.weekNumber.toString();
+      const dateRange = `${new Date(report.startDate).toLocaleDateString()} - ${new Date(report.endDate).toLocaleDateString()}`;
+      const projectName = report.projectName || '';
+      
+      return (
+        weekStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dateRange.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        projectName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
     setFilteredReports(filtered);
   }, [weeklyReports, searchTerm]);
 
@@ -330,15 +319,17 @@ const WeeklyReportDashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {filteredReports.map((report) => (
-                    <Card key={report._id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenReport(report._id)}>
+                    <Card key={report.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenReport(report.id)}>
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold">{report.weekNumber}</h3>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold">Week {report.weekNumber}</h3>
                               {getStatusBadge(report.status)}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-1">{report.dateRange}</p>
+                            <p className="text-sm text-muted-foreground mb-1">
+                              {new Date(report.startDate).toLocaleDateString()} - {new Date(report.endDate).toLocaleDateString()}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               Last updated: {new Date(report.updatedAt).toLocaleDateString()}
                             </p>

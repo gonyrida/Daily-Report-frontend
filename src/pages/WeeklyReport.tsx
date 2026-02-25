@@ -11,7 +11,19 @@ import { createDefaultSiteActivitiesSections } from "@/utils/referenceHelpers";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud } from "lucide-react";
+import { useActivities } from "@/hooks/useActivities";
+import { useConstructionIssue } from "@/hooks/useConstructionIssue";
+import { useHsesData } from "@/hooks/useHsesData";
+import { useIntroductionText } from "@/hooks/useIntroductionText";
+import { useOverallProgress } from "@/hooks/useOverallProgress";
+import { useQaqcTable } from "@/hooks/useQaqcTable";
+import { useResourceTable } from "@/hooks/useResourceTable";
+import { 
+  createWeeklyReport, 
+  updateWeeklyReport, 
+  submitWeeklyReport,
+  getWeeklyReportById 
+} from "@/services/weeklyReportService";
 import {
   SidebarInset,
   SidebarProvider,
@@ -37,8 +49,10 @@ import {
 const WeeklyReport = () => {
   const [searchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
+  const reportId = searchParams.get('reportId');
   const [projectLogo, setProjectLogo] = useState<string>("/koica_logo.png");
   const [showIntroduction, setShowIntroduction] = useState(false);
+  const [currentReportId, setCurrentReportId] = useState<string | null>(reportId || null);
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
@@ -97,6 +111,25 @@ const WeeklyReport = () => {
     projectName: selectedProject || "Default Project Name",
     employer: "Client Name",
     coverImage: "",
+    // Introduction fields
+    projectOverview: "",
+    designNConstruction: "",
+    // Letter data fields
+    reportDate: "",
+    recipientCompany: "",
+    recipientLocation: "",
+    recipientName: "",
+    ccList: [],
+    letterBody: "",
+    signatureImage: "",
+    signatoryName: "",
+    signatoryPosition: "",
+    constructorName: "",
+    companyLocation: "",
+    companyPhone1: "",
+    companyPhone2: "",
+    companyEmail1: "",
+    companyEmail2: ""
   });
 
   // Site Activities Photos state
@@ -127,6 +160,9 @@ const WeeklyReport = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [reportStatus, setReportStatus] = useState<string>("draft");
 
+  // Overall Progress hook
+  const overallProgressHook = useOverallProgress();
+
   // Update projectName when selectedProject changes
   useEffect(() => {
     if (selectedProject) {
@@ -137,20 +173,211 @@ const WeeklyReport = () => {
     }
   }, [selectedProject]);
 
+  // Load existing report data when reportId is present
+  useEffect(() => {
+    const loadExistingReport = async () => {
+      if (reportId) {
+        try {
+          const response = await getWeeklyReportById(reportId);
+          if (response.success && response.data) {
+            const report = response.data;
+            setCurrentReportId(report.id);
+            setReportStatus(report.status || 'draft');
+            
+            // Update shared data with existing report data
+            setSharedData(prev => ({
+              ...prev,
+              weekNumber: report.weekNumber?.toString() || '',
+              projectName: report.projectName || selectedProject || 'Default Project Name',
+              employer: report.sections?.cover?.employer || 'Client Name',
+              coverImage: report.sections?.cover?.coverImage || '',
+              dateRange: report.sections?.cover?.dateRange || '',
+              // Load introduction data
+              projectOverview: report.sections?.introduction?.projectOverview || '',
+              designNConstruction: report.sections?.introduction?.designNConstruction || '',
+              // Load letter data
+              refNoPrefix: report.sections?.letter?.refNoPrefix || '',
+              reportDate: report.sections?.letter?.reportDate || '',
+              recipientCompany: report.sections?.letter?.recipientCompany || '',
+              recipientLocation: report.sections?.letter?.recipientLocation || '',
+              recipientName: report.sections?.letter?.recipientName || '',
+              ccList: report.sections?.letter?.ccList || [],
+              letterBody: report.sections?.letter?.letterBody || '',
+              signatureImage: report.sections?.letter?.signatureImage || '',
+              signatoryName: report.sections?.letter?.signatoryName || '',
+              signatoryPosition: report.sections?.letter?.signatoryPosition || '',
+              constructorName: report.sections?.letter?.constructorName || '',
+              companyLocation: report.sections?.letter?.companyLocation || '',
+              companyPhone1: report.sections?.letter?.companyPhone1 || '',
+              companyPhone2: report.sections?.letter?.companyPhone2 || '',
+              companyEmail1: report.sections?.letter?.companyEmail1 || '',
+              companyEmail2: report.sections?.letter?.companyEmail2 || ''
+            }));
+            
+            // Load overall progress data
+            if (report.sections?.overallProgress?.rows) {
+              overallProgressHook.setRows(report.sections.overallProgress.rows);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading report:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load existing report.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    loadExistingReport();
+  }, [reportId, selectedProject, toast]);
+
   // Handler functions
   const handleSaveAsDraft = async () => {
     setIsSaving(true);
     try {
-      // TODO: Implement save functionality
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate save
-      toast({
-        title: "Saved",
-        description: "Weekly report saved as draft successfully.",
-      });
+      // Helper function to format rows with displayIndex
+      const formatRowsWithDisplayIndex = (rows: any[]) => {
+        let titleCount = 0;
+        return rows.map((row, index) => {
+          if (row.rowType === "title") {
+            titleCount++;
+            return {
+              ...row,
+              displayIndex: `${toRoman(titleCount)}.`,
+            };
+          }
+          if (row.rowType === "detail") {
+            let detailCount = 0;
+            for (let i = 0; i <= index; i++) {
+              if (rows[i].rowType === "title") {
+                detailCount = 0;
+              } else if (rows[i].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            return {
+              ...row,
+              displayIndex: `${detailCount}.`,
+            };
+          }
+          return row;
+        });
+      };
+
+      // Import toRoman function
+      const toRoman = (num: number): string => {
+        const romanNumerals = [
+          { value: 1000, numeral: "M" },
+          { value: 900, numeral: "CM" },
+          { value: 500, numeral: "D" },
+          { value: 400, numeral: "CD" },
+          { value: 100, numeral: "C" },
+          { value: 90, numeral: "XC" },
+          { value: 50, numeral: "L" },
+          { value: 40, numeral: "XL" },
+          { value: 10, numeral: "X" },
+          { value: 9, numeral: "IX" },
+          { value: 5, numeral: "V" },
+          { value: 4, numeral: "IV" },
+          { value: 1, numeral: "I" },
+        ];
+        let result = "";
+        let remaining = num;
+        for (const { value, numeral } of romanNumerals) {
+          while (remaining >= value) {
+            result += numeral;
+            remaining -= value;
+          }
+        }
+        return result;
+      };
+
+      // Collect all form data
+      const reportData = {
+        projectName: sharedData.projectName,
+        weekNumber: parseInt(sharedData.weekNumber) || 1,
+        startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
+        endDate: new Date().toISOString().split('T')[0],
+        sections: {
+          cover: {
+            projectName: sharedData.projectName,
+            reportTitle: 'Weekly Progress Report',
+            weekNumber: sharedData.weekNumber,
+            dateRange: sharedData.dateRange,
+            contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+            clientName: sharedData.employer || 'Client Name',
+            contractNumber: '', // Add contract number field if needed
+            coverImage: sharedData.coverImage || '',
+            projectTitle: sharedData.projectName,
+            employer: sharedData.employer || 'Client Name'
+          },
+          letter: {
+            refNoPrefix: sharedData.refNoPrefix || "",
+            weekNumber: sharedData.weekNumber || "",
+            reportDate: sharedData.reportDate || new Date().toISOString().split("T")[0],
+            recipientCompany: sharedData.recipientCompany || "",
+            recipientLocation: sharedData.recipientLocation || "",
+            recipientName: sharedData.recipientName || "",
+            ccList: sharedData.ccList || [],
+            letterBody: sharedData.letterBody || "",
+            signatureImage: sharedData.signatureImage || "",
+            signatoryName: sharedData.signatoryName || "",
+            signatoryPosition: sharedData.signatoryPosition || "",
+            constructorName: sharedData.constructorName || "",
+            companyLocation: sharedData.companyLocation || "",
+            companyPhone1: sharedData.companyPhone1 || "",
+            companyPhone2: sharedData.companyPhone2 || "",
+            companyEmail1: sharedData.companyEmail1 || "",
+            companyEmail2: sharedData.companyEmail2 || ""
+          },
+          introduction: {
+            projectOverview: sharedData.projectOverview || "",
+            designNConstruction: sharedData.designNConstruction || "",
+            coverImage: sharedData.coverImage || ""
+          },
+          overallProgress: {
+            rows: formatRowsWithDisplayIndex(overallProgressHook.rows)
+          },
+          // Add other sections as needed
+        }
+      };
+
+      let response;
+      if (currentReportId) {
+        // Update existing report - only send sections that changed
+        const updateData = {
+          sections: reportData.sections,
+          status: 'draft' as const
+        };
+        response = await updateWeeklyReport(currentReportId, updateData);
+      } else {
+        // Create new report
+        response = await createWeeklyReport(reportData);
+        if (response.success && response.data?.id) {
+          setCurrentReportId(response.data.id);
+          // Update URL to include new report ID
+          const newUrl = `${window.location.pathname}?reportId=${response.data.id}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+          window.history.replaceState({}, '', newUrl);
+        }
+      }
+
+      if (response.success) {
+        toast({
+          title: "Saved",
+          description: currentReportId 
+            ? "Weekly report updated successfully." 
+            : "Weekly report created successfully.",
+        });
+      } else {
+        throw new Error(response.error || 'Save failed');
+      }
     } catch (error) {
+      console.error('Save error:', error);
       toast({
         title: "Save Failed",
-        description: "Could not save weekly report. Please try again.",
+        description: error instanceof Error ? error.message : "Could not save weekly report. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -159,19 +386,33 @@ const WeeklyReport = () => {
   };
 
   const handleSubmit = async () => {
+    if (!currentReportId) {
+      toast({
+        title: "Cannot Submit",
+        description: "Please save the report as draft first before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // TODO: Implement submit functionality
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate submit
-      setReportStatus("submitted");
-      toast({
-        title: "Submitted",
-        description: "Weekly report submitted successfully.",
-      });
+      const response = await submitWeeklyReport(currentReportId);
+      
+      if (response.success) {
+        setReportStatus("submitted");
+        toast({
+          title: "Submitted",
+          description: "Weekly report submitted successfully.",
+        });
+      } else {
+        throw new Error(response.error || 'Submit failed');
+      }
     } catch (error) {
+      console.error('Submit error:', error);
       toast({
         title: "Submit Failed",
-        description: "Could not submit weekly report. Please try again.",
+        description: error instanceof Error ? error.message : "Could not submit weekly report. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -563,6 +804,7 @@ const WeeklyReport = () => {
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
+                      setSharedData={setSharedData}
                     />
                   </div>
                 </>
@@ -579,6 +821,7 @@ const WeeklyReport = () => {
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
+                      setSharedData={setSharedData}
                     />
                   </div>
                 </>
@@ -591,10 +834,13 @@ const WeeklyReport = () => {
                       showIntroduction={showIntroduction}
                       setShowIntroduction={setShowIntroduction}
                       projectLogo={sharedData.coverImage}
-                      setActiveTab={debugSetActiveTab}
+                      setActiveTab={setActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
+                      setSharedData={setSharedData}
+                      overallProgressData={overallProgressHook}
+                      setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
                     />
                   </div>
                 </>
@@ -611,6 +857,7 @@ const WeeklyReport = () => {
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
+                      setSharedData={setSharedData}
                     />
                   </div>
                 </>
@@ -627,6 +874,7 @@ const WeeklyReport = () => {
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
+                      setSharedData={setSharedData}
                     />
                   </div>
                 </>
@@ -643,6 +891,7 @@ const WeeklyReport = () => {
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
+                      setSharedData={setSharedData}
                     />
                   </div>
                 </>

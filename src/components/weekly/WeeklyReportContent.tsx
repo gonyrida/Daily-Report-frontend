@@ -23,18 +23,26 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   setShowSecondNav,
   activeTab,
   sharedData,
+  setSharedData,
+  overallProgressData,
+  setOverallProgressData
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
 
   // Initialize all hooks at parent level
-  const activitiesHook = useActivities([], []);
+  const activitiesHook = { weeklyActivities: [], setWeeklyActivities: () => {}, nextWeekPlan: [], setNextWeekPlan: () => {} };
   const constructionIssueHook = useConstructionIssue({});
   const hsesDataHook = useHsesData();
   const introductionTextHook = useIntroductionText(projectLogo);
-  const overallProgressHook = useOverallProgress();
   const qaqcTableHook = useQaqcTable(QAQC_SECTIONS);
   const resourceTableHook = useResourceTable(sharedData, true);
+
+  // Use passed overallProgress data or create a simple fallback
+  const overallProgressHook = overallProgressData || { 
+    rows: [], 
+    setRows: () => {} 
+  };
 
   const showIntroduction = externalShowIntroduction ?? internalShowIntroduction;
   const setShowIntroduction =
@@ -56,18 +64,36 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
         </h2>
         <Introduction 
           projectLogo={projectLogo}
-          projectOverview={introductionTextHook.projectOverview}
-          setProjectOverview={introductionTextHook.setProjectOverview}
-          designConstruction={introductionTextHook.designConstruction}
-          setDesignConstruction={introductionTextHook.setDesignConstruction}
-          designList={introductionTextHook.designList}
-          setDesignList={introductionTextHook.setDesignList}
-          handleTextChange={introductionTextHook.handleTextChangeWrapper}
-          handleTabKey={introductionTextHook.handleTabKeyWrapper}
-          handleBold={introductionTextHook.handleBoldWrapper}
-          handleListChange={introductionTextHook.handleListChange}
-          addListItem={introductionTextHook.addListItem}
-          removeListItem={introductionTextHook.removeListItem}
+          projectOverview={sharedData.projectOverview || ""}
+          setProjectOverview={(value) => setSharedData(prev => ({ ...prev, projectOverview: value }))}
+          designConstruction={sharedData.designNConstruction || ""}
+          setDesignConstruction={(value) => setSharedData(prev => ({ ...prev, designNConstruction: value }))}
+          handleTextChange={(e, setter) => {
+            const target = e.target as HTMLTextAreaElement;
+            setter(target.value);
+          }}
+          handleTabKey={(e) => {
+            // Basic tab handling - can be expanded later
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              const target = e.target as HTMLTextAreaElement;
+              const start = target.selectionStart;
+              const end = target.selectionEnd;
+              target.value = target.value.substring(0, start) + '  ' + target.value.substring(end);
+              target.selectionStart = target.selectionEnd = start + 2;
+            }
+          }}
+          handleBold={(e) => {
+            // Basic bold handling - can be expanded later
+            if (e.altKey && e.key === 'b') {
+              e.preventDefault();
+              const target = e.target as HTMLTextAreaElement;
+              const start = target.selectionStart;
+              const end = target.selectionEnd;
+              const selectedText = target.value.substring(start, end);
+              target.value = target.value.substring(0, start) + `**${selectedText}**` + target.value.substring(end);
+            }
+          }}
         />
       </div>
     );

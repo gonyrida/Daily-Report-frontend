@@ -1,8 +1,7 @@
 export interface WeeklyReportLetterProps {
   data?: {
+    refNoPrefix?: string;
     weekNumber?: string;
-    dateRange?: string;
-    projectName?: string;
     reportDate?: string;
     recipientCompany?: string;
     recipientLocation?: string;
@@ -18,7 +17,8 @@ export interface WeeklyReportLetterProps {
     companyPhone2?: string;
     companyEmail1?: string;
     companyEmail2?: string;
-    refNoPrefix?: string;
+    dateRange?: string;
+    projectName?: string;
     employer?: string;
   };
   onDataChange?: (data: any) => void;

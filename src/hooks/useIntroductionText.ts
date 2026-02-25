@@ -21,40 +21,40 @@ export const useIntroductionText = (projectLogo: string = "") => {
     return "";
   });
 
-  const [designConstruction, setDesignConstruction] = useState(() => {
+  const [designNConstruction, setDesignNConstruction] = useState(() => {
     try {
       const saved = localStorage.getItem(INTRODUCTION_STORAGE_KEY);
       if (saved) {
         const data = JSON.parse(saved);
-        console.log('[useIntroductionText] Loaded saved designConstruction:', data.designConstruction);
-        return data.designConstruction || "";
+        console.log('[useIntroductionText] Loaded saved designNConstruction:', data.designNConstruction);
+        return data.designNConstruction || "";
       }
     } catch (e) {
-      console.error('[useIntroductionText] Failed to load saved designConstruction:', e);
+      console.error('[useIntroductionText] Failed to load saved designNConstruction:', e);
     }
     return "";
   });
 
-  const [designList, setDesignList] = useState<string[]>(() => {
+  const [coverImage, setCoverImage] = useState(() => {
     try {
       const saved = localStorage.getItem(INTRODUCTION_STORAGE_KEY);
       if (saved) {
         const data = JSON.parse(saved);
-        console.log('[useIntroductionText] Loaded saved designList:', data.designList);
-        return data.designList || [""];
+        console.log('[useIntroductionText] Loaded saved coverImage:', data.coverImage);
+        return data.coverImage || projectLogo || "";
       }
     } catch (e) {
-      console.error('[useIntroductionText] Failed to load saved designList:', e);
+      console.error('[useIntroductionText] Failed to load saved coverImage:', e);
     }
-    return [""];
+    return projectLogo || "";
   });
 
   // Save data to localStorage whenever it changes
   useEffect(() => {
     const dataToSave = {
       projectOverview,
-      designConstruction,
-      designList
+      designNConstruction,
+      coverImage
     };
     
     // Use setTimeout to avoid blocking React's render queue
@@ -68,7 +68,7 @@ export const useIntroductionText = (projectLogo: string = "") => {
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [projectOverview, designConstruction, designList]);
+  }, [projectOverview, designNConstruction, coverImage]);
 
   // Refs for textareas
   const projectOverviewRef = useRef<HTMLTextAreaElement>(null);
@@ -81,7 +81,7 @@ export const useIntroductionText = (projectLogo: string = "") => {
 
   useEffect(() => {
     autoResize(designConstructionRef);
-  }, [designConstruction]);
+  }, [designNConstruction]);
 
   // Initial resize on mount
   useEffect(() => {
@@ -99,41 +99,38 @@ export const useIntroductionText = (projectLogo: string = "") => {
 
   // Handle Tab key for list indentation
   const handleTabKeyWrapper = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    handleTabKey(e, setProjectOverview, setDesignConstruction, projectOverviewRef, designConstructionRef);
+    handleTabKey(e, setProjectOverview, setDesignNConstruction, projectOverviewRef, designConstructionRef);
   };
 
   // Handle Alt+B for bold text (to avoid browser Ctrl+B conflict)
   const handleBoldWrapper = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    handleBold(e, setProjectOverview, setDesignConstruction, projectOverviewRef, designConstructionRef);
+    handleBold(e, setProjectOverview, setDesignNConstruction, projectOverviewRef, designConstructionRef);
   };
 
-  const handleListChange = (index: number, value: string) => {
-    const newList = [...designList];
-    newList[index] = value;
-    setDesignList(newList);
-  };
-
-  const addListItem = () => {
-    setDesignList([...designList, ""]);
-  };
-
-  const removeListItem = (index: number) => {
-    if (designList.length === 1) return;
-    setDesignList(designList.filter((_, i) => i !== index));
+  // Return data in the format expected by the backend
+  const data = {
+    projectOverview,
+    designNConstruction,
+    coverImage
   };
 
   return {
+    // Data
+    data,
     projectOverview,
     setProjectOverview,
-    designConstruction,
-    setDesignConstruction,
-    designList,
-    setDesignList,
+    designNConstruction,
+    setDesignNConstruction,
+    coverImage,
+    setCoverImage,
+    
+    // Legacy field names for backward compatibility
+    designConstruction: designNConstruction,
+    setDesignConstruction: setDesignNConstruction,
+    
+    // Handlers
     handleTextChangeWrapper,
     handleTabKeyWrapper,
     handleBoldWrapper,
-    handleListChange,
-    addListItem,
-    removeListItem,
   };
 };

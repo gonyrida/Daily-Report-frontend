@@ -44,7 +44,7 @@ const toRoman = (num: number): string => {
 export interface ResourceRow {
   id: string;
   description: string;
-  unit?: string;
+  unit?: number;
   prev: number;
   today: number;
   accumulated: number;

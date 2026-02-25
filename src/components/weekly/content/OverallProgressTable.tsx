@@ -126,6 +126,7 @@ export default function OverallProgressTable({
           const upToPrevWeek = typeof updatedRow.unit === "number" ? updatedRow.unit : Number(updatedRow.unit) || 0;
           const thisWeek = typeof updatedRow.prev === "number" ? updatedRow.prev : Number(updatedRow.prev) || 0;
           updatedRow.today = upToPrevWeek + thisWeek;
+          // Remove automatic accumulated calculation - let user input it manually
         }
 
         return updatedRow;
@@ -141,11 +142,10 @@ export default function OverallProgressTable({
     const newRow: ProgressRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: "hrs",
+      unit: 0,
       prev: 0,
       today: 0,
       accumulated: 0,
-      extra: "",
       rowType: "title",
       nextWeekPlan: 0,
       upNextWeekPlan: 0,
@@ -161,11 +161,10 @@ export default function OverallProgressTable({
     const newRow: ProgressRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: "hrs",
+      unit: 0,
       prev: 0,
       today: 0,
       accumulated: 0,
-      extra: "",
       rowType: "detail",
       nextWeekPlan: 0,
       upNextWeekPlan: 0,
@@ -323,6 +322,7 @@ export default function OverallProgressTable({
                 {/* Remaining */}
                 <PercentageCell
                   value={row.accumulated}
+                  onChange={(value) => customUpdateRow(row.id, "accumulated", value)}
                   placeholder="0"
                   showIndicator={false}
                   backgroundType="orange"
@@ -331,6 +331,7 @@ export default function OverallProgressTable({
                 {/* % Next Week Plan */}
                 <PercentageCell
                   value={row.nextWeekPlan}
+                  onChange={(value) => customUpdateRow(row.id, "nextWeekPlan", value)}
                   placeholder="0"
                   showIndicator={false}
                   backgroundType="none"
@@ -339,6 +340,7 @@ export default function OverallProgressTable({
                 {/* % Up Next Week Plan */}
                 <PercentageCell
                   value={row.upNextWeekPlan}
+                  onChange={(value) => customUpdateRow(row.id, "upNextWeekPlan", value)}
                   placeholder="0"
                   showIndicator={false}
                   backgroundType="green"

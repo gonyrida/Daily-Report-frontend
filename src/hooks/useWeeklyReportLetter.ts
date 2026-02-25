@@ -3,15 +3,15 @@ import { WeeklyReportLetterProps } from "@/types/weeklyReportLetter.types";
 import { formatDate } from "@/lib/dateUtils";
 import { handleSignatureUpload } from "@/lib/fileUploadUtils";
 import { handleFieldChange } from "@/lib/fieldUtils";
+import { useTheme } from "@/hooks/useTheme";
 
 export const useWeeklyReportLetter = (data: WeeklyReportLetterProps["data"] = {}, onDataChange?: WeeklyReportLetterProps["onDataChange"]) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === "dark";
 
   const [letterData, setLetterData] = useState({
+    refNoPrefix: data.refNoPrefix || "",
     weekNumber: data.weekNumber || "",
-    dateRange: data.dateRange || "",
-    projectName: data.projectName || "",
     reportDate: data.reportDate || new Date().toISOString().split("T")[0],
     recipientCompany: data.recipientCompany || "",
     recipientLocation: data.recipientLocation || "",
@@ -20,16 +20,15 @@ export const useWeeklyReportLetter = (data: WeeklyReportLetterProps["data"] = {}
     letterBody: data.letterBody || "",
     signatureImage: data.signatureImage || "",
     signatoryName: data.signatoryName || "",
-    signatoryPosition: data.signatoryPosition || "Project Manager",
-    constructorName:
-      "Cambodian Advanced Construction Project Management (CACPM)",
-    companyLocation:
-      "8th floor, K1 Tower, No.148, Mao Tse Toung Blvd (245),Sangkat Toul Tumpong II, Khan Chamkamom, Phnom Penh, Cambodia",
-    companyPhone1: "+855 (0) 23 964 417~8",
+    signatoryPosition: data.signatoryPosition || "",
+    constructorName: data.constructorName || "",
+    companyLocation: data.companyLocation || "",
+    companyPhone1: data.companyPhone1 || "",
     companyPhone2: data.companyPhone2 || "",
     companyEmail1: data.companyEmail1 || "",
-    companyEmail2: "info@cacpm.com.kh",
-    refNoPrefix: data.refNoPrefix || "ICT-CPM-LETTER",
+    companyEmail2: data.companyEmail2 || "",
+    dateRange: data.dateRange || "",
+    projectName: data.projectName || "",
   });
 
   // Auto-generate letter body when key fields change
@@ -54,10 +53,25 @@ export const useWeeklyReportLetter = (data: WeeklyReportLetterProps["data"] = {}
     setLetterData((prev) => {
       const updatedData = {
         ...prev,
+        refNoPrefix: data.refNoPrefix || prev.refNoPrefix,
         weekNumber: data.weekNumber || prev.weekNumber,
         dateRange: data.dateRange || prev.dateRange,
         projectName: data.projectName || prev.projectName,
-        refNoPrefix: data.refNoPrefix || prev.refNoPrefix,
+        reportDate: data.reportDate || prev.reportDate,
+        recipientCompany: data.recipientCompany || prev.recipientCompany,
+        recipientLocation: data.recipientLocation || prev.recipientLocation,
+        recipientName: data.recipientName || prev.recipientName,
+        ccList: data.ccList || prev.ccList,
+        letterBody: data.letterBody || prev.letterBody,
+        signatureImage: data.signatureImage || prev.signatureImage,
+        signatoryName: data.signatoryName || prev.signatoryName,
+        signatoryPosition: data.signatoryPosition || prev.signatoryPosition,
+        constructorName: data.constructorName || prev.constructorName,
+        companyLocation: data.companyLocation || prev.companyLocation,
+        companyPhone1: data.companyPhone1 || prev.companyPhone1,
+        companyPhone2: data.companyPhone2 || prev.companyPhone2,
+        companyEmail1: data.companyEmail1 || prev.companyEmail1,
+        companyEmail2: data.companyEmail2 || prev.companyEmail2,
       };
 
       // Auto-update recipientCompany with employer data
