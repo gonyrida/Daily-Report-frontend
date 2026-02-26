@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { apiPost } from '@/lib/apiFetch';
+import { 
+  apiPost,
+  apiGet,
+  apiPut
+} from '@/lib/apiFetch';
 import { 
   SidebarTrigger, 
   SidebarProvider,
@@ -20,10 +24,19 @@ import {
 import { 
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import HierarchicalSidebar from '@/components/HierarchicalSidebar';
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -46,17 +59,52 @@ const PurchaseRequest = () => {
       material: false,
       services: false
     },
-    items: []
+    items: [],
+    // NEW: Add approvers selection
+    approvers: {
+      checkedBy: '',
+      verifiedBy: '',
+      approvedBy: ''
+    }
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    requesterName: '',
+    requesterDepartment: '',
+    projectName: '',
+    purpose: '',
+    requestDate: new Date().toISOString().split('T')[0],
+    deliveryPlace: '',
+    categories: {
+      construction: false,
+      admin: false,
+      material: false,
+      services: false
+    },
+    items: [],
+    approvers: {
+      preparedBy: '',
+      checkedBy: '',
+      verifiedBy: '',
+      approvedBy: ''
+    }
   });
 
   const [selectedItems, setSelectedItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('my-requests');
   const [showNewRequest, setShowNewRequest] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [requests, setRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [editingRequest, setEditingRequest] = useState(null); // NEW: For editing
+  const [showEditModal, setShowEditModal] = useState(false); // NEW: Edit modal visibility
 
   const [newItem, setNewItem] = useState({
     description: '',
@@ -68,159 +116,45 @@ const PurchaseRequest = () => {
     note: ''
   });
 
-  const [requests, setRequests] = useState([
-    {
-      _id: '507f1f77bcf86cd799439011',
-      id: 'MR-2024-001',
-      projectName: 'Project Alpha',
-      purpose: 'Office Setup',
-      deliveryPlace: 'Main Office - Reception Area',
-      categories: {
-        construction: false,
-        admin: true,
-        material: false,
-        services: false
-      },
-      items: [
-        {
-          description: 'Dell Laptop XPS 15',
-          unit: 'pcs',
-          quantity: 5,
-          unitPrice: 1299.99,
-          brand: 'Dell',
-          reference: 'DL-XPS15-001',
-          note: 'For development team'
-        },
-        {
-          description: 'LG 27" 4K Monitor',
-          unit: 'pcs',
-          quantity: 5,
-          unitPrice: 349.99,
-          brand: 'LG',
-          reference: 'LG-4K27-002',
-          note: 'Dual monitor setup'
-        }
-      ],
-      grandTotal: 8249.90,
-      status: 'pending',
-      priority: 'medium',
-      preparedBy: null,
-      checkedBy: null,
-      verifiedBy: null,
-      approvedBy: null,
-      requesterName: 'John Doe',
-      requesterDepartment: 'IT Department',
-      createdAt: '2024-01-15T10:30:00Z',
-      updatedAt: '2024-01-15T10:30:00Z'
-    },
-    {
-      _id: '507f1f77bcf86cd799439012',
-      id: 'MR-2024-002',
-      projectName: 'Project Beta',
-      purpose: 'Construction Materials',
-      deliveryPlace: 'Construction Site - Warehouse',
-      categories: {
-        construction: true,
-        admin: false,
-        material: true,
-        services: false
-      },
-      items: [
-        {
-          description: 'Steel Reinforcement Bar',
-          unit: 'tons',
-          quantity: 10,
-          unitPrice: 850.00,
-          brand: 'ArcelorMittal',
-          reference: 'STL-RB-003',
-          note: 'Grade 60 steel'
-        },
-        {
-          description: 'Ready Mix Concrete',
-          unit: 'cubic meters',
-          quantity: 50,
-          unitPrice: 120.00,
-          brand: 'Holcim',
-          reference: 'CON-RMX-004',
-          note: 'High strength concrete'
-        },
-        {
-          description: 'Portland Cement',
-          unit: 'bags',
-          quantity: 200,
-          unitPrice: 12.50,
-          brand: 'Lafarge',
-          reference: 'CEM-PORT-005',
-          note: 'Type I cement'
-        }
-      ],
-      grandTotal: 15500.00,
-      status: 'approved',
-      priority: 'high',
-      preparedBy: 'Jane Smith',
-      checkedBy: 'Mike Johnson',
-      verifiedBy: 'Sarah Wilson',
-      approvedBy: 'David Brown',
-      requesterName: 'Bob Smith',
-      requesterDepartment: 'Construction',
-      createdAt: '2024-01-14T09:15:00Z',
-      updatedAt: '2024-01-16T14:20:00Z'
-    },
-    {
-      _id: '507f1f77bcf86cd799439013',
-      id: 'MR-2024-003',
-      projectName: 'Project Gamma',
-      purpose: 'Legal Consulting Services',
-      deliveryPlace: 'Head Office - Legal Department',
-      categories: {
-        construction: false,
-        admin: false,
-        material: false,
-        services: true
-      },
-      items: [
-        {
-          description: 'Legal Consultation Services',
-          unit: 'hours',
-          quantity: 40,
-          unitPrice: 250.00,
-          brand: null,
-          reference: 'LGL-CONS-006',
-          note: 'Contract review and compliance'
-        }
-      ],
-      grandTotal: 10000.00,
-      status: 'rejected',
-      priority: 'low',
-      preparedBy: 'Alice Johnson',
-      checkedBy: 'Tom Davis',
-      verifiedBy: null,
-      approvedBy: null,
-      requesterName: 'Carol White',
-      requesterDepartment: 'Legal',
-      createdAt: '2024-01-13T16:45:00Z',
-      updatedAt: '2024-01-14T11:30:00Z'
-    }
-  ]);
   const { toast } = useToast();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (action = 'post') => {
+    // e.preventDefault();
     setIsSubmitting(true);
     
     try {
       // Validate form
-      if (!formData.projectName || !formData.purpose || !formData.deliveryPlace || formData.items.length === 0) {
+      // if (!formData.projectName || !formData.purpose || !formData.deliveryPlace || formData.items.length === 0) {
+      //   toast({
+      //     title: "Validation Error",
+      //     description: "Please fill in all required fields and add at least one item"
+      //   });
+      //   return;
+      // }
+
+      // Validate form (less strict for drafts)
+      if (action === 'post' && (!formData.projectName || !formData.purpose || !formData.deliveryPlace || formData.items.length === 0)) {
         toast({
           title: "Validation Error",
           description: "Please fill in all required fields and add at least one item"
         });
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (action === 'draft' && !formData.projectName) {
+        toast({
+          title: "Validation Error", 
+          description: "Please enter at least a project name for drafts"
+        });
+        setIsSubmitting(false);
         return;
       }
 
       // Prepare submission data with approval fields
       const submissionData = {
         ...formData,
+        status: action === 'draft' ? 'draft' : 'pending',
         // Add approval workflow fields (can be populated later)
         preparedBy: null,
         checkedBy: null, 
@@ -235,7 +169,7 @@ const PurchaseRequest = () => {
       if (result.success) {
         toast({
           title: "Success",
-          description: "Purchase request submitted successfully"
+          description: `Purchase request ${action === 'draft' ? 'saved as draft' : 'submitted'} successfully`
         });
         
         // Reset form but keep user info
@@ -252,7 +186,13 @@ const PurchaseRequest = () => {
             material: false,
             services: false
           },
-          items: []
+          items: [],
+          // NEW: Add approvers selection
+          approvers: {
+            checkedBy: '',
+            verifiedBy: '',
+            approvedBy: ''
+          }
         });
         
         // Close modal
@@ -270,8 +210,8 @@ const PurchaseRequest = () => {
     } catch (error) {
       console.error('Submit error:', error);
       toast({
-        title: "Error", 
-        description: "Failed to submit request. Please try again."
+        title: "Error",
+        description: `Failed to ${action === 'draft' ? 'save draft' : 'submit request'}`
       });
     } finally {
       setIsSubmitting(false);
@@ -283,17 +223,35 @@ const PurchaseRequest = () => {
     if (newItem.description && newItem.quantity > 0 && newItem.unitPrice > 0) {
       let updatedItems;
       
+      // Smart context detection
+      const isEditMode = showEditModal;
+      
       if (editingIndex !== null) {
         // Edit existing item
-        updatedItems = formData.items.map((item, index) => 
-          index === editingIndex ? newItem : item
-        );
+        if (isEditMode) {
+          updatedItems = editFormData.items.map((item, index) => 
+            index === editingIndex ? newItem : item
+          );
+        } else {
+          updatedItems = formData.items.map((item, index) => 
+            index === editingIndex ? newItem : item
+          );
+        }
       } else {
         // Add new item
-        updatedItems = [...formData.items, newItem];
+        if (isEditMode) {
+          updatedItems = [...editFormData.items, newItem];
+        } else {
+          updatedItems = [...formData.items, newItem];
+        }
       }
       
-      setFormData({...formData, items: updatedItems});
+      // Update the appropriate state
+      if (isEditMode) {
+        setEditFormData({...editFormData, items: updatedItems});
+      } else {
+        setFormData({...formData, items: updatedItems});
+      }
       
       // Reset form
       setNewItem({
@@ -313,7 +271,11 @@ const PurchaseRequest = () => {
   const handleEditSelected = () => {
     if (selectedItems.length === 1) {
       const itemIndex = selectedItems[0];
-      const item = formData.items[itemIndex];
+      
+      // Smart context detection
+      const isEditMode = showEditModal;
+      const currentItems = isEditMode ? editFormData.items : formData.items;
+      const item = currentItems[itemIndex];
       
       setNewItem({
         description: item.description,
@@ -332,8 +294,16 @@ const PurchaseRequest = () => {
 
   const handleRemoveSelected = () => {
     if (selectedItems.length > 0) {
-      const updatedItems = formData.items.filter((_, index) => !selectedItems.includes(index));
-      setFormData({...formData, items: updatedItems});
+      // Smart context detection
+      const isEditMode = showEditModal;
+      
+      if (isEditMode) {
+        const updatedItems = editFormData.items.filter((_, index) => !selectedItems.includes(index));
+        setEditFormData({...editFormData, items: updatedItems});
+      } else {
+        const updatedItems = formData.items.filter((_, index) => !selectedItems.includes(index));
+        setFormData({...formData, items: updatedItems});
+      }
       setSelectedItems([]);
     }
   };
@@ -382,6 +352,150 @@ const PurchaseRequest = () => {
     setSelectedRequest(request);
     setShowDetailsModal(true);
   };
+
+  // Fetch all users on component mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const response = await apiGet('/purchase-requests/users');
+        const result = await response.json();
+        if (result.success) {
+          setAllUsers(result.data);
+          console.log('✅ Users loaded:', result.data);
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load users"
+        });
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    
+    fetchUsers();
+  }, []);
+
+  // Add tab-specific fetching:
+  useEffect(() => {
+    const fetchRequests = async () => {
+      setLoadingRequests(true);
+      try {
+        // Use different endpoints based on active tab
+        const endpoint = activeTab === 'my-requests' 
+          ? '/purchase-requests/my-requests' 
+            : '/purchase-requests';
+        
+        const response = await apiGet(endpoint);
+        const result = await response.json();
+        if (result.success) {
+          setRequests(result.data);
+          console.log('✅ Requests loaded:', result.data);
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load requests"
+        });
+      } finally {
+        setLoadingRequests(false);
+      }
+    };
+    
+    fetchRequests();
+  }, [activeTab]); // Re-fetch when tab changes
+
+  // Role-based filtering functions
+  const getUsersForRole = (allowedRoles) => {
+    return allUsers.filter(user => 
+      allowedRoles.includes(user.role?.toLowerCase())
+    );
+  };
+
+  const handleEditRequest = (request) => {
+    console.log('Edit request:', request);
+    setEditingRequest(request);
+
+    const approversFromWorkflow = {
+      preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
+      checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
+      verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
+      approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
+    };
+    
+    // Populate formData with request data
+    setEditFormData({
+      requesterName: request.requesterName || '',
+      requesterDepartment: request.requesterDepartment || '',
+      projectName: request.projectName || '',
+      purpose: request.purpose || '',
+      requestDate: request.requestDate ? new Date(request.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      deliveryPlace: request.deliveryPlace || '',
+      categories: request.categories || {
+        construction: false,
+        admin: false,
+        material: false,
+        services: false
+      },
+      items: request.items || [],
+      approvers: approversFromWorkflow
+    });
+    
+    setShowEditModal(true);
+  };
+
+  const handlePlaceholder1 = (request) => {
+    console.log('Placeholder 1 for:', request);
+    // TODO: Implement placeholder 1 functionality
+    toast({
+      title: "Placeholder 1",
+      description: `Action for request: ${request.id}`
+    });
+  };
+
+  const handleUpdateRequest = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const response = await apiPut(`/purchase-requests/${editingRequest._id}`, editFormData);
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Request updated successfully"
+        });
+        setShowEditModal(false);
+        setEditingRequest(null);
+        // Refresh requests
+        const fetchRequests = async () => {
+          const endpoint = activeTab === 'my-requests' 
+            ? '/purchase-requests/my-requests' 
+            : '/purchase-requests';
+          const response = await apiGet(endpoint);
+          const result = await response.json();
+          if (result.success) {
+            setRequests(result.data);
+          }
+        };
+        fetchRequests();
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update request"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Specific filters for each dropdown
+  const preparers = allUsers; // Anyone can prepare
+  const checkers = getUsersForRole(['admin', 'approver']);
+  const verifiers = getUsersForRole(['admin', 'approver']);
+  const approvers = getUsersForRole(['admin', 'approver']);
 
   return (
     <SidebarProvider>
@@ -447,7 +561,7 @@ const PurchaseRequest = () => {
                             </TabsList>
 
                             <TabsContent value="purchase-request" className="space-y-4 mt-6">
-                              <form onSubmit={handleSubmit} className="space-y-6">
+                              <form className="space-y-6">
                                 {/* Header Section */}
                                 <div className="bg-muted/30 p-4 rounded-lg">
                                   <div className="space-y-4">
@@ -699,51 +813,99 @@ const PurchaseRequest = () => {
                                         <SelectValue placeholder="Select preparer" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="user1">John Doe</SelectItem>
-                                        <SelectItem value="user2">Jane Smith</SelectItem>
-                                        <SelectItem value="user3">Mike Johnson</SelectItem>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          preparers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
                                       </SelectContent>
                                     </Select>
                                   </div>
                                 
                                   <div>
                                     <Label className="text-sm font-medium">Checked By</Label>
-                                    <Select>
+                                    <Select 
+                                      value={formData.approvers.checkedBy} 
+                                      onValueChange={(value) => 
+                                        setFormData(prev => ({
+                                          ...prev,
+                                          approvers: { ...prev.approvers, checkedBy: value }
+                                        }))
+                                      }
+                                    >
                                       <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Select checker" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="user1">John Doe</SelectItem>
-                                        <SelectItem value="user2">Jane Smith</SelectItem>
-                                        <SelectItem value="user3">Mike Johnson</SelectItem>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          checkers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
                                       </SelectContent>
                                     </Select>
                                   </div>
                                 
                                   <div>
                                     <Label className="text-sm font-medium">Verified By</Label>
-                                    <Select>
+                                    <Select 
+                                      value={formData.approvers.verifiedBy} 
+                                      onValueChange={(value) => 
+                                        setFormData(prev => ({
+                                          ...prev,
+                                          approvers: { ...prev.approvers, verifiedBy: value }
+                                        }))
+                                      }
+                                    >
                                       <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Select verifier" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="user1">John Doe</SelectItem>
-                                        <SelectItem value="user2">Jane Smith</SelectItem>
-                                        <SelectItem value="user3">Mike Johnson</SelectItem>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          verifiers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
                                       </SelectContent>
                                     </Select>
                                   </div>
                                 
                                   <div>
                                     <Label className="text-sm font-medium">Approved By</Label>
-                                    <Select>
+                                    <Select 
+                                      value={formData.approvers.approvedBy} 
+                                      onValueChange={(value) => 
+                                        setFormData(prev => ({
+                                          ...prev,
+                                          approvers: { ...prev.approvers, approvedBy: value }
+                                        }))
+                                      }
+                                    >
                                       <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Select approver" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="user1">John Doe</SelectItem>
-                                        <SelectItem value="user2">Jane Smith</SelectItem>
-                                        <SelectItem value="user3">Mike Johnson</SelectItem>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          approvers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -784,11 +946,462 @@ const PurchaseRequest = () => {
                                     >
                                       Cancel
                                     </Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button 
+                                          type="button" 
+                                          disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                                        >
+                                          {isSubmitting ? "Processing..." : "Options ▼"}
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent>
+                                        <DropdownMenuItem onClick={() => handleSubmit('post')}>
+                                          {isSubmitting ? "Posting..." : "Post"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleSubmit('draft')}>
+                                          {isSubmitting ? "Saving..." : "Save as Draft"}
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </div>
+                              </form>
+                            </TabsContent>
+
+                            <TabsContent value="placeholder1" className="mt-6">
+                              <div className="text-center py-8 text-muted-foreground">
+                                <p>Placeholder 1 content will appear here.</p>
+                              </div>
+                            </TabsContent>
+
+                            <TabsContent value="placeholder2" className="mt-6">
+                              <div className="text-center py-8 text-muted-foreground">
+                                <p>Placeholder 2 content will appear here.</p>
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        </DialogContent>
+                      </Dialog>
+
+                      {/* Edit Request Modal Re-do */}
+                      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+                        <DialogContent 
+                          className="max-w-6xl max-h-[95vh] overflow-y-auto"
+                          onPointerDownOutside={(e) => e.preventDefault()}
+                          onEscapeKeyDown={(e) => e.preventDefault()}
+                        >
+                          <DialogHeader>
+                            <DialogTitle>Edit Purchase Request</DialogTitle>
+                          </DialogHeader>
+                          
+                          {/* Modal Tabs */}
+                          <Tabs defaultValue="purchase-request" className="w-full">
+                            <TabsList className="grid w-full grid-cols-3">
+                              <TabsTrigger value="purchase-request">Purchase Request</TabsTrigger>
+                              <TabsTrigger value="placeholder1">Placeholder 1</TabsTrigger>
+                              <TabsTrigger value="placeholder2">Placeholder 2</TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="purchase-request" className="space-y-4 mt-6">
+                              <form onSubmit={handleUpdateRequest} className="space-y-6">
+                                {/* Header Section */}
+                                <div className="bg-muted/30 p-4 rounded-lg">
+                                  <div className="space-y-4">
+                                    {/* Requester */}
+                                    <div>
+                                      <label className="text-sm font-medium text-muted-foreground">Requester</label>
+                                      <div className="text-sm font-semibold">
+                                        {editFormData.requesterName} ({editFormData.requesterDepartment})
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Project Name */}
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium">Project Name *</label>
+                                      <Input
+                                        value={editFormData.projectName}
+                                        onChange={(e) => setEditFormData({...editFormData, projectName: e.target.value})}
+                                        placeholder="Enter project name"
+                                        required
+                                      />
+                                    </div>
+                                    
+                                    {/* Purpose */}
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium">Purpose *</label>
+                                      <Input
+                                        value={editFormData.purpose}
+                                        onChange={(e) => setEditFormData({...editFormData, purpose: e.target.value})}
+                                        placeholder="Enter Purpose of Request"
+                                      />
+                                    </div>
+                                    
+                                    {/* Request Date */}
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium">Request Date</label>
+                                      <Input
+                                        type="date"
+                                        value={editFormData.requestDate || new Date().toISOString().split('T')[0]}
+                                        onChange={(e) => setEditFormData({...editFormData, requestDate: e.target.value})}
+                                      />
+                                    </div>
+                                    
+                                    {/* Delivery Place */}
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium">Delivery Place</label>
+                                      <Input
+                                        value={editFormData.deliveryPlace}
+                                        onChange={(e) => setEditFormData({...editFormData, deliveryPlace: e.target.value})}
+                                        placeholder="Enter delivery location"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Category Selection */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Category Selection</label>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        id="construction"
+                                        checked={editFormData.categories.construction}
+                                        onChange={(e) => setEditFormData({
+                                          ...editFormData,
+                                          categories: {...editFormData.categories, construction: e.target.checked}
+                                        })}
+                                      />
+                                      <label htmlFor="construction" className="text-sm">Construction</label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        id="admin"
+                                        checked={editFormData.categories.admin}
+                                        onChange={(e) => setEditFormData({
+                                          ...editFormData,
+                                          categories: {...editFormData.categories, admin: e.target.checked}
+                                        })}
+                                      />
+                                      <label htmlFor="admin" className="text-sm">Admin</label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        id="material"
+                                        checked={editFormData.categories.material}
+                                        onChange={(e) => setEditFormData({
+                                          ...editFormData,
+                                          categories: {...editFormData.categories, material: e.target.checked}
+                                        })}
+                                      />
+                                      <label htmlFor="material" className="text-sm">Material</label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        id="services"
+                                        checked={editFormData.categories.services}
+                                        onChange={(e) => setEditFormData({
+                                          ...editFormData,
+                                          categories: {...editFormData.categories, services: e.target.checked}
+                                        })}
+                                      />
+                                      <label htmlFor="services" className="text-sm">Services</label>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Item Management */}
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <label className="text-sm font-medium">Item Management</label>
+                                    <div className="flex gap-2">
+                                      <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => setShowAddItemModal(true)}
+                                      >
+                                        Add Item
+                                      </Button>
+                                      <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleEditSelected}
+                                        disabled={selectedItems.length === 0 || selectedItems.length > 1}
+                                      >
+                                        Edit Selected
+                                      </Button>
+                                      <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleRemoveSelected}
+                                        disabled={selectedItems.length === 0}
+                                      >
+                                        Remove Selected
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {/* Items Table */}
+                                  <div className="border rounded-lg overflow-hidden">
+                                    <table className="w-full">
+                                      <thead className="bg-muted/50">
+                                        <tr>
+                                          <th className="text-left p-2 text-xs font-medium w-8">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedItems.length === editFormData.items.length && editFormData.items.length > 0}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedItems(editFormData.items.map((_, index) => index));
+                                                } else {
+                                                  setSelectedItems([]);
+                                                }
+                                              }}
+                                            />
+                                          </th>
+                                          <th className="text-left p-2 text-xs font-medium">No</th>
+                                          <th className="text-left p-2 text-xs font-medium">Description</th>
+                                          <th className="text-left p-2 text-xs font-medium">Unit</th>
+                                          <th className="text-left p-2 text-xs font-medium">Qty</th>
+                                          <th className="text-left p-2 text-xs font-medium">Unit Price</th>
+                                          <th className="text-left p-2 text-xs font-medium">Total Price</th>
+                                          <th className="text-left p-2 text-xs font-medium">Brand</th>
+                                          <th className="text-left p-2 text-xs font-medium">Reference</th>
+                                          <th className="text-left p-2 text-xs font-medium">Note</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {editFormData.items.map((item, index) => (
+                                          <tr 
+                                            key={index} 
+                                            className={`border-t cursor-pointer transition-colors ${
+                                              selectedItems.includes(index) ? 'bg-blue-50' : 'hover:bg-muted/30'
+                                            }`}
+                                          >
+                                            <td className="p-2 text-xs">
+                                              <input
+                                                type="checkbox"
+                                                checked={selectedItems.includes(index)}
+                                                onChange={(e) => {
+                                                  if (e.target.checked) {
+                                                    setSelectedItems([...selectedItems, index]);
+                                                  } else {
+                                                    setSelectedItems(selectedItems.filter(i => i !== index));
+                                                  }
+                                                }}
+                                              />
+                                            </td>
+                                            <td className="p-2 text-xs">{index + 1}</td>
+                                            <td className="p-2 text-xs">{item.description || ''}</td>
+                                            <td className="p-2 text-xs">{item.unit || ''}</td>
+                                            <td className="p-2 text-xs">{item.quantity || ''}</td>
+                                            <td className="p-2 text-xs">{item.unitPrice || ''}</td>
+                                            <td className="p-2 text-xs font-medium">
+                                              ${(item.quantity * item.unitPrice).toFixed(2) || '0.00'}
+                                            </td>
+                                            <td className="p-2 text-xs">{item.brand || ''}</td>
+                                            <td className="p-2 text-xs">{item.reference || ''}</td>
+                                            <td className="p-2 text-xs">{item.note || ''}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Stacked Total Section */}
+                                  <div className="bg-muted/30 p-4 rounded-lg">
+                                    {/* Grand Total */}
+                                    <div className="flex items-center mb-3 gap-2">
+                                      <span className="text-sm font-medium">Grand Total: </span>
+                                      <span className="text-lg font-bold">
+                                        ${editFormData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Amount in Words */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium">Amount in Words: </span>
+                                      <span className="text-base font-semibold capitalize">
+                                        {(() => {
+                                          const total = editFormData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+                                          const dollars = Math.floor(total);
+                                          const cents = Math.round((total - dollars) * 100);
+                                          
+                                          const wordResult = numberToWords(dollars);
+                                          const centsStr = cents.toString().padStart(2, '0');
+                                          
+                                          return `${wordResult} and ${centsStr}/100 Dollars`;
+                                        })()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="border-t pt-4 mt-4"></div>
+                                
+                                {/* Signature Section */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                  <div>
+                                    <Label className="text-sm font-medium">Prepared By</Label>
+                                    <Select 
+                                      value={editFormData.approvers.preparedBy} 
+                                      onValueChange={(value) => 
+                                        setEditFormData(prev => ({
+                                          ...prev,
+                                          approvers: { ...prev.approvers, preparedBy: value }
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select preparer" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          preparers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                
+                                  <div>
+                                    <Label className="text-sm font-medium">Checked By</Label>
+                                    <Select 
+                                      value={editFormData.approvers.checkedBy} 
+                                      onValueChange={(value) => 
+                                        setEditFormData(prev => ({
+                                          ...prev,
+                                          approvers: { ...prev.approvers, checkedBy: value }
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select checker" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          checkers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                
+                                  <div>
+                                    <Label className="text-sm font-medium">Verified By</Label>
+                                    <Select 
+                                      value={editFormData.approvers.verifiedBy} 
+                                      onValueChange={(value) => 
+                                        setEditFormData(prev => ({
+                                          ...prev,
+                                          approvers: { ...prev.approvers, verifiedBy: value }
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select verifier" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          verifiers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                
+                                  <div>
+                                    <Label className="text-sm font-medium">Approved By</Label>
+                                    <Select 
+                                      value={editFormData.approvers.approvedBy} 
+                                      onValueChange={(value) => 
+                                        setEditFormData(prev => ({
+                                          ...prev,
+                                          approvers: { ...prev.approvers, approvedBy: value }
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select approver" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {loadingUsers ? (
+                                          <SelectItem value="" disabled>Loading...</SelectItem>
+                                        ) : (
+                                          approvers.map((user) => (
+                                            <SelectItem key={user._id} value={user._id}>
+                                              {user.firstName + ' ' + user.lastName} ({user.role})
+                                            </SelectItem>
+                                          ))
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex justify-between items-center pt-4 border-t">
+                                  {/* Left side - Export and Preview */}
+                                  <div className="flex space-x-2">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline"
+                                      onClick={() => {
+                                        // Export logic here
+                                        console.log("Export clicked");
+                                      }}
+                                    >
+                                      Export
+                                    </Button>
+                                    <Button 
+                                      type="button" 
+                                      variant="outline"
+                                      onClick={() => {
+                                        // Preview logic here
+                                        console.log("Preview clicked");
+                                      }}
+                                    >
+                                      Preview
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Right side - Cancel and Post */}
+                                  <div className="flex space-x-2">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline"
+                                      onClick={() => setShowEditModal(false)}
+                                    >
+                                      Cancel
+                                    </Button>
                                     <Button 
                                       type="submit" 
-                                      disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                                      disabled={isUpdating || !editFormData.projectName || editFormData.items.length === 0}
                                     >
-                                      {isSubmitting ? "Posting..." : "Post"}
+                                      {isUpdating ? "Updating..." : "Update"}
                                     </Button>
                                   </div>
                                 </div>
@@ -941,53 +1554,89 @@ const PurchaseRequest = () => {
                             <thead>
                               <tr className="bg-muted">
                                 <th className="text-left p-3 font-medium">Request ID</th>
-                                <th className="text-left p-3 font-medium">Project Name</th>
+                                <th className="text-left p-3 font-medium">Project</th>
                                 <th className="text-left p-3 font-medium">Category</th>
                                 <th className="text-left p-3 font-medium">Purpose</th>
                                 <th className="text-left p-3 font-medium">Items</th>
                                 <th className="text-left p-3 font-medium">Total</th>
                                 <th className="text-left p-3 font-medium">Status</th>
                                 <th className="text-left p-3 font-medium">Date</th>
+                                <th className="text-left p-3 font-medium">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {requests.map((request) => (
-                                <tr 
-                                  key={request.id} 
-                                  className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
-                                  onClick={() => handleViewDetails(request)}
-                                >
-                                  <td className="p-3 font-medium">{request.id}</td>
-                                  <td className="p-3">{request.projectName}</td>
-                                  <td className="p-3">
-                                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                      {request.categories.admin ? 'Admin' : 
-                                      request.categories.construction ? 'Construction' :
-                                      request.categories.material ? 'Material' :
-                                      request.categories.services ? 'Services' : 'Other'}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">{request.purpose}</td>
-                                  <td className="p-3">
-                                    <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                                      {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
-                                  <td className="p-3">
-                                    <span className={`px-2 py-1 rounded-full text-xs ${
-                                      request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                      request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                      request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                                      request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                                      'bg-red-100 text-red-800'
-                                    }`}>
-                                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
-                                </tr>
-                              ))}
+                              {loadingRequests ? (
+                                <div className="text-center py-8">
+                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                                  <p className="mt-2 text-gray-600">Loading requests...</p>
+                                </div>
+                              ) : requests.length === 0 ? (
+                                <div className="text-center py-8">
+                                  <p className="text-gray-600">No requests found</p>
+                                </div>
+                              ) : (
+                                // Your existing request list table
+                                <>
+                                  {requests.map((request) => (
+                                    <tr 
+                                      key={request.id} 
+                                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                                      onClick={() => handleViewDetails(request)}
+                                    >
+                                      <td className="p-3 font-medium">{request.id}</td>
+                                      <td className="p-3">{request.projectName}</td>
+                                      <td className="p-3">
+                                        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                          {request.categories.admin ? 'Admin' : 
+                                          request.categories.construction ? 'Construction' :
+                                          request.categories.material ? 'Material' :
+                                          request.categories.services ? 'Services' : 'Other'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3">{request.purpose}</td>
+                                      <td className="p-3">
+                                        <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                          {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
+                                      <td className="p-3">
+                                        <span className={`px-2 py-1 rounded-full text-xs ${
+                                          request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                          request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                          request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                          'bg-red-100 text-red-800'
+                                        }`}>
+                                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                        </span>
+                                      </td>
+                                      <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
+                                      <td className="p-3">
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                              <span className="sr-only">Open menu</span>
+                                              <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={(e) => {
+                                              e.stopPropagation(); // NEW: Prevent row click
+                                              handleEditRequest(request);
+                                            }}>
+                                              Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handlePlaceholder1(request)}>
+                                              Placeholder 1
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </>
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -1172,22 +1821,53 @@ const PurchaseRequest = () => {
                                 </span>
                               </div>
                               
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <label className="text-sm font-medium">Prepared By</label>
-                                  <p className="text-sm">{selectedRequest.preparedBy || 'Not Assigned'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium">Checked By</label>
-                                  <p className="text-sm">{selectedRequest.checkedBy || 'Not Assigned'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium">Verified By</label>
-                                  <p className="text-sm">{selectedRequest.verifiedBy || 'Not Assigned'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium">Approved By</label>
-                                  <p className="text-sm">{selectedRequest.approvedBy || 'Not Assigned'}</p>
+                              {/* NEW: Workflow Table Display */}
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  {selectedRequest.approvalWorkflow?.map((step, index) => {
+                                    // Find the user details based on the approver ID
+                                    let userDetails = null;
+                                    if (step.role === 'prepared') {
+                                      userDetails = preparers.find(user => user._id === step.approver);
+                                    } else if (step.role === 'checked') {
+                                      userDetails = checkers.find(user => user._id === step.approver);
+                                    } else if (step.role === 'verified') {
+                                      userDetails = verifiers.find(user => user._id === step.approver);
+                                    } else if (step.role === 'approved') {
+                                      userDetails = approvers.find(user => user._id === step.approver);
+                                    }
+
+                                    return (
+                                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                                        <div className="flex-1">
+                                          <div className="flex items-center space-x-2">
+                                            <span className="font-medium capitalize">{step.role}</span>
+                                            <span className={`px-2 py-1 rounded text-xs ${
+                                              step.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                              step.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-gray-100 text-gray-800'
+                                            }`}>
+                                              {step.status}
+                                            </span>
+                                          </div>
+                                          <div className="text-sm text-gray-600 mt-1">
+                                            {userDetails ? `${userDetails.firstName} ${userDetails.lastName}` : 'Not Assigned'}
+                                            {userDetails?.role && (
+                                              <span className="ml-1">({userDetails.role})</span>
+                                            )}
+                                          </div>
+                                          {step.notes && (
+                                            <div className="text-xs text-gray-500 mt-1">
+                                              Note: {step.notes}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="text-right text-sm text-gray-600">
+                                          {step.timestamp ? new Date(step.timestamp).toLocaleDateString() : 'Pending'}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             </div>
@@ -1204,17 +1884,76 @@ const PurchaseRequest = () => {
                     </DialogContent>
                   </Dialog>
 
+                  {/* All Related MRs */}
                   <TabsContent value="all-mrs" className="space-y-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>All Related Material Requests</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-center py-8 text-muted-foreground">
-                          <p>All material requests from related projects will appear here.</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted">
+                            <th className="text-left p-3 font-medium">Request ID</th>
+                            <th className="text-left p-3 font-medium">Project Name</th>
+                            <th className="text-left p-3 font-medium">Category</th>
+                            <th className="text-left p-3 font-medium">Purpose</th>
+                            <th className="text-left p-3 font-medium">Items</th>
+                            <th className="text-left p-3 font-medium">Total</th>
+                            <th className="text-left p-3 font-medium">Status</th>
+                            <th className="text-left p-3 font-medium">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {loadingRequests ? (
+                            <div className="text-center py-8">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                              <p className="mt-2 text-gray-600">Loading requests...</p>
+                            </div>
+                          ) : requests.length === 0 ? (
+                            <div className="text-center py-8">
+                              <p className="text-gray-600">No requests found</p>
+                            </div>
+                          ) : (
+                            <>
+                              {requests.map((request) => (
+                                <tr 
+                                  key={request.id} 
+                                  className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                                  onClick={() => handleViewDetails(request)}
+                                >
+                                  <td className="p-3 font-medium">{request.id}</td>
+                                  <td className="p-3">{request.projectName}</td>
+                                  <td className="p-3">
+                                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                      {request.categories.admin ? 'Admin' : 
+                                      request.categories.construction ? 'Construction' :
+                                      request.categories.material ? 'Material' :
+                                      request.categories.services ? 'Services' : 'Other'}
+                                    </span>
+                                  </td>
+                                  <td className="p-3">{request.purpose}</td>
+                                  <td className="p-3">
+                                    <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                      {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
+                                  <td className="p-3">
+                                    <span className={`px-2 py-1 rounded-full text-xs ${
+                                      request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                      request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                      request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                      request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                      'bg-red-100 text-red-800'
+                                    }`}>
+                                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                    </span>
+                                  </td>
+                                  <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </TabsContent>
                 </Tabs>
               </div>
