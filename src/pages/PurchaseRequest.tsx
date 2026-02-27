@@ -349,7 +349,19 @@ const PurchaseRequest = () => {
   }
 
   const handleViewDetails = (request) => {
-    setSelectedRequest(request);
+    const approversFromWorkflow = {
+      preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
+      checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
+      verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
+      approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
+    };
+
+    // Populate selectedRequest with request data
+    setSelectedRequest({
+      ...request,
+      approvers: approversFromWorkflow
+    });
+
     setShowDetailsModal(true);
   };
 
@@ -984,561 +996,6 @@ const PurchaseRequest = () => {
                         </DialogContent>
                       </Dialog>
 
-                      {/* Edit Request Modal Re-do */}
-                      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-                        <DialogContent 
-                          className="max-w-6xl max-h-[95vh] overflow-y-auto"
-                          onPointerDownOutside={(e) => e.preventDefault()}
-                          onEscapeKeyDown={(e) => e.preventDefault()}
-                        >
-                          <DialogHeader>
-                            <DialogTitle>Edit Purchase Request</DialogTitle>
-                          </DialogHeader>
-                          
-                          {/* Modal Tabs */}
-                          <Tabs defaultValue="purchase-request" className="w-full">
-                            <TabsList className="grid w-full grid-cols-3">
-                              <TabsTrigger value="purchase-request">Purchase Request</TabsTrigger>
-                              <TabsTrigger value="placeholder1">Placeholder 1</TabsTrigger>
-                              <TabsTrigger value="placeholder2">Placeholder 2</TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="purchase-request" className="space-y-4 mt-6">
-                              <form onSubmit={handleUpdateRequest} className="space-y-6">
-                                {/* Header Section */}
-                                <div className="bg-muted/30 p-4 rounded-lg">
-                                  <div className="space-y-4">
-                                    {/* Requester */}
-                                    <div>
-                                      <label className="text-sm font-medium text-muted-foreground">Requester</label>
-                                      <div className="text-sm font-semibold">
-                                        {editFormData.requesterName} ({editFormData.requesterDepartment})
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Project Name */}
-                                    <div className="space-y-2">
-                                      <label className="text-sm font-medium">Project Name *</label>
-                                      <Input
-                                        value={editFormData.projectName}
-                                        onChange={(e) => setEditFormData({...editFormData, projectName: e.target.value})}
-                                        placeholder="Enter project name"
-                                        required
-                                      />
-                                    </div>
-                                    
-                                    {/* Purpose */}
-                                    <div className="space-y-2">
-                                      <label className="text-sm font-medium">Purpose *</label>
-                                      <Input
-                                        value={editFormData.purpose}
-                                        onChange={(e) => setEditFormData({...editFormData, purpose: e.target.value})}
-                                        placeholder="Enter Purpose of Request"
-                                      />
-                                    </div>
-                                    
-                                    {/* Request Date */}
-                                    <div className="space-y-2">
-                                      <label className="text-sm font-medium">Request Date</label>
-                                      <Input
-                                        type="date"
-                                        value={editFormData.requestDate || new Date().toISOString().split('T')[0]}
-                                        onChange={(e) => setEditFormData({...editFormData, requestDate: e.target.value})}
-                                      />
-                                    </div>
-                                    
-                                    {/* Delivery Place */}
-                                    <div className="space-y-2">
-                                      <label className="text-sm font-medium">Delivery Place</label>
-                                      <Input
-                                        value={editFormData.deliveryPlace}
-                                        onChange={(e) => setEditFormData({...editFormData, deliveryPlace: e.target.value})}
-                                        placeholder="Enter delivery location"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Category Selection */}
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Category Selection</label>
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center space-x-2">
-                                      <input
-                                        type="checkbox"
-                                        id="construction"
-                                        checked={editFormData.categories.construction}
-                                        onChange={(e) => setEditFormData({
-                                          ...editFormData,
-                                          categories: {...editFormData.categories, construction: e.target.checked}
-                                        })}
-                                      />
-                                      <label htmlFor="construction" className="text-sm">Construction</label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <input
-                                        type="checkbox"
-                                        id="admin"
-                                        checked={editFormData.categories.admin}
-                                        onChange={(e) => setEditFormData({
-                                          ...editFormData,
-                                          categories: {...editFormData.categories, admin: e.target.checked}
-                                        })}
-                                      />
-                                      <label htmlFor="admin" className="text-sm">Admin</label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <input
-                                        type="checkbox"
-                                        id="material"
-                                        checked={editFormData.categories.material}
-                                        onChange={(e) => setEditFormData({
-                                          ...editFormData,
-                                          categories: {...editFormData.categories, material: e.target.checked}
-                                        })}
-                                      />
-                                      <label htmlFor="material" className="text-sm">Material</label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <input
-                                        type="checkbox"
-                                        id="services"
-                                        checked={editFormData.categories.services}
-                                        onChange={(e) => setEditFormData({
-                                          ...editFormData,
-                                          categories: {...editFormData.categories, services: e.target.checked}
-                                        })}
-                                      />
-                                      <label htmlFor="services" className="text-sm">Services</label>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Item Management */}
-                                <div className="space-y-4">
-                                  <div className="flex justify-between items-center">
-                                    <label className="text-sm font-medium">Item Management</label>
-                                    <div className="flex gap-2">
-                                      <Button 
-                                        type="button" 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => setShowAddItemModal(true)}
-                                      >
-                                        Add Item
-                                      </Button>
-                                      <Button 
-                                        type="button" 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={handleEditSelected}
-                                        disabled={selectedItems.length === 0 || selectedItems.length > 1}
-                                      >
-                                        Edit Selected
-                                      </Button>
-                                      <Button 
-                                        type="button" 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={handleRemoveSelected}
-                                        disabled={selectedItems.length === 0}
-                                      >
-                                        Remove Selected
-                                      </Button>
-                                    </div>
-                                  </div>
-
-                                  {/* Items Table */}
-                                  <div className="border rounded-lg overflow-hidden">
-                                    <table className="w-full">
-                                      <thead className="bg-muted/50">
-                                        <tr>
-                                          <th className="text-left p-2 text-xs font-medium w-8">
-                                            <input
-                                              type="checkbox"
-                                              checked={selectedItems.length === editFormData.items.length && editFormData.items.length > 0}
-                                              onChange={(e) => {
-                                                if (e.target.checked) {
-                                                  setSelectedItems(editFormData.items.map((_, index) => index));
-                                                } else {
-                                                  setSelectedItems([]);
-                                                }
-                                              }}
-                                            />
-                                          </th>
-                                          <th className="text-left p-2 text-xs font-medium">No</th>
-                                          <th className="text-left p-2 text-xs font-medium">Description</th>
-                                          <th className="text-left p-2 text-xs font-medium">Unit</th>
-                                          <th className="text-left p-2 text-xs font-medium">Qty</th>
-                                          <th className="text-left p-2 text-xs font-medium">Unit Price</th>
-                                          <th className="text-left p-2 text-xs font-medium">Total Price</th>
-                                          <th className="text-left p-2 text-xs font-medium">Brand</th>
-                                          <th className="text-left p-2 text-xs font-medium">Reference</th>
-                                          <th className="text-left p-2 text-xs font-medium">Note</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {editFormData.items.map((item, index) => (
-                                          <tr 
-                                            key={index} 
-                                            className={`border-t cursor-pointer transition-colors ${
-                                              selectedItems.includes(index) ? 'bg-blue-50' : 'hover:bg-muted/30'
-                                            }`}
-                                          >
-                                            <td className="p-2 text-xs">
-                                              <input
-                                                type="checkbox"
-                                                checked={selectedItems.includes(index)}
-                                                onChange={(e) => {
-                                                  if (e.target.checked) {
-                                                    setSelectedItems([...selectedItems, index]);
-                                                  } else {
-                                                    setSelectedItems(selectedItems.filter(i => i !== index));
-                                                  }
-                                                }}
-                                              />
-                                            </td>
-                                            <td className="p-2 text-xs">{index + 1}</td>
-                                            <td className="p-2 text-xs">{item.description || ''}</td>
-                                            <td className="p-2 text-xs">{item.unit || ''}</td>
-                                            <td className="p-2 text-xs">{item.quantity || ''}</td>
-                                            <td className="p-2 text-xs">{item.unitPrice || ''}</td>
-                                            <td className="p-2 text-xs font-medium">
-                                              ${(item.quantity * item.unitPrice).toFixed(2) || '0.00'}
-                                            </td>
-                                            <td className="p-2 text-xs">{item.brand || ''}</td>
-                                            <td className="p-2 text-xs">{item.reference || ''}</td>
-                                            <td className="p-2 text-xs">{item.note || ''}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-
-                                  {/* Stacked Total Section */}
-                                  <div className="bg-muted/30 p-4 rounded-lg">
-                                    {/* Grand Total */}
-                                    <div className="flex items-center mb-3 gap-2">
-                                      <span className="text-sm font-medium">Grand Total: </span>
-                                      <span className="text-lg font-bold">
-                                        ${editFormData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toFixed(2)}
-                                      </span>
-                                    </div>
-                                    
-                                    {/* Amount in Words */}
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">Amount in Words: </span>
-                                      <span className="text-base font-semibold capitalize">
-                                        {(() => {
-                                          const total = editFormData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-                                          const dollars = Math.floor(total);
-                                          const cents = Math.round((total - dollars) * 100);
-                                          
-                                          const wordResult = numberToWords(dollars);
-                                          const centsStr = cents.toString().padStart(2, '0');
-                                          
-                                          return `${wordResult} and ${centsStr}/100 Dollars`;
-                                        })()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Divider */}
-                                <div className="border-t pt-4 mt-4"></div>
-                                
-                                {/* Signature Section */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                  <div>
-                                    <Label className="text-sm font-medium">Prepared By</Label>
-                                    <Select 
-                                      value={editFormData.approvers.preparedBy} 
-                                      onValueChange={(value) => 
-                                        setEditFormData(prev => ({
-                                          ...prev,
-                                          approvers: { ...prev.approvers, preparedBy: value }
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select preparer" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {loadingUsers ? (
-                                          <SelectItem value="" disabled>Loading...</SelectItem>
-                                        ) : (
-                                          preparers.map((user) => (
-                                            <SelectItem key={user._id} value={user._id}>
-                                              {user.firstName + ' ' + user.lastName} ({user.role})
-                                            </SelectItem>
-                                          ))
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                
-                                  <div>
-                                    <Label className="text-sm font-medium">Checked By</Label>
-                                    <Select 
-                                      value={editFormData.approvers.checkedBy} 
-                                      onValueChange={(value) => 
-                                        setEditFormData(prev => ({
-                                          ...prev,
-                                          approvers: { ...prev.approvers, checkedBy: value }
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select checker" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {loadingUsers ? (
-                                          <SelectItem value="" disabled>Loading...</SelectItem>
-                                        ) : (
-                                          checkers.map((user) => (
-                                            <SelectItem key={user._id} value={user._id}>
-                                              {user.firstName + ' ' + user.lastName} ({user.role})
-                                            </SelectItem>
-                                          ))
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                
-                                  <div>
-                                    <Label className="text-sm font-medium">Verified By</Label>
-                                    <Select 
-                                      value={editFormData.approvers.verifiedBy} 
-                                      onValueChange={(value) => 
-                                        setEditFormData(prev => ({
-                                          ...prev,
-                                          approvers: { ...prev.approvers, verifiedBy: value }
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select verifier" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {loadingUsers ? (
-                                          <SelectItem value="" disabled>Loading...</SelectItem>
-                                        ) : (
-                                          verifiers.map((user) => (
-                                            <SelectItem key={user._id} value={user._id}>
-                                              {user.firstName + ' ' + user.lastName} ({user.role})
-                                            </SelectItem>
-                                          ))
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                
-                                  <div>
-                                    <Label className="text-sm font-medium">Approved By</Label>
-                                    <Select 
-                                      value={editFormData.approvers.approvedBy} 
-                                      onValueChange={(value) => 
-                                        setEditFormData(prev => ({
-                                          ...prev,
-                                          approvers: { ...prev.approvers, approvedBy: value }
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select approver" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {loadingUsers ? (
-                                          <SelectItem value="" disabled>Loading...</SelectItem>
-                                        ) : (
-                                          approvers.map((user) => (
-                                            <SelectItem key={user._id} value={user._id}>
-                                              {user.firstName + ' ' + user.lastName} ({user.role})
-                                            </SelectItem>
-                                          ))
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex justify-between items-center pt-4 border-t">
-                                  {/* Left side - Export and Preview */}
-                                  <div className="flex space-x-2">
-                                    <Button 
-                                      type="button" 
-                                      variant="outline"
-                                      onClick={() => {
-                                        // Export logic here
-                                        console.log("Export clicked");
-                                      }}
-                                    >
-                                      Export
-                                    </Button>
-                                    <Button 
-                                      type="button" 
-                                      variant="outline"
-                                      onClick={() => {
-                                        // Preview logic here
-                                        console.log("Preview clicked");
-                                      }}
-                                    >
-                                      Preview
-                                    </Button>
-                                  </div>
-                                  
-                                  {/* Right side - Cancel and Post */}
-                                  <div className="flex space-x-2">
-                                    <Button 
-                                      type="button" 
-                                      variant="outline"
-                                      onClick={() => setShowEditModal(false)}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button 
-                                      type="submit" 
-                                      disabled={isUpdating || !editFormData.projectName || editFormData.items.length === 0}
-                                    >
-                                      {isUpdating ? "Updating..." : "Update"}
-                                    </Button>
-                                  </div>
-                                </div>
-                              </form>
-                            </TabsContent>
-
-                            <TabsContent value="placeholder1" className="mt-6">
-                              <div className="text-center py-8 text-muted-foreground">
-                                <p>Placeholder 1 content will appear here.</p>
-                              </div>
-                            </TabsContent>
-
-                            <TabsContent value="placeholder2" className="mt-6">
-                              <div className="text-center py-8 text-muted-foreground">
-                                <p>Placeholder 2 content will appear here.</p>
-                              </div>
-                            </TabsContent>
-                          </Tabs>
-                        </DialogContent>
-                      </Dialog>
-
-                      {/* Add Item Modal */}
-                      <Dialog open={showAddItemModal} onOpenChange={setShowAddItemModal}>
-                        <Draggable handle=".drag-handle">
-                          <DialogContent 
-                            className="max-w-md max-h-[95vh] overflow-y-auto"
-                            onPointerDownOutside={(e) => e.preventDefault()}
-                            onEscapeKeyDown={(e) => e.preventDefault()}
-                          >
-                            <DialogHeader className="drag-handle cursor-move">
-                              <DialogTitle>Add New Item</DialogTitle>
-                            </DialogHeader>
-                            
-                            <div className="space-y-4">
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Description *</label>
-                                <Input
-                                  value={newItem.description}
-                                  onChange={(e) => setNewItem({...newItem, description: e.target.value})}
-                                  placeholder="Enter item description"
-                                />
-                              </div>
-                      
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Unit</label>
-                                  <Input
-                                    value={newItem.unit}
-                                    onChange={(e) => setNewItem({...newItem, unit: e.target.value})}
-                                    placeholder="e.g., pcs, kg, m"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Quantity *</label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={newItem.quantity}
-                                    onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 1})}
-                                  />
-                                </div>
-                              </div>
-                      
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Unit Price *</label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={newItem.unitPrice.toString()}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      setNewItem({...newItem, unitPrice: value ? parseFloat(value) : 0});
-                                    }}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Total</label>
-                                  <Input
-                                    type="text"
-                                    value={`$${(newItem.quantity * newItem.unitPrice).toFixed(2)}`}
-                                    readOnly
-                                    className="bg-muted/50"
-                                  />
-                                </div>
-                              </div>
-                      
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Brand</label>
-                                  <Input
-                                    value={newItem.brand}
-                                    onChange={(e) => setNewItem({...newItem, brand: e.target.value})}
-                                    placeholder="Enter brand"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Reference</label>
-                                  <Input
-                                    value={newItem.reference}
-                                    onChange={(e) => setNewItem({...newItem, reference: e.target.value})}
-                                    placeholder="Enter reference"
-                                  />
-                                </div>
-                              </div>
-                      
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Note</label>
-                                <Textarea
-                                  value={newItem.note}
-                                  onChange={(e) => setNewItem({...newItem, note: e.target.value})}
-                                  placeholder="Enter additional notes"
-                                  rows={2}
-                                />
-                              </div>
-                            </div>
-                      
-                            <div className="flex justify-end space-x-2 pt-4">
-                              <Button 
-                                type="button" 
-                                variant="outline"
-                                onClick={() => setShowAddItemModal(false)}
-                              >
-                                Cancel
-                              </Button>
-                              <Button 
-                                type="button"
-                                onClick={handleAddItem}
-                                disabled={!newItem.description || newItem.quantity <= 0 || newItem.unitPrice <= 0}
-                              >
-                                Add Item
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Draggable>
-                      </Dialog>
                       <Button variant="outline">Placeholder 1</Button>
                       <Button variant="outline">Placeholder 2</Button>
                     </div>
@@ -1650,7 +1107,22 @@ const PurchaseRequest = () => {
                       <DialogHeader>
                         <DialogTitle>Purchase Request Details</DialogTitle>
                       </DialogHeader>
-                      
+
+                      {/* Edit Button: Top right below close button, only for owner */}
+                      {selectedRequest && profile && selectedRequest.approvers.preparedBy === profile.id && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="ml-2 w-fit"
+                          onClick={() => {
+                            handleEditRequest(selectedRequest);
+                            setShowDetailsModal(false);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      )}
+
                       {/* Add to your details modal content */}
                       {selectedRequest && (
                         <div className="space-y-6">
@@ -1884,76 +1356,642 @@ const PurchaseRequest = () => {
                     </DialogContent>
                   </Dialog>
 
+                  {/* Edit Request Modal Re-do */}
+                  <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+                    <DialogContent 
+                      className="max-w-6xl max-h-[95vh] overflow-y-auto"
+                      onPointerDownOutside={(e) => e.preventDefault()}
+                      onEscapeKeyDown={(e) => e.preventDefault()}
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Edit Purchase Request</DialogTitle>
+                      </DialogHeader>
+                      
+                      {/* Modal Tabs */}
+                      <Tabs defaultValue="purchase-request" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                          <TabsTrigger value="purchase-request">Purchase Request</TabsTrigger>
+                          <TabsTrigger value="placeholder1">Placeholder 1</TabsTrigger>
+                          <TabsTrigger value="placeholder2">Placeholder 2</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="purchase-request" className="space-y-4 mt-6">
+                          <form onSubmit={handleUpdateRequest} className="space-y-6">
+                            {/* Header Section */}
+                            <div className="bg-muted/30 p-4 rounded-lg">
+                              <div className="space-y-4">
+                                {/* Requester */}
+                                <div>
+                                  <label className="text-sm font-medium text-muted-foreground">Requester</label>
+                                  <div className="text-sm font-semibold">
+                                    {editFormData.requesterName} ({editFormData.requesterDepartment})
+                                  </div>
+                                </div>
+                                
+                                {/* Project Name */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Project Name *</label>
+                                  <Input
+                                    value={editFormData.projectName}
+                                    onChange={(e) => setEditFormData({...editFormData, projectName: e.target.value})}
+                                    placeholder="Enter project name"
+                                    required
+                                  />
+                                </div>
+                                
+                                {/* Purpose */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Purpose *</label>
+                                  <Input
+                                    value={editFormData.purpose}
+                                    onChange={(e) => setEditFormData({...editFormData, purpose: e.target.value})}
+                                    placeholder="Enter Purpose of Request"
+                                  />
+                                </div>
+                                
+                                {/* Request Date */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Request Date</label>
+                                  <Input
+                                    type="date"
+                                    value={editFormData.requestDate || new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setEditFormData({...editFormData, requestDate: e.target.value})}
+                                  />
+                                </div>
+                                
+                                {/* Delivery Place */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Delivery Place</label>
+                                  <Input
+                                    value={editFormData.deliveryPlace}
+                                    onChange={(e) => setEditFormData({...editFormData, deliveryPlace: e.target.value})}
+                                    placeholder="Enter delivery location"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Category Selection */}
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Category Selection</label>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id="construction"
+                                    checked={editFormData.categories.construction}
+                                    onChange={(e) => setEditFormData({
+                                      ...editFormData,
+                                      categories: {...editFormData.categories, construction: e.target.checked}
+                                    })}
+                                  />
+                                  <label htmlFor="construction" className="text-sm">Construction</label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id="admin"
+                                    checked={editFormData.categories.admin}
+                                    onChange={(e) => setEditFormData({
+                                      ...editFormData,
+                                      categories: {...editFormData.categories, admin: e.target.checked}
+                                    })}
+                                  />
+                                  <label htmlFor="admin" className="text-sm">Admin</label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id="material"
+                                    checked={editFormData.categories.material}
+                                    onChange={(e) => setEditFormData({
+                                      ...editFormData,
+                                      categories: {...editFormData.categories, material: e.target.checked}
+                                    })}
+                                  />
+                                  <label htmlFor="material" className="text-sm">Material</label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id="services"
+                                    checked={editFormData.categories.services}
+                                    onChange={(e) => setEditFormData({
+                                      ...editFormData,
+                                      categories: {...editFormData.categories, services: e.target.checked}
+                                    })}
+                                  />
+                                  <label htmlFor="services" className="text-sm">Services</label>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Item Management */}
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center">
+                                <label className="text-sm font-medium">Item Management</label>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => setShowAddItemModal(true)}
+                                  >
+                                    Add Item
+                                  </Button>
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={handleEditSelected}
+                                    disabled={selectedItems.length === 0 || selectedItems.length > 1}
+                                  >
+                                    Edit Selected
+                                  </Button>
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={handleRemoveSelected}
+                                    disabled={selectedItems.length === 0}
+                                  >
+                                    Remove Selected
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Items Table */}
+                              <div className="border rounded-lg overflow-hidden">
+                                <table className="w-full">
+                                  <thead className="bg-muted/50">
+                                    <tr>
+                                      <th className="text-left p-2 text-xs font-medium w-8">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedItems.length === editFormData.items.length && editFormData.items.length > 0}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setSelectedItems(editFormData.items.map((_, index) => index));
+                                            } else {
+                                              setSelectedItems([]);
+                                            }
+                                          }}
+                                        />
+                                      </th>
+                                      <th className="text-left p-2 text-xs font-medium">No</th>
+                                      <th className="text-left p-2 text-xs font-medium">Description</th>
+                                      <th className="text-left p-2 text-xs font-medium">Unit</th>
+                                      <th className="text-left p-2 text-xs font-medium">Qty</th>
+                                      <th className="text-left p-2 text-xs font-medium">Unit Price</th>
+                                      <th className="text-left p-2 text-xs font-medium">Total Price</th>
+                                      <th className="text-left p-2 text-xs font-medium">Brand</th>
+                                      <th className="text-left p-2 text-xs font-medium">Reference</th>
+                                      <th className="text-left p-2 text-xs font-medium">Note</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {editFormData.items.map((item, index) => (
+                                      <tr 
+                                        key={index} 
+                                        className={`border-t cursor-pointer transition-colors ${
+                                          selectedItems.includes(index) ? 'bg-blue-50' : 'hover:bg-muted/30'
+                                        }`}
+                                      >
+                                        <td className="p-2 text-xs">
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedItems.includes(index)}
+                                            onChange={(e) => {
+                                              if (e.target.checked) {
+                                                setSelectedItems([...selectedItems, index]);
+                                              } else {
+                                                setSelectedItems(selectedItems.filter(i => i !== index));
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="p-2 text-xs">{index + 1}</td>
+                                        <td className="p-2 text-xs">{item.description || ''}</td>
+                                        <td className="p-2 text-xs">{item.unit || ''}</td>
+                                        <td className="p-2 text-xs">{item.quantity || ''}</td>
+                                        <td className="p-2 text-xs">{item.unitPrice || ''}</td>
+                                        <td className="p-2 text-xs font-medium">
+                                          ${(item.quantity * item.unitPrice).toFixed(2) || '0.00'}
+                                        </td>
+                                        <td className="p-2 text-xs">{item.brand || ''}</td>
+                                        <td className="p-2 text-xs">{item.reference || ''}</td>
+                                        <td className="p-2 text-xs">{item.note || ''}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* Stacked Total Section */}
+                              <div className="bg-muted/30 p-4 rounded-lg">
+                                {/* Grand Total */}
+                                <div className="flex items-center mb-3 gap-2">
+                                  <span className="text-sm font-medium">Grand Total: </span>
+                                  <span className="text-lg font-bold">
+                                    ${editFormData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                
+                                {/* Amount in Words */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium">Amount in Words: </span>
+                                  <span className="text-base font-semibold capitalize">
+                                    {(() => {
+                                      const total = editFormData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+                                      const dollars = Math.floor(total);
+                                      const cents = Math.round((total - dollars) * 100);
+                                      
+                                      const wordResult = numberToWords(dollars);
+                                      const centsStr = cents.toString().padStart(2, '0');
+                                      
+                                      return `${wordResult} and ${centsStr}/100 Dollars`;
+                                    })()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="border-t pt-4 mt-4"></div>
+                            
+                            {/* Signature Section */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div>
+                                <Label className="text-sm font-medium">Prepared By</Label>
+                                <Select 
+                                  value={editFormData.approvers.preparedBy} 
+                                  onValueChange={(value) => 
+                                    setEditFormData(prev => ({
+                                      ...prev,
+                                      approvers: { ...prev.approvers, preparedBy: value }
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select preparer" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {loadingUsers ? (
+                                      <SelectItem value="" disabled>Loading...</SelectItem>
+                                    ) : (
+                                      preparers.map((user) => (
+                                        <SelectItem key={user._id} value={user._id}>
+                                          {user.firstName + ' ' + user.lastName} ({user.role})
+                                        </SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            
+                              <div>
+                                <Label className="text-sm font-medium">Checked By</Label>
+                                <Select 
+                                  value={editFormData.approvers.checkedBy} 
+                                  onValueChange={(value) => 
+                                    setEditFormData(prev => ({
+                                      ...prev,
+                                      approvers: { ...prev.approvers, checkedBy: value }
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select checker" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {loadingUsers ? (
+                                      <SelectItem value="" disabled>Loading...</SelectItem>
+                                    ) : (
+                                      checkers.map((user) => (
+                                        <SelectItem key={user._id} value={user._id}>
+                                          {user.firstName + ' ' + user.lastName} ({user.role})
+                                        </SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            
+                              <div>
+                                <Label className="text-sm font-medium">Verified By</Label>
+                                <Select 
+                                  value={editFormData.approvers.verifiedBy} 
+                                  onValueChange={(value) => 
+                                    setEditFormData(prev => ({
+                                      ...prev,
+                                      approvers: { ...prev.approvers, verifiedBy: value }
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select verifier" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {loadingUsers ? (
+                                      <SelectItem value="" disabled>Loading...</SelectItem>
+                                    ) : (
+                                      verifiers.map((user) => (
+                                        <SelectItem key={user._id} value={user._id}>
+                                          {user.firstName + ' ' + user.lastName} ({user.role})
+                                        </SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            
+                              <div>
+                                <Label className="text-sm font-medium">Approved By</Label>
+                                <Select 
+                                  value={editFormData.approvers.approvedBy} 
+                                  onValueChange={(value) => 
+                                    setEditFormData(prev => ({
+                                      ...prev,
+                                      approvers: { ...prev.approvers, approvedBy: value }
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select approver" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {loadingUsers ? (
+                                      <SelectItem value="" disabled>Loading...</SelectItem>
+                                    ) : (
+                                      approvers.map((user) => (
+                                        <SelectItem key={user._id} value={user._id}>
+                                          {user.firstName + ' ' + user.lastName} ({user.role})
+                                        </SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex justify-between items-center pt-4 border-t">
+                              {/* Left side - Export and Preview */}
+                              <div className="flex space-x-2">
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    // Export logic here
+                                    console.log("Export clicked");
+                                  }}
+                                >
+                                  Export
+                                </Button>
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    // Preview logic here
+                                    console.log("Preview clicked");
+                                  }}
+                                >
+                                  Preview
+                                </Button>
+                              </div>
+                              
+                              {/* Right side - Cancel and Post */}
+                              <div className="flex space-x-2">
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  onClick={() => setShowEditModal(false)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button 
+                                  type="submit" 
+                                  disabled={isUpdating || !editFormData.projectName || editFormData.items.length === 0}
+                                >
+                                  {isUpdating ? "Updating..." : "Update"}
+                                </Button>
+                              </div>
+                            </div>
+                          </form>
+                        </TabsContent>
+
+                        <TabsContent value="placeholder1" className="mt-6">
+                          <div className="text-center py-8 text-muted-foreground">
+                            <p>Placeholder 1 content will appear here.</p>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="placeholder2" className="mt-6">
+                          <div className="text-center py-8 text-muted-foreground">
+                            <p>Placeholder 2 content will appear here.</p>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Add Item Modal */}
+                  <Dialog open={showAddItemModal} onOpenChange={setShowAddItemModal}>
+                    <Draggable handle=".drag-handle">
+                      <DialogContent 
+                        className="max-w-md max-h-[95vh] overflow-y-auto"
+                        onPointerDownOutside={(e) => e.preventDefault()}
+                        onEscapeKeyDown={(e) => e.preventDefault()}
+                      >
+                        <DialogHeader className="drag-handle cursor-move">
+                          <DialogTitle>Add New Item</DialogTitle>
+                        </DialogHeader>
+                        
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Description *</label>
+                            <Input
+                              value={newItem.description}
+                              onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                              placeholder="Enter item description"
+                            />
+                          </div>
+                  
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Unit</label>
+                              <Input
+                                value={newItem.unit}
+                                onChange={(e) => setNewItem({...newItem, unit: e.target.value})}
+                                placeholder="e.g., pcs, kg, m"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Quantity *</label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={newItem.quantity}
+                                onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 1})}
+                              />
+                            </div>
+                          </div>
+                  
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Unit Price *</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={newItem.unitPrice.toString()}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setNewItem({...newItem, unitPrice: value ? parseFloat(value) : 0});
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Total</label>
+                              <Input
+                                type="text"
+                                value={`$${(newItem.quantity * newItem.unitPrice).toFixed(2)}`}
+                                readOnly
+                                className="bg-muted/50"
+                              />
+                            </div>
+                          </div>
+                  
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Brand</label>
+                              <Input
+                                value={newItem.brand}
+                                onChange={(e) => setNewItem({...newItem, brand: e.target.value})}
+                                placeholder="Enter brand"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Reference</label>
+                              <Input
+                                value={newItem.reference}
+                                onChange={(e) => setNewItem({...newItem, reference: e.target.value})}
+                                placeholder="Enter reference"
+                              />
+                            </div>
+                          </div>
+                  
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Note</label>
+                            <Textarea
+                              value={newItem.note}
+                              onChange={(e) => setNewItem({...newItem, note: e.target.value})}
+                              placeholder="Enter additional notes"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                  
+                        <div className="flex justify-end space-x-2 pt-4">
+                          <Button 
+                            type="button" 
+                            variant="outline"
+                            onClick={() => setShowAddItemModal(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            type="button"
+                            onClick={handleAddItem}
+                            disabled={!newItem.description || newItem.quantity <= 0 || newItem.unitPrice <= 0}
+                          >
+                            Add Item
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Draggable>
+                  </Dialog>
+
                   {/* All Related MRs */}
                   <TabsContent value="all-mrs" className="space-y-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border">
-                        <thead>
-                          <tr className="bg-muted">
-                            <th className="text-left p-3 font-medium">Request ID</th>
-                            <th className="text-left p-3 font-medium">Project Name</th>
-                            <th className="text-left p-3 font-medium">Category</th>
-                            <th className="text-left p-3 font-medium">Purpose</th>
-                            <th className="text-left p-3 font-medium">Items</th>
-                            <th className="text-left p-3 font-medium">Total</th>
-                            <th className="text-left p-3 font-medium">Status</th>
-                            <th className="text-left p-3 font-medium">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {loadingRequests ? (
-                            <div className="text-center py-8">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                              <p className="mt-2 text-gray-600">Loading requests...</p>
-                            </div>
-                          ) : requests.length === 0 ? (
-                            <div className="text-center py-8">
-                              <p className="text-gray-600">No requests found</p>
-                            </div>
-                          ) : (
-                            <>
-                              {requests.map((request) => (
-                                <tr 
-                                  key={request.id} 
-                                  className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
-                                  onClick={() => handleViewDetails(request)}
-                                >
-                                  <td className="p-3 font-medium">{request.id}</td>
-                                  <td className="p-3">{request.projectName}</td>
-                                  <td className="p-3">
-                                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                      {request.categories.admin ? 'Admin' : 
-                                      request.categories.construction ? 'Construction' :
-                                      request.categories.material ? 'Material' :
-                                      request.categories.services ? 'Services' : 'Other'}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">{request.purpose}</td>
-                                  <td className="p-3">
-                                    <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                                      {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
-                                  <td className="p-3">
-                                    <span className={`px-2 py-1 rounded-full text-xs ${
-                                      request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                      request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                      request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                                      request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                                      'bg-red-100 text-red-800'
-                                    }`}>
-                                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
-                                </tr>
-                              ))}
-                            </>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                    {/* All Request List */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>All Requests</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse border">
+                            <thead>
+                              <tr className="bg-muted">
+                                <th className="text-left p-3 font-medium">Request ID</th>
+                                <th className="text-left p-3 font-medium">Project Name</th>
+                                <th className="text-left p-3 font-medium">Requester</th>
+                                <th className="text-left p-3 font-medium">Category</th>
+                                <th className="text-left p-3 font-medium">Purpose</th>
+                                <th className="text-left p-3 font-medium">Items</th>
+                                <th className="text-left p-3 font-medium">Total</th>
+                                <th className="text-left p-3 font-medium">Status</th>
+                                <th className="text-left p-3 font-medium">Date</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {loadingRequests ? (
+                                <div className="text-center py-8">
+                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                                  <p className="mt-2 text-gray-600">Loading requests...</p>
+                                </div>
+                              ) : requests.length === 0 ? (
+                                <div className="text-center py-8">
+                                  <p className="text-gray-600">No requests found</p>
+                                </div>
+                              ) : (
+                                <>
+                                  {requests.map((request) => (
+                                    <tr 
+                                      key={request.id} 
+                                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                                      onClick={() => handleViewDetails(request)}
+                                    >
+                                      <td className="p-3 font-medium">{request.id}</td>
+                                      <td className="p-3">{request.projectName}</td>
+                                      <td className="p-3">{request.requesterName}</td>
+                                      <td className="p-3">
+                                        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                          {request.categories.admin ? 'Admin' : 
+                                          request.categories.construction ? 'Construction' :
+                                          request.categories.material ? 'Material' :
+                                          request.categories.services ? 'Services' : 'Other'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3">{request.purpose}</td>
+                                      <td className="p-3">
+                                        <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                          {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
+                                      <td className="p-3">
+                                        <span className={`px-2 py-1 rounded-full text-xs ${
+                                          request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                          request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                          request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                          'bg-red-100 text-red-800'
+                                        }`}>
+                                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                        </span>
+                                      </td>
+                                      <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
+                                    </tr>
+                                  ))}
+                                </>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </TabsContent>
                 </Tabs>
               </div>
