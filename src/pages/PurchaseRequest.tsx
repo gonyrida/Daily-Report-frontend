@@ -42,6 +42,7 @@ import HierarchicalSidebar from '@/components/HierarchicalSidebar';
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ProfileIcon from '@/components/ProfileIcon';
 import { useProfileContext } from '@/contexts/ProfileContext';
+import PendingApprovalsTab from '@/components/purchase_request/PendingApprovalsTab';
 import Draggable from 'react-draggable';
 
 const PurchaseRequest = () => {
@@ -94,6 +95,8 @@ const PurchaseRequest = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('my-requests');
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [loadingPendingApprovals, setLoadingPendingApprovals] = useState(false);
   const [showNewRequest, setShowNewRequest] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
@@ -105,6 +108,20 @@ const PurchaseRequest = () => {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null); // NEW: For editing
   const [showEditModal, setShowEditModal] = useState(false); // NEW: Edit modal visibility
+
+  // Fetch pending approvals for approver/admin
+  useEffect(() => {
+    if (profile?.role === 'approver' || profile?.role === 'admin') {
+      setLoadingPendingApprovals(true);
+      apiGet('/purchase-requests/pending-approvals')
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) setPendingApprovals(result.data);
+        })
+        .catch(() => setPendingApprovals([]))
+        .finally(() => setLoadingPendingApprovals(false));
+    }
+  }, [profile]);
 
   const [newItem, setNewItem] = useState({
     description: '',
@@ -468,7 +485,7 @@ const PurchaseRequest = () => {
 
   const handleUpdateRequest = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setIsUpdating(true);
     try {
       const response = await apiPut(`/purchase-requests/${editingRequest._id}`, editFormData);
       const result = await response.json();
@@ -499,7 +516,7 @@ const PurchaseRequest = () => {
         description: "Failed to update request"
       });
     } finally {
-      setIsSubmitting(false);
+      setIsUpdating(false);
     }
   };
 
@@ -546,6 +563,9 @@ const PurchaseRequest = () => {
                   <TabsList>
                     <TabsTrigger value="my-requests">My Request(s)</TabsTrigger>
                     <TabsTrigger value="all-mrs">All Related MRs</TabsTrigger>
+                    {profile?.role === 'approver' || profile?.role === 'admin' ? (
+                      <TabsTrigger value="pending-approvals">Pending Approvals</TabsTrigger>
+                    ) : null}
                   </TabsList>
 
                   <TabsContent value="my-requests" className="space-y-6">
@@ -1993,6 +2013,16 @@ const PurchaseRequest = () => {
                       </CardContent>
                     </Card>
                   </TabsContent>
+                  {profile?.role === 'approver' || profile?.role === 'admin' ? (
+                    <TabsContent value="pending-approvals" className="space-y-6">
+                      <PendingApprovalsTab 
+                        requests={pendingApprovals}
+                        loadingRequests={loadingPendingApprovals}
+                        onApprove={(id) => console.log('Approve', id)}
+                        onReject={(id) => console.log('Reject', id)}
+                      />
+                    </TabsContent>
+                  ) : null}
                 </Tabs>
               </div>
             </div>
