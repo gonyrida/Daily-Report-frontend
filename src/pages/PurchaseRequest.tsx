@@ -102,6 +102,7 @@ const PurchaseRequest = () => {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedRequests, setSelectedRequests] = useState([]);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -494,7 +495,9 @@ const PurchaseRequest = () => {
       items: request.items || [],
       approvers: approversFromWorkflow
     });
-    
+
+    setSelectedRequests([]); // Clear selection after edit opens
+    setSelectedItems([]); // CLEAR selection from New Request modal
     setShowEditModal(true);
   };
 
@@ -638,10 +641,38 @@ const PurchaseRequest = () => {
 
                   <TabsContent value="my-requests" className="space-y-6">
                     {/* Button Row */}
-                    <div className="flex gap-2 mb-6">
+                    <div className="flex gap-2 mb-6 sticky top-0 bg-background z-10 py-4 border-b">
                       <Dialog open={showNewRequest} onOpenChange={setShowNewRequest}>
                         <DialogTrigger asChild>
-                          <Button variant="default">New Request</Button>
+                          <Button 
+                            variant="default"
+                            onClick={() => {
+                              // Reset form data when opening New Request
+                              setFormData({
+                                requesterName: profile?.fullName || '',
+                                requesterDepartment: profile?.department || '',
+                                projectName: '',
+                                purpose: '',
+                                requestDate: new Date().toISOString().split('T')[0],
+                                deliveryPlace: '',
+                                categories: {
+                                  construction: false,
+                                  admin: false,
+                                  material: false,
+                                  services: false
+                                },
+                                items: [],
+                                approvers: {
+                                  checkedBy: '',
+                                  verifiedBy: '',
+                                  approvedBy: ''
+                                }
+                              });
+                              setSelectedItems([]); // Clear any selected items
+                            }}
+                          >
+                            New Request
+                          </Button>
                         </DialogTrigger>
                         <DialogContent 
                           className="max-w-6xl max-h-[95vh] overflow-y-auto"
@@ -780,7 +811,14 @@ const PurchaseRequest = () => {
                                         type="button" 
                                         variant="outline" 
                                         size="sm"
-                                        onClick={() => setShowAddItemModal(true)}
+                                        onClick={() => {
+                                          // Reset all edit-related state before opening
+                                          setNewItem({ description: '', unit: '', quantity: 0, unitPrice: 0, brand: '', reference: '', note: '' });
+                                          setDisplayValues({ quantity: '0', unitPrice: '0' });
+                                          setEditingIndex(null);
+                                          setIsEditMode(false);
+                                          setShowAddItemModal(true)
+                                        }}
                                       >
                                         Add Item
                                       </Button>
@@ -1084,6 +1122,18 @@ const PurchaseRequest = () => {
                         </DialogContent>
                       </Dialog>
 
+                      <Button 
+                        variant="default" 
+                        onClick={() => {
+                          if (selectedRequests.length === 1) {
+                            const request = requests.find(r => r.id === selectedRequests[0] || r._id === selectedRequests[0]);
+                            if (request) handleEditRequest(request);
+                          }
+                        }}
+                        disabled={selectedRequests.length !== 1}
+                      >
+                        Edit Request
+                      </Button>
                       <Button variant="outline">Placeholder 1</Button>
                       <Button variant="outline">Placeholder 2</Button>
                     </div>
@@ -1098,6 +1148,20 @@ const PurchaseRequest = () => {
                           <table className="w-full border-collapse border">
                             <thead>
                               <tr className="bg-muted">
+                                <th className="text-left p-3 font-medium">
+                                  <input
+                                    type="checkbox"
+                                    className="w-4 h-4 cursor-pointer"
+                                    checked={selectedRequests.length === requests.length && requests.length > 0}
+                                    onChange={e => {
+                                      if (e.target.checked) {
+                                        setSelectedRequests(requests.map(r => r.id || r._id));
+                                      } else {
+                                        setSelectedRequests([]);
+                                      }
+                                    }}
+                                  />
+                                </th>
                                 <th className="text-left p-3 font-medium">Request ID</th>
                                 <th className="text-left p-3 font-medium">Project</th>
                                 <th className="text-left p-3 font-medium">Category</th>
@@ -1106,7 +1170,6 @@ const PurchaseRequest = () => {
                                 <th className="text-left p-3 font-medium">Total</th>
                                 <th className="text-left p-3 font-medium">Status</th>
                                 <th className="text-left p-3 font-medium">Date</th>
-                                <th className="text-left p-3 font-medium">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1122,72 +1185,76 @@ const PurchaseRequest = () => {
                               ) : (
                                 // Your existing request list table
                                 <>
-                                  {requests.map((request) => (
-                                    <tr 
-                                      key={request.id} 
-                                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
-                                      onClick={() => handleViewDetails(request)}
-                                    >
-                                      <td className="p-3 font-medium">{request.id}</td>
-                                      <td className="p-3">{request.projectName}</td>
-                                      <td className="p-3">
-                                        <div className="flex gap-1 flex-wrap">
-                                          {request.categories.admin && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
-                                          )}
-                                          {request.categories.construction && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
-                                          )}
-                                          {request.categories.material && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
-                                          )}
-                                          {request.categories.services && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="p-3">{request.purpose}</td>
-                                      <td className="p-3">
-                                        <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                                          {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
-                                        </span>
-                                      </td>
-                                      <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
-                                      <td className="p-3">
-                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                          request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                          request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                                          request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                                          'bg-red-100 text-red-800'
-                                        }`}>
-                                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                        </span>
-                                      </td>
-                                      <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
-                                      <td className="p-3">
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                              <span className="sr-only">Open menu</span>
-                                              <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={(e) => {
-                                              e.stopPropagation(); // NEW: Prevent row click
-                                              handleEditRequest(request);
-                                            }}>
-                                              Edit
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handlePlaceholder1(request)}>
-                                              Placeholder 1
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </td>
-                                    </tr>
-                                  ))}
+                                  {requests.map((request) => {
+                                    const isSelected = selectedRequests.includes(request.id || request._id);
+                                    const requestId = request.id || request._id;
+                                    
+                                    return (
+                                      <tr 
+                                        key={requestId} 
+                                        className={`border-b cursor-pointer transition-colors ${isSelected ? 'bg-blue-100' : 'hover:bg-muted/30'}`}
+                                        onClick={(e) => {
+                                          // If clicking checkbox, don't toggle
+                                          if (e.target instanceof HTMLInputElement) return;
+                                          // Optional: row click opens details
+                                          handleViewDetails(request);
+                                        }}
+                                      >
+                                        <td className="p-3">
+                                          <input
+                                            type="checkbox"
+                                            className="w-4 h-4 cursor-pointer"
+                                            checked={isSelected}
+                                            onChange={e => {
+                                              e.stopPropagation();
+                                              if (e.target.checked) {
+                                                setSelectedRequests([...selectedRequests, requestId]);
+                                              } else {
+                                                setSelectedRequests(selectedRequests.filter(id => id !== requestId));
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="p-3 font-medium">{request.id}</td>
+                                        <td className="p-3">{request.projectName}</td>
+                                        <td className="p-3">
+                                          <div className="flex gap-1 flex-wrap">
+                                            {request.categories.admin && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
+                                            )}
+                                            {request.categories.construction && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
+                                            )}
+                                            {request.categories.material && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
+                                            )}
+                                            {request.categories.services && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="p-3">{request.purpose}</td>
+                                        <td className="p-3">
+                                          <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                            {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
+                                          </span>
+                                        </td>
+                                        <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
+                                        <td className="p-3">
+                                          <span className={`px-2 py-1 rounded-full text-xs ${
+                                            request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                            request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                            'bg-red-100 text-red-800'
+                                          }`}>
+                                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                          </span>
+                                        </td>
+                                        <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
+                                      </tr>
+                                    );
+                                  })}
                                 </>
                               )}
                             </tbody>
@@ -1602,22 +1669,11 @@ const PurchaseRequest = () => {
                                     variant="outline" 
                                     size="sm"
                                     onClick={() => {
-                                      // Reset form data
-                                      setNewItem({
-                                        description: '',
-                                        unit: '',
-                                        quantity: 0,
-                                        unitPrice: 0,
-                                        brand: '',
-                                        reference: '',
-                                        note: ''
-                                      });
-                                      // Reset display values
-                                      setDisplayValues({
-                                        quantity: '0',
-                                        unitPrice: '0'
-                                      });
-                                      setIsEditMode(false); // Set to add mode
+                                      // Reset all edit-related state before opening
+                                      setNewItem({ description: '', unit: '', quantity: 0, unitPrice: 0, brand: '', reference: '', note: '' });
+                                      setDisplayValues({ quantity: '0', unitPrice: '0' });
+                                      setEditingIndex(null);
+                                      setIsEditMode(false);
                                       setShowAddItemModal(true)
                                     }}
                                   >
