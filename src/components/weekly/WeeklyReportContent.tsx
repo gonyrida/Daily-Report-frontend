@@ -28,17 +28,17 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   setSharedData,
   overallProgressData,
   setOverallProgressData,
-  reportId, // NEW: Accept reportId prop
-  // NEW: Accept activities props from parent
+  reportId,
   weeklyActivities: externalWeeklyActivities,
   setWeeklyActivities: externalSetWeeklyActivities,
   nextWeekPlan: externalNextWeekPlan,
   setNextWeekPlan: externalSetNextWeekPlan,
-  qaqcData, // NEW: Accept QAQC data from parent
-  setQaqcData, // NEW: Accept QAQC data setter from parent
-  hsesData, // NEW: Accept HSES data from parent
-  setHsesData, // NEW: Accept HSES data setter from parent
-  onQaqcDataChange // NEW: Callback to notify parent of QAQC data changes
+  qaqcData,
+  setQaqcData,
+  hsesData,
+  setHsesData,
+  onQaqcDataChange,
+  onClearQaqcData
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -240,6 +240,13 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       setHsesData(hsesDataHook.hsesData);
     }
   }, [hsesDataHook.hsesData, setHsesData]);
+
+  // Expose clearQaqcData function to parent for successful submit cleanup
+  useEffect(() => {
+    if (onClearQaqcData && qaqcTableHook.clearQaqcData) {
+      onClearQaqcData(qaqcTableHook.clearQaqcData);
+    }
+  }, [onClearQaqcData, qaqcTableHook.clearQaqcData]);
 
   const handleIntroductionClick = (e: React.MouseEvent) => {
     e.preventDefault();

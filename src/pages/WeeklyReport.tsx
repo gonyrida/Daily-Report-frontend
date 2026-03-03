@@ -182,6 +182,9 @@ const WeeklyReport = () => {
   // NEW: Add Schedule state to WeeklyReport page (like other sections)
   const [scheduleData, setScheduleData] = useState<any>(null);
 
+  // NEW: Add state to store the clearQaqcData function reference
+  const clearQaqcDataRef = useRef<(() => void) | null>(null);
+
   // Overall Progress hook
   const overallProgressHook = useOverallProgress();
 
@@ -747,6 +750,10 @@ const WeeklyReport = () => {
       
       if (response.success) {
         setReportStatus("submitted");
+        // Clear QAQC localStorage data on successful submit
+        if (clearQaqcDataRef.current) {
+          clearQaqcDataRef.current();
+        }
         toast({
           title: "Submitted",
           description: "Weekly report submitted successfully.",
@@ -1225,6 +1232,7 @@ const WeeklyReport = () => {
                       setNextWeekPlan={setNextWeekPlan}
                       qaqcData={qaqcData}
                       setQaqcData={setQaqcData}
+                      onClearQaqcData={(fn) => { clearQaqcDataRef.current = fn; }}
                     />
                   </div>
                 </>

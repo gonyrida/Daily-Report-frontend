@@ -28,4 +28,5 @@ export interface WeeklyReportContentProps {
   hsesData?: any;
   setHsesData?: (hsesData: any) => void;
   onQaqcDataChange?: (qaqcData: any) => void;
+  onClearQaqcData?: (clearFn: () => void) => void;
 }
