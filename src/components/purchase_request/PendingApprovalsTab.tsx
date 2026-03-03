@@ -165,7 +165,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
         </DialogContent>
       </Dialog>
       {/* Button Row */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 sticky top-0 bg-background z-10 py-4 border-b">
         <Button variant="default" onClick={handleApprove} disabled={selectedRequests.length === 0}>Approve</Button>
         <Button variant="destructive" onClick={handleReject} disabled={selectedRequests.length === 0}>Reject</Button>
         <Button variant="outline">Placeholder1</Button>

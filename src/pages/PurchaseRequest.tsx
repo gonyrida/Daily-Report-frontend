@@ -47,6 +47,7 @@ import Draggable from 'react-draggable';
 
 const PurchaseRequest = () => {
   const { profile } = useProfileContext();
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [formData, setFormData] = useState({
     requesterName: profile?.fullName || '',
     requesterDepartment: profile?.department || '',
@@ -108,6 +109,11 @@ const PurchaseRequest = () => {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null); // NEW: For editing
   const [showEditModal, setShowEditModal] = useState(false); // NEW: Edit modal visibility
+  const [displayValues, setDisplayValues] = useState({
+    quantity: '0',
+    unitPrice: '0'
+  });
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Fetch pending approvals for approver/admin
   useEffect(() => {
@@ -123,10 +129,20 @@ const PurchaseRequest = () => {
     }
   }, [profile]);
 
+  useEffect(() => {
+    if (showAddItemModal && !isEditMode) {
+      // Only reset when adding, not editing
+      setDisplayValues({
+        quantity: '0',
+        unitPrice: '0'
+      });
+    }
+  }, [showAddItemModal, isEditMode]);
+
   const [newItem, setNewItem] = useState({
     description: '',
     unit: '',
-    quantity: 1,
+    quantity: 0,
     unitPrice: 0,
     brand: '',
     reference: '',
@@ -136,19 +152,9 @@ const PurchaseRequest = () => {
   const { toast } = useToast();
 
   const handleSubmit = async (action = 'post') => {
-    // e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      // Validate form
-      // if (!formData.projectName || !formData.purpose || !formData.deliveryPlace || formData.items.length === 0) {
-      //   toast({
-      //     title: "Validation Error",
-      //     description: "Please fill in all required fields and add at least one item"
-      //   });
-      //   return;
-      // }
-
       // Validate form (less strict for drafts)
       if (action === 'post' && (!formData.projectName || !formData.purpose || !formData.deliveryPlace || formData.items.length === 0)) {
         toast({
@@ -304,8 +310,15 @@ const PurchaseRequest = () => {
         note: item.note
       });
       
-      setShowAddItemModal(true);
       setEditingIndex(itemIndex);
+
+      // Set display values for editing
+      setDisplayValues({
+        quantity: item.quantity.toString(),
+        unitPrice: item.unitPrice.toString()
+      });
+      setIsEditMode(true); // Set to edit mode
+      setShowAddItemModal(true);
     }
   };
 
@@ -435,6 +448,17 @@ const PurchaseRequest = () => {
     fetchRequests();
   }, [activeTab]); // Re-fetch when tab changes
 
+  useEffect(() => {
+    if (profile) {
+      setFormData(prev => ({
+        ...prev,
+        requesterName: profile.fullName || prev.requesterName,
+        requesterDepartment: profile.department || prev.requesterDepartment
+      }));
+      setIsProfileLoading(false);
+    }
+  }, [profile]);
+
   // Role-based filtering functions
   const getUsersForRole = (allowedRoles) => {
     return allUsers.filter(user => 
@@ -483,11 +507,15 @@ const PurchaseRequest = () => {
     });
   };
 
-  const handleUpdateRequest = async (e) => {
-    e.preventDefault();
+  const handleUpdateRequest = async (action = 'update') => {
     setIsUpdating(true);
     try {
-      const response = await apiPut(`/purchase-requests/${editingRequest._id}`, editFormData);
+      const updateData = {
+        ...editFormData,
+        ...(action === 'post' && { status: 'pending' })
+      };
+
+      const response = await apiPut(`/purchase-requests/${editingRequest._id}`, updateData);
       const result = await response.json();
       
       if (result.success) {
@@ -517,6 +545,46 @@ const PurchaseRequest = () => {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Add this helper function in your component
+  const handleDecimalInput = (value: string, fieldName: 'quantity' | 'unitPrice') => {
+    const regex = /^\d*\.?\d{0,2}$/;
+    
+    if (regex.test(value) || value === "") {
+      // Update display value
+      setDisplayValues(prev => ({
+        ...prev,
+        [fieldName]: value
+      }));
+      
+      // Update stored value (as number)
+      setNewItem(prev => ({
+        ...prev,
+        [fieldName]: value === "" || value === "." ? 0 : parseFloat(value) || 0
+      }));
+    }
+  };
+  
+  const handleBlur = (fieldName: 'quantity' | 'unitPrice') => {
+    const currentValue = displayValues[fieldName];
+    if (currentValue !== "") {
+      const numericValue = parseFloat(currentValue);
+      
+      // Only show decimal places if it's not a whole number
+      const formatted = numericValue % 1 === 0 
+        ? numericValue.toString()  // "10" instead of "10.00"
+        : numericValue.toFixed(2); // "10.50" stays as "10.50"
+      
+      setDisplayValues(prev => ({
+        ...prev,
+        [fieldName]: formatted
+      }));
+      setNewItem(prev => ({
+        ...prev,
+        [fieldName]: parseFloat(formatted)
+      }));
     }
   };
 
@@ -601,7 +669,7 @@ const PurchaseRequest = () => {
                                     <div>
                                       <label className="text-sm font-medium text-muted-foreground">Requester</label>
                                       <div className="text-sm font-semibold">
-                                        {formData.requesterName} ({formData.requesterDepartment})
+                                        {isProfileLoading ? 'Loading...' : `${formData.requesterName} (${formData.requesterDepartment})`}
                                       </div>
                                     </div>
                                     
@@ -791,7 +859,7 @@ const PurchaseRequest = () => {
                                             <td className="p-2 text-xs">{item.description || ''}</td>
                                             <td className="p-2 text-xs">{item.unit || ''}</td>
                                             <td className="p-2 text-xs">{item.quantity || ''}</td>
-                                            <td className="p-2 text-xs">{item.unitPrice || ''}</td>
+                                            <td className="p-2 text-xs">${item.unitPrice || ''}</td>
                                             <td className="p-2 text-xs font-medium">
                                               ${(item.quantity * item.unitPrice).toFixed(2) || '0.00'}
                                             </td>
@@ -1063,12 +1131,20 @@ const PurchaseRequest = () => {
                                       <td className="p-3 font-medium">{request.id}</td>
                                       <td className="p-3">{request.projectName}</td>
                                       <td className="p-3">
-                                        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                          {request.categories.admin ? 'Admin' : 
-                                          request.categories.construction ? 'Construction' :
-                                          request.categories.material ? 'Material' :
-                                          request.categories.services ? 'Services' : 'Other'}
-                                        </span>
+                                        <div className="flex gap-1 flex-wrap">
+                                          {request.categories.admin && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
+                                          )}
+                                          {request.categories.construction && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
+                                          )}
+                                          {request.categories.material && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
+                                          )}
+                                          {request.categories.services && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="p-3">{request.purpose}</td>
                                       <td className="p-3">
@@ -1157,8 +1233,10 @@ const PurchaseRequest = () => {
                               </div>
                               <div className="text-right">
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  selectedRequest.status === 'Approved' ? 'bg-green-100 text-green-800' :
-                                  selectedRequest.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  selectedRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                  selectedRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  selectedRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                  selectedRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
                                   'bg-red-100 text-red-800'
                                 }`}>
                                   {selectedRequest.status}
@@ -1181,14 +1259,20 @@ const PurchaseRequest = () => {
                               </div>
                               <div>
                                 <label className="text-sm font-medium text-blue-700">Category</label>
-                                <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                                  {
-                                    selectedRequest.categories.admin ? 'Admin' : 
-                                    selectedRequest.categories.construction ? 'Construction' :
-                                    selectedRequest.categories.material ? 'Material' :
-                                    selectedRequest.categories.services ? 'Services' : 'Other'
-                                  }
-                                </span>
+                                <div className="flex gap-1 flex-wrap">
+                                  {selectedRequest.categories.admin && (
+                                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
+                                  )}
+                                  {selectedRequest.categories.construction && (
+                                    <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
+                                  )}
+                                  {selectedRequest.categories.material && (
+                                    <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
+                                  )}
+                                  {selectedRequest.categories.services && (
+                                    <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
+                                  )}
+                                </div>
                               </div>
                               <div>
                                 <label className="text-sm font-medium text-blue-700">Purpose</label>
@@ -1305,8 +1389,10 @@ const PurchaseRequest = () => {
                               <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
                                 <span className="text-sm font-medium">Current Status</span>
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  selectedRequest.status === 'Approved' ? 'bg-green-100 text-green-800' :
-                                  selectedRequest.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  selectedRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                  selectedRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  selectedRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                  selectedRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
                                   'bg-red-100 text-red-800'
                                 }`}>
                                   {selectedRequest.status}
@@ -1396,7 +1482,7 @@ const PurchaseRequest = () => {
                         </TabsList>
 
                         <TabsContent value="purchase-request" className="space-y-4 mt-6">
-                          <form onSubmit={handleUpdateRequest} className="space-y-6">
+                          <form className="space-y-6">
                             {/* Header Section */}
                             <div className="bg-muted/30 p-4 rounded-lg">
                               <div className="space-y-4">
@@ -1515,7 +1601,25 @@ const PurchaseRequest = () => {
                                     type="button" 
                                     variant="outline" 
                                     size="sm"
-                                    onClick={() => setShowAddItemModal(true)}
+                                    onClick={() => {
+                                      // Reset form data
+                                      setNewItem({
+                                        description: '',
+                                        unit: '',
+                                        quantity: 0,
+                                        unitPrice: 0,
+                                        brand: '',
+                                        reference: '',
+                                        note: ''
+                                      });
+                                      // Reset display values
+                                      setDisplayValues({
+                                        quantity: '0',
+                                        unitPrice: '0'
+                                      });
+                                      setIsEditMode(false); // Set to add mode
+                                      setShowAddItemModal(true)
+                                    }}
                                   >
                                     Add Item
                                   </Button>
@@ -1594,7 +1698,7 @@ const PurchaseRequest = () => {
                                         <td className="p-2 text-xs">{item.description || ''}</td>
                                         <td className="p-2 text-xs">{item.unit || ''}</td>
                                         <td className="p-2 text-xs">{item.quantity || ''}</td>
-                                        <td className="p-2 text-xs">{item.unitPrice || ''}</td>
+                                        <td className="p-2 text-xs">${item.unitPrice || ''}</td>
                                         <td className="p-2 text-xs font-medium">
                                           ${(item.quantity * item.unitPrice).toFixed(2) || '0.00'}
                                         </td>
@@ -1789,12 +1893,31 @@ const PurchaseRequest = () => {
                                 >
                                   Cancel
                                 </Button>
-                                <Button 
-                                  type="submit" 
-                                  disabled={isUpdating || !editFormData.projectName || editFormData.items.length === 0}
-                                >
-                                  {isUpdating ? "Updating..." : "Update"}
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      type="button" 
+                                      disabled={isUpdating || !editFormData.projectName || editFormData.items.length === 0}
+                                    >
+                                      {isUpdating ? "Processing..." : "Options ▼"}
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleUpdateRequest('post')}
+                                      disabled={editingRequest?.status !== 'draft'}
+                                      className={editingRequest?.status !== 'draft' ? 'opacity-50 cursor-not-allowed' : ''}
+                                    >
+                                      {isUpdating ? "Posting..." : "Post"}
+                                      {editingRequest?.status !== 'draft' && (
+                                        <span className="ml-2 text-xs text-gray-500">(Only for drafts)</span>
+                                      )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateRequest('update')}>
+                                      {isSubmitting ? "Updating..." : "Update"}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </div>
                           </form>
@@ -1849,10 +1972,13 @@ const PurchaseRequest = () => {
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Quantity *</label>
                               <Input
-                                type="number"
-                                min="1"
-                                value={newItem.quantity}
-                                onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 1})}
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0"
+                                value={displayValues.quantity}
+                                onChange={(e) => handleDecimalInput(e.target.value, 'quantity')}
+                                onBlur={() => handleBlur('quantity')}
+                                autoComplete="off"
                               />
                             </div>
                           </div>
@@ -1860,16 +1986,19 @@ const PurchaseRequest = () => {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Unit Price *</label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={newItem.unitPrice.toString()}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setNewItem({...newItem, unitPrice: value ? parseFloat(value) : 0});
-                                }}
-                              />
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 z-10 pointer-events-none">$</span>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="0.00"
+                                  value={displayValues.unitPrice}
+                                  onChange={(e) => handleDecimalInput(e.target.value, 'unitPrice')}
+                                  onBlur={() => handleBlur('unitPrice')}
+                                  autoComplete="off"
+                                  className="pl-8" // Add padding to make room for the $ sign
+                                />
+                              </div>
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Total</label>
@@ -1945,7 +2074,7 @@ const PurchaseRequest = () => {
                             <thead>
                               <tr className="bg-muted">
                                 <th className="text-left p-3 font-medium">Request ID</th>
-                                <th className="text-left p-3 font-medium">Project Name</th>
+                                <th className="text-left p-3 font-medium">Project</th>
                                 <th className="text-left p-3 font-medium">Requester</th>
                                 <th className="text-left p-3 font-medium">Category</th>
                                 <th className="text-left p-3 font-medium">Purpose</th>
@@ -1977,12 +2106,20 @@ const PurchaseRequest = () => {
                                       <td className="p-3">{request.projectName}</td>
                                       <td className="p-3">{request.requesterName}</td>
                                       <td className="p-3">
-                                        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                          {request.categories.admin ? 'Admin' : 
-                                          request.categories.construction ? 'Construction' :
-                                          request.categories.material ? 'Material' :
-                                          request.categories.services ? 'Services' : 'Other'}
-                                        </span>
+                                        <div className="flex gap-1 flex-wrap">
+                                          {request.categories.admin && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
+                                          )}
+                                          {request.categories.construction && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
+                                          )}
+                                          {request.categories.material && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
+                                          )}
+                                          {request.categories.services && (
+                                            <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="p-3">{request.purpose}</td>
                                       <td className="p-3">
