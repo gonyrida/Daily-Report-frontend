@@ -97,6 +97,10 @@ export const API_ENDPOINTS = {
     SAVE: `/daily-reports/upsert`,
     SUBMIT: `/daily-reports/submit`,
     GET_BY_DATE: (date: string) => `/daily-reports/date/${date}`,
+    // NEW: Bulk import endpoints
+    BULK_IMPORT: (reportId: string) => `/daily-reports/${reportId}/bulk-import`,
+    GET_BY_BULK_ID: (bulkId: string) => `/daily-reports/bulk-import/${bulkId}`,
+    BULK_STATS: `/daily-reports/bulk-import/stats`,
   },
   PROJECTS: {
     BASE: `/projects`,

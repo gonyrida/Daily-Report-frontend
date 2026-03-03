@@ -4,6 +4,7 @@ import ReportHeader from "@/components/ReportHeader";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import WeeklyReportCover from "@/components/weekly/WeeklyReportCover";
 import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
+import { ActivityRow } from "@/types/activity.types";
 import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
 import ReferenceSection from "@/components/ReferenceSection";
 import ConstructionIssue from "@/components/weekly/content/ConstructionIssue";
@@ -17,6 +18,8 @@ import { useHsesData } from "@/hooks/useHsesData";
 import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
 import { useQaqcTable } from "@/hooks/useQaqcTable";
+import { UploadCloud } from "lucide-react";
+import { getQaqcStatus } from "@/integrations/reportsApi";
 import { useResourceTable } from "@/hooks/useResourceTable";
 import { 
   createWeeklyReport, 
@@ -158,7 +161,26 @@ const WeeklyReport = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // NEW: Add activities state to WeeklyReport page
+  const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
+  const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
   const [reportStatus, setReportStatus] = useState<string>("draft");
+
+  // NEW: Add QAQC state to WeeklyReport page (like other sections)
+  const [qaqcData, setQaqcData] = useState<any>(null);
+
+  // NEW: Add HSES state to WeeklyReport page (like other sections)
+  const [hsesData, setHsesData] = useState<any>(null);
+
+  // NEW: Add Photos state to WeeklyReport page (like other sections)
+  const [photosData, setPhotosData] = useState<any>(null);
+
+  // NEW: Add Issues state to WeeklyReport page (like other sections)
+  const [issuesData, setIssuesData] = useState<any>(null);
+
+  // NEW: Add Schedule state to WeeklyReport page (like other sections)
+  const [scheduleData, setScheduleData] = useState<any>(null);
 
   // Overall Progress hook
   const overallProgressHook = useOverallProgress();
@@ -172,6 +194,13 @@ const WeeklyReport = () => {
       }));
     }
   }, [selectedProject]);
+
+  // Sync Issues data changes to parent state (like other sections)
+  useEffect(() => {
+    if (setIssuesData && constructionIssues) {
+      setIssuesData(constructionIssues);
+    }
+  }, [constructionIssues]); // Remove setIssuesData to prevent infinite loop
 
   // Load existing report data when reportId is present
   useEffect(() => {
@@ -218,6 +247,116 @@ const WeeklyReport = () => {
             if (report.sections?.overallProgress?.rows) {
               overallProgressHook.setRows(report.sections.overallProgress.rows);
             }
+
+            // Load QAQC data
+            if (report.sections?.qaqcStatus) {
+              setQaqcData(report.sections.qaqcStatus);
+            } else {
+              // Create empty QAQC structure if none exists (no default items)
+              setQaqcData({
+                ncr: { items: [], comments: "" },
+                car: { items: [], comments: "" },
+                scar: { items: [], comments: "" },
+                pmsi: { items: [], comments: "" },
+                csi: { items: [], comments: "" },
+                ir: { items: [], comments: "" },
+                mfa: { items: [], comments: "" },
+                rfi: { items: [], comments: "" },
+                rfa: { items: [], comments: "" },
+                fcr: { items: [], comments: "" },
+                vo: { items: [], comments: "" },
+                tr: { items: [], comments: "" }
+              });
+            }
+
+            // Load HSES data
+            if (report.sections?.hses) {
+              setHsesData(report.sections.hses);
+            } else {
+              // Create empty HSES structure if none exists (matching useHsesData structure)
+              setHsesData({
+                training: [
+                  { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+                  { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+                  { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
+                ],
+                inspection: [
+                  { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+                  { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+                  { typeOfInspection: "", date: "", inspector: "", remarks: "" }
+                ],
+                permit: [
+                  { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+                  { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+                  { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
+                ],
+                firstAidAccident: "",
+                otherActivities: "",
+                hsePhotoReferences: []
+              });
+            }
+
+            // Load Photos data
+            if (report.sections?.photos) {
+              setPhotosData(report.sections.photos);
+              // Also update the siteActivitiesSections to match loaded data
+              if (report.sections.photos.locations) {
+                const convertedSections = report.sections.photos.locations.map(location => ({
+                  id: crypto.randomUUID(),
+                  title: location.location,
+                  entries: location.entries || []
+                }));
+                setSiteActivitiesSections(convertedSections);
+              }
+            } else {
+              // Create empty Photos structure if none exists
+              setPhotosData([]);
+            }
+
+            // Load Issues data
+            if (report.sections?.constructionIssues) {
+              setIssuesData(report.sections.constructionIssues);
+              // Also update the constructionIssues state to match loaded data
+              if (report.sections.constructionIssues.length > 0) {
+                const convertedIssues = report.sections.constructionIssues.map(issue => ({
+                  id: crypto.randomUUID(),
+                  issueNumber: issue.no || "",
+                  location: issue.location || "",
+                  problem: issue.problem || "",
+                  actionBy: issue.actionBy || "",
+                  photo: issue.photo || ""
+                }));
+                setConstructionIssues(convertedIssues);
+              }
+            } else {
+              // Create empty Issues structure if none exists
+              setIssuesData([]);
+            }
+
+            // Load Schedule data
+            if (report.sections?.masterSchedule) {
+              setScheduleData(report.sections.masterSchedule);
+              // Also update the scheduleSections state to match loaded data
+              if (report.sections.masterSchedule.length > 0) {
+                const convertedSchedule = report.sections.masterSchedule.map(item => ({
+                  id: item.id,
+                  type: item.type,
+                  title: item.title || "",
+                  description: item.description || "",
+                  date: item.date || "",
+                  file: item.fileData ? new File([item.fileData], item.fileName || "file") : null,
+                  caption: item.title || ""
+                }));
+                setScheduleSections([{
+                  id: crypto.randomUUID(),
+                  title: "Master Schedule",
+                  entries: convertedSchedule
+                }]);
+              }
+            } else {
+              // Create empty Schedule structure if none exists
+              setScheduleData([]);
+            }
           }
         } catch (error) {
           console.error('Error loading report:', error);
@@ -235,7 +374,8 @@ const WeeklyReport = () => {
 
   // Handler functions
   const handleSaveAsDraft = async () => {
-    setIsSaving(true);
+        setIsSaving(true);
+    let reportData: any;
     try {
       // Helper function to format rows with displayIndex
       const formatRowsWithDisplayIndex = (rows: any[]) => {
@@ -294,8 +434,184 @@ const WeeklyReport = () => {
         return result;
       };
 
+      // Use QAQC data from state (like other sections)
+      const qaqcDataForSave = qaqcData || {
+        ncr: { items: [], comments: "" },
+        car: { items: [], comments: "" },
+        scar: { items: [], comments: "" },
+        pmsi: { items: [], comments: "" },
+        csi: { items: [], comments: "" },
+        ir: { items: [], comments: "" },
+        mfa: { items: [], comments: "" },
+        rfi: { items: [], comments: "" },
+        rfa: { items: [], comments: "" },
+        fcr: { items: [], comments: "" },
+        vo: { items: [], comments: "" },
+        tr: { items: [], comments: "" }
+      };
+
+      // Helper function to convert File objects to base64 strings
+      const convertImagesToBase64 = async (photoReferences: any[]) => {
+        const converted = await Promise.all(
+          photoReferences.map(async (section) => {
+            const convertedEntries = await Promise.all(
+              section.entries.map(async (entry) => {
+                const convertedSlots = await Promise.all(
+                  entry.slots.map(async (slot) => {
+                    if (slot.image instanceof File) {
+                      const base64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(slot.image);
+                      });
+                      return { ...slot, image: base64 };
+                    }
+                    return slot;
+                  })
+                );
+                return { ...entry, slots: convertedSlots };
+              })
+            );
+            return { ...section, entries: convertedEntries };
+          })
+        );
+        return converted;
+      };
+
+      // Use HSES data from state (like other sections)
+      const hsesDataForSave = hsesData || {
+        training: [
+          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
+        ],
+        inspection: [
+          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { typeOfInspection: "", date: "", inspector: "", remarks: "" }
+        ],
+        permit: [
+          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
+        ],
+        firstAidAccident: "",
+        otherActivities: "",
+        hsePhotoReferences: []
+      };
+
+      // Convert Photos images to base64 before saving
+      let photosDataForSave = {
+        title: "Site Activities Photos", 
+        locations: []
+      };
+
+      if (siteActivitiesSections && siteActivitiesSections.length > 0) {
+        // Convert frontend format to backend format with base64 images
+        const locations = await Promise.all(
+          siteActivitiesSections.map(async (section) => {
+            const convertedEntries = await Promise.all(
+              (section.entries || []).map(async (entry) => {
+                const convertedSlots = await Promise.all(
+                  (entry.slots || []).map(async (slot) => {
+                    if (slot.image instanceof File) {
+                      const base64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(slot.image);
+                      });
+                      return { ...slot, image: base64 };
+                    }
+                    return slot;
+                  })
+                );
+                return { ...entry, slots: convertedSlots };
+              })
+            );
+            return {
+              location: section.title,
+              entries: convertedEntries
+            };
+          })
+        );
+        photosDataForSave = {
+          title: "Site Activities Photos",
+          locations: locations
+        };
+      }
+
+      // Convert Issues data to backend format
+      let issuesDataForSave = [];
+      
+      // Convert Schedule data to backend format
+      let scheduleDataForSave = [];
+      
+      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries.length > 0) {
+        // Convert frontend format to backend format with base64 files
+        scheduleDataForSave = await Promise.all(
+          scheduleSections[0].entries.map(async (entry) => {
+            let fileData = "";
+            let fileName = "";
+            
+            // Convert file to base64 if it exists
+            if (entry.file instanceof File) {
+              // Check file size (limit to 5MB for base64)
+              const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+              if (entry.file.size > MAX_FILE_SIZE) {
+                console.warn(`File ${entry.file.name} is too large for database storage`);
+                fileData = ""; // Don't store large files
+                fileName = entry.file.name + " (too large for storage)";
+              } else {
+                fileData = await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.readAsDataURL(entry.file);
+                });
+                fileName = entry.file.name;
+              }
+            }
+            
+            return {
+              id: entry.id,
+              type: entry.type,
+              title: entry.title || entry.caption || "",
+              description: entry.description || "",
+              date: entry.date || new Date().toISOString().split('T')[0],
+              fileName: fileName,
+              fileData: fileData
+            };
+          })
+        );
+      }
+            
+      if (constructionIssues && constructionIssues.length > 0) {
+        // Convert frontend format to backend format with base64 images
+        issuesDataForSave = await Promise.all(
+          constructionIssues.map(async (issue) => {
+            let photoBase64 = issue.photo || "";
+            
+            // Convert image to base64 if it's a File object
+            if (issue.photo instanceof File) {
+              photoBase64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(issue.photo);
+              });
+            }
+            
+            return {
+              no: issue.issueNumber || "",
+              location: issue.location || "",
+              problem: issue.problem || "",
+              actionBy: issue.actionBy || "",
+              photo: photoBase64
+            };
+          })
+        );
+      }
+
       // Collect all form data
-      const reportData = {
+      reportData = {
         projectName: sharedData.projectName,
         weekNumber: parseInt(sharedData.weekNumber) || 1,
         startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
@@ -340,10 +656,32 @@ const WeeklyReport = () => {
           overallProgress: {
             rows: formatRowsWithDisplayIndex(overallProgressHook.rows)
           },
-          // Add other sections as needed
+          // NEW: Add activities section to save payload
+          activities: {
+            weeklyActivities: weeklyActivities || [],
+            nextWeekPlan: nextWeekPlan || []
+          },
+          // NEW: Add QAQC section to save payload (from state like other sections)
+          qaqcStatus: qaqcDataForSave,
+          // NEW: Add HSES section to save payload (from state like other sections)
+          hses: hsesDataForSave,
+          // NEW: Add Photos section to save payload (from state like other sections)
+          photos: photosDataForSave,
+          // NEW: Add Issues section to save payload (from state like other sections)
+          constructionIssues: issuesDataForSave,
+          // NEW: Add Schedule section to save payload
+          masterSchedule: scheduleDataForSave
         }
       };
 
+      // QAQC data saves cleanly with other sections
+      
+      // Convert HSES photo references to base64 before saving
+      if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
+        hsesDataForSave.hsePhotoReferences = await convertImagesToBase64(hsesDataForSave.hsePhotoReferences);
+      }
+
+            
       let response;
       if (currentReportId) {
         // Update existing report - only send sections that changed
@@ -375,6 +713,14 @@ const WeeklyReport = () => {
       }
     } catch (error) {
       console.error('Save error:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      // Try to get more specific error information
+      if (error instanceof Error && error.message.includes('Validation failed')) {
+        console.error('Validation error - checking data structure...');
+        console.error('Report data:', JSON.stringify(reportData, null, 2));
+      }
+      
       toast({
         title: "Save Failed",
         description: error instanceof Error ? error.message : "Could not save weekly report. Please try again.",
@@ -805,6 +1151,11 @@ const WeeklyReport = () => {
                       activeTab={activeTab}
                       sharedData={sharedData}
                       setSharedData={setSharedData}
+                      reportId={currentReportId}
+                      weeklyActivities={weeklyActivities}
+                      setWeeklyActivities={setWeeklyActivities}
+                      nextWeekPlan={nextWeekPlan}
+                      setNextWeekPlan={setNextWeekPlan}
                     />
                   </div>
                 </>
@@ -822,6 +1173,11 @@ const WeeklyReport = () => {
                       activeTab={activeTab}
                       sharedData={sharedData}
                       setSharedData={setSharedData}
+                      reportId={currentReportId}
+                      weeklyActivities={weeklyActivities}
+                      setWeeklyActivities={setWeeklyActivities}
+                      nextWeekPlan={nextWeekPlan}
+                      setNextWeekPlan={setNextWeekPlan}
                     />
                   </div>
                 </>
@@ -841,6 +1197,10 @@ const WeeklyReport = () => {
                       setSharedData={setSharedData}
                       overallProgressData={overallProgressHook}
                       setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
+                      weeklyActivities={weeklyActivities}
+                      setWeeklyActivities={setWeeklyActivities}
+                      nextWeekPlan={nextWeekPlan}
+                      setNextWeekPlan={setNextWeekPlan}
                     />
                   </div>
                 </>
@@ -858,6 +1218,13 @@ const WeeklyReport = () => {
                       activeTab={activeTab}
                       sharedData={sharedData}
                       setSharedData={setSharedData}
+                      reportId={currentReportId}
+                      weeklyActivities={weeklyActivities}
+                      setWeeklyActivities={setWeeklyActivities}
+                      nextWeekPlan={nextWeekPlan}
+                      setNextWeekPlan={setNextWeekPlan}
+                      qaqcData={qaqcData}
+                      setQaqcData={setQaqcData}
                     />
                   </div>
                 </>
@@ -875,6 +1242,13 @@ const WeeklyReport = () => {
                       activeTab={activeTab}
                       sharedData={sharedData}
                       setSharedData={setSharedData}
+                      reportId={currentReportId}
+                      weeklyActivities={weeklyActivities}
+                      setWeeklyActivities={setWeeklyActivities}
+                      nextWeekPlan={nextWeekPlan}
+                      setNextWeekPlan={setNextWeekPlan}
+                      hsesData={hsesData}
+                      setHsesData={setHsesData}
                     />
                   </div>
                 </>
@@ -892,6 +1266,11 @@ const WeeklyReport = () => {
                       activeTab={activeTab}
                       sharedData={sharedData}
                       setSharedData={setSharedData}
+                      reportId={currentReportId}
+                      weeklyActivities={weeklyActivities}
+                      setWeeklyActivities={setWeeklyActivities}
+                      nextWeekPlan={nextWeekPlan}
+                      setNextWeekPlan={setNextWeekPlan}
                     />
                   </div>
                 </>
@@ -986,6 +1365,11 @@ const WeeklyReport = () => {
                             const updatedIssues = constructionIssues.filter((_, i) => i !== index);
                             setConstructionIssues(updatedIssues);
                           }}
+                          onDataChange={(data) => {
+                            const updatedIssues = [...constructionIssues];
+                            updatedIssues[index] = { ...updatedIssues[index], ...data };
+                            setConstructionIssues(updatedIssues);
+                          }}
                         />
                       ))}
                     </div>
@@ -1000,6 +1384,7 @@ const WeeklyReport = () => {
                       <div className="mb-6">
                         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
                         
+                                                
                         {/* Upload Section */}
                         <div className="mb-6">
                           <div 
@@ -1069,10 +1454,7 @@ const WeeklyReport = () => {
                                           className="w-full h-auto max-h-96 object-contain bg-gray-50 dark:bg-gray-900"
                                         />
                                         <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white p-3">
-                                          <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium truncate">{entry.file.name}</span>
-                                            <span className="text-xs opacity-75">Image</span>
-                                          </div>
+                                          <p className="text-sm">{entry.caption}</p>
                                         </div>
                                       </div>
                                     ) : entry.type === "pdf" ? (
@@ -1098,8 +1480,37 @@ const WeeklyReport = () => {
                                             }}
                                           />
                                         </div>
-                                        <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-xs">
-                                          PDF • {entry.file.name}
+                                        <div className="absolute top-2 right-2 flex items-center gap-2">
+                                          <div className="bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-xs">
+                                            PDF • {entry.file.name}
+                                          </div>
+                                          <button
+                                            onClick={() => {
+                                              const updatedSections = [...scheduleSections];
+                                              updatedSections[0] = {
+                                                ...updatedSections[0],
+                                                entries: updatedSections[0].entries.filter((e: any) => e.id !== entry.id)
+                                              };
+                                              setScheduleSections(updatedSections);
+                                            }}
+                                            className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-all duration-200 hover:scale-110 shadow-lg hover:shadow-red-500/25"
+                                            title="Delete PDF"
+                                            aria-label="Delete PDF"
+                                          >
+                                            <svg
+                                              xmlns="http://www.w3.org/2000/svg"
+                                              width="14"
+                                              height="14"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                            >
+                                              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
+                                            </svg>
+                                          </button>
                                         </div>
                                       </div>
                                     ) : null}

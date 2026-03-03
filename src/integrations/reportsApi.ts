@@ -4,6 +4,7 @@
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "../config/api";
 import { apiGet, apiPost, apiDelete, apiPatch } from "../lib/apiFetch";
 import { pythonApiPost } from "../lib/pythonApiFetch";
+import { transformFrontendToBackend, transformBackendToFrontend, transformLegacyToFrontend } from "../utils/activityTransform";
 
 const API_BASE_URL = API_ENDPOINTS.DAILY_REPORTS.BASE;
 
@@ -725,4 +726,102 @@ export const getCompanyProjects = async () => {
     console.error("Error fetching company projects:", error);
     throw error;
   }
+};
+
+// NEW: Bulk import API functions
+export const bulkImportActivities = async (reportId: string, activitiesData: any) => {
+  console.log("🔒 BULK IMPORT: Importing activities to report", reportId);
+
+  // Transform activities to backend format
+  const transformedData = {
+    weeklyActivities: transformFrontendToBackend(activitiesData.weeklyActivities || []),
+    nextWeekPlan: transformFrontendToBackend(activitiesData.nextWeekPlan || [])
+  };
+
+  const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.BULK_IMPORT(reportId), transformedData);
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to bulk import activities" }));
+    console.error("🔒 BULK IMPORT: Failed:", error);
+    throw new Error(error.message || "Failed to bulk import activities");
+  }
+
+  const result = await response.json();
+  console.log("🔒 BULK IMPORT: Success:", result);
+  return result;
+};
+
+export const getActivitiesByBulkImportId = async (bulkImportId: string) => {
+  console.log("🔒 GET BY BULK ID: Fetching activities for bulk import", bulkImportId);
+
+  const response = await apiGet(API_ENDPOINTS.DAILY_REPORTS.GET_BY_BULK_ID(bulkImportId));
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to get bulk import activities" }));
+    console.error("🔒 GET BY BULK ID: Failed:", error);
+    throw new Error(error.message || "Failed to get bulk import activities");
+  }
+
+  const result = await response.json();
+  console.log("🔒 GET BY BULK ID: Success:", result);
+  return transformBackendToFrontend(result.activities);
+};
+
+export const getBulkImportStats = async () => {
+  console.log("🔒 BULK STATS: Getting bulk import statistics");
+
+  const response = await apiGet(API_ENDPOINTS.DAILY_REPORTS.BULK_STATS);
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to get bulk import statistics" }));
+    console.error("🔒 BULK STATS: Failed:", error);
+    throw new Error(error.message || "Failed to get bulk import statistics");
+  }
+
+  const result = await response.json();
+  console.log("🔒 BULK STATS: Success:", result);
+  return result;
+};
+
+// QAQC API functions
+export const updateQaqcStatus = async (reportId: string, qaqcData: any) => {
+  console.log("🔒 UPDATE QAQC: Updating QAQC status for report", reportId);
+
+  const response = await apiPatch(`/weekly-reports/${reportId}/qaqc-status`, qaqcData);
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to update QAQC status" }));
+    console.error("🔒 UPDATE QAQC: Failed:", error);
+    throw new Error(error.message || "Failed to update QAQC status");
+  }
+
+  const result = await response.json();
+  console.log("🔒 UPDATE QAQC: Success:", result);
+  return result;
+};
+
+export const getQaqcStatus = async (reportId: string) => {
+  console.log("🔒 GET QAQC: Getting QAQC status for report", reportId);
+
+  const response = await apiGet(`/weekly-reports/${reportId}`);
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to get QAQC status" }));
+    console.error("🔒 GET QAQC: Failed:", error);
+    throw new Error(error.message || "Failed to get QAQC status");
+  }
+
+  const result = await response.json();
+  console.log("🔒 GET QAQC: Success:", result);
+  return result.sections?.qaqcStatus || null;
 };

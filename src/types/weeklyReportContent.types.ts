@@ -1,3 +1,5 @@
+import { ActivityRow } from "./activity.types";
+
 export interface Section {
   id: string;
   title: string;
@@ -7,13 +9,23 @@ export type TabType = "cover" | "letter" | "table-of-content" | "overall-progres
 
 export interface WeeklyReportContentProps {
   showIntroduction?: boolean;
-  setShowIntroduction?: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowIntroduction?: (show: boolean) => void;
   projectLogo?: string;
   setActiveTab?: (tab: TabType) => void;
   setShowSecondNav?: (show: boolean) => void;
   activeTab?: TabType;
   sharedData?: any;
-  setSharedData?: React.Dispatch<React.SetStateAction<any>>;
+  setSharedData?: (data: any) => void;
   overallProgressData?: any;
-  setOverallProgressData?: React.Dispatch<React.SetStateAction<any>>;
+  setOverallProgressData?: (data: any) => void;
+  reportId?: string; 
+  weeklyActivities?: ActivityRow[];
+  setWeeklyActivities?: (activities: ActivityRow[]) => void;
+  nextWeekPlan?: ActivityRow[];
+  setNextWeekPlan?: (activities: ActivityRow[]) => void;
+  qaqcData?: any;
+  setQaqcData?: (qaqcData: any) => void;
+  hsesData?: any;
+  setHsesData?: (hsesData: any) => void;
+  onQaqcDataChange?: (qaqcData: any) => void;
 }

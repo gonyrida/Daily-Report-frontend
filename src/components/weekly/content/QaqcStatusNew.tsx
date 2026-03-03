@@ -1,9 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CheckCircle, AlertCircle, Clock, XCircle, FileText, Plus, Trash2, MessageSquare } from "lucide-react";
 import { StatusKey, QaqcRow, Section, TableData, QaqcTableProps, QaqcStatusNewProps } from "@/types/qaqc.types";
 import { STATUS_OPTIONS } from "@/constants/qaqcStatus";
 import { makeRow } from "@/utils/rowFactory";
 import { handleCommentChange } from "@/lib/tableUtils";
+import { QaqcStatusApiWrapper } from "./QaqcStatusApiWrapper";
+
+interface ExtendedQaqcStatusNewProps extends QaqcStatusNewProps {
+  weeklyReportId?: string;
+}
 
 const StatusIcon: React.FC<{ status: StatusKey }> = ({ status }) => {
   switch (status) {
@@ -179,8 +184,9 @@ export default function QaqcStatusNew({
   handleCellChange,
   totalRows,
   openRows,
-  filteredSections = sections
-}: QaqcStatusNewProps) {
+  filteredSections = sections,
+  weeklyReportId
+}: ExtendedQaqcStatusNewProps) {
   const initialData: TableData = Object.fromEntries(
     sections.map((s) => [s.id, Array(5).fill(null).map(() => makeRow())])
   );
@@ -188,11 +194,23 @@ export default function QaqcStatusNew({
   const [localTableData, setLocalTableData] = useState<TableData>(tableData || initialData);
   const [localSearch, setLocalSearch] = useState<string>(search || "");
 
+  // Sync local state with hook state when hook state changes (for example data loading)
+  useEffect(() => {
+    if (tableData && JSON.stringify(tableData) !== JSON.stringify(localTableData)) {
+      setLocalTableData(tableData);
+    }
+  }, [tableData, localTableData]);
+
   const handleAddRowLocal = (sectionId: string): void => {
     setLocalTableData((prev) => ({
       ...prev,
       [sectionId]: [...prev[sectionId], makeRow()],
     }));
+    
+    // Also update the hook state if available
+    if (handleAddRow) {
+      handleAddRow(sectionId);
+    }
   };
 
   const handleDeleteRowLocal = (sectionId: string, rowId: string): void => {
@@ -200,6 +218,11 @@ export default function QaqcStatusNew({
       ...prev,
       [sectionId]: prev[sectionId].filter((r) => r.id !== rowId),
     }));
+    
+    // Also update the hook state if available
+    if (handleDeleteRow) {
+      handleDeleteRow(sectionId, rowId);
+    }
   };
 
   const handleCellChangeLocal = (
@@ -210,10 +233,15 @@ export default function QaqcStatusNew({
   ): void => {
     setLocalTableData((prev) => ({
       ...prev,
-      [sectionId]: prev[sectionId].map((r) =>
-        r.id === rowId ? { ...r, [field]: value } : r
+      [sectionId]: prev[sectionId].map((row) =>
+        row.id === rowId ? { ...row, [field]: value } : row
       ),
     }));
+    
+    // Also update the hook state if available
+    if (handleCellChange) {
+      handleCellChange(sectionId, rowId, field, value);
+    }
   };
 
   const totalRowsCount = Object.values(localTableData).reduce((a, r) => a + r.length, 0);
@@ -230,10 +258,59 @@ export default function QaqcStatusNew({
   const onDeleteRowHandler = handleDeleteRow || handleDeleteRowLocal;
   const onCellChangeHandler = handleCellChange || handleCellChangeLocal;
 
+  // If we have a reportId, use the API wrapper for full backend integration
+  if (weeklyReportId) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-primary text-primary-foreground p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="w-6 h-6" />
+              <div>
+                <h1 className="text-xl font-bold">QA/QC Status Register</h1>
+                <p className="text-sm opacity-90">Quality Assurance / Quality Control</p>
+              </div>
+              <span className="px-2 py-1 bg-white/20 rounded text-xs font-bold">
+                SECTION 4
+              </span>
+            </div>
+            <div className="flex gap-6 text-sm">
+              <span>Total Entries: <strong>{totalRows || 0}</strong></span>
+              <span>Open Items: <strong className="text-yellow-300">{openRows || 0}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Controls */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex-1 min-w-64">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search sections here..."
+              className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-card dark:border-border"
+            />
+          </div>
+        </div>
+
+        {/* API Wrapper Component */}
+        <QaqcStatusApiWrapper
+          sections={sections}
+          weeklyReportId={weeklyReportId}
+          search={search}
+          setSearch={setSearch}
+        />
+      </div>
+    );
+  }
+
+  // Fallback to local state management when no reportId
   return (
     <div className="space-y-6">
       {/* Header */}
-      {/* <div className="bg-primary text-primary-foreground p-4 rounded-lg">
+      <div className="bg-primary text-primary-foreground p-4 rounded-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <FileText className="w-6 h-6" />
@@ -246,19 +323,19 @@ export default function QaqcStatusNew({
             </span>
           </div>
           <div className="flex gap-6 text-sm">
-            <span>Total Entries: <strong>{totalRows}</strong></span>
-            <span>Open Items: <strong className="text-yellow-300">{openRows}</strong></span>
+            <span>Total Entries: <strong>{totalRowsCount}</strong></span>
+            <span>Open Items: <strong className="text-yellow-300">{openRowsCount}</strong></span>
           </div>
         </div>
-      </div> */}
+      </div>
 
       {/* Search and Controls */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-64">
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search sections here..."
             className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-card dark:border-border"
           />
@@ -267,19 +344,19 @@ export default function QaqcStatusNew({
 
       {/* Tables */}
       <div className="space-y-6">
-        {filteredSections.map((section) => (
+        {filteredSectionsList.map((section) => (
           <div key={section.id} id={`section-${section.id}`}>
             <QaqcTable
               section={section}
-              rows={tableData[section.id]}
-              onAddRow={handleAddRow}
-              onDeleteRow={handleDeleteRow}
-              onCellChange={handleCellChange}
+              rows={localTableData[section.id]}
+              onAddRow={handleAddRowLocal}
+              onDeleteRow={handleDeleteRowLocal}
+              onCellChange={handleCellChangeLocal}
             />
           </div>
         ))}
 
-        {filteredSections.length === 0 && (
+        {filteredSectionsList.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             No sections match your filter.
           </div>

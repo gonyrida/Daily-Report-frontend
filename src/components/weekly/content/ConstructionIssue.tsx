@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Slot from "@/components/reference/Slot";
 import { Trash2 } from "lucide-react";
 import { ConstructionIssueProps } from "@/types/constructionIssue.types";
@@ -10,7 +10,8 @@ const ConstructionIssue = ({
   problems = "",
   actionBy = "",
   onRemove,
-}: ConstructionIssueProps) => {
+  onDataChange,
+}: ConstructionIssueProps & { onDataChange?: (data: any) => void }) => {
   const [fields, setFields] = useState({
     siteLocation,
     photoReference,
@@ -29,6 +30,20 @@ const ConstructionIssue = ({
       prev.map((slot) => (slot.id === updatedSlot.id ? updatedSlot : slot)),
     );
   };
+
+  // Sync data changes to parent
+  useEffect(() => {
+    if (onDataChange) {
+      const data = {
+        issueNumber,
+        location: fields.siteLocation,
+        problem: fields.problems,
+        actionBy: fields.actionBy,
+        photo: slots[0]?.image || null
+      };
+      onDataChange(data);
+    }
+  }, [fields, slots, issueNumber, onDataChange]);
 
   const onDeleteSlot = (slotId) => {
     setSlots((prev) =>
