@@ -38,7 +38,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   hsesData,
   setHsesData,
   onQaqcDataChange,
-  onClearQaqcData
+  onClearQaqcData,
+  onClearHsesData
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -55,7 +56,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Initialize all hooks at parent level
   const constructionIssueHook = useConstructionIssue({});
-  const hsesDataHook = useHsesData();
+  const hsesDataHook = useHsesData(undefined, false);
   const introductionTextHook = useIntroductionText(projectLogo);
   
   // Use local hook with state management (like other sections)
@@ -162,68 +163,146 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       }));
     });
     
-    // Set both parent state and hook state for immediate UI update
+    // Set parent state directly
     console.log("🔧 DEBUG: Setting parent state with:", exampleData);
     console.log("🔧 DEBUG: Setting hook state with:", frontendExampleData);
     
     setQaqcData(exampleData);
     qaqcTableHook.setTableData(frontendExampleData);
     
-    // Also need to update local state since QAQC component uses local state when weeklyReportId is undefined
-    // We'll trigger this by forcing the component to re-render with the new hook data
     console.log("🔧 DEBUG: QAQC example data loaded to both states");
   };
 
+  // Load example data for HSES sections
+  const loadHsesExampleData = () => {
+    const exampleData: any = {
+      training: [
+        { typeOfTraining: "Safety Orientation", date: "2024-01-15", venue: "Site Office", trainer: "John Smith", attendee: "25 workers", remarks: "Completed successfully" },
+        { typeOfTraining: "PPE Usage", date: "2024-01-16", venue: "Main Site", trainer: "Jane Doe", attendee: "30 workers", remarks: "All passed assessment" },
+        { typeOfTraining: "Emergency Response", date: "2024-01-18", venue: "Training Room", trainer: "Mike Johnson", attendee: "20 workers", remarks: "Drill completed" }
+      ],
+      inspection: [
+        { typeOfInspection: "Daily Safety Walk", date: "2024-01-15", inspector: "Safety Officer A", remarks: "No issues found" },
+        { typeOfInspection: "Equipment Check", date: "2024-01-17", inspector: "Engineer B", remarks: "All equipment operational" },
+        { typeOfInspection: "Scaffolding Inspection", date: "2024-01-19", inspector: "Inspector C", remarks: "Minor repairs needed on section 3" }
+      ],
+      permit: [
+        { typeOfPermit: "Hot Work", startDate: "2024-01-15", endDate: "2024-01-15", inspector: "Supervisor A", approver: "Manager X", remarks: "Welding activity approved" },
+        { typeOfPermit: "Excavation", startDate: "2024-01-16", endDate: "2024-01-20", inspector: "Engineer B", approver: "Manager X", remarks: "Deep excavation permit" },
+        { typeOfPermit: "Confined Space", startDate: "2024-01-18", endDate: "2024-01-18", inspector: "Safety Officer C", approver: "Manager Y", remarks: "Tank cleaning operation" }
+      ],
+      firstAidAccident: "Minor cut injury on 2024-01-17 - treated on site. Near miss reported on 2024-01-18 - loose cable tripped worker, no injury.",
+      otherActivities: "Environmental monitoring conducted on 2024-01-16. Waste segregation audit completed with satisfactory results."
+    };
+
+    // Preserve existing hsePhotoReferences to keep section 5.6 UI unchanged
+    const currentPhotoReferences = hsesData?.hsePhotoReferences || [];
+    exampleData.hsePhotoReferences = currentPhotoReferences;
+
+    // Set parent state directly
+    console.log("🔧 DEBUG: Setting HSES example data:", exampleData);
+    setHsesData(exampleData);
+  };
+
   // Sync QAQC data changes to parent state (like other sections)
+  // REMOVED: This creates circular dependency with the useEffect below
+  // useEffect(() => {
+  //   if (setQaqcData && qaqcTableHook.tableData) {
+  //     
+  //     // Transform frontend data to backend format
+  //     const backendData: any = {};
+  //     
+  //     // Map frontend section IDs to backend keys
+  //     const sectionIdMap: Record<string, string> = {
+  //       "4.1": "ncr",
+  //       "4.2": "car", 
+  //       "4.3": "scar",
+  //       "4.4": "pmsi",
+  //       "4.5": "csi",
+  //       "4.6": "ir",
+  //       "4.7": "mfa",
+  //       "4.8": "rfi",
+  //       "4.9": "rfa",
+  //       "4.10": "fcr",
+  //       "4.11": "vo",
+  //       "4.12": "tr"
+  //     };
+  //     
+  //     Object.entries(qaqcTableHook.tableData).forEach(([sectionId, rows]) => {
+  //       const backendKey = sectionIdMap[sectionId];
+  //       if (backendKey) {
+  //         // Filter out empty rows (only save rows with actual data)
+  //         const nonEmptyRows = rows.filter(row => 
+  //           row.code.trim() || 
+  //           row.description.trim() || 
+  //           row.status.trim() || 
+  //           row.dateResponse.trim() ||
+  //           row.comment.trim()
+  //         );
+  //         
+  //         backendData[backendKey] = {
+  //           items: nonEmptyRows.map(row => ({
+  //             code: row.code,
+  //             description: row.description,
+  //             status: row.status,
+  //             dateResponded: row.dateResponse
+  //           })),
+  //           comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
+  //         };
+  //       }
+  //     });
+  //     
+  //     setQaqcData(backendData);
+  //   }
+  // }, [qaqcTableHook.tableData, setQaqcData]);
+
+  // Load QAQC data from parent into local hook (like other sections)
   useEffect(() => {
-    if (setQaqcData && qaqcTableHook.tableData) {
-      
-      // Transform frontend data to backend format
-      const backendData: any = {};
-      
-      // Map frontend section IDs to backend keys
+    if (qaqcData && qaqcTableHook.setTableData) {
+      // Transform backend data to frontend format
+      const frontendData: any = {};
       const sectionIdMap: Record<string, string> = {
-        "4.1": "ncr",
-        "4.2": "car", 
-        "4.3": "scar",
-        "4.4": "pmsi",
-        "4.5": "csi",
-        "4.6": "ir",
-        "4.7": "mfa",
-        "4.8": "rfi",
-        "4.9": "rfa",
-        "4.10": "fcr",
-        "4.11": "vo",
-        "4.12": "tr"
+        "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
+        "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
+        "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr"
       };
       
-      Object.entries(qaqcTableHook.tableData).forEach(([sectionId, rows]) => {
-        const backendKey = sectionIdMap[sectionId];
-        if (backendKey) {
-          // Filter out empty rows (only save rows with actual data)
-          const nonEmptyRows = rows.filter(row => 
-            row.code.trim() || 
-            row.description.trim() || 
-            row.status.trim() || 
-            row.dateResponse.trim() ||
-            row.comment.trim()
-          );
+      // Reverse mapping for frontend to backend
+      const reverseSectionMap: Record<string, string> = {};
+      Object.entries(sectionIdMap).forEach(([frontendId, backendKey]) => {
+        reverseSectionMap[backendKey] = frontendId;
+      });
+      
+      Object.entries(qaqcData).forEach(([backendKey, sectionData]) => {
+        const frontendId = reverseSectionMap[backendKey];
+        const typedSectionData = sectionData as any;
+        if (frontendId && typedSectionData.items) {
+          frontendData[frontendId] = typedSectionData.items.map((item: any, index: number) => ({
+            id: `${frontendId}-item-${index}`,
+            code: item.code || "",
+            description: item.description || "",
+            status: item.status || "",
+            dateResponse: item.dateResponded || "",
+            comment: typedSectionData.comments || ""
+          }));
           
-          backendData[backendKey] = {
-            items: nonEmptyRows.map(row => ({
-              code: row.code,
-              description: row.description,
-              status: row.status,
-              dateResponded: row.dateResponse
-            })),
-            comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
-          };
+          // Add default rows if less than 5
+          while (frontendData[frontendId].length < 5) {
+            frontendData[frontendId].push({
+              id: `${frontendId}-default-${frontendData[frontendId].length}`,
+              code: "",
+              description: "",
+              status: "",
+              dateResponse: "",
+              comment: ""
+            });
+          }
         }
       });
       
-      setQaqcData(backendData);
+      qaqcTableHook.setTableData(frontendData);
     }
-  }, [qaqcTableHook.tableData, setQaqcData]);
+  }, [qaqcData]); // Add qaqcData dependency to sync when parent changes
 
   // Load HSES data from parent into local hook (like other sections)
   useEffect(() => {
@@ -232,21 +311,19 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     }
   }, [hsesData]); // Add hsesData dependency to sync when parent changes
 
-  // Sync HSES data changes to parent state (like other sections)
-  useEffect(() => {
-    if (setHsesData && hsesDataHook.hsesData) {
-      console.log("🔧 DEBUG: HSES data syncing to parent:", hsesDataHook.hsesData);
-      console.log("🔧 DEBUG: HSES photo references in hook:", hsesDataHook.hsesData.hsePhotoReferences);
-      setHsesData(hsesDataHook.hsesData);
-    }
-  }, [hsesDataHook.hsesData, setHsesData]);
-
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
     if (onClearQaqcData && qaqcTableHook.clearQaqcData) {
       onClearQaqcData(qaqcTableHook.clearQaqcData);
     }
   }, [onClearQaqcData, qaqcTableHook.clearQaqcData]);
+
+  // Expose clearHsesData function to parent for successful submit cleanup
+  useEffect(() => {
+    if (onClearHsesData && hsesDataHook.clearHsesData) {
+      onClearHsesData(hsesDataHook.clearHsesData);
+    }
+  }, [onClearHsesData, hsesDataHook.clearHsesData]);
 
   const handleIntroductionClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -337,7 +414,38 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
         <QaqcStatusNew 
           sections={qaqcTableHook.filteredSections}
           tableData={qaqcTableHook.tableData}
-          setTableData={qaqcTableHook.setTableData}
+          setTableData={(data) => {
+            qaqcTableHook.setTableData(data);
+            // Also sync to parent state for persistence
+            if (setQaqcData) {
+              const backendData: any = {};
+              const sectionIdMap: Record<string, string> = {
+                "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
+                "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
+                "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr"
+              };
+              
+              Object.entries(data).forEach(([sectionId, rows]) => {
+                const backendKey = sectionIdMap[sectionId];
+                if (backendKey) {
+                  const nonEmptyRows = rows.filter(row => 
+                    row.code.trim() || row.description.trim() || row.status.trim() || 
+                    row.dateResponse.trim() || row.comment.trim()
+                  );
+                  
+                  backendData[backendKey] = {
+                    items: nonEmptyRows.map(row => ({
+                      code: row.code, description: row.description, status: row.status,
+                      dateResponded: row.dateResponse
+                    })),
+                    comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
+                  };
+                }
+              });
+              
+              setQaqcData(backendData);
+            }
+          }}
           search={qaqcTableHook.search}
           setSearch={qaqcTableHook.setSearch}
           handleAddRow={qaqcTableHook.handleAddRow}
@@ -357,13 +465,21 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     console.log("WeeklyReportContent: Showing HSES, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
-          5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-0 text-foreground">
+            5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
+          </h2>
+          <button
+            onClick={loadHsesExampleData}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium mr-6"
+          >
+            📝 Load Example Data
+          </button>
+        </div>
         <Hses 
           isEditing={true}
-          data={hsesDataHook.hsesData}
-          onChange={hsesDataHook.setHsesData}
+          data={hsesData}
+          onChange={setHsesData}
         />
       </div>
     );

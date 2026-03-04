@@ -185,6 +185,9 @@ const WeeklyReport = () => {
   // NEW: Add state to store the clearQaqcData function reference
   const clearQaqcDataRef = useRef<(() => void) | null>(null);
 
+  // NEW: Add state to store the clearHsesData function reference
+  const clearHsesDataRef = useRef<(() => void) | null>(null);
+
   // Overall Progress hook
   const overallProgressHook = useOverallProgress();
 
@@ -750,9 +753,12 @@ const WeeklyReport = () => {
       
       if (response.success) {
         setReportStatus("submitted");
-        // Clear QAQC localStorage data on successful submit
+        // Clear QAQC and HSES localStorage data on successful submit
         if (clearQaqcDataRef.current) {
           clearQaqcDataRef.current();
+        }
+        if (clearHsesDataRef.current) {
+          clearHsesDataRef.current();
         }
         toast({
           title: "Submitted",
@@ -1257,6 +1263,7 @@ const WeeklyReport = () => {
                       setNextWeekPlan={setNextWeekPlan}
                       hsesData={hsesData}
                       setHsesData={setHsesData}
+                      onClearHsesData={(fn) => { clearHsesDataRef.current = fn; }}
                     />
                   </div>
                 </>

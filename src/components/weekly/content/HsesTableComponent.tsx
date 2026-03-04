@@ -10,20 +10,32 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
   emptyMessage,
   addButtonText = "Add Row"
 }) => {
-  const [tableData, setTableData] = useState<any[]>(data);
+  // Ensure all rows have unique IDs
+  const dataWithIds = data.map((row, index) => ({
+    ...row,
+    id: row.id || `existing-row-${index}-${Date.now()}`
+  }));
+  
+  const [tableData, setTableData] = useState<any[]>(dataWithIds);
+
+  // Sync with prop data
+  React.useEffect(() => {
+    setTableData(dataWithIds);
+  }, [data]);
 
   const addRow = () => {
     const newRow: any = {};
     columns.forEach(column => {
       newRow[column.key] = "";
     });
+    newRow.id = `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newData = [...tableData, newRow];
     setTableData(newData);
     onChange?.(newData);
   };
 
-  const removeRow = (index: number) => {
-    const newData = tableData.filter((_, i) => i !== index);
+  const removeRow = (rowId: string) => {
+    const newData = tableData.filter((row) => row.id !== rowId);
     setTableData(newData);
     onChange?.(newData);
   };
@@ -39,13 +51,13 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
   if (!isEditing) {
     return (
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse border border-border">
+        <table className="min-w-full">
           <thead>
             <tr className="bg-muted/50">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="border border-border px-4 py-2 text-left text-sm font-medium text-foreground"
+                  className="px-4 py-2 text-left text-sm font-medium text-foreground"
                 >
                   {column.label}
                 </th>
@@ -54,11 +66,11 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
           </thead>
           <tbody>
             {tableData.map((row, index) => (
-              <tr key={index}>
+              <tr key={row.id || index}>
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className="border border-border px-4 py-2 text-sm text-muted-foreground"
+                    className="px-2 py-1 text-sm text-muted-foreground"
                     style={{ width: column.width || 'auto' }}
                   >
                     {row[column.key] || "-"}
@@ -90,25 +102,30 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse border border-border">
+        <table className="min-w-full">
           <thead>
             <tr className="bg-muted/50">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="border border-border px-4 py-2 text-left text-sm font-medium text-foreground"
+                  className="px-4 py-2 text-left text-sm font-medium text-foreground"
                   style={{ width: column.width || 'auto' }}
                 >
                   {column.label}
                 </th>
               ))}
+              {isEditing && (
+                <th className="px-4 py-2 text-left text-sm font-medium text-foreground" style={{ width: '80px' }}>
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
             {tableData.map((row, index) => (
-              <tr key={index}>
+              <tr key={row.id || index}>
                 {columns.map((column) => (
-                  <td key={column.key} className="border border-border px-2 py-1" style={{ width: column.width || 'auto' }}>
+                  <td key={column.key} className="px-2 py-1" style={{ width: column.width || 'auto' }}>
                     {column.type === 'date' ? (
                       <input
                         type="date"
@@ -127,6 +144,17 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
                     )}
                   </td>
                 ))}
+                {isEditing && (
+                  <td className="px-2 py-1 text-center" style={{ width: '80px' }}>
+                    <button
+                      onClick={() => removeRow(row.id)}
+                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      title="Delete row"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
