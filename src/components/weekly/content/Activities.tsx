@@ -11,6 +11,39 @@ const Activities = (props: ActivitiesProps) => {
   
   console.log("🔍 DEBUG Activities: props.reportId =", props.reportId); // DEBUG: Log reportId
   
+  // Helper function to detect indentation level
+  const getIndentationLevel = (description: string): number => {
+    const trimmed = description.trim();
+    if (!trimmed) return 0;
+    
+    const firstWord = trimmed.split(/\s+/)[0];
+    
+    // Roman numerals (level 0)
+    if (/^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?$/i.test(firstWord)) {
+      return 0;
+    }
+    
+    // Numbers with dots (level 1 or 2)
+    if (/^\d+(?:\.\d+)*\.?$/.test(firstWord)) {
+      const dotCount = (firstWord.match(/\./g) || []).length;
+      return dotCount; // 1. = level 1, 1.1 = level 2, 1.1.1 = level 3
+    }
+    
+    // Bullets (level 3)
+    if (/^[-•]$/i.test(firstWord)) {
+      return 3;
+    }
+    
+    return 0;
+  };
+
+  // Helper function to get indentation style
+  const getIndentationStyle = (description: string) => {
+    const level = getIndentationLevel(description);
+    const indentPixels = level * 20; // 20px per level
+    return { paddingLeft: `${indentPixels}px` };
+  };
+  
   // Use props directly or fallback to local state
   const weeklyActivities = props.weeklyActivities || [];
   const nextWeekPlan = props.nextWeekPlan || [];
@@ -192,7 +225,12 @@ const Activities = (props: ActivitiesProps) => {
                       }`}
                       placeholder="Enter description"
                       rows={1}
-                      style={{ border: 'none', outline: 'none', padding: '2px' }}
+                      style={{ 
+                        border: 'none', 
+                        outline: 'none', 
+                        padding: '2px',
+                        ...getIndentationStyle(row.description)
+                      }}
                     />
                     {/* Bulk import indicator - REMOVED */}
                     {/* {row.source === "bulk" && (
@@ -309,7 +347,12 @@ const Activities = (props: ActivitiesProps) => {
                     }`}
                     placeholder="Enter description"
                     rows={1}
-                    style={{ border: 'none', outline: 'none', padding: '2px' }}
+                    style={{ 
+                      border: 'none', 
+                      outline: 'none', 
+                      padding: '2px',
+                      ...getIndentationStyle(row.description)
+                    }}
                   />
                   {/* Bulk import indicator - REMOVED */}
                   {/* {row.source === "bulk" && (
