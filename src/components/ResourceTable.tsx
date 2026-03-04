@@ -48,7 +48,7 @@ export interface ResourceRow {
   prev: number;
   today: number;
   accumulated: number;
-  rowType?: "title" | "detail";
+  rowType?: "title" | "detail" | "subDetail";
   nextWeekPlan?: number;
   upNextWeekPlan?: number;
   searchTerm?: string;

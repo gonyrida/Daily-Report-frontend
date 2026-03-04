@@ -31,16 +31,34 @@ export default function OverallProgressTable({
 }: OverallProgressTableProps) {
   const [localRows, setLocalRows] = useState<ProgressRow[]>(rows || []);
 
-  // Sync local state with props when they change
+  // Sync local state with props when they change, but don't overwrite local changes
   useEffect(() => {
-    setLocalRows(rows || []);
+    // Only sync if the props rows are different and we don't have local changes
+    if (rows && rows.length > 0) {
+      // Check if we have any local rows that aren't in the props
+      const hasLocalChanges = localRows.some(localRow => 
+        !rows.some(propRow => propRow.id === localRow.id)
+      );
+      
+      if (!hasLocalChanges) {
+        setLocalRows(rows);
+      }
+    } else if (!rows || rows.length === 0) {
+      // Only clear if props are empty and we don't have local rows
+      if (localRows.length === 0) {
+        setLocalRows([]);
+      }
+    }
   }, [rows]);
 
   // 🔥 Correct numbering logic
   const formattedRows = useMemo(() => {
     let titleCount = 0;
 
-    return localRows.map((row, index) => {
+    const result = localRows.map((row, index) => {
+      // Debug: log each row to see what's happening
+      console.log(`Processing row ${index}:`, row.rowType, row.displayIndex);
+      
       if (row.rowType === "title") {
         titleCount++;
         return {
@@ -50,24 +68,82 @@ export default function OverallProgressTable({
       }
 
       if (row.rowType === "detail") {
+        // Count detail rows up to this point
         let detailCount = 0;
-
         for (let i = 0; i <= index; i++) {
-          if (localRows[i].rowType === "title") {
-            detailCount = 0; // reset when new title appears
-          } else if (localRows[i].rowType === "detail") {
+          if (localRows[i].rowType === "detail") {
             detailCount++;
           }
         }
-
         return {
           ...row,
           displayIndex: `${detailCount}.`,
         };
       }
 
+      if (row.rowType === "subDetail") {
+        // Find the parent detail number for this sub-detail
+        let parentDetailNumber = 0;
+        for (let i = index; i >= 0; i--) {
+          if (localRows[i].rowType === "detail") {
+            // Count detail rows up to that point to get the parent number
+            let detailCount = 0;
+            for (let j = 0; j <= i; j++) {
+              if (localRows[j].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            parentDetailNumber = detailCount;
+            break;
+          }
+        }
+
+        // Count sub-details under the same parent
+        let subDetailCount = 0;
+        for (let i = 0; i <= index; i++) {
+          if (localRows[i].rowType === "detail") {
+            // Check if this is the parent detail
+            let detailCount = 0;
+            for (let j = 0; j <= i; j++) {
+              if (localRows[j].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            if (detailCount === parentDetailNumber) {
+              subDetailCount = 0; // Reset for this parent
+            }
+          } else if (localRows[i].rowType === "subDetail") {
+            // Count sub-details under the same parent
+            let currentParentDetail = 0;
+            for (let k = i; k >= 0; k--) {
+              if (localRows[k].rowType === "detail") {
+                let detailCount = 0;
+                for (let j = 0; j <= k; j++) {
+                  if (localRows[j].rowType === "detail") {
+                    detailCount++;
+                  }
+                }
+                currentParentDetail = detailCount;
+                break;
+              }
+            }
+            if (currentParentDetail === parentDetailNumber) {
+              subDetailCount++;
+            }
+          }
+        }
+
+        return {
+          ...row,
+          displayIndex: `${parentDetailNumber}.${subDetailCount}`,
+        };
+      }
+
       return row;
     });
+
+    console.log("Final formatted rows:", result);
+    return result;
   }, [localRows]);
 
   const localUpdateRows = (newRows: ProgressRow[]) => {
@@ -111,10 +187,16 @@ export default function OverallProgressTable({
         let processedValue = value;
         
         if (percentageFields.includes(field) && typeof value === "string") {
-          // Convert string input to number
-          const numericValue = parseFloat(value);
-          if (!isNaN(numericValue)) {
-            processedValue = numericValue;
+          // Convert string input to number, but handle special cases
+          if (value === "__custom_unit_input__") {
+            processedValue = value; // Keep the special string value
+          } else {
+            const numericValue = parseFloat(value);
+            if (!isNaN(numericValue)) {
+              processedValue = numericValue;
+            } else {
+              processedValue = 0; // Default to 0 for invalid numbers
+            }
           }
         }
 
@@ -123,10 +205,25 @@ export default function OverallProgressTable({
 
         // Calculate % Up to This Week when % Up to Previous Week or % This Week changes
         if (field === "unit" || field === "prev") {
-          const upToPrevWeek = typeof updatedRow.unit === "number" ? updatedRow.unit : Number(updatedRow.unit) || 0;
+          const upToPrevWeek = typeof updatedRow.unit === "number" ? updatedRow.unit : (typeof updatedRow.unit === "string" && updatedRow.unit !== "__custom_unit_input__" ? Number(updatedRow.unit) || 0 : 0);
           const thisWeek = typeof updatedRow.prev === "number" ? updatedRow.prev : Number(updatedRow.prev) || 0;
           updatedRow.today = upToPrevWeek + thisWeek;
-          // Remove automatic accumulated calculation - let user input it manually
+          // Calculate Remaining as 100% - up to this week %
+          const upToThisWeek = updatedRow.today;
+          updatedRow.accumulated = Math.max(0, 100 - upToThisWeek);
+        }
+
+        // Recalculate Remaining when today field changes directly
+        if (field === "today") {
+          const upToThisWeek = typeof updatedRow.today === "number" ? updatedRow.today : Number(updatedRow.today) || 0;
+          updatedRow.accumulated = Math.max(0, 100 - upToThisWeek);
+        }
+
+        // Calculate % Up to next week plan when % up to this week or % next week plan changes
+        if (field === "today" || field === "nextWeekPlan") {
+          const upToThisWeek = typeof updatedRow.today === "number" ? updatedRow.today : Number(updatedRow.today) || 0;
+          const nextWeekPlan = typeof updatedRow.nextWeekPlan === "number" ? updatedRow.nextWeekPlan : Number(updatedRow.nextWeekPlan) || 0;
+          updatedRow.upNextWeekPlan = upToThisWeek + nextWeekPlan;
         }
 
         return updatedRow;
@@ -176,6 +273,27 @@ export default function OverallProgressTable({
     addDetailRow?.();
   };
 
+  const localAddSubDetailRow = () => {
+    const newRow: ProgressRow = {
+      id: crypto.randomUUID(),
+      description: "",
+      unit: 0,
+      prev: 0,
+      today: 0,
+      accumulated: 0,
+      rowType: "subDetail",
+      nextWeekPlan: 0,
+      upNextWeekPlan: 0,
+      searchTerm: "",
+      isCustomInput: false,
+    };
+
+    const newRows = [...localRows, newRow];
+    setLocalRows(newRows);
+    setRows?.(newRows);
+    updateRows?.(newRows);
+  };
+
   const removeRow = (id: string) => {
     const newRows = localRows.filter((row) => row.id !== id);
     setLocalRows(newRows);
@@ -192,7 +310,7 @@ export default function OverallProgressTable({
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-muted/50">
+            <tr className="bg-primary text-primary-foreground p-4 rounded-lg">
               <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[5%]">#</th>
               <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[25%]">
                 Scope of work
@@ -222,8 +340,8 @@ export default function OverallProgressTable({
           </thead>
           <tbody>
             {formattedRows.map((row) => (
-              <tr key={row.id} className="border-b hover:bg-muted/30">
-                <td className="px-4 py-2 text-sm text-muted-foreground">
+              <tr key={row.id} className={`border-b ${row.rowType === "title" ? "bg-slate-200 dark:bg-slate-800/50" : row.rowType === "subDetail" ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-muted/30"}`}>
+                <td className={`px-4 py-2 text-sm ${row.rowType === "title" ? "font-semibold text-muted-foreground" : "text-muted-foreground"}`}>
                   {row.displayIndex || ""}
                 </td>
                 
@@ -237,7 +355,7 @@ export default function OverallProgressTable({
                           customUpdateRow(row.id, "description", e.target.value)
                         }
                         placeholder="Enter custom..."
-                        className="border-0 bg-transparent focus-visible:ring-1"
+                        className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
                         showIndicator={false}
                       />
                       <Button
@@ -258,7 +376,7 @@ export default function OverallProgressTable({
                         customUpdateRow(row.id, "description", value)
                       }
                     >
-                      <SelectTrigger className="border-0 bg-transparent focus:ring-1">
+                      <SelectTrigger className={`border-0 bg-transparent focus:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}>
                         <SelectValue placeholder="Select province..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -322,8 +440,8 @@ export default function OverallProgressTable({
                 {/* Remaining */}
                 <PercentageCell
                   value={row.accumulated}
-                  onChange={(value) => customUpdateRow(row.id, "accumulated", value)}
                   placeholder="0"
+                  readOnly
                   showIndicator={false}
                   backgroundType="orange"
                 />
@@ -340,8 +458,8 @@ export default function OverallProgressTable({
                 {/* % Up Next Week Plan */}
                 <PercentageCell
                   value={row.upNextWeekPlan}
-                  onChange={(value) => customUpdateRow(row.id, "upNextWeekPlan", value)}
                   placeholder="0"
+                  readOnly
                   showIndicator={false}
                   backgroundType="green"
                 />
@@ -382,6 +500,15 @@ export default function OverallProgressTable({
         >
           <Plus className="w-4 h-4" />
           Add Detail Row
+        </Button>
+        <Button
+          onClick={localAddSubDetailRow}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Sub Detail
         </Button>
       </div>
     </div>
