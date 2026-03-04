@@ -12,7 +12,7 @@ export const useResourceTable = (sharedData?: { dateRange?: string }, showTitles
       subRows: [
         {
           description: "",
-          dailyData: ["", "", "", "", "", "", "", ""],
+          dailyData: ["", "", "", "", "", "", ""],
           previousWeek: "",
           thisWeek: "",
           upToThisWeek: "",
@@ -25,7 +25,7 @@ export const useResourceTable = (sharedData?: { dateRange?: string }, showTitles
       subRows: [
         {
           description: "",
-          dailyData: ["", "", "", "", "", "", "", ""],
+          dailyData: ["", "", "", "", "", "", ""],
           previousWeek: "",
           thisWeek: "",
           upToThisWeek: "",
@@ -38,7 +38,7 @@ export const useResourceTable = (sharedData?: { dateRange?: string }, showTitles
       subRows: [
         {
           description: "",
-          dailyData: ["", "", "", "", "", "", "", ""],
+          dailyData: ["", "", "", "", "", "", ""],
           previousWeek: "",
           thisWeek: "",
           upToThisWeek: "",
@@ -51,7 +51,7 @@ export const useResourceTable = (sharedData?: { dateRange?: string }, showTitles
   
   // Generate month-year display and dates from sharedData dateRange
   const [monthYearDisplay, setMonthYearDisplay] = useState<string>("Feb-26");
-  const [dates, setDates] = useState<string[]>(["-", "-", "-", "-", "-", "-", "-", "-"]);
+  const [dates, setDates] = useState<string[]>(["-", "-", "-", "-", "-", "-", "-"]);
 
   useEffect(() => {
     if (sharedData?.dateRange) {

@@ -6,20 +6,22 @@ import { ConstructionIssueProps } from "@/types/constructionIssue.types";
 const ConstructionIssue = ({
   issueNumber = 1,
   siteLocation = "",
-  photoReference = "",
+  photoReference = null,
   problems = "",
   actionBy = "",
   onRemove,
   onDataChange,
-}: ConstructionIssueProps & { onDataChange?: (data: any) => void }) => {
+}: ConstructionIssueProps & { 
+  onDataChange?: (data: any) => void;
+  photoReference?: string | File | null;
+}) => {
   const [fields, setFields] = useState({
     siteLocation,
-    photoReference,
     problems,
     actionBy,
   });
   const [slots, setSlots] = useState([
-    { id: "construction-issue-photo", image: null, caption: "" },
+    { id: "construction-issue-photo", image: photoReference, caption: "" },
   ]);
 
   const update = (key) => (e) =>
@@ -43,7 +45,7 @@ const ConstructionIssue = ({
       };
       onDataChange(data);
     }
-  }, [fields, slots, issueNumber, onDataChange]);
+  }, [fields, slots, issueNumber]);
 
   const onDeleteSlot = (slotId) => {
     setSlots((prev) =>

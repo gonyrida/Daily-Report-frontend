@@ -26,7 +26,7 @@ const Resource: React.FC<{
   return (
     <div className="space-y-6">
       <div id="section-6.1">
-        <h3 className="text-lg font-semibold mb-4">6.1 Manpower Status</h3>
+        <h3 className="text-lg font-semibold mb-4"><span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">6.1</span> Manpower Status</h3>
         <ResourceTableComponent 
           sharedData={sharedData}
           sections={sections}
@@ -38,38 +38,11 @@ const Resource: React.FC<{
         />
       </div>
       <div id="section-6.2">
-        <h3 className="text-lg font-semibold mb-4">6.2 Material Delivery Status</h3>
-        <ResourceTable
-          title="Materials"
-          icon={<Package className="w-5 h-5 text-warning" />}
-          rows={materials}
-          setRows={setMaterials}
-          useDropdown={true}
-          dropdownOptions={[
-            "Aggregates",
-            "Brick",
-            "Cement",
-            "Electricity Tape",
-            "Electrical wire",
-            "HDPE pipe",
-            "Paint",
-            "PVC pipe",
-            "Rebar D14",
-            "Rebar DB10",
-            "Rebar DB16",
-            "Rebar R6",
-            "Rebar R8",
-            "Sand",
-            "Scaffolding",
-            "Tile",
-          ]}
-          showUnit={true}
-          unitOptions={["Pack", "PCS", "EA", "Box", "m", "m2", "m3", "kg", "ton"]}
-          inputNumberOnly={true}
-        />
+        <h3 className="text-lg font-semibold mb-4"><span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">6.2</span> Material Delivery Status</h3>
+        <ResourceTableComponent sharedData={sharedData} showTitles={false} />
       </div>
       <div id="section-6.3">
-        <h3 className="text-lg font-semibold mb-4">6.3 Machinery & Equipment Status</h3>
+        <h3 className="text-lg font-semibold mb-4"><span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">6.3</span> Machinery & Equipment Status</h3>
         <ResourceTableComponent sharedData={sharedData} showTitles={false} />
       </div>
     </div>

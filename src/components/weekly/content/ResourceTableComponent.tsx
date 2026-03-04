@@ -56,7 +56,7 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
     },
   ]);
 
-  const sections = passedSections || localSections;
+  const sections = Array.isArray(passedSections) ? passedSections : localSections;
   const setSections = passedSetSections || setLocalSections;
   const handleInputChange = passedHandleInputChange || ((sectionIndex, rowIndex, field, value, dayIndex) => {
     const newSections = [...sections];
@@ -114,7 +114,7 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
     upToThisWeek: "0",
   };
 
-  const calculateGrandTotal = () => {
+  const getGrandTotal = () => {
     let totalPreviousWeek = 0;
     let totalThisWeek = 0;
 
@@ -296,9 +296,9 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
           {/* Grand Total Row */}
           <tr>
             <td className="border border-border px-4 py-2 bg-blue-50 dark:bg-blue-900/20 font-bold">
-              {calculateGrandTotal(sections).description}
+              {getGrandTotal().description}
             </td>
-            {calculateGrandTotal(sections).dailyData.map((value, dayIndex) => (
+            {getGrandTotal().dailyData.map((value, dayIndex) => (
               <td
                 key={dayIndex}
                 className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold"
@@ -307,13 +307,13 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
               </td>
             ))}
             <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
-              {calculateGrandTotal(sections).previousWeek}
+              {getGrandTotal().previousWeek}
             </td>
             <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
-              {calculateGrandTotal(sections).thisWeek}
+              {getGrandTotal().thisWeek}
             </td>
             <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
-              {calculateGrandTotal(sections).upToThisWeek}
+              {getGrandTotal().upToThisWeek}
             </td>
           </tr>
         </tbody>

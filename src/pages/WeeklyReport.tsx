@@ -18,6 +18,7 @@ import { useHsesData } from "@/hooks/useHsesData";
 import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
 import { useQaqcTable } from "@/hooks/useQaqcTable";
+import { useIssues } from "@/hooks/useIssues";
 import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
 import { useResourceTable } from "@/hooks/useResourceTable";
@@ -144,10 +145,10 @@ const WeeklyReport = () => {
   );
   const [isExportingSiteActivities, setIsExportingSiteActivities] = useState(false);
 
-  // Construction Issues state
-  const [constructionIssues, setConstructionIssues] = useState([
-    { id: crypto.randomUUID(), issueNumber: 1 }
-  ]);
+  // Construction Issues state - managed by useIssues hook
+  // const [constructionIssues, setConstructionIssues] = useState([
+  //   { id: crypto.randomUUID(), issueNumber: 1 }
+  // ]);
 
   // Schedule sections state
   const [scheduleSections, setScheduleSections] = useState([
@@ -191,6 +192,9 @@ const WeeklyReport = () => {
   // Overall Progress hook
   const overallProgressHook = useOverallProgress();
 
+  // Issues hook for state management
+  const issuesHook = useIssues();
+
   // Update projectName when selectedProject changes
   useEffect(() => {
     if (selectedProject) {
@@ -203,10 +207,10 @@ const WeeklyReport = () => {
 
   // Sync Issues data changes to parent state (like other sections)
   useEffect(() => {
-    if (setIssuesData && constructionIssues) {
-      setIssuesData(constructionIssues);
+    if (setIssuesData && issuesHook.issuesData) {
+      setIssuesData(issuesHook.issuesData);
     }
-  }, [constructionIssues]); // Remove setIssuesData to prevent infinite loop
+  }, [issuesHook.issuesData]); // Remove setIssuesData to prevent infinite loop
 
   // Load existing report data when reportId is present
   useEffect(() => {
@@ -322,21 +326,22 @@ const WeeklyReport = () => {
             // Load Issues data
             if (report.sections?.constructionIssues) {
               setIssuesData(report.sections.constructionIssues);
-              // Also update the constructionIssues state to match loaded data
+              // Also update the useIssues hook state to match loaded data
               if (report.sections.constructionIssues.length > 0) {
                 const convertedIssues = report.sections.constructionIssues.map(issue => ({
                   id: crypto.randomUUID(),
-                  issueNumber: issue.no || "",
-                  location: issue.location || "",
-                  problem: issue.problem || "",
+                  issueNumber: issue.issueNumber || 1,
+                  location: issue.siteLocation || "",
+                  problem: issue.problems || "",
                   actionBy: issue.actionBy || "",
-                  photo: issue.photo || ""
+                  photo: issue.photoReference || null
                 }));
-                setConstructionIssues(convertedIssues);
+                issuesHook.setIssuesData(convertedIssues);
               }
             } else {
               // Create empty Issues structure if none exists
               setIssuesData([]);
+              issuesHook.setIssuesData([{ id: crypto.randomUUID(), issueNumber: 1, location: "", problem: "", actionBy: "", photo: null }]);
             }
 
             // Load Schedule data
@@ -590,10 +595,10 @@ const WeeklyReport = () => {
         );
       }
             
-      if (constructionIssues && constructionIssues.length > 0) {
+      if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
         // Convert frontend format to backend format with base64 images
         issuesDataForSave = await Promise.all(
-          constructionIssues.map(async (issue) => {
+          issuesHook.issuesData.map(async (issue) => {
             let photoBase64 = issue.photo || "";
             
             // Convert image to base64 if it's a File object
@@ -601,7 +606,7 @@ const WeeklyReport = () => {
               photoBase64 = await new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(issue.photo);
+                reader.readAsDataURL(issue.photo as File);
               });
             }
             
@@ -1347,11 +1352,7 @@ const WeeklyReport = () => {
                         <div className="flex justify-end">
                           <Button
                             onClick={() => {
-                              const newIssue = {
-                                id: crypto.randomUUID(),
-                                issueNumber: constructionIssues.length + 1
-                              };
-                              setConstructionIssues([...constructionIssues, newIssue]);
+                              issuesHook.addIssue();
                             }}
                             className="flex items-center gap-2"
                           >
@@ -1372,18 +1373,19 @@ const WeeklyReport = () => {
                           </Button>
                         </div>
                       </div>
-                      {constructionIssues.map((issue, index) => (
+                      {issuesHook.issuesData.map((issue, index) => (
                         <ConstructionIssue 
                           key={issue.id} 
                           issueNumber={index + 1} 
+                          siteLocation={issue.location}
+                          problems={issue.problem}
+                          actionBy={issue.actionBy}
+                          photoReference={issue.photo as string | null}
                           onRemove={() => {
-                            const updatedIssues = constructionIssues.filter((_, i) => i !== index);
-                            setConstructionIssues(updatedIssues);
+                            issuesHook.removeIssue(index);
                           }}
                           onDataChange={(data) => {
-                            const updatedIssues = [...constructionIssues];
-                            updatedIssues[index] = { ...updatedIssues[index], ...data };
-                            setConstructionIssues(updatedIssues);
+                            issuesHook.updateIssue(index, data);
                           }}
                         />
                       ))}

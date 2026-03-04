@@ -76,7 +76,9 @@ export interface WeeklyReportSections {
   qaqcStatus: QaqcEntry[];
   hses: HsesData;
   resources: ResourceSection[];
+  photos: any;
   constructionIssues: ConstructionIssue[];
+  masterSchedule: any[];
 }
 
 // ============================================================================
