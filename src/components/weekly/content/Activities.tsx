@@ -185,9 +185,14 @@ const Activities = (props: ActivitiesProps) => {
                         updateRow("weekly", idx, "description", e.target.value);
                         adjustHeightWrapper(e);
                       }}
-                      className="w-full border rounded px-2 py-1 resize-none overflow-hidden h-8 dark:bg-yellow-800/40 dark:border-border dark:text-foreground"
+                      className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground ${
+                        /^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$/i.test(row.description.trim().split(/\s+/)[0])
+                          ? 'font-bold'
+                          : 'font-normal'
+                      }`}
                       placeholder="Enter description"
                       rows={1}
+                      style={{ border: 'none', outline: 'none', padding: '2px' }}
                     />
                     {/* Bulk import indicator - REMOVED */}
                     {/* {row.source === "bulk" && (
@@ -203,21 +208,32 @@ const Activities = (props: ActivitiesProps) => {
                 <td className="py-2 px-2 align-top">
                   <div className="relative w-full">
                     <div 
-                      className="absolute inset-0 bg-yellow-200 dark:bg-yellow-300 rounded transition-all duration-300"
+                      className={`absolute inset-0 rounded transition-all duration-300 ${
+                        row.percent === 100 
+                          ? 'bg-green-200 dark:bg-green-300' 
+                          : 'bg-yellow-200 dark:bg-yellow-300'
+                      }`}
                       style={{ width: `${Math.min(row.percent, 100)}%` }}
                     />
                     <input
-                      type="number"
-                      value={row.percent || ""}
-                      onChange={(e) => updateRow("weekly", idx, "percent", e.target.value)}
-                      className={`relative w-full border rounded px-2 py-1 h-8 bg-transparent z-10 dark:bg-yellow-800/40 dark:border-border dark:text-foreground ${
+                      type="text"
+                      value={row.percent !== undefined && row.percent !== null && row.percent !== "" ? `${Number(row.percent).toFixed(2)}%` : ""}
+                      onChange={(e) => {
+                        // Remove % and convert to number
+                        const value = e.target.value.replace('%', '');
+                        const numValue = parseFloat(value);
+                        updateRow("weekly", idx, "percent", isNaN(numValue) ? 0 : numValue);
+                      }}
+                      className={`relative bg-transparent z-10 dark:text-foreground text-center w-20 px-2 py-1 ${
                         row.percent === 100 
-                          ? 'border-green-400 text-green-800 dark:text-green-300 dark:border-green-400 font-semibold' 
-                          : 'border-yellow-300 text-yellow-800 dark:text-yellow-300 dark:border-yellow-400'
+                          ? 'text-green-800 dark:text-green-300 font-semibold' 
+                          : 'text-yellow-800 dark:text-yellow-300'
                       }`}
-                      placeholder="%"
+                      placeholder="0.00%"
                       min={0}
+
                       max={100}
+
                     />
                   </div>
                 </td>
@@ -286,9 +302,14 @@ const Activities = (props: ActivitiesProps) => {
                       updateRow("next", idx, "description", e.target.value);
                       adjustHeightWrapper(e);
                     }}
-                    className="w-full border rounded px-2 py-1 resize-none overflow-hidden h-8 dark:bg-yellow-800/40 dark:border-border dark:text-foreground"
+                    className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground ${
+                      /^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$/i.test(row.description.trim().split(/\s+/)[0])
+                        ? 'font-bold'
+                        : 'font-normal'
+                    }`}
                     placeholder="Enter description"
                     rows={1}
+                    style={{ border: 'none', outline: 'none', padding: '2px' }}
                   />
                   {/* Bulk import indicator - REMOVED */}
                   {/* {row.source === "bulk" && (
@@ -303,21 +324,29 @@ const Activities = (props: ActivitiesProps) => {
                 <td className="py-2 px-2 align-top">
                   <div className="relative w-full">
                     <div 
-                      className="absolute inset-0 bg-yellow-200 dark:bg-yellow-400/70 rounded transition-all duration-300"
+                      className={`absolute inset-0 rounded transition-all duration-300 ${
+                        row.percent === 100 
+                          ? 'bg-green-200 dark:bg-green-400/70' 
+                          : 'bg-yellow-200 dark:bg-yellow-400/70'
+                      }`}
                       style={{ width: `${Math.min(row.percent, 100)}%` }}
                     />
                     <input
-                      type="number"
-                      value={row.percent || ""}
-                      onChange={(e) => updateRow("next", idx, "percent", e.target.value)}
-                      className={`relative w-full border rounded px-2 py-1 h-8 bg-transparent z-10 dark:bg-yellow-800/40 dark:border-border dark:text-foreground ${
+                      type="text"
+                      value={row.percent !== undefined && row.percent !== null && row.percent !== "" ? `${Number(row.percent).toFixed(2)}%` : ""}
+                      onChange={(e) => {
+                        // Remove % and convert to number
+                        const value = e.target.value.replace('%', '');
+                        const numValue = parseFloat(value);
+                        updateRow("next", idx, "percent", isNaN(numValue) ? 0 : numValue);
+                      }}
+                      className={`relative bg-transparent z-10 dark:text-foreground text-center w-20 px-2 py-1 ${
                         row.percent === 100 
-                          ? 'border-green-400 text-green-800 dark:text-green-300 dark:border-green-400 font-semibold' 
-                          : 'border-yellow-300 text-yellow-800 dark:text-yellow-300 dark:border-yellow-400'
+                          ? 'text-green-800 dark:text-green-300 font-semibold' 
+                          : 'text-yellow-800 dark:text-yellow-300'
                       }`}
-                      placeholder="%"
-                      min={0}
-                      max={100}
+                      placeholder="0.00%"
+                      style={{ border: 'none', outline: 'none' }}
                     />
                   </div>
                 </td>

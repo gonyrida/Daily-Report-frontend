@@ -255,10 +255,10 @@ export default function BulkActivitiesInput({ onImport, onClose, context }: Bulk
                               key={index}
                               className={`p-2 rounded text-sm ${
                                 activity.type === 'title' 
-                                  ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold'
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 font-bold'
                                   : activity.type === 'detail'
-                                  ? 'bg-green-50 dark:bg-green-900/20 ml-4'
-                                  : 'bg-gray-50 dark:bg-gray-900/20 ml-8'
+                                  ? 'bg-green-50 dark:bg-green-900/20 ml-4 font-semibold'
+                                  : 'bg-gray-50 dark:bg-gray-900/20 ml-8 font-semibold'
                               }`}
                             >
                               <span className="text-muted-foreground">
