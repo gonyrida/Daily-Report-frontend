@@ -20,7 +20,8 @@ import type {
   UpdateIntroductionRequest,
   UpdateLetterRequest,
   WeeklyReportExportOptions,
-  ExportStatus
+  ExportStatus,
+  MasterScheduleEntry
 } from '@/types/weeklyReport.types';
 
 // ============================================================================
@@ -334,7 +335,7 @@ export const getWeeklyReportTemplate = async (projectName: string): Promise<ApiR
  * Validate weekly report data before submission
  */
 export const validateWeeklyReport = async (id: string): Promise<ApiResponse<{ isValid: boolean; errors: string[]; warnings: string[] }>> => {
-  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/${id}/validate`);
+  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/${id}/validate`, {});
   return handleApiResponse<{ isValid: boolean; errors: string[]; warnings: string[] }>(response);
 };
 
@@ -376,8 +377,64 @@ export const bulkUpdateWeeklyReports = async (ids: string[], data: Partial<Updat
  */
 export const bulkDeleteWeeklyReports = async (ids: string[]): Promise<ApiResponse<void>> => {
   const response = await apiFetch(`${WEEKLY_REPORTS_BASE_URL}/bulk-delete`, {
-    method: "DELETE",
-    body: { ids }
+    method: 'DELETE',
+    body: JSON.stringify({ ids })
   });
   return handleApiResponse<void>(response);
+};
+
+// ============================================================================
+// Master Schedule Operations
+// ============================================================================
+
+/**
+ * Get master schedule for a weekly report
+ */
+export const getWeeklyReportMasterSchedule = async (reportId: string): Promise<ApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>> => {
+  const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule`);
+  return handleApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>(response);
+};
+
+/**
+ * Update master schedule section
+ */
+export const updateMasterSchedule = async (id: string, data: MasterScheduleEntry[]): Promise<ApiResponse<WeeklyReportSections['masterSchedule']>> => {
+  const response = await apiPatch(`${WEEKLY_REPORTS_BASE_URL}/${id}/master-schedule`, data);
+  return handleApiResponse<WeeklyReportSections['masterSchedule']>(response);
+};
+
+/**
+ * Save master schedule for a weekly report
+ */
+export const saveWeeklyReportMasterSchedule = async (reportId: string, entries: MasterScheduleEntry[], title?: string, description?: string): Promise<ApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>> => {
+  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule`, {
+    entries,
+    title,
+    description
+  });
+  return handleApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>(response);
+};
+
+/**
+ * Update specific master schedule entry
+ */
+export const updateMasterScheduleEntry = async (reportId: string, entryId: string, updateData: Partial<MasterScheduleEntry>): Promise<ApiResponse<any>> => {
+  const response = await apiPut(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule/entries/${entryId}`, updateData);
+  return handleApiResponse<any>(response);
+};
+
+/**
+ * Delete master schedule entry
+ */
+export const deleteMasterScheduleEntry = async (reportId: string, entryId: string): Promise<ApiResponse<void>> => {
+  const response = await apiDelete(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule/entries/${entryId}`);
+  return handleApiResponse<void>(response);
+};
+
+/**
+ * Get list of all files in master schedule
+ */
+export const getMasterScheduleFiles = async (reportId: string): Promise<ApiResponse<Array<{ id: string; type: string; title: string; fileName: string; fileSize: number; fileType: string; supabaseUrl: string; uploadedAt: string }>>> => {
+  const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule/files`);
+  return handleApiResponse<Array<{ id: string; type: string; title: string; fileName: string; fileSize: number; fileType: string; supabaseUrl: string; uploadedAt: string }>>(response);
 };

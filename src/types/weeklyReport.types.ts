@@ -78,7 +78,7 @@ export interface WeeklyReportSections {
   resources: ResourceSection[];
   photos: any;
   constructionIssues: ConstructionIssue[];
-  masterSchedule: any[];
+  masterSchedule: MasterScheduleEntry[];
 }
 
 // ============================================================================
@@ -236,6 +236,25 @@ export interface ResourceSection {
   title: string;
   subtitle: string;
   subRows: ResourceSubRow[];
+}
+
+/**
+ * Master schedule entry with Supabase file support
+ */
+export interface MasterScheduleEntry {
+  id: string;
+  type: 'document' | 'image' | 'chart';
+  title: string;
+  description?: string;
+  date: string;
+  fileName?: string;
+  fileData?: string; // Base64 for legacy support
+  supabaseUrl?: string; // New: Supabase storage URL
+  supabasePath?: string; // New: Supabase storage path
+  fileSize?: number;
+  fileType?: string;
+  caption?: string;
+  file?: File; // Temporary file object during upload
 }
 
 /**

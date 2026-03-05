@@ -8,6 +8,7 @@
  * @returns Full URL to the image
  */
 import { API_BASE_URL } from "@/config/api";
+import { isSupabaseUrl } from "./supabaseStorage";
 
 export const constructImageUrl = (
   relativePath: string | null | undefined,
@@ -21,6 +22,11 @@ export const constructImageUrl = (
     relativePath.startsWith("http") ||
     relativePath.startsWith("blob:")
   ) {
+    return relativePath;
+  }
+
+  // If it's a Supabase URL, return as-is (already complete)
+  if (isSupabaseUrl(relativePath)) {
     return relativePath;
   }
 
@@ -84,6 +90,11 @@ export const constructAuthenticatedImageUrl = (
     relativePath.startsWith("http") ||
     relativePath.startsWith("blob:")
   ) {
+    return relativePath;
+  }
+
+  // If it's a Supabase URL, return as-is (public URLs don't need auth)
+  if (isSupabaseUrl(relativePath)) {
     return relativePath;
   }
 

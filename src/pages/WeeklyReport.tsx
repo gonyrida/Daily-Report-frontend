@@ -21,7 +21,8 @@ import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { useIssues } from "@/hooks/useIssues";
 import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
-import { useResourceTable } from "@/hooks/useResourceTable";
+import { convertScheduleEntriesToSupabase } from '@/utils/weeklyReportSupabase';
+import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
 import { 
   createWeeklyReport, 
   updateWeeklyReport, 
@@ -212,6 +213,32 @@ const WeeklyReport = () => {
     }
   }, [issuesHook.issuesData]); // Remove setIssuesData to prevent infinite loop
 
+  // Load master schedule data when reportId changes or component mounts
+  useEffect(() => {
+    const loadMasterSchedule = async () => {
+      if (reportId) {
+        try {
+          const response = await getWeeklyReportById(reportId);
+          if (response.success && response.data) {
+            const report = response.data;
+            if (report.sections?.masterSchedule) {
+              console.log('DEBUG: Loading master schedule from saved report:', report.sections.masterSchedule);
+              setScheduleSections([{
+                id: crypto.randomUUID(),
+                title: "Master Schedule",
+                entries: report.sections.masterSchedule
+              }]);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading master schedule:', error);
+        }
+      }
+    };
+
+    loadMasterSchedule();
+  }, [reportId]); // Reload when reportId changes
+
   // Load existing report data when reportId is present
   useEffect(() => {
     const loadExistingReport = async () => {
@@ -256,6 +283,15 @@ const WeeklyReport = () => {
             // Load overall progress data
             if (report.sections?.overallProgress?.rows) {
               overallProgressHook.setRows(report.sections.overallProgress.rows);
+            }
+
+            // Load master schedule data
+            if (report.sections?.masterSchedule) {
+              setScheduleSections([{
+                id: crypto.randomUUID(),
+                title: "Master Schedule",
+                entries: report.sections.masterSchedule
+              }]);
             }
 
             // Load QAQC data
@@ -554,45 +590,21 @@ const WeeklyReport = () => {
       // Convert Issues data to backend format
       let issuesDataForSave = [];
       
-      // Convert Schedule data to backend format
+      // Convert Schedule data to backend format using Supabase
       let scheduleDataForSave = [];
       
-      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries.length > 0) {
-        // Convert frontend format to backend format with base64 files
-        scheduleDataForSave = await Promise.all(
-          scheduleSections[0].entries.map(async (entry) => {
-            let fileData = "";
-            let fileName = "";
-            
-            // Convert file to base64 if it exists
-            if (entry.file instanceof File) {
-              // Check file size (limit to 5MB for base64)
-              const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-              if (entry.file.size > MAX_FILE_SIZE) {
-                console.warn(`File ${entry.file.name} is too large for database storage`);
-                fileData = ""; // Don't store large files
-                fileName = entry.file.name + " (too large for storage)";
-              } else {
-                fileData = await new Promise((resolve) => {
-                  const reader = new FileReader();
-                  reader.onload = () => resolve(reader.result as string);
-                  reader.readAsDataURL(entry.file);
-                });
-                fileName = entry.file.name;
-              }
-            }
-            
-            return {
-              id: entry.id,
-              type: entry.type,
-              title: entry.title || entry.caption || "",
-              description: entry.description || "",
-              date: entry.date || new Date().toISOString().split('T')[0],
-              fileName: fileName,
-              fileData: fileData
-            };
-          })
+      if (scheduleSections && scheduleSections.length > 0) {
+        // Convert entries to Supabase URLs
+        scheduleDataForSave = await convertScheduleEntriesToSupabase(
+          scheduleSections[0].entries,
+          currentReportId || 'temp-report-id'
         );
+        
+        // Remove file objects that shouldn't be sent to backend
+        scheduleDataForSave = scheduleDataForSave.map(entry => {
+          const { file, ...entryWithoutFile } = entry;
+          return entryWithoutFile;
+        });
       }
             
       if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
@@ -685,8 +697,6 @@ const WeeklyReport = () => {
         }
       };
 
-      // QAQC data saves cleanly with other sections
-      
       // Convert HSES photo references to base64 before saving
       if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
         hsesDataForSave.hsePhotoReferences = await convertImagesToBase64(hsesDataForSave.hsePhotoReferences);
@@ -726,16 +736,21 @@ const WeeklyReport = () => {
       console.error('Save error:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
       
-      // Try to get more specific error information
-      if (error instanceof Error && error.message.includes('Validation failed')) {
+      // Log specific validation errors
+      if (error.message && error.message.includes('Validation failed')) {
         console.error('Validation error - checking data structure...');
-        console.error('Report data:', JSON.stringify(reportData, null, 2));
+        console.log('Report data being sent:', JSON.stringify(reportData, null, 2));
+        
+        // Check each section for potential issues
+        if (reportData.sections?.masterSchedule) {
+          console.log('Master schedule data:', JSON.stringify(reportData.sections.masterSchedule, null, 2));
+        }
       }
       
       toast({
         title: "Save Failed",
-        description: error instanceof Error ? error.message : "Could not save weekly report. Please try again.",
-        variant: "destructive",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
       });
     } finally {
       setIsSaving(false);
@@ -1400,146 +1415,22 @@ const WeeklyReport = () => {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6">
                       <div className="mb-6">
                         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
-                        
-                                                
-                        {/* Upload Section */}
-                        <div className="mb-6">
-                          <div 
-                            className="w-full"
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-                            {/* Bulk upload input (hidden) */}
-                            <input 
-                              ref={fileInputRef} 
-                              onChange={onScheduleFileInputChange} 
-                              type="file" 
-                              accept="image/*,.pdf" 
-                              multiple 
-                              className="hidden" 
-                            />
-
-                            <button 
-                              type="button" 
-                              onClick={() => fileInputRef.current?.click()} 
-                              className={`relative flex flex-col items-center gap-3 p-6 border-2 rounded-2xl transition-all duration-300 w-full ${
-                                isDragOver 
-                                  ? "border-blue-500 bg-blue-100 dark:bg-blue-900/30 scale-105" 
-                                  : "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-blue-400/10 transform hover:-translate-y-1"
-                              }`}
-                            >
-                              <div className="relative">
-                                <div className={`absolute inset-0 rounded-full blur-xl transition-opacity duration-300 ${
-                                  isDragOver ? "bg-blue-500 opacity-30" : "bg-blue-500 opacity-0 group-hover:opacity-20"
-                                }`}></div>
-                                <div className="relative bg-blue-500 p-3 rounded-full shadow-lg">
-                                  <UploadCloud className={`w-5 h-5 text-white transition-transform duration-300 ${
-                                    isDragOver ? "scale-125 animate-bounce" : "group-hover:scale-110"
-                                  }`} />
-                                </div>
-                              </div>
-                              <div className="text-center">
-                                <span className="font-semibold text-blue-700 dark:text-blue-300 text-sm">
-                                  {isDragOver ? "DROP FILES HERE" : "UPLOAD SCHEDULE FILES"}
-                                </span>
-                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                  {isDragOver ? "Release to upload images and PDFs" : "Bulk upload images and PDFs"}
-                                </p>
-                              </div>
-                              <div className="absolute top-2 right-2">
-                                <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                                  isDragOver ? "bg-green-400 animate-pulse" : "bg-blue-400 animate-pulse"
-                                }`}></div>
-                              </div>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Schedule Content */}
-                        <div className="p-6">
-                          {scheduleSections[0].entries.length > 0 ? (
-                            <div className="space-y-6">
-                              {scheduleSections[0].entries.map((entry: any) => (
-                                <div key={entry.id} className="border rounded-lg overflow-hidden">
-                                  <div className="w-full">
-                                    {entry.type === "image" ? (
-                                      <div className="relative group">
-                                        <img
-                                          src={URL.createObjectURL(entry.file)}
-                                          alt={`Schedule image`}
-                                          className="w-full h-auto max-h-96 object-contain bg-gray-50 dark:bg-gray-900"
-                                        />
-                                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white p-3">
-                                          <p className="text-sm">{entry.caption}</p>
-                                        </div>
-                                      </div>
-                                    ) : entry.type === "pdf" ? (
-                                      <div className="relative group bg-gray-100 dark:bg-gray-800">
-                                        <div className="w-full" style={{ minHeight: '600px' }}>
-                                          <iframe
-                                            src={URL.createObjectURL(entry.file)}
-                                            className="w-full h-full min-h-96 border-0"
-                                            title={`PDF: ${entry.file.name}`}
-                                            onLoad={(e) => {
-                                              const iframe = e.target as HTMLIFrameElement;
-                                              // Try to set iframe height based on content
-                                              try {
-                                                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                                                if (iframeDoc) {
-                                                  const height = iframeDoc.body.scrollHeight;
-                                                  iframe.style.height = `${Math.max(height, 600)}px`;
-                                                }
-                                              } catch (error) {
-                                                // Fallback to fixed height if cross-origin prevents access
-                                                iframe.style.height = '800px';
-                                              }
-                                            }}
-                                          />
-                                        </div>
-                                        <div className="absolute top-2 right-2 flex items-center gap-2">
-                                          <div className="bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-xs">
-                                            PDF • {entry.file.name}
-                                          </div>
-                                          <button
-                                            onClick={() => {
-                                              const updatedSections = [...scheduleSections];
-                                              updatedSections[0] = {
-                                                ...updatedSections[0],
-                                                entries: updatedSections[0].entries.filter((e: any) => e.id !== entry.id)
-                                              };
-                                              setScheduleSections(updatedSections);
-                                            }}
-                                            className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-all duration-200 hover:scale-110 shadow-lg hover:shadow-red-500/25"
-                                            title="Delete PDF"
-                                            aria-label="Delete PDF"
-                                          >
-                                            <svg
-                                              xmlns="http://www.w3.org/2000/svg"
-                                              width="14"
-                                              height="14"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                            >
-                                              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
-                                            </svg>
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-muted-foreground text-center py-8">No schedule files uploaded yet. Click the upload button above to add schedule images or PDFs.</p>
-                          )}
-                        </div>
                       </div>
+                      
+                      {/* New Supabase Master Schedule Component */}
+                      <MasterScheduleSupabase
+                        entries={scheduleSections[0].entries}
+                        onChange={(entries) => {
+                          const updatedSections = [...scheduleSections];
+                          updatedSections[0] = {
+                            ...updatedSections[0],
+                            entries: entries
+                          };
+                          setScheduleSections(updatedSections);
+                        }}
+                        reportId={currentReportId || undefined}
+                        disabled={isSaving}
+                      />
                     </div>
                   </div>
                 </>
