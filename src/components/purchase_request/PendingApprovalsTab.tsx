@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useProfileContext } from '@/contexts/ProfileContext';
 import { apiPut } from '@/lib/apiFetch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { apiGet } from '@/lib/apiFetch';
 
 
-const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject }) => {
+const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, onRefresh }) => {
   const [selectedRequests, setSelectedRequests] = useState([]);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [detailRequest, setDetailRequest] = useState(null);
@@ -15,8 +16,45 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const { toast } = useToast();
   const { profile } = useProfileContext();
+
+  // Add this useEffect after the existing ones
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await apiGet('/purchase-requests/users');
+        const result = await response.json();
+        setAllUsers(result.data || []);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const getUsersForRole = (roles) => {
+    return allUsers.filter(user => roles.includes(user.role));
+  };
+
+  // Add this after the useEffect
+  const checkers = useMemo(() => 
+    allUsers.filter(user => ['admin', 'approver'].includes(user.role)), 
+    [allUsers]
+  );
+  const verifiers = useMemo(() => 
+    allUsers.filter(user => ['admin', 'approver'].includes(user.role)), 
+    [allUsers]
+  );
+  const approvers = useMemo(() => 
+    allUsers.filter(user => ['admin', 'approver'].includes(user.role)), 
+    [allUsers]
+  );
+  const preparers = useMemo(() => allUsers, [allUsers]);
 
   const handleApprove = () => {
     setShowApproveDialog(true);
@@ -30,11 +68,24 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
         // Find the request to get the workflow step
         const req = requests.find(r => r.id === reqId);
         if (!req) continue;
+        console.log('Approving request:', req);
         // Find the user's workflow step (role)
         const step = req.approvalWorkflow?.find(w => w.approver?._id === profile.id || w.approver === profile.id);
         const role = step?.role || 'approved';
         await apiPut(`/purchase-requests/${reqId}/status`, {
-          status: role,
+          status: 'approved',  // Changed from `role` to `'approved'`
+          approverId: profile.id,
+          notes: '',
+          role
+        });
+        console.log('=== APPROVAL DEBUG START ===');
+        console.log('Request ID:', reqId);
+        console.log('Full request object:', req);
+        console.log('User profile:', profile);
+        console.log('Found workflow step:', step);
+        console.log('Role being sent:', role);
+        console.log('API payload:', {
+          status: 'approved',
           approverId: profile.id,
           notes: '',
           role
@@ -44,6 +95,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
       setSelectedRequests([]);
       setShowApproveDialog(false);
       onApprove && onApprove(selectedRequests);
+      onRefresh && onRefresh();
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to approve request(s).' });
     } finally {
@@ -73,6 +125,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
       setSelectedRequests([]);
       setShowRejectDialog(false);
       onReject && onReject(selectedRequests);
+      onRefresh && onRefresh();
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to reject request(s).' });
     } finally {
@@ -124,6 +177,69 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
     return words.trim();
   }
 
+  // Define order of the approval workflow roles
+  const ROLE_ORDER = ['checked','verified','approved'];
+
+  // Determine if a single request can be acted on by current profile
+  const canActSingle = (req) => {
+    if (!req || !profile || !req.approvalWorkflow) return false;
+    const myStep = req.approvalWorkflow.find(s =>
+      String(s.approver?._id) === profile.id || String(s.approver) === profile.id
+    );
+    if (!myStep) return false;
+    const myStepIdx = ROLE_ORDER.indexOf(myStep.role);
+    if (myStepIdx === 0) return true;
+    return req.approvalWorkflow
+      .filter(s => ROLE_ORDER.indexOf(s.role) < myStepIdx)
+      .every(s => s.status === 'approved' || s.status === 'rejected' || s.status === 'completed');
+  };
+
+  // Determine if all selected requests are ready to be acted on
+  const canActSelection = () => {
+    if (!selectedRequests || selectedRequests.length === 0) return false;
+    return selectedRequests.every(id => {
+      const req = requests.find(r => r.id === id);
+      return canActSingle(req);
+    });
+  };
+
+  const getPendingStatusText = (request) => {
+    if (request.status === 'approved') return 'Approved';
+    if (request.status === 'rejected') return 'Rejected';
+    
+    // Find the first pending step in order
+    const pendingStep = request.approvalWorkflow?.find(step => step.status === 'pending');
+    
+    console.log('request', request);
+    console.log('pendingStep', pendingStep);
+    console.log('approvalWorkflow', request.approvalWorkflow);
+
+    if (!pendingStep) return 'Pending';
+    
+    // Use the same logic as your detailed view
+    let userDetails = null;
+    if (pendingStep.role === 'prepared') {
+      userDetails = preparers.find(user => user._id === pendingStep.approver);
+      console.log('This is preparer',userDetails)
+    } else if (pendingStep.role === 'checked') {
+      userDetails = checkers.find(user => user._id === pendingStep.approver);
+      console.log('approver', pendingStep.approver)
+    } else if (pendingStep.role === 'verified') {
+      userDetails = verifiers.find(user => user._id === pendingStep.approver);
+      console.log('This is verifier',userDetails)
+    } else if (pendingStep.role === 'approved') {
+      userDetails = approvers.find(user => user._id === pendingStep.approver);
+    }
+    
+    if (userDetails?.firstName) {
+      return `Pending on ${userDetails.firstName} ${userDetails.lastName}`;
+    }
+
+    console.log('This is user details',userDetails)
+    
+    return 'Pending';
+  };
+
   return (
     <div className="space-y-6">
       {/* Approve Confirmation Dialog */}
@@ -136,12 +252,12 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowApproveDialog(false)} disabled={isApproving}>Cancel</Button>
             <Button 
-							variant="default" 
-							onClick={confirmApprove} 
-							disabled={isApproving}
-						>
-							{isApproving ? "Approving..." : "Confirm Approval"}
-						</Button>
+              variant="default" 
+              onClick={confirmApprove} 
+              disabled={isApproving || !(detailRequest ? canActSingle(detailRequest) : canActSelection())}
+            >
+              {isApproving ? "Approving..." : "Confirm Approval"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -166,7 +282,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
       </Dialog>
       {/* Button Row */}
       <div className="flex gap-2 mb-6 sticky top-0 bg-background z-10 py-4 border-b">
-        <Button variant="default" onClick={handleApprove} disabled={selectedRequests.length === 0}>Approve</Button>
+        <Button variant="default" onClick={handleApprove} disabled={selectedRequests.length === 0 || !canActSelection()}>Approve</Button>
         <Button variant="destructive" onClick={handleReject} disabled={selectedRequests.length === 0}>Reject</Button>
         <Button variant="outline">Placeholder1</Button>
       </div>
@@ -183,6 +299,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
 									<th className="text-left p-3 font-medium">
 										<input
 											type="checkbox"
+                      className="w-4 h-4 cursor-pointer"
 											checked={selectedRequests.length === requests.length && requests.length > 0}
 											onChange={e => {
 												if (e.target.checked) {
@@ -226,6 +343,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
 												<td className="p-3">
 													<input
 														type="checkbox"
+                            className="w-4 h-4 cursor-pointer"
 														checked={isSelected}
 														onChange={e => {
 															e.stopPropagation();
@@ -240,22 +358,35 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
 												<td className="p-3 font-medium">{request.id}</td>
 												<td className="p-3">{request.projectName}</td>
 												<td className="p-3">{request.requesterName}</td>
-												<td className="p-3">{request.categories.admin ? 'Admin' : request.categories.construction ? 'Construction' : request.categories.material ? 'Material' : request.categories.services ? 'Services' : 'Other'}</td>
+                        <td className="p-3">
+                          <div className="flex gap-1 flex-wrap">
+                            {request.categories.admin && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
+                            )}
+                            {request.categories.construction && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
+                            )}
+                            {request.categories.material && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
+                            )}
+                            {request.categories.services && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
+                            )}
+                          </div>
+                        </td>
 												<td className="p-3">{request.purpose}</td>
 												<td className="p-3">{request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}</td>
 												<td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
-												<td className="p-3">
+                        <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                            request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                            'bg-red-100 text-red-800'
+                            request.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                            {getPendingStatusText(request)}
                           </span>
                         </td>
-												<td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
+												<td className="p-3">{new Date(request.createdAt).toLocaleString()}</td>
 											</tr>
                     );
 									})
@@ -277,16 +408,18 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
                         <div>
                           <h3 className="font-bold text-lg">MR-{detailRequest.id}</h3>
                           <p className="text-sm text-muted-foreground">
-                            Created: {new Date(detailRequest.createdAt || detailRequest.date).toLocaleDateString()}
+                            Created: {new Date(detailRequest.createdAt || detailRequest.date).toLocaleString()}
                           </p>
                         </div>
                         <div className="text-right">
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            detailRequest.status === 'Approved' ? 'bg-green-100 text-green-800' :
-                            detailRequest.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                            detailRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            detailRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            detailRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                            detailRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
                             'bg-red-100 text-red-800'
                           }`}>
-                            {detailRequest.status}
+                            {getPendingStatusText(detailRequest)}
                           </span>
                         </div>
                       </div>
@@ -306,14 +439,20 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
                         </div>
                         <div>
                           <label className="text-sm font-medium text-blue-700">Category</label>
-                          <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                            {
-                              detailRequest.categories.admin ? 'Admin' : 
-                              detailRequest.categories.construction ? 'Construction' :
-                              detailRequest.categories.material ? 'Material' :
-                              detailRequest.categories.services ? 'Services' : 'Other'
-                            }
-                          </span>
+                          <div className="flex gap-1 flex-wrap">
+                            {detailRequest.categories.admin && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
+                            )}
+                            {detailRequest.categories.construction && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
+                            )}
+                            {detailRequest.categories.material && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
+                            )}
+                            {detailRequest.categories.services && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-blue-700">Purpose</label>
@@ -340,7 +479,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
                         </div> */}
                         <div>
                           <label className="text-sm font-medium text-green-700">Request Date</label>
-                          <p className="text-sm">{new Date(detailRequest.createdAt || detailRequest.date).toLocaleDateString()}</p>
+                          <p className="text-sm">{new Date(detailRequest.createdAt || detailRequest.date).toLocaleString()}</p>
                         </div>
                       </div>
                     </div>
@@ -400,7 +539,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-medium">Grand Total</label>
-                          <p className="text-2xl font-bold">${detailRequest.grandTotal || '0.00'}</p>
+                          <p className="text-2xl font-bold">${(detailRequest.grandTotal || '0.00').toFixed(2)}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium">Amount in Words</label>
@@ -430,47 +569,66 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject })
                         <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
                           <span className="text-sm font-medium">Current Status</span>
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            detailRequest.status === 'Approved' ? 'bg-green-100 text-green-800' :
-                            detailRequest.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                            detailRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            detailRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            detailRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                            detailRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
                             'bg-red-100 text-red-800'
                           }`}>
-                            {detailRequest.status}
+                            {getPendingStatusText(detailRequest)}
                           </span>
                         </div>
 
                         {/* NEW: Workflow Table Display */}
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            {detailRequest.approvalWorkflow?.map((step, index) => (
-                              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2">
-                                    <span className="font-medium capitalize">{step.role}</span>
-                                    <span className={`px-2 py-1 rounded text-xs ${
-                                      step.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                      step.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-gray-100 text-gray-800'
-                                    }`}>
-                                      {step.status}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-gray-600 mt-1">
-                                    {step.approver && typeof step.approver === 'object' ? `${step.approver.firstName} ${step.approver.lastName}` : 'Not Assigned'}
-                                    {step.approver?.role && (
-                                      <span className="ml-1">({step.approver.role})</span>
+                            {detailRequest.approvalWorkflow?.map((step, index) => {
+
+                              // Find the user details based on the approver ID
+                              let userDetails = null;
+                              if (step.role === 'prepared') {
+                                userDetails = preparers.find(user => user._id === step.approver);
+                              } else if (step.role === 'checked') {
+                                userDetails = checkers.find(user => user._id === step.approver);
+                              } else if (step.role === 'verified') {
+                                userDetails = verifiers.find(user => user._id === step.approver);
+                              } else if (step.role === 'approved') {
+                                userDetails = approvers.find(user => user._id === step.approver);
+                              }
+
+                              return (
+                                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="font-medium capitalize">{step.role}</span>
+                                      <span className={`px-2 py-1 rounded text-xs ${
+                                        step.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                        step.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                        step.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        step.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {step.status}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm text-gray-600 mt-1">
+                                      {userDetails ? `${userDetails.firstName} ${userDetails.lastName}` : 'Not Assigned'}
+                                      {userDetails?.role && (
+                                        <span className="ml-1">({userDetails.role})</span>
+                                      )}
+                                    </div>
+                                    {step.notes && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Note: {step.notes}
+                                      </div>
                                     )}
                                   </div>
-                                  {step.notes && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      Note: {step.notes}
-                                    </div>
-                                  )}
+                                  <div className="text-right text-sm text-gray-600">
+                                    {step.timestamp ? new Date(step.timestamp).toLocaleString() : 'Pending'}
+                                  </div>
                                 </div>
-                                <div className="text-right text-sm text-gray-600">
-                                  {step.timestamp ? new Date(step.timestamp).toLocaleDateString() : 'Pending'}
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

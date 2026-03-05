@@ -89,7 +89,8 @@ const PurchaseRequest = () => {
       checkedBy: '',
       verifiedBy: '',
       approvedBy: ''
-    }
+    },
+    status: ''
   });
 
   const [selectedItems, setSelectedItems] = useState([]);
@@ -116,8 +117,8 @@ const PurchaseRequest = () => {
   });
   const [isEditMode, setIsEditMode] = useState(false);
 
-  // Fetch pending approvals for approver/admin
-  useEffect(() => {
+  // Fetch pending approvals function
+  const fetchPendingApprovals = () => {
     if (profile?.role === 'approver' || profile?.role === 'admin') {
       setLoadingPendingApprovals(true);
       apiGet('/purchase-requests/pending-approvals')
@@ -128,6 +129,11 @@ const PurchaseRequest = () => {
         .catch(() => setPendingApprovals([]))
         .finally(() => setLoadingPendingApprovals(false));
     }
+  };
+
+  // Fetch pending approvals for approver/admin
+  useEffect(() => {
+    fetchPendingApprovals();
   }, [profile]);
 
   useEffect(() => {
@@ -222,8 +228,17 @@ const PurchaseRequest = () => {
         // Close modal
         setShowNewRequest(false);
         
-        // Optionally refresh requests list
-        // await fetchPurchaseRequests();
+        // Refresh requests list
+        try {
+          const endpoint = '/purchase-requests/my-requests';
+          const refreshResponse = await apiGet(endpoint);
+          const refreshResult = await refreshResponse.json();
+          if (refreshResult.success) {
+            setRequests(refreshResult.data);
+          }
+        } catch (error) {
+          console.error('Failed to refresh requests:', error);
+        }
         
       } else {
         toast({
@@ -396,6 +411,46 @@ const PurchaseRequest = () => {
     setShowDetailsModal(true);
   };
 
+  // Approval role order for stage display
+  const ROLE_ORDER = ['prepared', 'checked', 'verified', 'approved'];
+
+  // Compute stage string like "2/4 - Checked"
+  const computeStage = (req) => {
+    if (!req || !req.approvalWorkflow) return '';
+    
+    const total = req.approvalWorkflow.length || ROLE_ORDER.length;
+    
+    // Handle rejected status
+    if (req.status === 'rejected') {
+      // Find which step was rejected
+      const rejectedStep = req.approvalWorkflow.find(s => s.status === 'rejected');
+      if (rejectedStep) {
+        const rejectedIdx = ROLE_ORDER.indexOf(rejectedStep.role);
+        const stepNumber = rejectedIdx + 1;
+        return `${stepNumber}/${total} - Rejected`;
+      }
+      return `${total}/${total} - Rejected`;
+    }
+    
+    const completed = req.approvalWorkflow.filter(s => s.status === 'completed' || s.status === 'approved').length;
+    
+    // Determine label: if at least one completed, use last completed role; else use next pending role or prepared
+    let label = '';
+    if (completed > 0) {
+      const lastCompleted = req.approvalWorkflow
+        .filter(s => s.status === 'completed' || s.status === 'approved')
+        .slice(-1)[0];
+      label = lastCompleted?.role || ROLE_ORDER[Math.max(0, completed - 1)];
+    } else {
+      // find first pending or default to prepared
+      const next = req.approvalWorkflow.find(s => s.status !== 'completed' && s.status !== 'approved');
+      label = next?.role || 'prepared';
+    }
+    
+    // Capitalize first letter
+    return `${completed}/${total} - ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+  };
+
   // Fetch all users on component mount
   useEffect(() => {
     const fetchUsers = async () => {
@@ -493,7 +548,8 @@ const PurchaseRequest = () => {
         services: false
       },
       items: request.items || [],
-      approvers: approversFromWorkflow
+      approvers: approversFromWorkflow,
+      status: request.status || 'draft'  // ← ADD THIS
     });
 
     setSelectedRequests([]); // Clear selection after edit opens
@@ -540,6 +596,11 @@ const PurchaseRequest = () => {
           }
         };
         fetchRequests();
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to update request"
+        });
       }
     } catch (error) {
       toast({
@@ -589,6 +650,82 @@ const PurchaseRequest = () => {
         [fieldName]: parseFloat(formatted)
       }));
     }
+  };
+
+  const getPendingStatusText = (request) => {
+    if (request.status === 'draft') {
+      return 'Draft';
+    }
+
+    if (request.status === 'approved') {
+      // Find the last approved step to show who approved it
+      const approvedSteps = request.approvalWorkflow?.filter(step => step.status === 'approved');
+      if (approvedSteps && approvedSteps.length > 0) {
+        const lastApprovedStep = approvedSteps[approvedSteps.length - 1];
+        let userDetails = null;
+        
+        if (lastApprovedStep.role === 'prepared') {
+          userDetails = preparers.find(user => user._id === lastApprovedStep.approver);
+        } else if (lastApprovedStep.role === 'checked') {
+          userDetails = checkers.find(user => user._id === lastApprovedStep.approver);
+        } else if (lastApprovedStep.role === 'verified') {
+          userDetails = verifiers.find(user => user._id === lastApprovedStep.approver);
+        } else if (lastApprovedStep.role === 'approved') {
+          userDetails = approvers.find(user => user._id === lastApprovedStep.approver);
+        }
+        
+        if (userDetails?.firstName) {
+          return `Approved by ${userDetails.firstName} ${userDetails.lastName}`;
+        }
+      }
+      return 'Approved';
+    }
+    
+    if (request.status === 'rejected') {
+      // Find the rejected step to show who rejected it
+      const rejectedStep = request.approvalWorkflow?.find(step => step.status === 'rejected');
+      if (rejectedStep) {
+        let userDetails = null;
+        
+        if (rejectedStep.role === 'prepared') {
+          userDetails = preparers.find(user => user._id === rejectedStep.approver);
+        } else if (rejectedStep.role === 'checked') {
+          userDetails = checkers.find(user => user._id === rejectedStep.approver);
+        } else if (rejectedStep.role === 'verified') {
+          userDetails = verifiers.find(user => user._id === rejectedStep.approver);
+        } else if (rejectedStep.role === 'approved') {
+          userDetails = approvers.find(user => user._id === rejectedStep.approver);
+        }
+        
+        if (userDetails?.firstName) {
+          return `Rejected by ${userDetails.firstName} ${userDetails.lastName}`;
+        }
+      }
+      return 'Rejected';
+    }
+    
+    // Find the first pending step in order
+    const pendingStep = request.approvalWorkflow?.find(step => step.status === 'pending');
+    
+    if (!pendingStep) return 'Pending';
+    
+    // Use the same logic as your detailed view
+    let userDetails = null;
+    if (pendingStep.role === 'prepared') {
+      userDetails = preparers.find(user => user._id === pendingStep.approver);
+    } else if (pendingStep.role === 'checked') {
+      userDetails = checkers.find(user => user._id === pendingStep.approver);
+    } else if (pendingStep.role === 'verified') {
+      userDetails = verifiers.find(user => user._id === pendingStep.approver);
+    } else if (pendingStep.role === 'approved') {
+      userDetails = approvers.find(user => user._id === pendingStep.approver);
+    }
+    
+    if (userDetails?.firstName) {
+      return `Pending on ${userDetails.firstName} ${userDetails.lastName}`;
+    }
+    
+    return 'Pending';
   };
 
   // Specific filters for each dropdown
@@ -897,7 +1034,7 @@ const PurchaseRequest = () => {
                                             <td className="p-2 text-xs">{item.description || ''}</td>
                                             <td className="p-2 text-xs">{item.unit || ''}</td>
                                             <td className="p-2 text-xs">{item.quantity || ''}</td>
-                                            <td className="p-2 text-xs">${item.unitPrice || ''}</td>
+                                            <td className="p-2 text-xs">${(item.unitPrice || 0).toFixed(2)}</td>
                                             <td className="p-2 text-xs font-medium">
                                               ${(item.quantity * item.unitPrice).toFixed(2) || '0.00'}
                                             </td>
@@ -1130,7 +1267,13 @@ const PurchaseRequest = () => {
                             if (request) handleEditRequest(request);
                           }
                         }}
-                        disabled={selectedRequests.length !== 1}
+                        disabled={selectedRequests.length !== 1 || (() => {
+                          if (selectedRequests.length === 1) {
+                            const request = requests.find(r => r.id === selectedRequests[0] || r._id === selectedRequests[0]);
+                            return request?.approvalWorkflow?.some(step => step.status === 'approved' || step.status === 'rejected') || false;
+                          }
+                          return false;
+                        })()}
                       >
                         Edit Request
                       </Button>
@@ -1246,12 +1389,13 @@ const PurchaseRequest = () => {
                                             request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                             request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
                                             request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                            request.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
                                             'bg-red-100 text-red-800'
                                           }`}>
                                             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                                           </span>
                                         </td>
-                                        <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
+                                        <td className="p-3">{new Date(request.createdAt).toLocaleString()}</td>
                                       </tr>
                                     );
                                   })}
@@ -1295,7 +1439,7 @@ const PurchaseRequest = () => {
                               <div>
                                 <h3 className="font-bold text-lg">MR-{selectedRequest.id}</h3>
                                 <p className="text-sm text-muted-foreground">
-                                  Created: {new Date(selectedRequest.createdAt || selectedRequest.date).toLocaleDateString()}
+                                  Created: {new Date(selectedRequest.createdAt || selectedRequest.date).toLocaleString()}
                                 </p>
                               </div>
                               <div className="text-right">
@@ -1304,9 +1448,10 @@ const PurchaseRequest = () => {
                                   selectedRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                   selectedRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
                                   selectedRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                  selectedRequest.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
                                   'bg-red-100 text-red-800'
                                 }`}>
-                                  {selectedRequest.status}
+                                  {getPendingStatusText(selectedRequest)}
                                 </span>
                               </div>
                             </div>
@@ -1366,7 +1511,7 @@ const PurchaseRequest = () => {
                               </div> */}
                               <div>
                                 <label className="text-sm font-medium text-green-700">Request Date</label>
-                                <p className="text-sm">{new Date(selectedRequest.createdAt || selectedRequest.date).toLocaleDateString()}</p>
+                                <p className="text-sm">{new Date(selectedRequest.createdAt || selectedRequest.date).toLocaleString()}</p>
                               </div>
                             </div>
                           </div>
@@ -1426,7 +1571,7 @@ const PurchaseRequest = () => {
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="text-sm font-medium">Grand Total</label>
-                                <p className="text-2xl font-bold">${selectedRequest.grandTotal || '0.00'}</p>
+                                <p className="text-2xl font-bold">{selectedRequest.formattedGrandTotal || '0.00'}</p>
                               </div>
                               <div>
                                 <label className="text-sm font-medium">Amount in Words</label>
@@ -1460,9 +1605,10 @@ const PurchaseRequest = () => {
                                   selectedRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                   selectedRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
                                   selectedRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                  selectedRequest.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
                                   'bg-red-100 text-red-800'
                                 }`}>
-                                  {selectedRequest.status}
+                                  {getPendingStatusText(selectedRequest)}
                                 </span>
                               </div>
                               
@@ -1489,7 +1635,9 @@ const PurchaseRequest = () => {
                                             <span className="font-medium capitalize">{step.role}</span>
                                             <span className={`px-2 py-1 rounded text-xs ${
                                               step.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                              step.status === 'approved' ? 'bg-green-100 text-green-800' :
                                               step.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                              step.status === 'rejected' ? 'bg-red-100 text-red-800' :
                                               'bg-gray-100 text-gray-800'
                                             }`}>
                                               {step.status}
@@ -1508,7 +1656,7 @@ const PurchaseRequest = () => {
                                           )}
                                         </div>
                                         <div className="text-right text-sm text-gray-600">
-                                          {step.timestamp ? new Date(step.timestamp).toLocaleDateString() : 'Pending'}
+                                          {step.timestamp ? new Date(step.timestamp).toLocaleString() : 'Pending'}
                                         </div>
                                       </div>
                                     );
@@ -1754,7 +1902,7 @@ const PurchaseRequest = () => {
                                         <td className="p-2 text-xs">{item.description || ''}</td>
                                         <td className="p-2 text-xs">{item.unit || ''}</td>
                                         <td className="p-2 text-xs">{item.quantity || ''}</td>
-                                        <td className="p-2 text-xs">${item.unitPrice || ''}</td>
+                                        <td className="p-2 text-xs">${(item.unitPrice || 0).toFixed(2)}</td>
                                         <td className="p-2 text-xs font-medium">
                                           ${(item.quantity * item.unitPrice).toFixed(2) || '0.00'}
                                         </td>
@@ -2137,6 +2285,7 @@ const PurchaseRequest = () => {
                                 <th className="text-left p-3 font-medium">Items</th>
                                 <th className="text-left p-3 font-medium">Total</th>
                                 <th className="text-left p-3 font-medium">Status</th>
+                                <th className="text-left p-3 font-medium">Stage</th>
                                 <th className="text-left p-3 font-medium">Date</th>
                               </tr>
                             </thead>
@@ -2187,15 +2336,14 @@ const PurchaseRequest = () => {
                                       <td className="p-3">
                                         <span className={`px-2 py-1 rounded-full text-xs ${
                                           request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                          request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                                          request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                                          'bg-red-100 text-red-800'
+                                          request.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                          'bg-yellow-100 text-yellow-800'
                                         }`}>
-                                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                          {getPendingStatusText(request)}
                                         </span>
                                       </td>
-                                      <td className="p-3">{new Date(request.createdAt).toLocaleDateString()}</td>
+                                      <td className="p-3">{computeStage(request)}</td>
+                                      <td className="p-3">{new Date(request.createdAt).toLocaleString()}</td>
                                     </tr>
                                   ))}
                                 </>
@@ -2213,6 +2361,7 @@ const PurchaseRequest = () => {
                         loadingRequests={loadingPendingApprovals}
                         onApprove={(id) => console.log('Approve', id)}
                         onReject={(id) => console.log('Reject', id)}
+                        onRefresh={fetchPendingApprovals}
                       />
                     </TabsContent>
                   ) : null}
