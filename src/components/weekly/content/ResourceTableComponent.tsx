@@ -3,6 +3,8 @@ import { SubRow, Section, ResourceTableComponentProps } from "@/types/resourceTa
 import { DAY_NAMES } from "@/constants/dayNames";
 import { calculateGrandTotal } from "@/utils/calculationUtils";
 import { generateWeekDates } from "@/lib/weekDateUtils";
+import { Resources } from "@/types/resources.types";
+import { transformResourceDataToNewPayload } from "@/utils/resourceDataTransform";
 
 const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({ 
   sharedData, 
@@ -94,15 +96,18 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
     }
   });
 
-  const monthYearDisplay = passedMonthYearDisplay || "Feb-26";
-  const dates = passedDates || ["-", "-", "-", "-", "-", "-", "-"];
+  const monthYearDisplay = passedMonthYearDisplay || (sharedData?.dateRange ? generateWeekDates(sharedData.dateRange).monthYearDisplay : "Feb-26");
+  const dates = passedDates || (sharedData?.dateRange ? generateWeekDates(sharedData.dateRange).dates : ["-", "-", "-", "-", "-", "-", "-"]);
 
   const dayNames = DAY_NAMES;
 
   useEffect(() => {
-    if (sharedData?.dateRange && !passedMonthYearDisplay) {
+    if (sharedData?.dateRange) {
       const { monthYearDisplay: newMonthYearDisplay, dates: newDates } = generateWeekDates(sharedData.dateRange);
-      setLocalSections(prev => ({ ...prev, monthYearDisplay: newMonthYearDisplay, dates: newDates }));
+      // Update local state if no external control
+      if (!passedMonthYearDisplay) {
+        setLocalSections(prev => ({ ...prev, monthYearDisplay: newMonthYearDisplay, dates: newDates }));
+      }
     }
   }, [sharedData?.dateRange, passedMonthYearDisplay]);
 
@@ -142,6 +147,21 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
 
     return grandTotal;
   };
+
+  // Transform data to new payload structure when needed
+  const transformToNewPayload = (): Resources => {
+    const dateRange = sharedData?.dateRange || "";
+    return transformResourceDataToNewPayload(sections, dateRange);
+  };
+
+  // Expose the transformed data through a callback or global state
+  useEffect(() => {
+    // This can be used to sync with parent component
+    if (passedSetSections) {
+      const transformedData = transformToNewPayload();
+      // You can pass this data up to parent if needed
+    }
+  }, [sections]);
 
   return (
     <div className="overflow-x-auto">

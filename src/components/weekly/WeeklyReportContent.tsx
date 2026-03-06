@@ -501,6 +501,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           removeSubRow={resourceTableHook.removeSubRow}
           monthYearDisplay={resourceTableHook.monthYearDisplay}
           dates={resourceTableHook.dates}
+          reportId={reportId} // Pass reportId to Resource component
         />
       </div>
     );

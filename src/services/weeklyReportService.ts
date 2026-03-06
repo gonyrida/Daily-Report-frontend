@@ -438,3 +438,43 @@ export const getMasterScheduleFiles = async (reportId: string): Promise<ApiRespo
   const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule/files`);
   return handleApiResponse<Array<{ id: string; type: string; title: string; fileName: string; fileSize: number; fileType: string; supabaseUrl: string; uploadedAt: string }>>(response);
 };
+
+// ============================================================================
+// Manpower Aggregation API Functions
+// ============================================================================
+
+/**
+ * Aggregate manpower data for a weekly report
+ */
+export const aggregateManpower = async (projectName: string, startDate: string, endDate: string, options: { includePrevWeek?: boolean; includeAccumulated?: boolean } = {}): Promise<ApiResponse<any>> => {
+  const params = new URLSearchParams({
+    projectName,
+    startDate,
+    endDate
+  });
+  
+  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/aggregate-manpower?${params}`, options);
+  return handleApiResponse<any>(response);
+};
+
+/**
+ * Update weekly report with aggregated manpower data
+ */
+export const updateReportManpower = async (reportId: string, options: { includePrevWeek?: boolean; includeAccumulated?: boolean } = {}): Promise<ApiResponse<WeeklyReport>> => {
+  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/update-manpower`, options);
+  return handleApiResponse<WeeklyReport>(response);
+};
+
+/**
+ * Create weekly report with automatic manpower aggregation
+ */
+export const createReportWithManpower = async (data: CreateWeeklyReportRequest, aggregationOptions: { includePrevWeek?: boolean; includeAccumulated?: boolean } = {}): Promise<ApiResponse<WeeklyReport>> => {
+  const requestData = {
+    ...data,
+    aggregateManpower: true,
+    aggregationOptions
+  };
+  
+  const response = await apiPost(WEEKLY_REPORTS_BASE_URL, requestData);
+  return handleApiResponse<WeeklyReport>(response);
+};

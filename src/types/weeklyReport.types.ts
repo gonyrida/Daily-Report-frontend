@@ -2,6 +2,7 @@
 // Core type definitions for the Weekly Report module
 
 import { ProgressRow } from './progress.types';
+import { Resources } from './resources.types';
 
 // ============================================================================
 // API Response Types
@@ -75,7 +76,7 @@ export interface WeeklyReportSections {
   activities: WeeklyReportActivities;
   qaqcStatus: QaqcEntry[];
   hses: HsesData;
-  resources: ResourceSection[];
+  resources: Resources;
   photos: any;
   constructionIssues: ConstructionIssue[];
   masterSchedule: MasterScheduleEntry[];
@@ -327,7 +328,7 @@ export interface UpdateHsesRequest {
 }
 
 export interface UpdateResourcesRequest {
-  sections: ResourceSection[];
+  resources: Resources;
 }
 
 export interface UpdateConstructionIssuesRequest {
