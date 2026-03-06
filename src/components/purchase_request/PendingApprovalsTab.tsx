@@ -4,6 +4,7 @@ import { apiPut } from '@/lib/apiFetch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet } from '@/lib/apiFetch';
 
@@ -18,6 +19,9 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
   const [isRejecting, setIsRejecting] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [approveNotes, setApproveNotes] = useState('');
+  const [rejectNotes, setRejectNotes] = useState('');
+  const [rejectNotesError, setRejectNotesError] = useState('');
   const { toast } = useToast();
   const { profile } = useProfileContext();
 
@@ -57,6 +61,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
   const preparers = useMemo(() => allUsers, [allUsers]);
 
   const handleApprove = () => {
+    setApproveNotes(''); // Reset notes when opening dialog
     setShowApproveDialog(true);
   };
 
@@ -75,7 +80,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
         await apiPut(`/purchase-requests/${reqId}/status`, {
           status: 'approved',  // Changed from `role` to `'approved'`
           approverId: profile.id,
-          notes: '',
+          notes: approveNotes,
           role
         });
         console.log('=== APPROVAL DEBUG START ===');
@@ -87,13 +92,14 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
         console.log('API payload:', {
           status: 'approved',
           approverId: profile.id,
-          notes: '',
+          notes: approveNotes,
           role
         });
       }
       toast({ title: 'Approved', description: `Approved ${selectedRequests.length} request(s).` });
       setSelectedRequests([]);
       setShowApproveDialog(false);
+      setApproveNotes(''); // Reset notes after approval
       onApprove && onApprove(selectedRequests);
       onRefresh && onRefresh();
     } catch (err) {
@@ -105,7 +111,15 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
 
   const confirmReject = async () => {
     if (!profile) return;
+    
+    // Validate that reject notes are provided
+    if (!rejectNotes.trim()) {
+      setRejectNotesError('Please provide a reason for rejection');
+      return;
+    }
+    
     setIsRejecting(true);
+    setRejectNotesError(''); // Clear any previous error
     try {
       for (const reqId of selectedRequests) {
         // Find the request to get the workflow step
@@ -117,13 +131,15 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
         await apiPut(`/purchase-requests/${reqId}/status`, {
           status: 'rejected',
           approverId: profile.id,
-          notes: '',
+          notes: rejectNotes,
           role
         });
       }
       toast({ title: 'Rejected', description: `Rejected ${selectedRequests.length} request(s).` });
       setSelectedRequests([]);
       setShowRejectDialog(false);
+      setRejectNotes(''); // Reset notes after rejection
+      setRejectNotesError(''); // Clear error
       onReject && onReject(selectedRequests);
       onRefresh && onRefresh();
     } catch (err) {
@@ -134,6 +150,8 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
   };
 
 	const handleReject = () => {
+		setRejectNotes(''); // Reset notes when opening dialog
+		setRejectNotesError(''); // Reset validation error
 		setShowRejectDialog(true);
 	};
 
@@ -248,7 +266,21 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
           <DialogHeader>
             <DialogTitle>Confirm Approval</DialogTitle>
           </DialogHeader>
-          <div className="py-4">Are you sure you want to approve {selectedRequests.length} request(s)?</div>
+          <div className="py-4">
+            <p className="mb-4">Are you sure you want to approve {selectedRequests.length} request(s)?</p>
+            <div className="space-y-2">
+              <label htmlFor="approve-notes" className="text-sm font-medium text-gray-700">
+                Notes (Optional)
+              </label>
+              <Textarea
+                id="approve-notes"
+                placeholder="Add optional notes for this approval..."
+                value={approveNotes}
+                onChange={(e) => setApproveNotes(e.target.value)}
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowApproveDialog(false)} disabled={isApproving}>Cancel</Button>
             <Button 
@@ -267,13 +299,33 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
           <DialogHeader>
             <DialogTitle>Confirm Rejection</DialogTitle>
           </DialogHeader>
-          <div className="py-4">Are you sure you want to reject {selectedRequests.length} request(s)?</div>
+          <div className="py-4">
+            <p className="mb-4">Are you sure you want to reject {selectedRequests.length} request(s)?</p>
+            <div className="space-y-2">
+              <label htmlFor="reject-notes" className="text-sm font-medium text-gray-700">
+                Reason for Rejection <span className="text-red-500">*</span>
+              </label>
+              <Textarea
+                id="reject-notes"
+                placeholder="Please provide a reason for rejection..."
+                value={rejectNotes}
+                onChange={(e) => {
+                  setRejectNotes(e.target.value);
+                  if (rejectNotesError) setRejectNotesError(''); // Clear error on typing
+                }}
+                className="min-h-[80px]"
+              />
+              {rejectNotesError && (
+                <p className="text-sm text-red-500">{rejectNotesError}</p>
+              )}
+            </div>
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowRejectDialog(false)} disabled={isRejecting}>Cancel</Button>
             <Button
               variant="destructive" 
               onClick={confirmReject} 
-              disabled={isRejecting}
+              disabled={isRejecting || !rejectNotes.trim()}
             >
               {isRejecting ? "Rejecting..." : "Confirm Rejection"}
             </Button>
