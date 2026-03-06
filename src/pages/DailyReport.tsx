@@ -316,6 +316,7 @@ const loadMostRecentReportForProject = async (
         id: r._id,
         projectName: r.projectName,
         reportDate: r.reportDate,
+        location: r.location,
         createdAt: r.createdAt,
         userId: r.userId,
         userName: r.userId?.firstName
@@ -340,6 +341,7 @@ const loadMostRecentReportForProject = async (
       mostRecent
         ? {
             id: mostRecent._id,
+            location: mostRecent.location,
             userName: mostRecent.userId?.firstName
               ? `${mostRecent.userId.firstName} ${mostRecent.userId.lastName}`
               : "Unknown",
@@ -350,6 +352,81 @@ const loadMostRecentReportForProject = async (
     return mostRecent;
   } catch (error) {
     console.error("Failed to load project's most recent report:", error);
+    return null;
+  }
+};
+
+// NEW: Load most recent report for specific project AND location
+const loadMostRecentReportForProjectAndLocation = async (
+  projectName: string,
+  location: string
+): Promise<any> => {
+  try {
+    console.log(
+      "🔍 DEBUG: Loading most recent report for project:",
+      projectName,
+      "location:",
+      location
+    );
+
+    // Use the location-specific endpoint to get reports for this location
+    const response = await apiGet(`/daily-reports/by-location?location=${encodeURIComponent(location)}`);
+    if (!response.ok) return null;
+
+    const apiResponse = await response.json();
+    console.log("🔍 DEBUG: Location-specific API response:", apiResponse);
+
+    const locationReports = apiResponse || [];
+    console.log("🔍 DEBUG: Location reports count:", locationReports.length);
+    console.log(
+      "🔍 DEBUG: Location reports:",
+      locationReports.map((r) => ({
+        id: r._id,
+        projectName: r.projectName,
+        reportDate: r.reportDate,
+        location: r.location,
+        createdAt: r.createdAt,
+        userId: r.userId,
+        userName: r.userId?.firstName
+          ? `${r.userId.firstName} ${r.userId.lastName}`
+          : "Unknown",
+      }))
+    );
+
+    // Filter by project name as well (since location endpoint returns all reports for that location)
+    const projectLocationReports = locationReports.filter(
+      (report) => report.projectName === projectName
+    );
+
+    const sortedReports = projectLocationReports.sort((a, b) => {
+      const dateA = new Date(a.reportDate || a.createdAt || 0);
+      const dateB = new Date(b.reportDate || b.createdAt || 0);
+
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+
+      return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+
+    const mostRecent = sortedReports.length > 0 ? sortedReports[0] : null;
+    console.log(
+      "🔍 DEBUG: Most recent report for project+location:",
+      mostRecent
+        ? {
+            id: mostRecent._id,
+            projectName: mostRecent.projectName,
+            location: mostRecent.location,
+            reportDate: mostRecent.reportDate,
+            userName: mostRecent.userId?.firstName
+              ? `${mostRecent.userId.firstName} ${mostRecent.userId.lastName}`
+              : "Unknown",
+          }
+        : "None"
+    );
+
+    return mostRecent;
+  } catch (error) {
+    console.error("Failed to load project's most recent report for location:", error);
     return null;
   }
 };
@@ -566,7 +643,7 @@ const DailyReport = () => {
     // 🔥 FIX: Clear prev and accumulated when date changes
     // This ensures backend recalculates rolling totals from scratch
 
-    console.log("📅 Date changed - clearing rolling totals for new date");
+    console.log(" Date changed - clearing rolling totals for new date");
 
     // Clear managementTeam rolling totals
     setManagementTeam((prev) =>
@@ -623,7 +700,73 @@ const DailyReport = () => {
       }))
     );
 
-    console.log("✅ Rolling totals cleared - backend will recalculate on save");
+    console.log(" Rolling totals cleared - backend will recalculate on save");
+  };
+
+  const handleLocationChange = (newLocation: string) => {
+    setLocation(newLocation);
+
+    // Clear prev and accumulated when location changes
+    // This ensures backend recalculates rolling totals for the new location
+
+    console.log(" Location changed - clearing rolling totals for new location:", newLocation);
+
+    // Clear managementTeam rolling totals
+    setManagementTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+        // Keep description, unit, and today value
+      }))
+    );
+
+    // Clear workingTeam rolling totals (used for workingTeamInterior)
+    setWorkingTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear interiorTeam rolling totals
+    setInteriorTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear mepTeam rolling totals
+    setMepTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear materials rolling totals
+    setMaterials((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    // Clear machinery rolling totals
+    setMachinery((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    console.log(" Rolling totals cleared - backend will recalculate for new location");
   };
 
   // Helper function to get current user ID from user context
@@ -831,6 +974,7 @@ const DailyReport = () => {
                 const cleanState = initializeCleanReportState(
                   projectFromUrl || "",
                   setProjectName,
+                  setLocation,
                   setReportStatus
                 );
 
@@ -863,6 +1007,7 @@ const DailyReport = () => {
               const cleanState = initializeCleanReportState(
                 projectFromUrl || "",
                 setProjectName,
+                setLocation,
                 setReportStatus
               );
 
@@ -1028,20 +1173,69 @@ const DailyReport = () => {
                 "🔧 SMART LOAD: Creating new report for project:",
                 projectFromUrl
               );
-              const projectRecentReport = await loadMostRecentReportForProject(
-                projectFromUrl
-              );
+              
+              // Get current location from URL or state
+              const urlLocation = searchParams.get("location");
+              const currentLocation = urlLocation || "";
+              
+              let projectRecentReport;
+              
+              if (currentLocation) {
+                // Load most recent report for specific project AND location
+                console.log(
+                  "🔧 SMART LOAD: Loading for specific location:",
+                  currentLocation
+                );
+                projectRecentReport = await loadMostRecentReportForProjectAndLocation(
+                  projectFromUrl,
+                  currentLocation
+                );
+                
+                // If no location-specific report found, try loading most recent report for project (any location)
+                if (!projectRecentReport) {
+                  console.log(
+                    "🔧 SMART LOAD: No location-specific report found, trying any location"
+                  );
+                  projectRecentReport = await loadMostRecentReportForProject(
+                    projectFromUrl
+                  );
+                }
+              } else {
+                // Load most recent report for project (any location)
+                console.log(
+                  "🔧 SMART LOAD: Loading for any location"
+                );
+                projectRecentReport = await loadMostRecentReportForProject(
+                  projectFromUrl
+                );
+              }
 
               if (projectRecentReport) {
-                // Load project's most recent report as template
-                console.log(
-                  "🔧 SMART LOAD: Found project report, using as template"
-                );
+                // Check if the found report's location matches current location
+                const locationMatches = !currentLocation || projectRecentReport.location === currentLocation;
+                
+                if (locationMatches) {
+                  // Perfect match - use this report as template
+                  console.log(
+                    "🔧 SMART LOAD: Found project report with matching location, using as template"
+                  );
+                } else {
+                  // Location mismatch - use this report but update location
+                  console.log(
+                    "🔧 SMART LOAD: Found project report but location mismatch, updating location",
+                    {
+                      reportLocation: projectRecentReport.location,
+                      currentLocation: currentLocation,
+                      willUse: projectRecentReport.location || currentLocation
+                    }
+                  );
+                }
+                
                 setReportId(""); // Keep as new report
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
                 setReportStatus("draft");
-                setLocation(projectRecentReport.location); // Keep location for smart loaded report
+                setLocation(projectRecentReport.location || currentLocation); // Set location from report or URL
 
                 // Load data from project's most recent report
                 // setWeatherAM(projectRecentReport.weatherAM || "");
@@ -1141,6 +1335,7 @@ const DailyReport = () => {
                 const cleanState = initializeCleanReportState(
                   projectFromUrl || "",
                   setProjectName,
+                  setLocation,
                   setReportStatus
                 );
 
@@ -1173,6 +1368,7 @@ const DailyReport = () => {
               const cleanState = initializeCleanReportState(
                 projectFromUrl || "",
                 setProjectName,
+                setLocation,
                 setReportStatus
               );
 
@@ -3267,6 +3463,7 @@ const DailyReport = () => {
                         setProjectName={setProjectName}
                         location={location}
                         setLocation={setLocation}
+                        onLocationChange={handleLocationChange}
                         createdBy={createdBy}
                         setCreatedBy={setCreatedBy}
                         reportDate={reportDate}

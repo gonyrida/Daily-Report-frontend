@@ -650,6 +650,27 @@ export const generateCombinedPDF = async (
   return { success: true };
 };
 
+export const getReportsByLocation = async (location?: string) => {
+  try {
+    const queryParams = location ? `?location=${encodeURIComponent(location)}` : '';
+    const response = await apiGet(`/daily-reports/by-location${queryParams}`);
+    
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to fetch reports by location" }));
+      throw new Error(error.message || "Failed to fetch reports by location");
+    }
+    
+    const result = await response.json();
+    console.log("🔒 GET REPORTS BY LOCATION: Success:", result);
+    return result;
+  } catch (error) {
+    console.error("Error fetching reports by location:", error);
+    throw error;
+  }
+};
+
 export const getCompanyReports = async (
   page: number = 1,
   limit: number = 20,

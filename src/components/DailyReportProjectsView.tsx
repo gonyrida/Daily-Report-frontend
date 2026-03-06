@@ -15,17 +15,21 @@ import {
   getAllUserReports, 
   createNewReport,
   getCompanyReports,
+  getReportsByLocation,
 } from "@/integrations/reportsApi";
+import LocationFilter from "./LocationFilter";
 
 interface Report {
   projectName: string;
   reportDate: string;
+  location?: string;
 }
 
 interface Project {
   name: string;
   reportCount: number;
   lastReportDate?: string;
+  locations?: string[];
 }
 
 interface DailyReportProjectsViewProps {
@@ -43,6 +47,7 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
   // Data state
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
   
   // UI state
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -53,13 +58,25 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
       setLoading(true);
       
       console.log("🔍 DEBUG: Fetching company reports...");
-      const response = await getCompanyReports();
+      let response;
+      
+      if (selectedLocation) {
+        // Use location-specific endpoint
+        console.log("🔍 DEBUG: Fetching reports for location:", selectedLocation);
+        response = await getReportsByLocation(selectedLocation);
+      } else {
+        // Use regular company reports endpoint
+        console.log("🔍 DEBUG: Fetching all company reports");
+        response = await getCompanyReports();
+      }
+      
       console.log("🔍 DEBUG: Company reports response:", response);
       
-      const allReports = response.reports || [];
+      const allReports = response.reports || response || [];
       console.log("🔍 DEBUG: All reports count:", allReports.length);
       console.log("🔍 DEBUG: All reports:", allReports.map(r => ({
         projectName: r.projectName,
+        location: r.location,
         userId: r.userId,
         userName: r.userId?.firstName ? `${r.userId.firstName} ${r.userId.lastName}` : 'Unknown'
       })));
@@ -69,18 +86,24 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
       
       allReports.forEach((report: Report) => {
         const projectName = report.projectName || 'Untitled Project';
-        console.log("🔍 DEBUG: Processing report for project:", projectName);
+        console.log("🔍 DEBUG: Processing report for project:", projectName, "location:", report.location);
         
         if (!projectMap.has(projectName)) {
           projectMap.set(projectName, {
             name: projectName,
             reportCount: 0,
-            lastReportDate: report.reportDate
+            lastReportDate: report.reportDate,
+            locations: []
           });
         }
         
         const project = projectMap.get(projectName)!;
         project.reportCount++;
+        
+        // Add location to project's locations array if not already present
+        if (report.location && !project.locations!.includes(report.location)) {
+          project.locations!.push(report.location);
+        }
         
         // Update last report date if this one is more recent
         if (!project.lastReportDate || report.reportDate > project.lastReportDate) {
@@ -110,7 +133,7 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
     
     // Always refresh data when URL params change
     fetchData();
-  }, [searchParams]);
+  }, [searchParams, selectedLocation]);
 
   // Also refresh when window gains focus
   useEffect(() => {
@@ -235,6 +258,11 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
         </div>
         
         <div className="flex items-center gap-2">
+          <LocationFilter
+            selectedLocation={selectedLocation}
+            onLocationChange={setSelectedLocation}
+            onClearFilter={() => setSelectedLocation("")}
+          />
           <Button
             onClick={() => setShowCreateProject(true)}
             className="flex items-center gap-2"
@@ -325,6 +353,23 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Last Report</span>
                         <span className="text-sm">{formatDate(project.lastReportDate)}</span>
+                      </div>
+                    )}
+                    {project.locations && project.locations.length > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Locations</span>
+                        <div className="flex flex-wrap gap-1">
+                          {project.locations.slice(0, 2).map((loc, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {loc}
+                            </Badge>
+                          ))}
+                          {project.locations.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{project.locations.length - 2}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

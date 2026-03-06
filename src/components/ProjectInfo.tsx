@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import LocationDropdown from "./LocationDropdown";
 
 interface ProjectInfoProps {
   projectName: string;
@@ -25,6 +26,7 @@ interface ProjectInfoProps {
 
   location: string;
   setLocation: (location: string) => void;
+  onLocationChange?: (location: string) => void;
 
   createdBy: string;
   setCreatedBy: (name: string) => void;
@@ -49,6 +51,7 @@ const ProjectInfo = ({
   setProjectName,
   location,
   setLocation,
+  onLocationChange,
   createdBy,
   setCreatedBy,
   reportDate,
@@ -84,6 +87,15 @@ const ProjectInfo = ({
       setTempAM(value);
     } else {
       setTempPM(value);
+    }
+  };
+
+  // Handler for location change
+  const handleLocationInputChange = (newLocation: string) => {
+    setLocation(newLocation);
+    // Call parent handler if provided
+    if (onLocationChange) {
+      onLocationChange(newLocation);
     }
   };
 
@@ -131,27 +143,12 @@ const ProjectInfo = ({
             </span>
           </div>
 
-          {/* Location */}
-          <div>
-            <Label
-              htmlFor="location"
-              className="text-sm font-medium text-foreground"
-            >
-              Location
-            </Label>
-            <Input
-              inputSize="md"
-              id="location"
-              value={location}
-              // onChange={(e) => setLocation(e.target.value)}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setLocation(e.target.value)
-              }
-              placeholder="Enter site/location..."
-              className="mt-1.5"
-              showIndicator={false}
-            />
-          </div>
+          {/* Location Dropdown */}
+          <LocationDropdown
+            location={location}
+            setLocation={handleLocationInputChange}
+            className="mt-1.5"
+          />
           <div>
             <Label className="text-sm font-medium text-foreground">
               Report Date *
