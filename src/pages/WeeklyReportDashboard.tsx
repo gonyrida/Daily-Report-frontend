@@ -254,7 +254,10 @@ const WeeklyReportDashboard = () => {
                 </Button>
               </div>
             )}
-
+            {/* Implementation Notice Banner */}
+            <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold mb-6">
+              This page is still implement
+            </div>
             {/* Tabs */}
             <div className="mb-6">
               <div className="border-b border-gray-200">

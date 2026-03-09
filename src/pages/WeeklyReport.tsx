@@ -1149,6 +1149,11 @@ const WeeklyReport = () => {
 
             {/* Main Content */}
             <main className="w-full px-4 sm:px-6 pt-4 pb-6 space-y-6 overflow-x-hidden">
+              {/* Implementation Notice Banner */}
+              <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold">
+                This page is still implement
+              </div>
+              
               {/* Tab-based content rendering */}
               {activeTab === "cover" && (
                 <>
