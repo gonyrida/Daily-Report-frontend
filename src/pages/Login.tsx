@@ -24,7 +24,10 @@ import { useProfileContext } from "@/contexts/ProfileContext";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
+
+  //This is commented out for testing purposes
+  // Make sure to uncomment it before deploy
+  // password: z.string().min(1, "Password is required"),
   rememberMe: z.boolean().optional(),
 });
 
@@ -58,7 +61,10 @@ const Login = () => {
     setError(null);
 
     try {
-      const result = await loginUser(data.email, data.password);
+      // This is for standard login
+      // const result = await loginUser(data.email, data.password);
+      // This is for demo purposes only
+      const result = await loginUser(data.email, "password123");
 
       if (!result.success) {
         throw new Error(result.message || "Login failed");
@@ -135,7 +141,9 @@ const Login = () => {
               )}
             </div>
 
-            <div className="space-y-2">
+            {/* This is commeneted out for testing purposes
+            Make sure to uncomment it before deploying */}
+            {/* <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
@@ -168,7 +176,7 @@ const Login = () => {
                   {errors.password.message}
                 </p>
               )}
-            </div>
+            </div> */}
 
             <div className="flex items-center space-x-2">
               <Checkbox
