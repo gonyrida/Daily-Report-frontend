@@ -22,7 +22,7 @@ const getApiBaseUrl = (): string => {
     import.meta.env.VITE_FORCE_PRODUCTION === "true";
 
   if (isProduction) {
-    return "https://daily-report-backend.officemuckup.com/api";
+    return "https://api.cambodiacpm.com/api";
   }
 
   return "http://localhost:5000/api";
@@ -52,7 +52,7 @@ const getStaticBaseUrl = (): string => {
 
   if (isProduction) {
     // Fallback - update this to your actual service URL
-    return "https://daily-report-backend.officemuckup.com";
+    return "https://api.cambodiacpm.com"
   }
 
   return "http://localhost:5000";
@@ -67,7 +67,7 @@ const getPythonApiBaseUrl = (): string => {
 
   // If not defined, use production URL in production mode, localhost in development
   if (import.meta.env.MODE === "production") {
-    return "https://daily-report-python.officemuckup.com";
+    return "https://doc.cambodiacpm.com"
   }
 
   return "http://localhost:5001";
