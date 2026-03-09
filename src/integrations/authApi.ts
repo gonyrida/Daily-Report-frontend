@@ -31,11 +31,12 @@ export const verifyAuth = async () => {
   }
 };
 
-export const loginUser = async (email: string, password: string) => {
+export const loginUser = async (email: string /*, password: string */) => {
   try {
     console.log("DEBUG FRONTEND: Attempting login with email:", email);
     
-    const response = await apiPost(API_ENDPOINTS.AUTH.LOGIN, { email, password });
+    // const response = await apiPost(API_ENDPOINTS.AUTH.LOGIN, { email, password });
+    const response = await apiPost(API_ENDPOINTS.AUTH.LOGIN, { email });
     
     console.log("DEBUG FRONTEND: Login response status:", response.status);
     

@@ -59,7 +59,7 @@ const Login = () => {
 
     try {
       // const result = await loginUser(data.email, data.password);
-      const result = await loginUser(data.email, "123");
+      const result = await loginUser(data.email);
 
       if (!result.success) {
         throw new Error(result.message || "Login failed");
@@ -67,12 +67,6 @@ const Login = () => {
 
       // Token is now stored in HTTP-only cookie by backend
       // Only store user info for frontend display
-      // if (result.token) {
-      //   localStorage.setItem("authToken", result.token);
-      //   console.log("🔑 Stored auth token in localStorage");
-      // }
-
-      // Store user info for Python API authentication (token is now in HTTP-only cookie)
       localStorage.setItem("user", JSON.stringify(result.user));
       if (data.rememberMe) {
         localStorage.setItem("rememberMe", "true");
@@ -136,7 +130,7 @@ const Login = () => {
               )}
             </div>
 
-            {/* /* comment out for testing without login * */}
+            {/* Password field - commented out for email-only authentication */}
             {/* <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
