@@ -43,6 +43,11 @@ export default function PercentageCell({
   );
 
   const getBackgroundClass = () => {
+    // Check if value is over 100% and return red background
+    if (numericInputValue > 100) {
+      return "bg-[#ef4444]";
+    }
+    
     switch (backgroundType) {
       case "blue":
         return "bg-blue-500";
@@ -53,6 +58,15 @@ export default function PercentageCell({
       default:
         return "";
     }
+  };
+
+  const getTextClass = () => {
+    // Check if value is over 100% and return red text
+    if (numericInputValue > 100) {
+      return "text-red-500";
+    }
+    
+    return "";
   };
 
   // Allow free typing
@@ -76,8 +90,8 @@ export default function PercentageCell({
     const numValue = parseFloat(inputValue);
 
     if (!isNaN(numValue)) {
-      const clamped = Math.min(100, Math.max(0, numValue));
-      const formatted = clamped.toFixed(1);
+      // Keep the original value without clamping to 100
+      const formatted = numValue.toFixed(1);
       setInputValue(formatted);
       onChange?.(formatted);
     }
@@ -86,10 +100,10 @@ export default function PercentageCell({
   return (
     <td className={`px-3 py-2 relative ${className}`}>
       {/* Background bar */}
-      {backgroundType !== "none" && clampedValue > 0 && (
+      {((backgroundType !== "none" && clampedValue > 0) || numericInputValue > 100) && (
         <div
           className={`absolute inset-0 ${getBackgroundClass()} opacity-20`}
-          style={{ width: `${clampedValue}%` }}
+          style={{ width: `${numericInputValue > 100 ? 100 : clampedValue}%` }}
         />
       )}
 
@@ -101,16 +115,16 @@ export default function PercentageCell({
           onBlur={handleBlur}
           onFocus={(e) => e.target.select()} // optional: auto-select
           placeholder={placeholder}
-          className={`border-0 bg-transparent text-center focus-visible:ring-1 ${
+          className={`border-0 bg-transparent text-center focus-visible:ring-1 min-w-[60px] ${
             isPrimary ? "font-semibold text-primary" : ""
-          } ${inputClassName}`}
+          } ${getTextClass()} ${inputClassName}`}
           readOnly={readOnly}
           showIndicator={showIndicator}
         />
         <span
           className={`ml-1 text-sm font-medium ${
             isPrimary ? "text-primary" : ""
-          }`}
+          } ${getTextClass()}`}
         >
           %
         </span>
