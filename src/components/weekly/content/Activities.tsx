@@ -82,22 +82,24 @@ const Activities = (props: ActivitiesProps) => {
     type: "weekly" | "next",
     index: number,
     field: "description" | "percent",
-    value: string
+    value: string | number
   ) => {
     if (type === "weekly") {
       const newActivities = [...weeklyActivities];
       if (field === "percent") {
-        newActivities[index][field] = value === "" ? 0 : Number(value);
+        const numValue = typeof value === 'string' ? Number(value) : value;
+        newActivities[index][field] = isNaN(numValue) ? 0 : numValue;
       } else {
-        newActivities[index][field] = value;
+        newActivities[index][field] = value as string;
       }
       props.setWeeklyActivities?.(newActivities);
     } else {
       const newPlan = [...nextWeekPlan];
       if (field === "percent") {
-        newPlan[index][field] = value === "" ? 0 : Number(value);
+        const numValue = typeof value === 'string' ? Number(value) : value;
+        newPlan[index][field] = isNaN(numValue) ? 0 : numValue;
       } else {
-        newPlan[index][field] = value;
+        newPlan[index][field] = value as string;
       }
       props.setNextWeekPlan?.(newPlan);
     }
@@ -165,18 +167,18 @@ const Activities = (props: ActivitiesProps) => {
 
   return (
     <>
-      <div className="grid md:grid-cols-2 gap-6 animate-fade-in">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 animate-fade-in">
       
       {/* Weekly Activities */}
-      <div className="section-card p-6">
-        <div className="flex items-center justify-between gap-2 mb-4">
+      <div className="section-card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-primary/10 rounded-lg">
-              <ClipboardList className="w-5 h-5 text-primary" />
+              <ClipboardList className="w-4 sm:w-5 h-4 sm:h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Activities Of Work Done</h2>
-              <p className="text-sm text-muted-foreground">Describe this week's completed work</p>
+              <h2 className="text-base sm:text-lg font-semibold text-foreground">Activities Of Work Done</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">Describe this week's completed work</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -185,16 +187,16 @@ const Activities = (props: ActivitiesProps) => {
                 setImportContext("weekly");
                 setShowBulkModal(true);
               }}
-              className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 hover:underline"
+              className="flex items-center gap-1 text-xs sm:text-sm text-purple-600 hover:text-purple-700 hover:underline"
               title="Bulk import activities"
             >
-              <Upload className="w-4 h-4" /> Bulk Import
+              <Upload className="w-3 sm:w-4 h-3 sm:h-4" /> <span className="hidden sm:inline">Bulk Import</span><span className="sm:hidden">Bulk</span>
             </button>
             <button
               onClick={() => addRow("weekly")}
-              className="flex items-center gap-1 text-sm text-primary hover:underline"
+              className="flex items-center gap-1 text-xs sm:text-sm text-primary hover:underline"
             >
-              <Plus className="w-4 h-4" /> Add Row
+              <Plus className="w-3 sm:w-4 h-3 sm:h-4" /> <span className="hidden sm:inline">Add Row</span><span className="sm:hidden">Add</span>
             </button>
           </div>
         </div>
@@ -210,7 +212,7 @@ const Activities = (props: ActivitiesProps) => {
           <tbody>
             {(weeklyActivities || []).map((row, idx) => (
               <tr key={idx}>
-                <td className="py-2 px-2 align-top">
+                <td className="py-2 px-1 sm:px-2 align-top">
                   <div className="relative">
                     <textarea
                       value={row.description}
@@ -218,7 +220,7 @@ const Activities = (props: ActivitiesProps) => {
                         updateRow("weekly", idx, "description", e.target.value);
                         adjustHeightWrapper(e);
                       }}
-                      className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground ${
+                      className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground text-xs sm:text-sm ${
                         /^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$/i.test(row.description.trim().split(/\s+/)[0])
                           ? 'font-bold'
                           : 'font-normal'
@@ -228,22 +230,13 @@ const Activities = (props: ActivitiesProps) => {
                       style={{ 
                         border: 'none', 
                         outline: 'none', 
-                        padding: '2px',
+                        padding: '1px sm:2px',
                         ...getIndentationStyle(row.description)
                       }}
                     />
-                    {/* Bulk import indicator - REMOVED */}
-                    {/* {row.source === "bulk" && (
-                      <div className="absolute -top-1 -right-1">
-                        <div className="bg-purple-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                          <Upload className="w-3 h-3" />
-                          Bulk
-                        </div>
-                      </div>
-                    )} */}
                   </div>
                 </td>
-                <td className="py-2 px-2 align-top">
+                <td className="py-2 px-1 sm:px-2 align-top">
                   <div className="relative w-full">
                     <div 
                       className={`absolute inset-0 rounded transition-all duration-300 ${
@@ -255,33 +248,31 @@ const Activities = (props: ActivitiesProps) => {
                     />
                     <input
                       type="text"
-                      value={row.percent !== undefined && row.percent !== null && row.percent !== "" ? `${Number(row.percent).toFixed(2)}%` : ""}
+                      value={row.percent !== undefined && row.percent !== null ? `${Number(row.percent).toFixed(2)}%` : ""}
                       onChange={(e) => {
                         // Remove % and convert to number
                         const value = e.target.value.replace('%', '');
                         const numValue = parseFloat(value);
                         updateRow("weekly", idx, "percent", isNaN(numValue) ? 0 : numValue);
                       }}
-                      className={`relative bg-transparent z-10 dark:text-foreground text-center w-20 px-2 py-1 ${
+                      className={`relative bg-transparent z-10 dark:text-foreground text-center w-16 sm:w-20 px-1 sm:px-2 py-1 text-xs sm:text-sm ${
                         row.percent === 100 
                           ? 'text-green-800 dark:text-green-300 font-semibold' 
                           : 'text-yellow-800 dark:text-yellow-300'
                       }`}
                       placeholder="0.00%"
                       min={0}
-
                       max={100}
-
                     />
                   </div>
                 </td>
-                <td className="py-2 px-2 align-top">
+                <td className="py-2 px-1 sm:px-2 align-top">
                   <button
                     onClick={() => deleteRow("weekly", idx)}
                     className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-red-400 dark:hover:text-red-300 rounded transition-colors"
                     title="Delete row"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                 </td>
               </tr>
@@ -291,15 +282,15 @@ const Activities = (props: ActivitiesProps) => {
       </div>
 
       {/* Next Week Plan */}
-      <div className="section-card p-6">
-        <div className="flex items-center justify-between gap-2 mb-4">
+      <div className="section-card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-accent/10 rounded-lg">
-              <CalendarCheck className="w-5 h-5 text-accent" />
+              <CalendarCheck className="w-4 sm:w-5 h-4 sm:h-5 text-accent" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Next Week Plan</h2>
-              <p className="text-sm text-muted-foreground">Plan next week's activities</p>
+              <h2 className="text-base sm:text-lg font-semibold text-foreground">Next Week Plan</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">Plan next week's activities</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -308,16 +299,16 @@ const Activities = (props: ActivitiesProps) => {
                 setImportContext("next");
                 setShowBulkModal(true);
               }}
-              className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 hover:underline"
+              className="flex items-center gap-1 text-xs sm:text-sm text-purple-600 hover:text-purple-700 hover:underline"
               title="Bulk import activities"
             >
-              <Upload className="w-4 h-4" /> Bulk Import
+              <Upload className="w-3 sm:w-4 h-3 sm:h-4" /> <span className="hidden sm:inline">Bulk Import</span><span className="sm:hidden">Bulk</span>
             </button>
             <button
               onClick={() => addRow("next")}
-              className="flex items-center gap-1 text-sm text-accent hover:underline"
+              className="flex items-center gap-1 text-xs sm:text-sm text-accent hover:underline"
             >
-              <Plus className="w-4 h-4" /> Add Row
+              <Plus className="w-3 sm:w-4 h-3 sm:h-4" /> <span className="hidden sm:inline">Add Row</span><span className="sm:hidden">Add</span>
             </button>
           </div>
         </div>
@@ -333,14 +324,14 @@ const Activities = (props: ActivitiesProps) => {
           <tbody>
             {(nextWeekPlan || []).map((row, idx) => (
               <tr key={idx}>
-                <td className="py-2 px-2 align-top">
+                <td className="py-2 px-1 sm:px-2 align-top">
                   <textarea
                     value={row.description}
                     onChange={(e) => {
                       updateRow("next", idx, "description", e.target.value);
                       adjustHeightWrapper(e);
                     }}
-                    className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground ${
+                    className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground text-xs sm:text-sm ${
                       /^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$/i.test(row.description.trim().split(/\s+/)[0])
                         ? 'font-bold'
                         : 'font-normal'
@@ -350,21 +341,12 @@ const Activities = (props: ActivitiesProps) => {
                     style={{ 
                       border: 'none', 
                       outline: 'none', 
-                      padding: '2px',
+                      padding: '1px sm:2px',
                       ...getIndentationStyle(row.description)
                     }}
                   />
-                  {/* Bulk import indicator - REMOVED */}
-                  {/* {row.source === "bulk" && (
-                    <div className="absolute -top-1 -right-1">
-                      <div className="bg-purple-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                        <Upload className="w-3 h-3" />
-                        Bulk
-                      </div>
-                    </div>
-                  )} */}
                 </td>
-                <td className="py-2 px-2 align-top">
+                <td className="py-2 px-1 sm:px-2 align-top">
                   <div className="relative w-full">
                     <div 
                       className={`absolute inset-0 rounded transition-all duration-300 ${
@@ -376,14 +358,14 @@ const Activities = (props: ActivitiesProps) => {
                     />
                     <input
                       type="text"
-                      value={row.percent !== undefined && row.percent !== null && row.percent !== "" ? `${Number(row.percent).toFixed(2)}%` : ""}
+                      value={row.percent !== undefined && row.percent !== null ? `${Number(row.percent).toFixed(2)}%` : ""}
                       onChange={(e) => {
                         // Remove % and convert to number
                         const value = e.target.value.replace('%', '');
                         const numValue = parseFloat(value);
                         updateRow("next", idx, "percent", isNaN(numValue) ? 0 : numValue);
                       }}
-                      className={`relative bg-transparent z-10 dark:text-foreground text-center w-20 px-2 py-1 ${
+                      className={`relative bg-transparent z-10 dark:text-foreground text-center w-16 sm:w-20 px-1 sm:px-2 py-1 text-xs sm:text-sm ${
                         row.percent === 100 
                           ? 'text-green-800 dark:text-green-300 font-semibold' 
                           : 'text-yellow-800 dark:text-yellow-300'
@@ -393,13 +375,13 @@ const Activities = (props: ActivitiesProps) => {
                     />
                   </div>
                 </td>
-                <td className="py-2 px-2 align-top">
+                <td className="py-2 px-1 sm:px-2 align-top">
                   <button
                     onClick={() => deleteRow("next", idx)}
                     className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-red-400 dark:hover:text-red-300 rounded transition-colors"
                     title="Delete row"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                 </td>
               </tr>

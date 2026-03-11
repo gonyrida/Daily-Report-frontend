@@ -308,29 +308,30 @@ export default function OverallProgressTable({
       </div>
 
       <div className="border rounded-lg overflow-hidden">
+        <div className="w-full overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="bg-primary text-primary-foreground p-4 rounded-lg">
               <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[5%]">#</th>
-              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[25%]">
+              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[300px]">
                 Scope of work
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                 % Up to Previous Week
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                 % This Week
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                 % Up to This Week
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                 Remaining
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                 % Next Week Plan
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                 % Up Next Week Plan
               </th>
               <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[5%]">
@@ -479,6 +480,7 @@ export default function OverallProgressTable({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Add Buttons */}

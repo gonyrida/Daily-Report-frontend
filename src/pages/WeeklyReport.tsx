@@ -6,6 +6,7 @@ import WeeklyReportCover from "@/components/weekly/WeeklyReportCover";
 import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
 import { ActivityRow } from "@/types/activity.types";
 import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
+import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import ReferenceSection from "@/components/ReferenceSection";
 import ConstructionIssue from "@/components/weekly/content/ConstructionIssue";
 import { createDefaultSiteActivitiesSections } from "@/utils/referenceHelpers";
@@ -23,11 +24,12 @@ import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
 import { convertScheduleEntriesToSupabase } from '@/utils/weeklyReportSupabase';
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
-import { 
-  createWeeklyReport, 
-  updateWeeklyReport, 
+import { constructionProgress } from '@/components/weekly/ConstructionProgress';
+import {
+  createWeeklyReport,
+  updateWeeklyReport,
   submitWeeklyReport,
-  getWeeklyReportById 
+  getWeeklyReportById
 } from "@/services/weeklyReportService";
 import {
   SidebarInset,
@@ -61,6 +63,7 @@ const WeeklyReport = () => {
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
+    | "construction-progress"
     | "cover"
     | "letter"
     | "table-of-content"
@@ -72,7 +75,7 @@ const WeeklyReport = () => {
     | "photos"
     | "issues"
     | "schedule"
-  >("cover");
+  >("construction-progress");
 
   // Debug logging for activeTab changes
   const debugSetActiveTab = (tab: any) => {
@@ -151,6 +154,9 @@ const WeeklyReport = () => {
   //   { id: crypto.randomUUID(), issueNumber: 1 }
   // ]);
 
+  // Construction Progress state
+  const [constructionProgressData, setConstructionProgressData] = useState(null);
+
   // Schedule sections state
   const [scheduleSections, setScheduleSections] = useState([
     { id: crypto.randomUUID(), title: "Master Schedule", entries: [] }
@@ -189,6 +195,15 @@ const WeeklyReport = () => {
 
   // NEW: Add state to store the clearHsesData function reference
   const clearHsesDataRef = useRef<(() => void) | null>(null);
+
+  // Callback functions for clearing data
+  const handleClearQaqcData = (clearFn: () => void) => {
+    clearQaqcDataRef.current = clearFn;
+  };
+
+  const handleClearHsesData = (clearFn: () => void) => {
+    clearHsesDataRef.current = clearFn;
+  };
 
   // Overall Progress hook
   const overallProgressHook = useOverallProgress();
@@ -249,7 +264,7 @@ const WeeklyReport = () => {
             const report = response.data;
             setCurrentReportId(report.id);
             setReportStatus(report.status || 'draft');
-            
+
             // Update shared data with existing report data
             setSharedData(prev => ({
               ...prev,
@@ -279,7 +294,7 @@ const WeeklyReport = () => {
               companyEmail1: report.sections?.letter?.companyEmail1 || '',
               companyEmail2: report.sections?.letter?.companyEmail2 || ''
             }));
-            
+
             // Load overall progress data
             if (report.sections?.overallProgress?.rows) {
               overallProgressHook.setRows(report.sections.overallProgress.rows);
@@ -421,7 +436,7 @@ const WeeklyReport = () => {
 
   // Handler functions
   const handleSaveAsDraft = async () => {
-        setIsSaving(true);
+    setIsSaving(true);
     let reportData: any;
     try {
       // Helper function to format rows with displayIndex
@@ -549,7 +564,7 @@ const WeeklyReport = () => {
 
       // Convert Photos images to base64 before saving
       let photosDataForSave = {
-        title: "Site Activities Photos", 
+        title: "Site Activities Photos",
         locations: []
       };
 
@@ -589,30 +604,30 @@ const WeeklyReport = () => {
 
       // Convert Issues data to backend format
       let issuesDataForSave = [];
-      
+
       // Convert Schedule data to backend format using Supabase
       let scheduleDataForSave = [];
-      
+
       if (scheduleSections && scheduleSections.length > 0) {
         // Convert entries to Supabase URLs
         scheduleDataForSave = await convertScheduleEntriesToSupabase(
           scheduleSections[0].entries,
           currentReportId || 'temp-report-id'
         );
-        
+
         // Remove file objects that shouldn't be sent to backend
         scheduleDataForSave = scheduleDataForSave.map(entry => {
           const { file, ...entryWithoutFile } = entry;
           return entryWithoutFile;
         });
       }
-            
+
       if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
         // Convert frontend format to backend format with base64 images
         issuesDataForSave = await Promise.all(
           issuesHook.issuesData.map(async (issue) => {
             let photoBase64 = issue.photo || "";
-            
+
             // Convert image to base64 if it's a File object
             if (issue.photo instanceof File) {
               photoBase64 = await new Promise((resolve) => {
@@ -621,7 +636,7 @@ const WeeklyReport = () => {
                 reader.readAsDataURL(issue.photo as File);
               });
             }
-            
+
             return {
               no: issue.issueNumber || "",
               location: issue.location || "",
@@ -702,7 +717,7 @@ const WeeklyReport = () => {
         hsesDataForSave.hsePhotoReferences = await convertImagesToBase64(hsesDataForSave.hsePhotoReferences);
       }
 
-            
+
       let response;
       if (currentReportId) {
         // Update existing report - only send sections that changed
@@ -725,8 +740,8 @@ const WeeklyReport = () => {
       if (response.success) {
         toast({
           title: "Saved",
-          description: currentReportId 
-            ? "Weekly report updated successfully." 
+          description: currentReportId
+            ? "Weekly report updated successfully."
             : "Weekly report created successfully.",
         });
       } else {
@@ -735,18 +750,18 @@ const WeeklyReport = () => {
     } catch (error) {
       console.error('Save error:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
-      
+
       // Log specific validation errors
       if (error.message && error.message.includes('Validation failed')) {
         console.error('Validation error - checking data structure...');
         console.log('Report data being sent:', JSON.stringify(reportData, null, 2));
-        
+
         // Check each section for potential issues
         if (reportData.sections?.masterSchedule) {
           console.log('Master schedule data:', JSON.stringify(reportData.sections.masterSchedule, null, 2));
         }
       }
-      
+
       toast({
         title: "Save Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -770,7 +785,7 @@ const WeeklyReport = () => {
     setIsSaving(true);
     try {
       const response = await submitWeeklyReport(currentReportId);
-      
+
       if (response.success) {
         setReportStatus("submitted");
         // Clear QAQC and HSES localStorage data on successful submit
@@ -882,7 +897,7 @@ const WeeklyReport = () => {
   // Schedule upload functionality
   const handleScheduleUpload = (files: FileList | null) => {
     if (!files) return;
-    const validFiles = Array.from(files).filter((f) => 
+    const validFiles = Array.from(files).filter((f) =>
       f.type.startsWith("image/") || f.type === "application/pdf"
     );
     if (validFiles.length === 0) {
@@ -949,7 +964,7 @@ const WeeklyReport = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-    
+
     const files = e.dataTransfer.files;
     handleScheduleUpload(files);
   };
@@ -969,7 +984,7 @@ const WeeklyReport = () => {
             />
 
             {/* Navigation Bar */}
-            <div className="w-full px-4 sm:px-6 py-4 sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
+            <div className="w-full px-4 sm:px-6 py-4 sticky top-0 z-5 bg-background/95 backdrop-blur-sm border-b shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <SidebarTrigger />
@@ -1000,6 +1015,19 @@ const WeeklyReport = () => {
                   </Button>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant={activeTab === "construction-progress" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      console.log("Con.Prog tab clicked, setting activeTab to construction-progress");
+                      setActiveTab("construction-progress");
+                      setShowSecondNav(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                  >
+                    Con.Prog
+                  </Button>
                   <Button
                     variant={activeTab === "cover" ? "default" : "outline"}
                     size="sm"
@@ -1057,11 +1085,11 @@ const WeeklyReport = () => {
               activeTab === "issues" ||
               activeTab === "schedule") &&
               showSecondNav && (
-                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-40 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
+                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-4 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
                   <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                     {tableOfContentSections.map((section) => {
                       // Determine if this section is currently active
-                      const isActiveSection = 
+                      const isActiveSection =
                         (section.id === 1 && activeTab === "table-of-content" && showIntroduction) ||
                         (section.id === 2 && activeTab === "overall-progress") ||
                         (section.id === 3 && activeTab === "activities") ||
@@ -1071,76 +1099,76 @@ const WeeklyReport = () => {
                         (section.id === 7 && activeTab === "photos") ||
                         (section.id === 8 && activeTab === "issues") ||
                         (section.id === 9 && activeTab === "schedule");
-                      
+
                       return (
-                      <Button
-                        key={section.id}
-                        variant={isActiveSection ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => {
-                          console.log(
-                            "Second nav button clicked, section.id:",
-                            section.id,
-                          );
-                          if (section.id === 1) {
-                            setShowIntroduction(true);
-                            debugSetActiveTab("table-of-content");
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 2) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("overall-progress");
-                            if (setShowSecondNav) setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 3) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("activities");
-                            if (setShowSecondNav) setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 4) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("qaqc-status");
-                            if (setShowSecondNav) setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 5) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("hses");
-                            setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 6) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("resource");
-                            setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 7) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("photos");
-                            setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 8) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("issues");
-                            setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else if (section.id === 9) {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("schedule");
-                            setShowSecondNav(true);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else {
-                            setShowIntroduction(false);
-                            debugSetActiveTab("table-of-content");
-                            const element = document.querySelector(
-                              section.href,
+                        <Button
+                          key={section.id}
+                          variant={isActiveSection ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            console.log(
+                              "Second nav button clicked, section.id:",
+                              section.id,
                             );
-                            if (element) {
-                              element.scrollIntoView({ behavior: "smooth" });
+                            if (section.id === 1) {
+                              setShowIntroduction(true);
+                              debugSetActiveTab("table-of-content");
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 2) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("overall-progress");
+                              if (setShowSecondNav) setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 3) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("activities");
+                              if (setShowSecondNav) setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 4) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("qaqc-status");
+                              if (setShowSecondNav) setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 5) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("hses");
+                              setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 6) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("resource");
+                              setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 7) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("photos");
+                              setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 8) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("issues");
+                              setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (section.id === 9) {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("schedule");
+                              setShowSecondNav(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else {
+                              setShowIntroduction(false);
+                              debugSetActiveTab("table-of-content");
+                              const element = document.querySelector(
+                                section.href,
+                              );
+                              if (element) {
+                                element.scrollIntoView({ behavior: "smooth" });
+                              }
                             }
-                          }
-                        }}
-                        className="rounded-full text-sm transition-all duration-200 hover:scale-105 flex-shrink-0"
-                      >
-                        {section.id}. {section.name}
-                      </Button>
+                          }}
+                          className="rounded-full text-sm transition-all duration-200 hover:scale-105 flex-shrink-0"
+                        >
+                          {section.id}. {section.name}
+                        </Button>
                       );
                     })}
                   </div>
@@ -1153,7 +1181,7 @@ const WeeklyReport = () => {
               <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold">
                 This page is still implement
               </div>
-              
+
               {/* Tab-based content rendering */}
               {activeTab === "cover" && (
                 <>
@@ -1177,6 +1205,19 @@ const WeeklyReport = () => {
                 </>
               )}
 
+              {activeTab === "construction-progress" && (
+                <>
+                  {console.log("construction-progress tab is active")}
+                  <div className="bg-card rounded-lg border p-6">
+                    <WeeklyReportConstructionProgress
+                      data={constructionProgressData}
+                      onDataChange={(data) => setConstructionProgressData(data)}
+                      reportId={currentReportId}
+                    />
+                  </div>
+                </>
+              )}
+
               {activeTab === "table-of-content" && (
                 <>
                   <div className="bg-card rounded-lg border p-6">
@@ -1189,11 +1230,19 @@ const WeeklyReport = () => {
                       activeTab={activeTab}
                       sharedData={sharedData}
                       setSharedData={setSharedData}
+                      overallProgressData={overallProgressHook}
+                      setOverallProgressData={overallProgressHook.setRows}
                       reportId={currentReportId}
                       weeklyActivities={weeklyActivities}
                       setWeeklyActivities={setWeeklyActivities}
                       nextWeekPlan={nextWeekPlan}
                       setNextWeekPlan={setNextWeekPlan}
+                      qaqcData={qaqcData}
+                      setQaqcData={setQaqcData}
+                      hsesData={hsesData}
+                      setHsesData={setHsesData}
+                      onClearQaqcData={handleClearQaqcData}
+                      onClearHsesData={handleClearHsesData}
                     />
                   </div>
                 </>
@@ -1344,7 +1393,7 @@ const WeeklyReport = () => {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           >
-                            <path d="M12 5v14M5 12h14"/>
+                            <path d="M12 5v14M5 12h14" />
                           </svg>
                           Add Section
                         </Button>
@@ -1352,7 +1401,7 @@ const WeeklyReport = () => {
                       <ReferenceSection
                         sections={siteActivitiesSections}
                         setSections={setSiteActivitiesSections}
-                        onExportReference={() => {}}
+                        onExportReference={() => { }}
                         isExporting={isExportingSiteActivities}
                         tableTitle={siteActivitiesTitle}
                         setTableTitle={setSiteActivitiesTitle}
@@ -1387,16 +1436,16 @@ const WeeklyReport = () => {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             >
-                              <path d="M12 5v14M5 12h14"/>
+                              <path d="M12 5v14M5 12h14" />
                             </svg>
                             Add Issue
                           </Button>
                         </div>
                       </div>
                       {issuesHook.issuesData.map((issue, index) => (
-                        <ConstructionIssue 
-                          key={issue.id} 
-                          issueNumber={index + 1} 
+                        <ConstructionIssue
+                          key={issue.id}
+                          issueNumber={index + 1}
                           siteLocation={issue.location}
                           problems={issue.problem}
                           actionBy={issue.actionBy}
@@ -1421,7 +1470,7 @@ const WeeklyReport = () => {
                       <div className="mb-6">
                         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
                       </div>
-                      
+
                       {/* New Supabase Master Schedule Component */}
                       <MasterScheduleSupabase
                         entries={scheduleSections[0].entries}
