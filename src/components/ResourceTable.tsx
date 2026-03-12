@@ -44,7 +44,7 @@ const toRoman = (num: number): string => {
 export interface ResourceRow {
   id: string;
   description: string;
-  unit?: number;
+  unit?: string;
   prev: number;
   today: number;
   accumulated: number;
@@ -52,7 +52,8 @@ export interface ResourceRow {
   nextWeekPlan?: number;
   upNextWeekPlan?: number;
   searchTerm?: string;
-  isCustomInput?: boolean;
+  isCustomInput?: boolean;        // For description
+  isCustomUnitInput?: boolean;    // For unit
 }
 
 interface ResourceTableProps {
@@ -108,7 +109,7 @@ const ResourceTable = ({
     const newRow: ResourceRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: showUnit ? "" : undefined,
+      unit: showUnit ? "Pack" : undefined,
       prev: 0,
       today: 0,
       accumulated: 0,
@@ -116,6 +117,7 @@ const ResourceTable = ({
       upNextWeekPlan: 0,
       searchTerm: "",
       isCustomInput: false,
+      isCustomUnitInput: false,
     };
     setRows([...rows, newRow]);
   };
@@ -138,8 +140,11 @@ const ResourceTable = ({
             if (field === "description" && value === "__custom__") {
               return { ...row, description: "", isCustomInput: true };
             }
-            if (field === "unit" && value === "__custom_unit__") {
-              return { ...row, unit: "__custom_unit_input__" };
+            if (field === "isCustomUnitInput") {
+              return { ...row, isCustomUnitInput: value === "true" };
+            }
+            if (field === "isCustomInput") {
+              return { ...row, isCustomInput: value === "true" };
             }
             const updatedRow = { ...row, [field]: value };
             if (field === "prev" || field === "today") {
@@ -223,21 +228,21 @@ const ResourceTable = ({
                   No
                 </th>
               )}
-              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[25%]">
+              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[20%]">
                 {customHeaders.description || "Description"}
               </th>
               {showUnit && (
-                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[8%]">
                   {customHeaders.unit || "Unit"}
                 </th>
               )}
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center py-2.5 text-sm font-medium text-base w-[20%]">
                 {customHeaders.prev || "Prev"}
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center py-2.5 text-sm font-medium text-base w-[20%]">
                 {customHeaders.today || "Today"}
               </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
+              <th className="text-center py-2.5 text-sm font-medium text-base w-[23%]">
                 {customHeaders.accumulated || "Accum"}
               </th>
               {showExtraColumns && (
@@ -322,16 +327,27 @@ const ResourceTable = ({
                       </td>
                     )}
                     {/* Description / Dropdown */}
-                    <td className="px-3 py-2">
-                      {useDropdown && dropdownOptions.length > 0 ? (
-                        !row.isCustomInput ? (
+                    <td className="px-1 py-2">
+                      {useDropdown && dropdownOptions.length > 0 ? (() => {
+                        const allOptions = row.description && !dropdownOptions.includes(row.description) 
+                          ? [...dropdownOptions, row.description] 
+                          : dropdownOptions;
+
+                        return !row.isCustomInput ? (
                           <Select
                             value={row.description}
-                            onValueChange={(value) =>
-                              updateRow(row.id, "description", value)
-                            }
+                            onValueChange={(value) => {
+                              if (value === "__custom__") {
+                                updateRow(row.id, "isCustomInput", "true");
+                              } else {
+                                updateRow(row.id, "description", value);
+                              }
+                            }}
                           >
-                            <SelectTrigger className="border-0 bg-transparent focus:ring-1">
+                            <SelectTrigger 
+                              className="border-0 bg-transparent focus:ring-1 w-[100px] truncate"
+                              title={row.description} // Add title to the trigger
+                            >
                               <SelectValue placeholder="Select..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -349,12 +365,19 @@ const ResourceTable = ({
                                   className="h-8"
                                 />
                               </div>
-                              {filteredOptions.map((option, index) => (
+                              {allOptions.filter(option => 
+                                option.toLowerCase().includes((row.searchTerm || "").toLowerCase())
+                              ).map((option, index) => (
                                 <SelectItem
                                   key={`${title}-opt-${option}-${index}`}
                                   value={option}
+                                  className="p-0 px-4"
                                 >
-                                  {option}
+                                  <div 
+                                    className="truncate whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] px-2 py-1.5"
+                                  >
+                                    {option}
+                                  </div>
                                 </SelectItem>
                               ))}
                               <SelectItem key="custom-entry" value="__custom__">
@@ -371,6 +394,11 @@ const ResourceTable = ({
                               onChange={(e) =>
                                 updateRow(row.id, "description", e.target.value)
                               }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  updateRow(row.id, "isCustomInput", "false");
+                                }
+                              }}
                               placeholder="Enter custom..."
                               className="border-0 bg-transparent focus-visible:ring-1"
                               autoFocus
@@ -387,8 +415,8 @@ const ResourceTable = ({
                               <X className="w-4 h-4" />
                             </Button>
                           </div>
-                        )
-                      ) : (
+                        );
+                      })() : (
                         <Input
                           value={row.description}
                           onChange={(e) =>
@@ -413,14 +441,22 @@ const ResourceTable = ({
 
                     {/* Unit */}
                     {showUnit && (
-                      <td className="px-3 py-2">
-                        {unitOptions.length > 0 ? (
-                          row.unit !== "__custom_unit_input__" ? (
+                      <td className="px-1 py-2">
+                        {unitOptions.length > 0 ? (() => {
+                          const allUnitOptions = row.unit && row.unit !== "" && !unitOptions.includes(row.unit) 
+                            ? [...unitOptions, row.unit] 
+                            : unitOptions;
+                            
+                          return !row.isCustomUnitInput ? ( // Use the new flag
                             <Select
-                              value={row.unit}
-                              onValueChange={(value) =>
-                                updateRow(row.id, "unit", value)
-                              }
+                              value={row.unit || ""}
+                              onValueChange={(value) => {
+                                if (value === "__custom_unit__") {
+                                  updateRow(row.id, "isCustomUnitInput", "true");
+                                } else {
+                                  updateRow(row.id, "unit", value); // Direct string assignment
+                                }
+                              }}
                             >
                               <SelectTrigger
                                 className={`border-0 bg-transparent focus:ring-1 ${
@@ -432,7 +468,7 @@ const ResourceTable = ({
                                 <SelectValue placeholder="Select unit..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {unitOptions.map((unit, index) => (
+                                {allUnitOptions.map((unit, index) => (
                                   <SelectItem
                                     key={`${title}-unit-${unit}-${index}`}
                                     value={unit}
@@ -453,12 +489,19 @@ const ResourceTable = ({
                           ) : (
                             <div className="flex items-center gap-1">
                               <Input
-                                value=""
+                                value={row.unit || ""}
                                 onChange={(e) =>
                                   updateRow(row.id, "unit", e.target.value)
                                 }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    // Save the custom value and exit custom input mode
+                                    updateRow(row.id, "unit", (e.target as HTMLInputElement).value || "Pack");
+                                    updateRow(row.id, "isCustomUnitInput", "false");
+                                  }
+                                }}
                                 placeholder="Enter custom unit..."
-                                className="border-0 bg-transparent focus-visible:ring-1"
+                                className="border-0 bg-transparent focus-visible:ring-1 w-[90px]"
                                 autoFocus
                                 showIndicator={false}
                               />
@@ -466,11 +509,7 @@ const ResourceTable = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() =>
-                                  updateRow(
-                                    row.id,
-                                    "unit",
-                                    unitOptions[0] || "",
-                                  )
+                                  updateRow(row.id, "isCustomUnitInput", "false")
                                 }
                                 className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                               >
@@ -478,7 +517,7 @@ const ResourceTable = ({
                               </Button>
                             </div>
                           )
-                        ) : unitNumberOnly ? (
+                        })() : unitNumberOnly ? (
                           <Input
                             type="number"
                             value={row.unit || ""}
@@ -516,7 +555,7 @@ const ResourceTable = ({
                           updateRow(row.id, "prev", Number(e.target.value) || 0)
                         }
                         placeholder="0"
-                        className="border-0 bg-transparent text-center focus-visible:ring-1"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-[70px]"
                         showIndicator={false}
                       />
                     </td>
@@ -534,7 +573,7 @@ const ResourceTable = ({
                           )
                         }
                         placeholder="0"
-                        className="border-0 bg-transparent text-center focus-visible:ring-1"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-[70px]"
                         showIndicator={false}
                       />
                     </td>
@@ -553,7 +592,7 @@ const ResourceTable = ({
                           )
                         }
                         placeholder="0"
-                        className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1"
+                        className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1 w-[70px]"
                       />
                     </td>
 

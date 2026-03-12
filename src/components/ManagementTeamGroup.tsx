@@ -1,6 +1,7 @@
 import { Users, Wrench,Trash2 } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
+import { useState } from "react";
 
 interface ManagementTeamGroupProps {
   managementTeam: ResourceRow[];
@@ -15,6 +16,10 @@ const ManagementTeamGroup = ({
   mepTeam,
   setMepTeam,
 }: ManagementTeamGroupProps) => {
+
+  // This tracks which row is currently showing the text input
+  const [editingId, setEditingId] = useState(null);
+
   return (
     <div className="section-card overflow-hidden animate-fade-in">
       {/* Parent Header */}
@@ -81,20 +86,25 @@ const ManagementTeamGroup = ({
                         className="border-t border-table-border hover:bg-muted/30 transition-colors"
                       >
                         <td className="px-3 py-2">
-                          {MANAGEMENT_OPTIONS.length > 0 ? (
-                            (row.description === "" || MANAGEMENT_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
+                          {MANAGEMENT_OPTIONS.length > 0 ? (() => {
+                            // 1. Create a temporary list that includes the current custom value
+                            // This ensures that even after typing, the "Dropdown" view can show it.
+                            const isInOptions = MANAGEMENT_OPTIONS.includes(row.description);
+
+                            // Check if THIS specific row is being edited
+                            const isEditing = editingId === row.id;
+
+                            return !isEditing ? (
                               <select
                                 value={row.description}
                                 onChange={(e) => {
                                   const value = e.target.value;
                                   if (value === "__custom__") {
-                                    setManagementTeam(
-                                      managementTeam.map((r) =>
-                                        r.id === row.id
-                                          ? { ...r, description: "__custom_input__" }
-                                          : r
-                                      )
-                                    );
+                                    setEditingId(row.id); // Trigger Edit Mode
+                                    // Clear the field for a fresh start
+                                    setManagementTeam(managementTeam.map((r) =>
+                                      r.id === row.id ? { ...r, description: "" } : r
+                                    ));
                                   } else {
                                     setManagementTeam(
                                       managementTeam.map((r) =>
@@ -103,9 +113,17 @@ const ManagementTeamGroup = ({
                                     );
                                   }
                                 }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1"
+                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                title={row.description}
                               >
                                 <option value="">Select position...</option>
+
+                                {/* 3. If the current value is custom, we must render it as an option 
+                                so the <select> has something to display! */}
+                                {!isInOptions && row.description !== "" && (
+                                  <option value={row.description}>{row.description}</option>
+                                )}
+
                                 {MANAGEMENT_OPTIONS.map((option) => (
                                   <option key={option} value={option}>
                                     {option}
@@ -125,6 +143,12 @@ const ManagementTeamGroup = ({
                                       )
                                     )
                                   }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      setEditingId(null); // SNAP BACK TO DROPDOWN
+                                    }
+                                  }}
+                                  onBlur={() => setEditingId(null)} // SNAP BACK IF CLICKED OUTSIDE
                                   placeholder="Enter custom position..."
                                   className="flex-1 border-0 bg-transparent focus-visible:ring-1 rounded px-2 py-1"
                                   autoFocus
@@ -145,7 +169,7 @@ const ManagementTeamGroup = ({
                                 </button>
                               </div>
                             )
-                          ) : (
+                          })() : (
                             <input
                               type="text"
                               value={row.description}
@@ -276,20 +300,20 @@ const ManagementTeamGroup = ({
                         className="border-t border-table-border hover:bg-muted/30 transition-colors"
                       >
                         <td className="px-3 py-2">
-                          {MEP_TEAM_OPTIONS.length > 0 ? (
-                            (row.description === "" || MEP_TEAM_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
+                          {MEP_TEAM_OPTIONS.length > 0 ? (() => {
+                            const isInOptions = MEP_TEAM_OPTIONS.includes(row.description);
+                            const isEditing = editingId === row.id;
+                            return !isEditing ? (
                               <select
                                 value={row.description}
                                 onChange={(e) => {
                                   const value = e.target.value;
                                   if (value === "__custom__") {
-                                    setMepTeam(
-                                      mepTeam.map((r) =>
-                                        r.id === row.id
-                                          ? { ...r, description: "__custom_input__" }
-                                          : r
-                                      )
-                                    );
+                                    setEditingId(row.id); // Trigger Edit Mode
+                                    // Clear the field for a fresh start
+                                    setMepTeam(mepTeam.map((r) =>
+                                      r.id === row.id ? { ...r, description: "" } : r
+                                    ));
                                   } else {
                                     setMepTeam(
                                       mepTeam.map((r) =>
@@ -298,9 +322,17 @@ const ManagementTeamGroup = ({
                                     );
                                   }
                                 }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1"
+                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                title={row.description}
                               >
                                 <option value="">Select position...</option>
+
+                                {/* 3. If the current value is custom, we must render it as an option 
+                                so the <select> has something to display! */}
+                                {!isInOptions && row.description !== "" && (
+                                  <option value={row.description}>{row.description}</option>
+                                )}
+
                                 {MEP_TEAM_OPTIONS.map((option) => (
                                   <option key={option} value={option}>
                                     {option}
@@ -320,6 +352,12 @@ const ManagementTeamGroup = ({
                                       )
                                     )
                                   }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      setEditingId(null); // SNAP BACK TO DROPDOWN
+                                    }
+                                  }}
+                                  onBlur={() => setEditingId(null)} // SNAP BACK IF CLICKED OUTSIDE
                                   placeholder="Enter custom position..."
                                   className="flex-1 border-0 bg-transparent focus-visible:ring-1 rounded px-2 py-1"
                                   autoFocus
@@ -340,7 +378,7 @@ const ManagementTeamGroup = ({
                                 </button>
                               </div>
                             )
-                          ) : (
+                          })() : (
                             <input
                               type="text"
                               value={row.description}
