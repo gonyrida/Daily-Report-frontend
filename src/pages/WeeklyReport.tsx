@@ -971,11 +971,11 @@ const WeeklyReport = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full overflow-hidden">
         <HierarchicalSidebar />
 
         <SidebarInset>
-          <div className="min-h-screen bg-background">
+          <div className="h-screen flex flex-col bg-background">
             {/* Report Header with Company and Client Logos */}
             <ReportHeader
               projectLogo={projectLogo}
@@ -1085,7 +1085,7 @@ const WeeklyReport = () => {
               activeTab === "issues" ||
               activeTab === "schedule") &&
               showSecondNav && (
-                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-4 bg-background/95 backdrop-blur-sm border-b shadow-sm overflow-x-auto">
+                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-4 bg-background/95 backdrop-blur-sm border-b shadow-sm">
                   <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                     {tableOfContentSections.map((section) => {
                       // Determine if this section is currently active
@@ -1176,7 +1176,7 @@ const WeeklyReport = () => {
               )}
 
             {/* Main Content */}
-            <main className="w-full px-4 sm:px-6 pt-4 pb-6 space-y-6 overflow-x-hidden">
+            <main className="w-full px-4 sm:px-6 pt-4 pb-6 flex flex-col">
               {/* Implementation Notice Banner */}
               <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold">
                 This page is still implement
@@ -1208,7 +1208,7 @@ const WeeklyReport = () => {
               {activeTab === "construction-progress" && (
                 <>
                   {console.log("construction-progress tab is active")}
-                  <div className="bg-card rounded-lg border p-6">
+                  <div className="flex flex-col bg-card rounded-lg border">
                     <WeeklyReportConstructionProgress
                       data={constructionProgressData}
                       onDataChange={(data) => setConstructionProgressData(data)}
