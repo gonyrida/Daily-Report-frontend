@@ -47,9 +47,9 @@ interface EditableCell { rowIndex: number; field: string; }
 type IdType = 'roman' | 'level1' | 'level2' | 'level3' | 'alpha' | 'empty';
 
 const ROMAN_VALUES: [string, number][] = [
-  ['M',1000],['CM',900],['D',500],['CD',400],
-  ['C',100],['XC',90],['L',50],['XL',40],
-  ['X',10],['IX',9],['V',5],['IV',4],['I',1]
+  ['M', 1000], ['CM', 900], ['D', 500], ['CD', 400],
+  ['C', 100], ['XC', 90], ['L', 50], ['XL', 40],
+  ['X', 10], ['IX', 9], ['V', 5], ['IV', 4], ['I', 1]
 ];
 
 function toRoman(num: number): string {
@@ -62,11 +62,11 @@ function toRoman(num: number): string {
 }
 
 function fromRoman(str: string): number {
-  const map: Record<string, number> = {I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
+  const map: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
   let total = 0;
   for (let i = 0; i < str.length; i++) {
     const cur = map[str[i]] ?? 0;
-    const next = map[str[i+1]] ?? 0;
+    const next = map[str[i + 1]] ?? 0;
     total += cur < next ? -cur : cur;
   }
   return total;
@@ -114,9 +114,9 @@ function incrementId(refId: string, type: IdType): string {
 function findNearestParent(items: ConstructionProgressItem[], insertAfterIndex: number, type: IdType): string | undefined {
   const parentType: IdType | null =
     type === 'level2' ? 'level1' :
-    type === 'level3' ? 'level2' :
-    type === 'alpha'  ? 'level3' :   // alpha groups under level3
-    null;
+      type === 'level3' ? 'level2' :
+        type === 'alpha' ? 'level3' :   // alpha groups under level3
+          null;
 
   if (!parentType) return undefined;
 
@@ -126,7 +126,7 @@ function findNearestParent(items: ConstructionProgressItem[], insertAfterIndex: 
     // e.g. for level2, stop scanning if we hit a roman (section boundary)
     if (type === 'level2' && detectIdType(items[i].id) === 'roman') break;
     if (type === 'level3' && detectIdType(items[i].id) === 'level1') break;
-    if (type === 'alpha'  && detectIdType(items[i].id) === 'level2') break;
+    if (type === 'alpha' && detectIdType(items[i].id) === 'level2') break;
   }
 
   // Fallback: scan without boundary restriction
@@ -389,8 +389,8 @@ function isAutoCalculated(allItems: ConstructionProgressItem[], item: Constructi
 
   // Has rates → amount = qty×unitRate
   const hasRates = (boQ.materialRate || 0) > 0 ||
-                   (boQ.laborRate   || 0) > 0 ||
-                   (boQ.unitRate    || 0) > 0;
+    (boQ.laborRate || 0) > 0 ||
+    (boQ.unitRate || 0) > 0;
   if (hasRates) return true;
 
   // Has children → aggregation
@@ -401,7 +401,36 @@ function isAutoCalculated(allItems: ConstructionProgressItem[], item: Constructi
 }
 
 /**
- * Run a full bottom-up pass to compute all boQ.amounts.
+ * Calculate amount for a progress period using the same logic as BoQ amount
+ */
+function calculateProgressAmount(
+  qty: number,
+  unitRate: number,
+  materialRate: number,
+  laborRate: number,
+  childrenAmounts: number[]
+): number {
+  // Rule 1: If has rates → qty × unitRate
+  if ((materialRate || 0) > 0 || (laborRate || 0) > 0) {
+    const calculatedUnitRate = (materialRate || 0) + (laborRate || 0);
+    return Math.round((qty || 0) * calculatedUnitRate * 100) / 100;
+  }
+
+  if ((unitRate || 0) > 0) {
+    return Math.round((qty || 0) * (unitRate || 0) * 100) / 100;
+  }
+
+  // Rule 2: If has children → sum children amounts
+  if (childrenAmounts.length > 0) {
+    return Math.round(childrenAmounts.reduce((acc, amount) => acc + (amount || 0), 0) * 100) / 100;
+  }
+
+  // Rule 3: Keep manual (return 0 for new calculation)
+  return 0;
+}
+
+/**
+ * Run a full bottom-up pass to compute all boQ.amounts and progress period amounts.
  *
  * Priority per row:
  *   1. If the row has any rate (materialRate | laborRate | unitRate) > 0
@@ -414,7 +443,16 @@ function isAutoCalculated(allItems: ConstructionProgressItem[], item: Constructi
  */
 function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgressItem[] {
   if (!items || items.length === 0) return items ?? [];
-  const result = items.map(item => ({ ...item, boQ: { ...item.boQ } }));
+  const result = items.map(item => ({ 
+    ...item, 
+    boQ: { ...item.boQ },
+    previousWeek: { ...item.previousWeek },
+    thisWeek: { ...item.thisWeek },
+    upToThisWeek: { ...item.upToThisWeek },
+    remaining: { ...item.remaining },
+    nextWeekPlan: { ...item.nextWeekPlan },
+    upToNextWeekPlan: { ...item.upToNextWeekPlan }
+  }));
 
   for (let i = result.length - 1; i >= 0; i--) {
     const boQ = result[i].boQ;
@@ -422,39 +460,131 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
     const type = isRomanId(id) ? 'roman' : detectIdType(id);
     const isBoldEmpty = result[i].isBold && type === 'empty';
 
-    // Rule 0: bold-empty row → sum ALL rows below until next bold-empty or named ID
-    if (isBoldEmpty) {
-      let sum = 0;
+    // Get children for aggregation
+    const children = getDirectChildren(result, i);
+    const childrenBoQAmounts = children.map(ci => result[ci].boQ.amount || 0);
+    const childrenPreviousWeekAmounts = children.map(ci => result[ci].previousWeek.amount || 0);
+    const childrenThisWeekAmounts = children.map(ci => result[ci].thisWeek.amount || 0);
+    const childrenUpToThisWeekAmounts = children.map(ci => result[ci].upToThisWeek.amount || 0);
+    const childrenRemainingAmounts = children.map(ci => result[ci].remaining.amount || 0);
+    const childrenNextWeekPlanAmounts = children.map(ci => result[ci].nextWeekPlan.amount || 0);
+    const childrenUpToNextWeekPlanAmounts = children.map(ci => result[ci].upToNextWeekPlan.amount || 0);
+
+    // Rule 0.1: Alpha row → sum ALL rows below until next Alpha
+    if (type === 'alpha') {
+      let boQSum = 0, previousWeekSum = 0, thisWeekSum = 0, upToThisWeekSum = 0;
+      let remainingSum = 0, nextWeekPlanSum = 0, upToNextWeekPlanSum = 0;
+      
       for (let j = i + 1; j < result.length; j++) {
         const jId = result[j].id;
         const jType = isRomanId(jId) ? 'roman' : detectIdType(jId);
-        const jIsBoldEmpty = result[j].isBold && jType === 'empty';
-        if (jIsBoldEmpty || jType !== 'empty') break; // stop at next bold-empty or named row
-        sum += result[j].boQ.amount || 0;
+        if (jType === 'alpha') break; // stop at next Alpha
+        
+        boQSum += result[j].boQ.amount || 0;
+        previousWeekSum += result[j].previousWeek.amount || 0;
+        thisWeekSum += result[j].thisWeek.amount || 0;
+        upToThisWeekSum += result[j].upToThisWeek.amount || 0;
+        remainingSum += result[j].remaining.amount || 0;
+        nextWeekPlanSum += result[j].nextWeekPlan.amount || 0;
+        upToNextWeekPlanSum += result[j].upToNextWeekPlan.amount || 0;
       }
-      result[i].boQ.amount = Math.round(sum * 100) / 100;
+      
+      result[i].boQ.amount = Math.round(boQSum * 100) / 100;
+      result[i].previousWeek.amount = Math.round(previousWeekSum * 100) / 100;
+      result[i].thisWeek.amount = Math.round(thisWeekSum * 100) / 100;
+      result[i].upToThisWeek.amount = Math.round(upToThisWeekSum * 100) / 100;
+      result[i].remaining.amount = Math.round(remainingSum * 100) / 100;
+      result[i].nextWeekPlan.amount = Math.round(nextWeekPlanSum * 100) / 100;
+      result[i].upToNextWeekPlan.amount = Math.round(upToNextWeekPlanSum * 100) / 100;
+      
+      // Calculate percentages for Alpha rows
+      const boQAmount = result[i].boQ.amount || 0;
+      result[i].previousWeek.percentage = boQAmount > 0 ? Math.round((result[i].previousWeek.amount / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].thisWeek.percentage = boQAmount > 0 ? Math.round((result[i].thisWeek.amount / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].upToThisWeek.percentage = boQAmount > 0 ? Math.round((result[i].upToThisWeek.amount / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].remaining.percentage = boQAmount > 0 ? Math.round((result[i].remaining.amount / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].nextWeekPlan.percentage = boQAmount > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].upToNextWeekPlan.percentage = boQAmount > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmount) * 100 * 10) / 10 : 0;
+      
+      // Alpha rows should preserve their unitRate - don't recalculate from material/labor rates
       continue;
     }
 
-    const hasRates = (boQ.materialRate || 0) > 0 ||
-                     (boQ.laborRate   || 0) > 0 ||
-                     (boQ.unitRate    || 0) > 0;
+    // Calculate unit rate from material + labor if both exist
+    if ((boQ.materialRate || 0) > 0 || (boQ.laborRate || 0) > 0) {
+      // Calculate unit rate as sum of material and labor rates
+      const calculatedUnitRate = (boQ.materialRate || 0) + (boQ.laborRate || 0);
+      result[i].boQ.unitRate = calculatedUnitRate;
 
-    if (hasRates) {
-      // Rule 1: qty × unitRate
+      // Rule 1: qty × unitRate for BoQ and individual progress periods only
+      result[i].boQ.amount = Math.round((boQ.qty || 0) * calculatedUnitRate * 100) / 100;
+      result[i].previousWeek.amount = Math.round((result[i].previousWeek.qty || 0) * calculatedUnitRate * 100) / 100;
+      result[i].thisWeek.amount = Math.round((result[i].thisWeek.qty || 0) * calculatedUnitRate * 100) / 100;
+      
+      // Calculate cumulative amounts from their components
+      result[i].upToThisWeek.amount = Math.round((result[i].previousWeek.amount + result[i].thisWeek.amount) * 100) / 100;
+      result[i].remaining.amount = Math.round((result[i].boQ.amount - result[i].upToThisWeek.amount) * 100) / 100;
+      result[i].nextWeekPlan.amount = Math.round((result[i].nextWeekPlan.qty || 0) * boQ.unitRate * 100) / 100;
+      result[i].upToNextWeekPlan.amount = Math.round((result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount) * 100) / 100;
+      
+      // Calculate percentages for rows with material/labor rates
+      const boQAmountMatLabor = result[i].boQ.amount || 0;
+      result[i].previousWeek.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].previousWeek.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
+      result[i].thisWeek.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].thisWeek.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
+      result[i].upToThisWeek.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].upToThisWeek.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
+      result[i].remaining.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].remaining.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
+      result[i].nextWeekPlan.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
+      result[i].upToNextWeekPlan.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
+      
+      continue;
+    }
+
+    if ((boQ.unitRate || 0) > 0) {
+      // Rule 1: qty × unitRate for BoQ and all progress periods
       result[i].boQ.amount = Math.round((boQ.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
+      result[i].previousWeek.amount = Math.round((result[i].previousWeek.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
+      result[i].thisWeek.amount = Math.round((result[i].thisWeek.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
+      
+      // Calculate cumulative amounts from their components
+      result[i].upToThisWeek.amount = Math.round((result[i].previousWeek.amount + result[i].thisWeek.amount) * 100) / 100;
+      result[i].remaining.amount = Math.round((result[i].boQ.amount - result[i].upToThisWeek.amount) * 100) / 100;
+      result[i].nextWeekPlan.amount = Math.round((result[i].nextWeekPlan.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
+      result[i].upToNextWeekPlan.amount = Math.round((result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount) * 100) / 100;
+      
+      // Calculate percentages for rows with unitRate
+      const boQAmountUnitRate = result[i].boQ.amount || 0;
+      result[i].previousWeek.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].previousWeek.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
+      result[i].thisWeek.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].thisWeek.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
+      result[i].upToThisWeek.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].upToThisWeek.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
+      result[i].remaining.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].remaining.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
+      result[i].nextWeekPlan.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
+      result[i].upToNextWeekPlan.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
+      
       continue;
     }
 
-    // Rule 2: sum children (skip alpha/empty — they have no children)
-    if (type === 'alpha' || type === 'empty') continue;
+    // Rule 2: sum children (skip empty — they have no children, but not alpha since alpha now has its own aggregation)
+    if (type === 'empty') continue;
 
-    const children = getDirectChildren(result, i);
     if (children.length === 0) continue; // Rule 3: keep manual
 
-    result[i].boQ.amount = Math.round(
-      children.reduce((acc, ci) => acc + (result[ci].boQ.amount || 0), 0) * 100
-    ) / 100;
+    // Aggregate children amounts for all periods
+    result[i].boQ.amount = Math.round(childrenBoQAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].previousWeek.amount = Math.round(childrenPreviousWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].thisWeek.amount = Math.round(childrenThisWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].upToThisWeek.amount = Math.round(childrenUpToThisWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].remaining.amount = Math.round(childrenRemainingAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].nextWeekPlan.amount = Math.round(childrenNextWeekPlanAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].upToNextWeekPlan.amount = Math.round(childrenUpToNextWeekPlanAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    
+    // Calculate percentages for rows that aggregate children
+    const boQAmountChildren = result[i].boQ.amount || 0;
+    result[i].previousWeek.percentage = boQAmountChildren > 0 ? Math.round((result[i].previousWeek.amount / boQAmountChildren) * 100 * 10) / 10 : 0;
+    result[i].thisWeek.percentage = boQAmountChildren > 0 ? Math.round((result[i].thisWeek.amount / boQAmountChildren) * 100 * 10) / 10 : 0;
+    result[i].upToThisWeek.percentage = boQAmountChildren > 0 ? Math.round((result[i].upToThisWeek.amount / boQAmountChildren) * 100 * 10) / 10 : 0;
+    result[i].remaining.percentage = boQAmountChildren > 0 ? Math.round((result[i].remaining.amount / boQAmountChildren) * 100 * 10) / 10 : 0;
+    result[i].nextWeekPlan.percentage = boQAmountChildren > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmountChildren) * 100 * 10) / 10 : 0;
+    result[i].upToNextWeekPlan.percentage = boQAmountChildren > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmountChildren) * 100 * 10) / 10 : 0;
   }
 
   return result;
@@ -482,7 +612,7 @@ function renumberFromIndex(
     if (type === 'level1' && isRomanId(item.id)) break;
     if (type === 'level2' && (itemType === 'level1' || isRomanId(item.id))) break;
     if (type === 'level3' && (itemType === 'level2' || itemType === 'level1' || isRomanId(item.id))) break;
-    if (type === 'alpha'  && (itemType === 'level3' || itemType === 'level2' || itemType === 'level1' || isRomanId(item.id))) break;
+    if (type === 'alpha' && (itemType === 'level3' || itemType === 'level2' || itemType === 'level1' || isRomanId(item.id))) break;
 
     const currentType = type === 'roman' ? (isRomanId(item.id) ? 'roman' : null) : itemType;
     if (currentType !== type) continue;
@@ -542,53 +672,361 @@ function renumberFromIndex(
 const defaultData: ConstructionProgressData = {
   projectInfo: {
     project: "Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia",
-    subtitle: "Detailed Bill of Quantities of 40 Classrooms",
-    date: "4-Mar-26",
+    subtitle: "Battambang Institute of Technology (BIT) - A-TYPE Renovation",
+    date: "13-Mar-26",
     revision: "Rev.01"
   },
   items: [
     {
-      id: "I", scopeOfWorks: "Excavation Works", detailDescription: "", unit: "m3",
-      boQ: { qty: 150, materialRate: 8, laborRate: 4.5, unitRate: 12.5, amount: 1875 }, remark: "On schedule",
-      previousWeek: { qty: 120, amount: 1500, percentage: 80 },
-      thisWeek: { qty: 15, amount: 187.5, percentage: 10 },
-      upToThisWeek: { qty: 135, amount: 1687.5, percentage: 90 },
-      remaining: { qty: 15, amount: 187.5, percentage: 10 },
-      nextWeekPlan: { qty: 15, amount: 187.5, percentage: 10 },
-      upToNextWeekPlan: { qty: 150, amount: 1875, percentage: 100 }
+      id: "I", scopeOfWorks: "Investigation Phase", detailDescription: "", unit: "Ls",
+      boQ: { qty: 1, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 1, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 1, amount: 1, percentage: 100 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 1, amount: 1, percentage: 100 },
+      isBold: true
     },
     {
-      id: "1", scopeOfWorks: "Lean Concrete", detailDescription: "5cm thick lean concrete 1:3:6 for all footing and ground beam", unit: "m2",
-      boQ: { qty: 85, materialRate: 5, laborRate: 3, unitRate: 8, amount: 680 }, remark: "-",
-      previousWeek: { qty: 42.5, amount: 340, percentage: 50 },
-      thisWeek: { qty: 17, amount: 136, percentage: 20 },
-      upToThisWeek: { qty: 59.5, amount: 476, percentage: 70 },
-      remaining: { qty: 25.5, amount: 204, percentage: 30 },
-      nextWeekPlan: { qty: 12.75, amount: 102, percentage: 15 },
-      upToNextWeekPlan: { qty: 72.25, amount: 578, percentage: 85 }
+      id: "1", scopeOfWorks: "Site survey", detailDescription: "", unit: "Ls",
+      boQ: { qty: 1, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 1, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 1, amount: 1, percentage: 100 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 1, amount: 1, percentage: 100 },
+      
     },
     {
-      id: "1.1", scopeOfWorks: "Footing Reinforced Concrete", detailDescription: "Reinforced concrete grade 25/30 for foundation work", unit: "m3",
-      boQ: { qty: 45, materialRate: 70, laborRate: 40, unitRate: 110, amount: 4950 }, remark: "Delayed by rain",
-      previousWeek: { qty: 9, amount: 990, percentage: 20 },
-      thisWeek: { qty: 4.5, amount: 495, percentage: 10 },
-      upToThisWeek: { qty: 13.5, amount: 1485, percentage: 30 },
-      remaining: { qty: 31.5, amount: 3465, percentage: 70 },
-      nextWeekPlan: { qty: 9, amount: 990, percentage: 20 },
-      upToNextWeekPlan: { qty: 22.5, amount: 2475, percentage: 50 }
-    }
+      id: "2", scopeOfWorks: "Drawing (Existing & Construction)", detailDescription: "", unit: "Ls",
+      boQ: { qty: 1.00, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 1.00, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 1.00, amount: 0, percentage: 100 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 1.00, amount: 0, percentage: 100 }
+    },
+    {
+      id: "3", scopeOfWorks: "BoQ", detailDescription: "", unit: "Ls",
+      boQ: { qty: 1.00, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 1.00, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 1.00, amount: 0, percentage: 100 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 1.00, amount: 0, percentage: 100 }
+    },
+    {
+      id: "II", scopeOfWorks: "Construction Phase", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      isBold: true
+    },
+    {
+      id: "1", scopeOfWorks: "Battambang Province", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "1.1", scopeOfWorks: "Battambang Institute of Technology (BIT)", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      isBold: true
+    },
+    {
+      id: "1.1.1", scopeOfWorks: "A-TYPE", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      isBold: true
+    },
+    {
+      id: "A", scopeOfWorks: "Architectural Works", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      isBold: true
+    },
+    {
+      id: "", scopeOfWorks: "Floor Finish", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "F1", detailDescription: "F1 - Cleaning the existing tiles with repairing joint including the existing base", unit: "Sq.m",
+      boQ: { qty: 62, materialRate: 2.6, laborRate: 1.8, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 10, amount: 0, percentage: 0 },
+      thisWeek: { qty: 10, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 20, amount: 0, percentage: 0 },
+      remaining: { qty: 42, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 5, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 25, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "Wall Finish", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "W1 ", detailDescription: "- Removing of existing paint and cleaning with repairing of existing mortar finish", unit: "Sq.m",
+      boQ: { qty: 82.4, materialRate: 2.8, laborRate: 1.8, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "W2 ", detailDescription: "- Interior wall paint (Emulsion paint with smooth surface roller paint, stucco paint cream white or designated color, 2 Coat)", unit: "Sq.m",
+      boQ: { qty: 53.9, materialRate: 5, laborRate: 4, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "W5 ", detailDescription: "- Acoustic wood panel (on existing wall) using nail gun and accessories", unit: "Sq.m",
+      boQ: { qty: 61.06, materialRate: 41.8, laborRate: 12.9, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "W6 ", detailDescription: "- External wall paint (Emulsion paint with smooth surface roller paint, existing color or designated color, 2 Coat)", unit: "Sq.m",
+      boQ: { qty: 36, materialRate: 4.3, laborRate: 3.6, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "S2 ", detailDescription: "- MC Wood Molding 20x50mm with laminate finishing", unit: "m",
+      boQ: { qty: 70, materialRate: 7.5, laborRate: 4.5, unitRate: 0, amount: 0 }, remark: "New items proposes for the top trim of W5 and around WD1",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "Ceiling Works", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "C2 ", detailDescription: "- Acoustic tax (300mm x 600mm, THK 6) on gypsum board (THK 9.5, 1 ply) with light-weight steel ceiling frame", unit: "Sq.m",
+      boQ: { qty: 62, materialRate: 22.6, laborRate: 7.6, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "Door Works", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "D1", detailDescription: "-  Replacing the existing door with new steel door including door frame (W: 1,000 x H: 2,100) certificated KS (Korean Standard) with 1 set of hardware, door lock, door closer and door stopper ", unit: "Set",
+      boQ: { qty: 0, materialRate: 428, laborRate: 71.2, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "D1'", detailDescription: "- Repaint the existing double door and install a new lock.", unit: "Set",
+      boQ: { qty: 1, materialRate: 120, laborRate: 35, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "Window Works", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "WD1", detailDescription: " - Replacing the existing window with new PVC window + THK 5 tempered glass", unit: "Sq.m",
+      boQ: { qty: 0, materialRate: 166.4, laborRate: 30, unitRate: 0, amount: 0 }, remark: "The existing window is good condition we propose to reuse and repainting",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "WD2 ", detailDescription: " - Paint on window frame and security bar (Cleaning the existing window frame and security bar / Removing the existing paint and re-paint with new paint, oil paint for steel, white or designated color)", unit: "Sq.m",
+      boQ: { qty: 10, materialRate: 11.30, laborRate: 5.70, unitRate: 0, amount: 0 }, remark: "The existing security bars are in good condition, we propose repainting",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+    },
+    {
+      id: "", scopeOfWorks: "WD3 ", detailDescription: "- Steel Security Bar: Size to cover the existing window opening including oil paint (Korean traditional window lattice pattern)", unit: "Sq.m",
+      boQ: { qty: 0, materialRate: 38.70, laborRate: 11.70, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "B", scopeOfWorks: "Electrical Works", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      isBold: true
+    },
+    {
+      id: "", scopeOfWorks: "Air Conditioner", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "AC ", detailDescription: "Installation wall mounted air conditioner (2.5HP each) with accessories", unit: "LS",
+      boQ: { qty: 1.00, materialRate: 2295.50, laborRate: 98.50, unitRate: 0, amount: 2394.00 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 1.00, amount: 0, percentage: 100 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "Electricity & Communication", detailDescription: "", unit: "",
+      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "E1", detailDescription: "Replacing existing lighting fixture with new LED (300 x 1,200, 50w)", unit: "LS",
+      boQ: { qty: 1.00, materialRate: 988.50, laborRate: 289.10, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 1.00, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "E2", detailDescription: "Install DB Panel, Power socket, grounding and accessories", unit: "LS",
+      boQ: { qty: 1.00, materialRate: 1369.80, laborRate: 323.20, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 1.00, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    },
+    {
+      id: "", scopeOfWorks: "E3", detailDescription: "Install Rack Cabinet, Data socket, Network switch, and Testing", unit: "LS",
+      boQ: { qty: 1.00, materialRate: 1612.90, laborRate: 350.20, unitRate: 0, amount: 0 }, remark: "",
+      previousWeek: { qty: 0, amount: 0, percentage: 0 },
+      thisWeek: { qty: 0, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 1.00, amount: 0, percentage: 0 },
+      nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
+    }, 
+
   ]
 };
 
 // ─── ID Type Config ───────────────────────────────────────────────────────────
 
 const ID_TYPE_CONFIG: { type: IdType; label: string; example: string; color: string }[] = [
-  { type: 'roman',  label: 'Section',  example: 'I, II, III',     color: 'bg-[#D0CECE]' },
-  { type: 'level1', label: 'Level 1',  example: '1, 2, 3',        color: 'bg-[#ACB9CA]' },
-  { type: 'level2', label: 'Level 2',  example: '1.1, 1.2',       color: 'bg-[#DDEBF7]' },
-  { type: 'level3', label: 'Level 3',  example: '1.1.1, 1.1.2',   color: 'bg-[#E7E6E6]' },
-  { type: 'alpha',  label: 'Alpha',    example: 'A, B, C',         color: 'bg-white' },
-  { type: 'empty',  label: 'No ID',    example: '(blank)',          color: 'bg-white' },
+  { type: 'roman', label: 'Section', example: 'I, II, III', color: 'bg-[#D0CECE]' },
+  { type: 'level1', label: 'Level 1', example: '1, 2, 3', color: 'bg-[#ACB9CA]' },
+  { type: 'level2', label: 'Level 2', example: '1.1, 1.2', color: 'bg-[#DDEBF7]' },
+  { type: 'level3', label: 'Level 3', example: '1.1.1, 1.1.2', color: 'bg-[#E7E6E6]' },
+  { type: 'alpha', label: 'Alpha', example: 'A, B, C, D', color: 'bg-white' },
+  { type: 'empty', label: 'No ID', example: '(blank)', color: 'bg-white' },
 ];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -606,6 +1044,16 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const [rowBackgrounds, setRowBackgrounds] = useState<Record<number, string>>({});
 
+  // ── Sample Data Loading ──
+  const loadSampleData = () => {
+    const computedItems = computeAllAmounts(defaultData.items);
+    setItems(computedItems);
+    setLocalProjectInfo(defaultData.projectInfo);
+    if (onDataChange) {
+      onDataChange({ ...defaultData, items: computedItems });
+    }
+  };
+
   // ── Add Rows Popup State ──
   const [showAddRows, setShowAddRows] = useState(false);
   // 'after' = insert after the row, 'before' = insert above the row
@@ -617,7 +1065,30 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
   const currentData = data || defaultData;
 
-  useEffect(() => { if (currentData.items?.length) setItems(computeAllAmounts(currentData.items)); else setItems([]); }, [currentData.items]);
+  useEffect(() => {
+    if (currentData.items?.length) {
+      const computed = computeAllAmounts(currentData.items);
+      setItems(computed);
+
+      // Auto-clear backgrounds for Alpha rows to ensure they always have white background
+      const alphaIndices: number[] = [];
+      computed.forEach((item, index) => {
+        if (detectIdType(item.id) === 'alpha') {
+          alphaIndices.push(index);
+        }
+      });
+
+      if (alphaIndices.length > 0) {
+        setRowBackgrounds(prev => {
+          const updated = { ...prev };
+          alphaIndices.forEach(idx => delete updated[idx]);
+          return updated;
+        });
+      }
+    } else {
+      setItems([]);
+    }
+  }, [currentData.items]);
 
   const [localProjectInfo, setLocalProjectInfo] = useState(currentData.projectInfo);
   useEffect(() => { if (data?.projectInfo) setLocalProjectInfo(data.projectInfo); }, [data?.projectInfo]);
@@ -669,19 +1140,34 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     return 'bg-white';
   };
 
-  const getRowBg = (item: ConstructionProgressItem, rowIndex: number) =>
-    rowBackgrounds[rowIndex] ?? getDefaultRowBg(item.id);
+  const getRowBg = (item: ConstructionProgressItem, rowIndex: number) => {
+    // Check if any percentage exceeds 100%
+    const hasOver100Percentage = 
+      item.previousWeek.percentage > 100 ||
+      item.thisWeek.percentage > 100 ||
+      item.upToThisWeek.percentage > 100 ||
+      item.remaining.percentage > 100 ||
+      item.nextWeekPlan.percentage > 100 ||
+      item.upToNextWeekPlan.percentage > 100;
+    
+    // If any percentage is over 100%, return red background
+    if (hasOver100Percentage) {
+      return 'bg-red-100';
+    }
+    
+    return rowBackgrounds[rowIndex] ?? getDefaultRowBg(item.id);
+  };
 
   // ── Cell Editing ──
   const ALL_COLUMNS = [
-    'id','scopeOfWorks','detailDescription','unit',
-    'boQ.qty','boQ.materialRate','boQ.laborRate','boQ.unitRate','boQ.amount','remark',
-    'previousWeek.qty','previousWeek.amount','previousWeek.percentage',
-    'thisWeek.qty','thisWeek.amount','thisWeek.percentage',
-    'upToThisWeek.qty','upToThisWeek.amount','upToThisWeek.percentage',
-    'remaining.qty','remaining.amount','remaining.percentage',
-    'nextWeekPlan.qty','nextWeekPlan.amount','nextWeekPlan.percentage',
-    'upToNextWeekPlan.qty','upToNextWeekPlan.amount','upToNextWeekPlan.percentage'
+    'id', 'scopeOfWorks', 'detailDescription', 'unit',
+    'boQ.qty', 'boQ.materialRate', 'boQ.laborRate', 'boQ.unitRate', 'boQ.amount', 'remark',
+    'previousWeek.qty', 'previousWeek.amount', 'previousWeek.percentage',
+    'thisWeek.qty', 'thisWeek.amount', 'thisWeek.percentage',
+    'upToThisWeek.qty', 'upToThisWeek.amount', 'upToThisWeek.percentage',
+    'remaining.qty', 'remaining.amount', 'remaining.percentage',
+    'nextWeekPlan.qty', 'nextWeekPlan.amount', 'nextWeekPlan.percentage',
+    'upToNextWeekPlan.qty', 'upToNextWeekPlan.amount', 'upToNextWeekPlan.percentage'
   ];
 
   const getItemValue = (item: ConstructionProgressItem, field: string) => {
@@ -742,7 +1228,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
   const cancelEdit = () => { setEditingCell(null); setEditValue(''); };
 
-  const navigate = (dir: 'right'|'left'|'up'|'down'|'next-row') => {
+  const navigate = (dir: 'right' | 'left' | 'up' | 'down' | 'next-row') => {
     if (!editingCell) return;
     const { rowIndex, field } = editingCell;
     const ci = ALL_COLUMNS.indexOf(field);
@@ -794,8 +1280,9 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     const blank = (id: string): ConstructionProgressItem => ({
       id, scopeOfWorks: '', detailDescription: '', unit: '',
       boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: '',
-      previousWeek: {...ep}, thisWeek: {...ep}, upToThisWeek: {...ep},
-      remaining: {...ep}, nextWeekPlan: {...ep}, upToNextWeekPlan: {...ep},
+      previousWeek: { ...ep }, thisWeek: { ...ep }, upToThisWeek: { ...ep },
+      remaining: { ...ep }, nextWeekPlan: { ...ep }, upToNextWeekPlan: { ...ep },
+      isBold: detectIdType(id) === 'alpha' || detectIdType(id) === 'level1' || detectIdType(id) === 'level2' || detectIdType(id) === 'level3' || isRomanId(id)
     });
     const ids: string[] = [];
     const tempItems = [...items];
@@ -821,7 +1308,6 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       const resolvedType: IdType = isRomanId(clickedItem.id) ? 'roman' : (t === 'empty' ? 'level1' : t);
       setAddRowsType(resolvedType);
     }
-    setActiveDropdown(null);
     setDropdownPosition(null);
     setShowAddRows(true);
   };
@@ -831,11 +1317,24 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     const emptyProgress = { qty: 0, amount: 0, percentage: 0 };
     const newRows: ConstructionProgressItem[] = previewIds.map((id) => ({
       id,
-      scopeOfWorks: '', detailDescription: '', unit: '',
-      boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: '',
-      previousWeek: { ...emptyProgress }, thisWeek: { ...emptyProgress },
-      upToThisWeek: { ...emptyProgress }, remaining: { ...emptyProgress },
-      nextWeekPlan: { ...emptyProgress }, upToNextWeekPlan: { ...emptyProgress }
+      scopeOfWorks: '',
+      detailDescription: '',
+      unit: '',
+      boQ: {
+        qty: 0,
+        materialRate: 0,
+        laborRate: 0,
+        unitRate: 0,
+        amount: 0,
+      },
+      remark: '',
+      previousWeek: { ...emptyProgress },
+      thisWeek: { ...emptyProgress },
+      upToThisWeek: { ...emptyProgress },
+      remaining: { ...emptyProgress },
+      nextWeekPlan: { ...emptyProgress },
+      upToNextWeekPlan: { ...emptyProgress },
+      isBold: detectIdType(id) === 'alpha' || detectIdType(id) === 'level1' || detectIdType(id) === 'level2' || detectIdType(id) === 'level3' || isRomanId(id)
     }));
 
     let newItems = [...items];
@@ -849,18 +1348,37 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     if (onDataChange) onDataChange({ ...currentData, items: computedItems });
     setShowAddRows(false);
     setTimeout(() => startEditing(insertAfterIndex + 1, 'scopeOfWorks'), 0);
+
+    // Clear backgrounds for any new Alpha rows
+    const newAlphaIndices: number[] = [];
+    for (let i = insertAfterIndex + 1; i <= insertAfterIndex + addRowsCount; i++) {
+      const itemType = detectIdType(computedItems[i].id);
+      console.log(`Row ${i}: ID="${computedItems[i].id}", Type="${itemType}", isAlpha=${itemType === 'alpha'}`);
+      if (itemType === 'alpha') {
+        newAlphaIndices.push(i);
+      }
+    }
+
+    if (newAlphaIndices.length > 0) {
+      console.log('Clearing backgrounds for Alpha rows:', newAlphaIndices);
+      setRowBackgrounds(prev => {
+        const updated = { ...prev };
+        newAlphaIndices.forEach(idx => delete updated[idx]);
+        return updated;
+      });
+    }
   };
 
   // ── Row Actions ──
   const backgroundColorOptions = [
-    { name: 'White',  value: 'bg-white',      class: 'bg-white border border-gray-300' },
-    { name: 'Gray',   value: 'bg-gray-100',   class: 'bg-gray-100' },
-    { name: 'Blue',   value: 'bg-blue-50',    class: 'bg-blue-50' },
-    { name: 'Green',  value: 'bg-green-50',   class: 'bg-green-50' },
-    { name: 'Yellow', value: 'bg-yellow-50',  class: 'bg-yellow-50' },
-    { name: 'Red',    value: 'bg-red-50',     class: 'bg-red-50' },
-    { name: 'Purple', value: 'bg-purple-50',  class: 'bg-purple-50' },
-    { name: 'Orange', value: 'bg-orange-50',  class: 'bg-orange-50' }
+    { name: 'White', value: 'bg-white', class: 'bg-white border border-gray-300' },
+    { name: 'Gray', value: 'bg-gray-100', class: 'bg-gray-100' },
+    { name: 'Blue', value: 'bg-blue-50', class: 'bg-blue-50' },
+    { name: 'Green', value: 'bg-green-50', class: 'bg-green-50' },
+    { name: 'Yellow', value: 'bg-yellow-50', class: 'bg-yellow-50' },
+    { name: 'Red', value: 'bg-red-50', class: 'bg-red-50' },
+    { name: 'Purple', value: 'bg-purple-50', class: 'bg-purple-50' },
+    { name: 'Orange', value: 'bg-orange-50', class: 'bg-orange-50' }
   ];
 
   const handleDropdownToggle = (rowIndex: number, e: React.MouseEvent<HTMLButtonElement>) => {
@@ -926,9 +1444,11 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     // Determine read-only state:
     // boQ.amount is read-only for auto-calculated parent rows
     // boQ.unitRate is always read-only (derived from materialRate + laborRate)
+    // All progress period amounts are read-only when auto-calculated
     const isBoQAmount = field === 'boQ.amount';
     const isUnitRate = field === 'boQ.unitRate';
-    const isReadOnly = isBoQAmount && isAutoCalculated(items, item);
+    const isProgressAmount = field.includes('.amount') && !field.startsWith('boQ.');
+    const isReadOnly = (isBoQAmount || isProgressAmount) && isAutoCalculated(items, item);
 
     if (isEditing) {
       return (
@@ -949,11 +1469,85 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
     let display: any = value;
     if (field.includes('materialRate') || field.includes('laborRate') || field.includes('qty') || field.includes('unitRate')) {
-      display = typeof value === 'number' ? formatNum(value) : value;
+      display = (typeof value === 'number' && value > 0) ? formatNum(value) : '-';
     } else if (field.includes('amount')) {
-      display = formatCurrency(typeof value === 'number' ? value : 0);
+      display = (typeof value === 'number' && value > 0) ? formatCurrency(value) : '-';
     } else if (field.includes('percentage')) {
-      display = `${value}%`;
+      display = (typeof value === 'number' && value > 0) ? `${value}%` : '-';
+
+      // For percentage fields, add background color based on value
+      const percentageValue = typeof value === 'number' ? value : 0;
+      const bgColorClass = percentageValue === 100 
+        ? 'bg-green-200 dark:bg-green-400/70' 
+        : 'bg-yellow-200 dark:bg-yellow-400/70';
+      const textColorClass = percentageValue === 100 
+        ? 'text-green-800 dark:text-green-300 font-semibold' 
+        : 'text-yellow-800 dark:text-yellow-300';
+
+      if (isEditing) {
+        return (
+          <div className="relative w-full">
+            <div 
+              className={`absolute inset-0 rounded transition-all duration-300 ${bgColorClass}`}
+              style={{ width: `${Math.min(percentageValue, 100)}%` }}
+            />
+            <Input
+              ref={(el) => { if (el) inputRefs.current.set(key, el); }}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={saveEdit}
+              onKeyDown={handleKeyDown}
+              className={`relative bg-transparent z-10 dark:text-foreground text-center w-full px-1 py-0.5 text-[10px] ${textColorClass}`}
+              inputSize="sm"
+              showIndicator={false}
+              style={{ border: 'none', outline: 'none' }}
+            />
+          </div>
+        );
+      }
+
+      if (isReadOnly) {
+        return (
+          <div className="relative w-full">
+            <div 
+              className={`absolute inset-0 rounded transition-all duration-300 ${bgColorClass}`}
+              style={{ width: `${Math.min(percentageValue, 100)}%` }}
+            />
+            <div
+              className={`relative bg-transparent z-10 px-1 py-0.5 rounded text-[10px] text-center whitespace-nowrap select-none cursor-not-allowed ${textColorClass}`}
+              title="Auto-calculated from children"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {(() => {
+                const b = item.boQ;
+                const hr = (b.materialRate || 0) > 0 || (b.laborRate || 0) > 0 || (b.unitRate || 0) > 0;
+                const isBoldEmptyRow = item.isBold && (detectIdType(item.id) === 'empty' || item.id.trim() === '');
+                if (hr) return <span className="mr-0.5 text-blue-300 text-[8px]" title="qty × unit rate"></span>;
+                if (isBoldEmptyRow) return <span className="mr-0.5 text-slate-600 font-bold" title="Bold-empty sum"></span>;
+                return <span className="mr-0.5 text-slate-400" title="Auto-sum from children"></span>;
+              })()}
+              {display}
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="relative w-full">
+          <div 
+            className={`absolute inset-0 rounded transition-all duration-300 ${bgColorClass}`}
+            style={{ width: `${Math.min(percentageValue, 100)}%` }}
+          />
+          <div
+            onClick={() => startEditing(rowIndex, field)}
+            className={`relative bg-transparent z-10 cursor-pointer hover:bg-blue-50/50 rounded text-[10px] text-center whitespace-nowrap px-1 py-0.5 ${textColorClass}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            {display}
+          </div>
+        </div>
+      );
     }
 
     if (isReadOnly) {
@@ -965,11 +1559,11 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
         >
           {(() => {
             const b = item.boQ;
-            const hr = (b.materialRate||0)>0||(b.laborRate||0)>0||(b.unitRate||0)>0;
+            const hr = (b.materialRate || 0) > 0 || (b.laborRate || 0) > 0 || (b.unitRate || 0) > 0;
             const isBoldEmptyRow = item.isBold && (detectIdType(item.id) === 'empty' || item.id.trim() === '');
-            if (hr) return <span className="mr-0.5 text-blue-300 text-[8px]" title="qty × unit rate">=</span>;
-            if (isBoldEmptyRow) return <span className="mr-0.5 text-slate-600 font-bold" title="Bold-empty sum">Σ</span>;
-            return <span className="mr-0.5 text-slate-400" title="Auto-sum from children">Σ</span>;
+            if (hr) return <span className="mr-0.5 text-blue-300 text-[8px]" title="qty × unit rate"></span>;
+            if (isBoldEmptyRow) return <span className="mr-0.5 text-slate-600 font-bold" title="Bold-empty sum"></span>;
+            return <span className="mr-0.5 text-slate-400" title="Auto-sum from children"></span>;
           })()}
           {display}
         </div>
@@ -1046,6 +1640,12 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           />
           <button
+            onClick={loadSampleData}
+            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2"
+          >
+            Load Sample Data
+          </button>
+          <button
             onClick={() => { setInsertMode('after'); setAddRowsAfter(-1); setAddRowsCount(1); setShowAddRows(true); }}
             className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex items-center gap-2"
           >
@@ -1087,7 +1687,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                   <th className="px-2 py-2 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>Actions</th>
                 </tr>
                 <tr className="bg-[#34495e]/90 text-white/90">
-                  {['QTY','Mat. Rate','Labor Rate','Unit Rate','Amount','QTY','Amount','%','QTY','Amount','%','QTY','Amount','%','QTY','Amount','%','QTY','Amount','%','QTY','Amount','%'].map((h, i) => (
+                  {['QTY', 'Mat. Rate', 'Labor Rate', 'Unit Rate', 'Amount', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%'].map((h, i) => (
                     <th key={i} className="px-1 py-1 border-r border-slate-600 text-center text-[9px]">{h}</th>
                   ))}
                 </tr>
@@ -1095,14 +1695,14 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
               <tbody className="divide-y divide-slate-200">
                 {filteredItems.map((item, index) => (
                   <tr key={index} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
-                    {['id','scopeOfWorks','detailDescription','unit',
-                      'boQ.qty','boQ.materialRate','boQ.laborRate','boQ.unitRate','boQ.amount','remark',
-                      'previousWeek.qty','previousWeek.amount','previousWeek.percentage',
-                      'thisWeek.qty','thisWeek.amount','thisWeek.percentage',
-                      'upToThisWeek.qty','upToThisWeek.amount','upToThisWeek.percentage',
-                      'remaining.qty','remaining.amount','remaining.percentage',
-                      'nextWeekPlan.qty','nextWeekPlan.amount','nextWeekPlan.percentage',
-                      'upToNextWeekPlan.qty','upToNextWeekPlan.amount','upToNextWeekPlan.percentage'
+                    {['id', 'scopeOfWorks', 'detailDescription', 'unit',
+                      'boQ.qty', 'boQ.materialRate', 'boQ.laborRate', 'boQ.unitRate', 'boQ.amount', 'remark',
+                      'previousWeek.qty', 'previousWeek.amount', 'previousWeek.percentage',
+                      'thisWeek.qty', 'thisWeek.amount', 'thisWeek.percentage',
+                      'upToThisWeek.qty', 'upToThisWeek.amount', 'upToThisWeek.percentage',
+                      'remaining.qty', 'remaining.amount', 'remaining.percentage',
+                      'nextWeekPlan.qty', 'nextWeekPlan.amount', 'nextWeekPlan.percentage',
+                      'upToNextWeekPlan.qty', 'upToNextWeekPlan.amount', 'upToNextWeekPlan.percentage'
                     ].map(field => (
                       <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''}`}>
                         {renderCell(item, index, field)}
@@ -1185,9 +1785,9 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       {/* ── Smart Add Rows Modal ── */}
       {showAddRows && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
               <h2 className="text-base font-bold text-slate-800">
                 {insertMode === 'before' ? 'Insert Row Above' : insertMode === 'after' && addRowsAfter !== items.length - 1 && addRowsAfter !== -1 ? 'Insert Row Below' : 'Add Rows'}
               </h2>
@@ -1196,7 +1796,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
               </button>
             </div>
 
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
               {/* Step 1: Row Type */}
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Step 1 — Row Type</p>
@@ -1205,11 +1805,10 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                     <button
                       key={cfg.type}
                       onClick={() => setAddRowsType(cfg.type)}
-                      className={`flex flex-col items-start px-3 py-2.5 rounded-lg border-2 transition-all text-left ${
-                        addRowsType === cfg.type
+                      className={`flex flex-col items-start px-3 py-2.5 rounded-lg border-2 transition-all text-left ${addRowsType === cfg.type
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-slate-200 hover:border-slate-300 bg-white'
-                      }`}
+                        }`}
                     >
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded mb-1 ${cfg.color} text-slate-700`}>
                         {cfg.label}
@@ -1285,7 +1884,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 flex-shrink-0">
               <button onClick={() => setShowAddRows(false)}
                 className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                 Cancel
