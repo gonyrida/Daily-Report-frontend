@@ -44,7 +44,7 @@ const toRoman = (num: number): string => {
 export interface ResourceRow {
   id: string;
   description: string;
-  unit?: number;
+  unit?: string | number;
   prev: number;
   today: number;
   accumulated: number;
@@ -53,6 +53,7 @@ export interface ResourceRow {
   upNextWeekPlan?: number;
   searchTerm?: string;
   isCustomInput?: boolean;
+  isCustomUnit?: boolean;
 }
 
 interface ResourceTableProps {
@@ -81,7 +82,7 @@ interface ResourceTableProps {
   customUpdateRow?: (
     id: string,
     field: keyof ResourceRow,
-    value: string | number,
+    value: string | number | boolean,
   ) => void;
   unitNumberOnly?: boolean;
 }
@@ -127,7 +128,7 @@ const ResourceTable = ({
   const updateRow = (
     id: string,
     field: keyof ResourceRow,
-    value: string | number,
+    value: string | number | boolean,
   ) => {
     if (customUpdateRow) {
       customUpdateRow(id, field, value);
@@ -139,7 +140,10 @@ const ResourceTable = ({
               return { ...row, description: "", isCustomInput: true };
             }
             if (field === "unit" && value === "__custom_unit__") {
-              return { ...row, unit: "__custom_unit_input__" };
+              return { ...row, unit: "", isCustomUnit: true };
+            }
+            if (field === "isCustomUnit" && value === false) {
+              return { ...row, isCustomUnit: false, unit: unitOptions[0] || "" };
             }
             const updatedRow = { ...row, [field]: value };
             if (field === "prev" || field === "today") {
@@ -217,42 +221,42 @@ const ResourceTable = ({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-muted dark:bg-muted">
-              {showAddButtons && (
-                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[8%]">
-                  No
-                </th>
-              )}
-              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[25%]">
-                {customHeaders.description || "Description"}
-              </th>
-              {showUnit && (
-                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                  {customHeaders.unit || "Unit"}
-                </th>
-              )}
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
-                {customHeaders.prev || "Prev"}
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
-                {customHeaders.today || "Today"}
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
-                {customHeaders.accumulated || "Accum"}
-              </th>
-              {showExtraColumns && (
-                <>
-                  <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
-                    {customHeaders.nextWeekPlan || "% Next Week Plan"}
-                  </th>
-                  <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[10%]">
-                    {customHeaders.upNextWeekPlan || "% Up Next Week Plan"}
-                  </th>
-                </>
-              )}
-              <th className="w-[5%]"></th>
-            </tr>
-          </thead>
+  <tr className="bg-muted dark:bg-muted">
+    {showAddButtons && (
+      <th className="text-center px-4 py-2.5 text-sm font-medium w-16">No</th>
+    )}
+
+    {/* REMOVED w-full here so it doesn't squash others */}
+    <th className="text-left px-4 py-2.5 text-sm font-medium min-w-[200px]">
+      {customHeaders.description || "Description"}
+    </th>
+
+    {showUnit && (
+      <th className="text-center px-4 py-2.5 text-sm font-medium whitespace-nowrap w-24">
+        {customHeaders.unit || "Unit"}
+      </th>
+    )}
+
+    {/* Added specific widths to create the "space" you want */}
+    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+      {customHeaders.prev || "Prev"}
+    </th>
+    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+      {customHeaders.today || "Today"}
+    </th>
+    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+      {customHeaders.accumulated || "Accum"}
+    </th>
+
+    {showExtraColumns && (
+      <>
+        <th className="text-center px-4 py-2.5 text-sm font-medium w-32">Next Plan</th>
+        <th className="text-center px-4 py-2.5 text-sm font-medium w-32">Up Next</th>
+      </>
+    )}
+    <th className="w-12"></th>
+  </tr>
+</thead>
           <tbody>
             {rows.length === 0 ? (
               <tr key="empty-row">
@@ -290,9 +294,8 @@ const ResourceTable = ({
                 return (
                   <tr
                     key={`${title}-${row.id}`}
-                    className={`border-t border-border hover:bg-muted/30 transition-colors ${
-                      row.rowType === "title" ? "bg-muted dark:bg-muted" : ""
-                    }`}
+                    className={`border-t border-border hover:bg-muted/30 transition-colors ${row.rowType === "title" ? "bg-muted dark:bg-muted" : ""
+                      }`}
                   >
                     {showAddButtons && (
                       <td className="px-3 py-2 text-center font-medium text-muted-foreground">
@@ -372,7 +375,7 @@ const ResourceTable = ({
                                 updateRow(row.id, "description", e.target.value)
                               }
                               placeholder="Enter custom..."
-                              className="border-0 bg-transparent focus-visible:ring-1"
+                              className="border-0 bg-transparent focus-visible:ring-1 w-full"
                               autoFocus
                               showIndicator={false}
                             />
@@ -380,7 +383,7 @@ const ResourceTable = ({
                               variant="ghost"
                               size="icon"
                               onClick={() =>
-                                updateRow(row.id, "isCustomInput", "false")
+                                updateRow(row.id, "isCustomInput", false)
                               }
                               className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                             >
@@ -401,11 +404,10 @@ const ResourceTable = ({
                             )
                           }
                           placeholder="Enter description..."
-                          className={`border-0 bg-transparent focus-visible:ring-1 ${
-                            row.rowType === "title"
-                              ? "font-bold text-foreground"
-                              : ""
-                          }`}
+                          className={`border-0 bg-transparent focus-visible:ring-1 w-full ${row.rowType === "title"
+                            ? "font-bold text-foreground"
+                            : ""
+                            }`}
                           showIndicator={false}
                         />
                       )}
@@ -413,102 +415,69 @@ const ResourceTable = ({
 
                     {/* Unit */}
                     {showUnit && (
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 whitespace-nowrap">
                         {unitOptions.length > 0 ? (
-                          row.unit !== "__custom_unit_input__" ? (
+                          // Check the boolean flag here
+                          !row.isCustomUnit ? (
                             <Select
-                              value={row.unit}
-                              onValueChange={(value) =>
-                                updateRow(row.id, "unit", value)
-                              }
+                              value={String(row.unit || "")}
+                              onValueChange={(value) => updateRow(row.id, "unit", value)}
                             >
-                              <SelectTrigger
-                                className={`border-0 bg-transparent focus:ring-1 ${
-                                  row.rowType === "title"
-                                    ? "font-bold text-foreground"
-                                    : ""
-                                }`}
-                              >
+                              <SelectTrigger className="border-0 bg-transparent focus:ring-1 min-w-[80px] w-full">
                                 <SelectValue placeholder="Select unit..." />
                               </SelectTrigger>
                               <SelectContent>
                                 {unitOptions.map((unit, index) => (
-                                  <SelectItem
-                                    key={`${title}-unit-${unit}-${index}`}
-                                    value={unit}
-                                  >
-                                    {unit}
-                                  </SelectItem>
+                                  <SelectItem key={index} value={unit}>{unit}</SelectItem>
                                 ))}
-                                <SelectItem
-                                  key="custom-unit"
-                                  value="__custom_unit__"
-                                >
-                                  <span className="text-primary">
-                                    + Custom Unit
-                                  </span>
+                                <SelectItem value="__custom_unit__">
+                                  <span className="text-primary">+ Custom Unit</span>
                                 </SelectItem>
                               </SelectContent>
                             </Select>
                           ) : (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 min-w-[100px]">
                               <Input
-                                value=""
-                                onChange={(e) =>
-                                  updateRow(row.id, "unit", e.target.value)
-                                }
-                                placeholder="Enter custom unit..."
-                                className="border-0 bg-transparent focus-visible:ring-1"
+                                value={row.unit || ""}
+                                onChange={(e) => updateRow(row.id, "unit", e.target.value)}
+                                placeholder="Unit..."
+                                className="border-0 bg-transparent w-auto max-w-full px-1 py-0"
                                 autoFocus
                                 showIndicator={false}
                               />
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() =>
-                                  updateRow(
-                                    row.id,
-                                    "unit",
-                                    unitOptions[0] || "",
-                                  )
-                                }
-                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                                onClick={() => {
+                                  // Reset custom mode
+                                  updateRow(row.id, "isCustomUnit", false);
+                                }}
                               >
                                 <X className="w-4 h-4" />
                               </Button>
                             </div>
                           )
-                        ) : unitNumberOnly ? (
+                        ) : (
+                          // NO DROPDOWN PROVIDED: Fallback to basic input
                           <Input
-                            type="number"
+                            type={unitNumberOnly ? "number" : "text"} // Only force number if explicitly asked
                             value={row.unit || ""}
                             onChange={(e) =>
                               updateRow(
                                 row.id,
                                 "unit",
-                                Number(e.target.value) || 0,
+                                unitNumberOnly ? Number(e.target.value) || 0 : e.target.value
                               )
                             }
-                            placeholder="0"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
-                            showIndicator={false}
-                          />
-                        ) : (
-                          <Input
-                            value={row.unit || ""}
-                            onChange={(e) =>
-                              updateRow(row.id, "unit", e.target.value)
-                            }
                             placeholder="Unit"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
-                            showIndicator={false}
+                            className="border-0 bg-transparent text-center w-auto max-w-full px-1 py-0"
                           />
                         )}
                       </td>
                     )}
 
                     {/* Prev */}
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 w-28">
                       <Input
                         type="number"
                         value={row.prev || ""}
@@ -516,13 +485,13 @@ const ResourceTable = ({
                           updateRow(row.id, "prev", Number(e.target.value) || 0)
                         }
                         placeholder="0"
-                        className="border-0 bg-transparent text-center focus-visible:ring-1"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
                         showIndicator={false}
                       />
                     </td>
 
                     {/* Today */}
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 w-28">
                       <Input
                         type="number"
                         value={row.today || ""}
@@ -534,13 +503,13 @@ const ResourceTable = ({
                           )
                         }
                         placeholder="0"
-                        className="border-0 bg-transparent text-center focus-visible:ring-1"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
                         showIndicator={false}
                       />
                     </td>
 
                     {/* Accumulated */}
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 w-28">
                       <Input
                         type="number"
                         showIndicator={false}
@@ -553,7 +522,7 @@ const ResourceTable = ({
                           )
                         }
                         placeholder="0"
-                        className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1"
+                        className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1 w-full"
                       />
                     </td>
 
@@ -572,7 +541,7 @@ const ResourceTable = ({
                               )
                             }
                             placeholder="0"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
                             showIndicator={false}
                           />
                         </td>
@@ -588,7 +557,7 @@ const ResourceTable = ({
                               )
                             }
                             placeholder="0"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
                             showIndicator={false}
                           />
                         </td>

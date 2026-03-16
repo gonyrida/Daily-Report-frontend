@@ -124,7 +124,7 @@ const ResourcesSection = ({
         Man Power
       </h2>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-1 gap-4">
         <ManagementTeamGroup
           managementTeam={managementTeam}
           setManagementTeam={setManagementTeam}

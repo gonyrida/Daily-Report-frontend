@@ -1,6 +1,7 @@
-import { Users, Wrench,Trash2 } from "lucide-react";
+import { Users, Wrench,Trash2, X } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ManagementTeamGroupProps {
   managementTeam: ResourceRow[];
@@ -83,36 +84,38 @@ const ManagementTeamGroup = ({
                         <td className="px-3 py-2">
                           {MANAGEMENT_OPTIONS.length > 0 ? (
                             (row.description === "" || MANAGEMENT_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
-                              <select
-                                value={row.description}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (value === "__custom__") {
-                                    setManagementTeam(
-                                      managementTeam.map((r) =>
-                                        r.id === row.id
-                                          ? { ...r, description: "__custom_input__" }
-                                          : r
-                                      )
-                                    );
-                                  } else {
-                                    setManagementTeam(
-                                      managementTeam.map((r) =>
-                                        r.id === row.id ? { ...r, description: value } : r
-                                      )
-                                    );
-                                  }
-                                }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1"
-                              >
-                                <option value="">Select position...</option>
+                              <Select
+                              value={row.description}
+                              onValueChange={(value) => {
+                                if (value === "__custom__") {
+                                  setManagementTeam(
+                                    managementTeam.map((r) =>
+                                      r.id === row.id
+                                        ? { ...r, description: "__custom_input__" }
+                                        : r
+                                    )
+                                  );
+                                } else {
+                                  setManagementTeam(
+                                    managementTeam.map((r) =>
+                                      r.id === row.id ? { ...r, description: value } : r
+                                    )
+                                  );
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1">
+                                <SelectValue placeholder="Select position..." />
+                              </SelectTrigger>
+                              <SelectContent>
                                 {MANAGEMENT_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
+                                  <SelectItem key={option} value={option}>
                                     {option}
-                                  </option>
+                                  </SelectItem>
                                 ))}
-                                <option value="__custom__">+ Custom Entry</option>
-                              </select>
+                                <SelectItem value="__custom__">+ Custom Entry</SelectItem>
+                              </SelectContent>
+                            </Select>
                             ) : (
                               <div className="flex items-center gap-1">
                                 <input
@@ -134,14 +137,14 @@ const ManagementTeamGroup = ({
                                     setManagementTeam(
                                       managementTeam.map((r) =>
                                         r.id === row.id
-                                          ? { ...r, description: MANAGEMENT_OPTIONS[0] || "" }
+                                          ? { ...r, description: MANAGEMENT_OPTIONS[0] || "", isCustomInput: false }
                                           : r
                                       )
                                     )
                                   }
                                   className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0 rounded"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             )
@@ -209,7 +212,7 @@ const ManagementTeamGroup = ({
                             }
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
                           >
-                            <Trash2 className="w-4 h-4" />
+                             <X className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
@@ -278,10 +281,9 @@ const ManagementTeamGroup = ({
                         <td className="px-3 py-2">
                           {MEP_TEAM_OPTIONS.length > 0 ? (
                             (row.description === "" || MEP_TEAM_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
-                              <select
+                              <Select
                                 value={row.description}
-                                onChange={(e) => {
-                                  const value = e.target.value;
+                                onValueChange={(value) => {
                                   if (value === "__custom__") {
                                     setMepTeam(
                                       mepTeam.map((r) =>
@@ -298,16 +300,19 @@ const ManagementTeamGroup = ({
                                     );
                                   }
                                 }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1"
                               >
-                                <option value="">Select position...</option>
+                              <SelectTrigger className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1">
+                                <SelectValue placeholder="Select position..." />
+                              </SelectTrigger>
+                              <SelectContent>
                                 {MEP_TEAM_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
+                                  <SelectItem key={option} value={option}>
                                     {option}
-                                  </option>
+                                  </SelectItem>
                                 ))}
-                                <option value="__custom__">+ Custom Entry</option>
-                              </select>
+                                <SelectItem value="__custom__">+ Custom Entry</SelectItem>
+                              </SelectContent>
+                            </Select>
                             ) : (
                               <div className="flex items-center gap-1">
                                 <input
@@ -329,14 +334,14 @@ const ManagementTeamGroup = ({
                                     setMepTeam(
                                       mepTeam.map((r) =>
                                         r.id === row.id
-                                          ? { ...r, description: MEP_TEAM_OPTIONS[0] || "" }
+                                          ? { ...r, description: MEP_TEAM_OPTIONS[0] || "", isCustomInput: false }
                                           : r
                                       )
                                     )
                                   }
                                   className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0 rounded"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                   <X className="w-4 h-4" />
                                 </button>
                               </div>
                             )
@@ -404,7 +409,7 @@ const ManagementTeamGroup = ({
                             }
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
                           >
-                           <Trash2 className="w-4 h-4" />
+                            <X className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
