@@ -205,15 +205,17 @@ const ResourceTable = ({
             </Button>
           </div>
         ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={addRow}
-            className="text-primary hover:text-primary hover:bg-primary/10"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Add Row
-          </Button>
+          <div></div> // Add div as a placeholder
+          // Comment out this button for now
+          // <Button
+          //   variant="ghost"
+          //   size="sm"
+          //   onClick={addRow}
+          //   className="text-primary hover:text-primary hover:bg-primary/10"
+          // >
+          //   <Plus className="w-4 h-4 mr-1" />
+          //   Add Row
+          // </Button>
         )}
       </div>
 
@@ -238,13 +240,13 @@ const ResourceTable = ({
     )}
 
     {/* Added specific widths to create the "space" you want */}
-    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[150px]">
       {customHeaders.prev || "Prev"}
     </th>
-    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[150px]">
       {customHeaders.today || "Today"}
     </th>
-    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[150px]">
       {customHeaders.accumulated || "Accum"}
     </th>
 
@@ -327,7 +329,7 @@ const ResourceTable = ({
                     {/* Description / Dropdown */}
                     <td className="px-3 py-2">
                       {useDropdown && dropdownOptions.length > 0 ? (
-                        !row.isCustomInput ? (
+                        dropdownOptions.includes(row.description) ? (
                           <Select
                             value={row.description}
                             onValueChange={(value) =>
@@ -382,9 +384,11 @@ const ResourceTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() =>
-                                updateRow(row.id, "isCustomInput", false)
-                              }
+                              onClick={() => {
+                                // Set to first dropdown option to switch back to dropdown mode
+                                const firstOption = dropdownOptions[0] || "";
+                                updateRow(row.id, "description", firstOption);
+                              }}
                               className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                             >
                               <X className="w-4 h-4" />
@@ -418,7 +422,7 @@ const ResourceTable = ({
                       <td className="px-3 py-2 whitespace-nowrap">
                         {unitOptions.length > 0 ? (
                           // Check the boolean flag here
-                          !row.isCustomUnit ? (
+                          unitOptions.includes(String(row.unit)) ? (
                             <Select
                               value={String(row.unit || "")}
                               onValueChange={(value) => updateRow(row.id, "unit", value)}
@@ -581,6 +585,17 @@ const ResourceTable = ({
             )}
           </tbody>
         </table>
+        <div className="flex justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={addRow}
+            className="text-primary hover:text-primary hover:bg-primary/10"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Row
+          </Button>
+        </div>
       </div>
     </div>
   );

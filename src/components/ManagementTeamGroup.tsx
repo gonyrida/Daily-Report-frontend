@@ -32,21 +32,6 @@ const ManagementTeamGroup = ({
         <div className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-bold text-foreground text-sm">Management</h2>
-            <button
-            onClick={() => {
-              const newRow: ResourceRow = {
-                id: crypto.randomUUID(),
-                description: "",
-                prev: 0,
-                today: 0,
-                accumulated: 0,
-              };
-              setManagementTeam([...managementTeam, newRow]);
-            }}
-            className="mt-3 text-primary hover:text-primary hover:bg-primary/10 px-3 py-1 rounded text-sm"
-          >
-            + Add Row
-          </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -221,6 +206,23 @@ const ManagementTeamGroup = ({
                 )}
               </tbody>
             </table>
+            <div className="flex justify-center">
+              <button
+                onClick={() => {
+                  const newRow: ResourceRow = {
+                    id: crypto.randomUUID(),
+                    description: "",
+                    prev: 0,
+                    today: 0,
+                    accumulated: 0,
+                  };
+                  setManagementTeam([...managementTeam, newRow]);
+                }}
+                className="mt-3 text-primary hover:text-primary hover:bg-primary/10 px-3 py-1 rounded text-sm"
+              >
+                + Add Row
+              </button>
+            </div>
           </div>
           
         </div>
@@ -229,21 +231,6 @@ const ManagementTeamGroup = ({
         <div className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-bold text-foreground text-sm">MEP Team</h2>
-            <button
-            onClick={() => {
-              const newRow: ResourceRow = {
-                id: crypto.randomUUID(),
-                description: "",
-                prev: 0,
-                today: 0,
-                accumulated: 0,
-              };
-              setMepTeam([...mepTeam, newRow]);
-            }}
-            className="mt-3 text-primary hover:text-primary hover:bg-primary/10 px-3 py-1 rounded text-sm"
-          >
-            + Add Row
-          </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -444,6 +431,23 @@ const ManagementTeamGroup = ({
             </tr>
           </tbody>
         </table>
+        <div className="flex justify-center">
+          <button
+            onClick={() => {
+              const newRow: ResourceRow = {
+                id: crypto.randomUUID(),
+                description: "",
+                prev: 0,
+                today: 0,
+                accumulated: 0,
+              };
+              setMepTeam([...mepTeam, newRow]);
+            }}
+            className="mt-3 text-primary hover:text-primary hover:bg-primary/10 px-3 py-1 rounded text-sm"
+          >
+            + Add Row
+          </button>
+        </div>
       </div>
     </div>
   );
