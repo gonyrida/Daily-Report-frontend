@@ -703,25 +703,145 @@ const DailyReport = () => {
     console.log(" Rolling totals cleared - backend will recalculate on save");
   };
 
-  const handleLocationChange = (newLocation: string) => {
+  const handleLocationChange = async (newLocation: string) => {
     setLocation(newLocation);
 
-    // Clear prev and accumulated when location changes
-    // This ensures backend recalculates rolling totals for the new location
+    console.log("🔄 Location changed - loading rolling totals for new location:", newLocation);
 
-    console.log(" Location changed - clearing rolling totals for new location:", newLocation);
+    // Load rolling totals for the new location
+    if (newLocation && projectName) {
+      try {
+        console.log("🔍 Loading most recent report for location:", newLocation);
+        
+        // Load most recent report for this specific project AND location
+        const locationRecentReport = await loadMostRecentReportForProjectAndLocation(
+          projectName,
+          newLocation
+        );
 
-    // Clear managementTeam rolling totals
+        if (locationRecentReport) {
+          console.log("✅ Found location-specific report, loading rolling totals");
+          
+          setWeatherAM(locationRecentReport.weatherAM || "");
+          setWeatherPM(locationRecentReport.weatherPM || "");
+          setTempAM(locationRecentReport.tempAM || "");
+          setTempPM(locationRecentReport.tempPM || "");
+          setCurrentPeriod(locationRecentReport.currentPeriod || "AM");
+          setActivityToday(locationRecentReport.activityToday || "");
+          setWorkPlanNextDay(locationRecentReport.workPlanNextDay || "");
+
+          // Load rolling totals from the most recent report for this location
+          setManagementTeam(
+            ensureRowIds(locationRecentReport.managementTeam || []).map((item) => ({
+              ...item,
+              prev: item.accumulated, // ← Carry over accumulated to prev
+              today: 0,               // ← Reset today to 0
+              accumulated: item.accumulated, // ← Keep accumulated same
+            }))
+          );
+
+          // Handle interior and MEP teams
+          if (locationRecentReport.workingTeamInterior && locationRecentReport.workingTeamMEP) {
+            setInteriorTeam(
+              ensureRowIds(locationRecentReport.workingTeamInterior).map((item) => ({
+                ...item,
+                prev: item.accumulated,
+                today: 0,
+                accumulated: item.accumulated,
+              }))
+            );
+            setMepTeam(
+              ensureRowIds(locationRecentReport.workingTeamMEP).map((item) => ({
+                ...item,
+                prev: item.accumulated,
+                today: 0,
+                accumulated: item.accumulated,
+              }))
+            );
+          } else {
+            const { interior, mep } = splitWorkingTeam(
+              ensureRowIds(locationRecentReport.workingTeam || [])
+            );
+            setInteriorTeam(interior);
+            setMepTeam(mep);
+          }
+
+          setMaterials(
+            ensureRowIds(locationRecentReport.materials || []).map((item) => ({
+              ...item,
+              prev: item.accumulated,
+              today: 0,
+              accumulated: item.accumulated,
+            }))
+          );
+
+          setMachinery(
+            ensureRowIds(locationRecentReport.machinery || []).map((item) => ({
+              ...item,
+              prev: item.accumulated,
+              today: 0,
+              accumulated: item.accumulated,
+            }))
+          );
+
+          if (locationRecentReport.hse_ref && locationRecentReport.hse_ref.length > 0) {
+            // Convert from DB format (hse_ref) to frontend format (referenceSections)
+            setReferenceSections(locationRecentReport.hse_ref);
+          } else {
+            setReferenceSections(
+              locationRecentReport.referenceSections &&
+                locationRecentReport.referenceSections.length > 0
+                ? locationRecentReport.referenceSections
+                : createDefaultHSESections()
+            );
+          }
+          // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+          if (locationRecentReport.site_ref && locationRecentReport.site_ref.length > 0) {
+            // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+            const convertedSiteActivities = convertFromSiteRefFormat(
+              locationRecentReport.site_ref
+            );
+            setSiteActivitiesSections(convertedSiteActivities);
+          } else {
+            setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+          }
+          setSiteActivitiesTitle(
+            locationRecentReport.site_title || "Site Activities Photos"
+          );
+          setCarSheet(locationRecentReport.carSheet || createEmptyCarSheet());
+          
+          setProjectLogo(locationRecentReport.projectLogo || null);
+
+          console.log("✅ Rolling totals loaded for location:", newLocation);
+        } else {
+          console.log("⚠️ No previous report found for location:", newLocation, "- resetting totals");
+          
+          // Reset all totals to 0 if no reports exist for this location
+          resetAllRollingTotals();
+        }
+      } catch (error) {
+        console.error("❌ Error loading location-specific totals:", error);
+        // Fallback: reset totals to 0
+        resetAllRollingTotals();
+      }
+    } else {
+      // If no location or project name, reset totals
+      resetAllRollingTotals();
+    }
+  };
+
+  // Helper function to reset all rolling totals
+  const resetAllRollingTotals = () => {
+    console.log("🔄 Resetting all rolling totals to 0");
+    
     setManagementTeam((prev) =>
       prev.map((item) => ({
         ...item,
         prev: 0,
         accumulated: 0,
-        // Keep description, unit, and today value
       }))
     );
 
-    // Clear workingTeam rolling totals (used for workingTeamInterior)
     setWorkingTeam((prev) =>
       prev.map((item) => ({
         ...item,
@@ -730,7 +850,6 @@ const DailyReport = () => {
       }))
     );
 
-    // Clear interiorTeam rolling totals
     setInteriorTeam((prev) =>
       prev.map((item) => ({
         ...item,
@@ -739,7 +858,6 @@ const DailyReport = () => {
       }))
     );
 
-    // Clear mepTeam rolling totals
     setMepTeam((prev) =>
       prev.map((item) => ({
         ...item,
@@ -748,7 +866,6 @@ const DailyReport = () => {
       }))
     );
 
-    // Clear materials rolling totals
     setMaterials((prev) =>
       prev.map((item) => ({
         ...item,
@@ -757,7 +874,6 @@ const DailyReport = () => {
       }))
     );
 
-    // Clear machinery rolling totals
     setMachinery((prev) =>
       prev.map((item) => ({
         ...item,
@@ -765,8 +881,6 @@ const DailyReport = () => {
         accumulated: 0,
       }))
     );
-
-    console.log(" Rolling totals cleared - backend will recalculate for new location");
   };
 
   // Helper function to get current user ID from user context
@@ -1238,13 +1352,13 @@ const DailyReport = () => {
                 setLocation(projectRecentReport.location || currentLocation); // Set location from report or URL
 
                 // Load data from project's most recent report
-                // setWeatherAM(projectRecentReport.weatherAM || "");
-                // setWeatherPM(projectRecentReport.weatherPM || "");
-                // setTempAM(projectRecentReport.tempAM || "");
-                // setTempPM(projectRecentReport.tempPM || "");
-                // setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
-                // setActivityToday(projectRecentReport.activityToday || "");
-                // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                setWeatherAM(projectRecentReport.weatherAM || "");
+                setWeatherPM(projectRecentReport.weatherPM || "");
+                setTempAM(projectRecentReport.tempAM || "");
+                setTempPM(projectRecentReport.tempPM || "");
+                setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
+                setActivityToday(projectRecentReport.activityToday || "");
+                setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
                   ensureRowIds(projectRecentReport.managementTeam || []).map(
                     (item) => ({
@@ -1313,7 +1427,28 @@ const DailyReport = () => {
                     })
                   )
                 );
-                
+
+                if (projectRecentReport.hse_ref && projectRecentReport.hse_ref.length > 0) {
+                  // Convert from DB format (hse_ref) to frontend format (referenceSections)
+                  setReferenceSections(projectRecentReport.hse_ref);
+                } else {
+                  setReferenceSections(
+                    projectRecentReport.referenceSections &&
+                      projectRecentReport.referenceSections.length > 0
+                      ? projectRecentReport.referenceSections
+                      : createDefaultHSESections()
+                  );
+                }
+                // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+                if (projectRecentReport.site_ref && projectRecentReport.site_ref.length > 0) {
+                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                  const convertedSiteActivities = convertFromSiteRefFormat(
+                    projectRecentReport.site_ref
+                  );
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+                }
                 setSiteActivitiesTitle(
                   projectRecentReport.site_title || "Site Activities Photos"
                 );
