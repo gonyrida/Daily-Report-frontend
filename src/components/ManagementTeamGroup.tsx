@@ -1,7 +1,8 @@
-import { Users, Wrench,Trash2, X } from "lucide-react";
+import { Users, Wrench,Trash2, X, GripVertical } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
 
 interface ManagementTeamGroupProps {
   managementTeam: ResourceRow[];
@@ -16,6 +17,37 @@ const ManagementTeamGroup = ({
   mepTeam,
   setMepTeam,
 }: ManagementTeamGroupProps) => {
+  const [draggedRow, setDraggedRow] = useState<{
+    type: 'management' | 'mep';
+    index: number;
+  } | null>(null);
+
+  const handleDragStart = (type: 'management' | 'mep', index: number) => {
+    setDraggedRow({ type, index });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, type: 'management' | 'mep', dropIndex: number) => {
+    e.preventDefault();
+    
+    if (!draggedRow) return;
+    
+    if (draggedRow.type === type && draggedRow.index !== dropIndex) {
+      const sourceArray = type === 'management' ? managementTeam : mepTeam;
+      const setSourceArray = type === 'management' ? setManagementTeam : setMepTeam;
+      
+      const newArray = [...sourceArray];
+      const [draggedItem] = newArray.splice(draggedRow.index, 1);
+      newArray.splice(dropIndex, 0, draggedItem);
+      
+      setSourceArray(newArray);
+    }
+    
+    setDraggedRow(null);
+  };
   return (
     <div className="section-card overflow-hidden animate-fade-in">
       {/* Parent Header */}
@@ -37,6 +69,7 @@ const ManagementTeamGroup = ({
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-12"></th>
                   <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
                     Description
                   </th>
@@ -55,17 +88,32 @@ const ManagementTeamGroup = ({
               <tbody>
                 {managementTeam.length === 0 ? (
                   <tr key="empty-management">
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       No entries yet. Click "Add Row" to begin.
                     </td>
                   </tr>
                 ) : (
                   <>
-                    {managementTeam.map((row) => (
+                    {managementTeam.map((row, index) => (
                       <tr
                         key={`management-${row.id}`}
-                        className="border-t border-table-border hover:bg-muted/30 transition-colors"
+                        className={`border-t border-table-border hover:bg-muted/30 transition-colors ${
+                          draggedRow?.type === 'management' && draggedRow.index === index
+                            ? 'opacity-50'
+                            : ''
+                        }`}
+                        draggable
+                        onDragStart={() => handleDragStart('management', index)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, 'management', index)}
                       >
+                        <td className="px-2 py-2">
+                          <div className="flex justify-center">
+                            <div className="cursor-move text-muted-foreground hover:text-foreground">
+                              <GripVertical className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           {MANAGEMENT_OPTIONS.length > 0 ? (
                             (row.description === "" || MANAGEMENT_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
@@ -236,6 +284,7 @@ const ManagementTeamGroup = ({
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
+                  <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-12"></th>
                   <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
                     Description
                   </th>
@@ -254,17 +303,32 @@ const ManagementTeamGroup = ({
               <tbody>
                 {mepTeam.length === 0 ? (
                   <tr key="empty-mep">
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       No entries yet. Click "Add Row" to begin.
                     </td>
                   </tr>
                 ) : (
                   <>
-                    {mepTeam.map((row) => (
+                    {mepTeam.map((row, index) => (
                       <tr
                         key={`mep-${row.id}`}
-                        className="border-t border-table-border hover:bg-muted/30 transition-colors"
+                        className={`border-t border-table-border hover:bg-muted/30 transition-colors ${
+                          draggedRow?.type === 'mep' && draggedRow.index === index
+                            ? 'opacity-50'
+                            : ''
+                        }`}
+                        draggable
+                        onDragStart={() => handleDragStart('mep', index)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, 'mep', index)}
                       >
+                        <td className="px-2 py-2">
+                          <div className="flex justify-center">
+                            <div className="cursor-move text-muted-foreground hover:text-foreground">
+                              <GripVertical className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           {MEP_TEAM_OPTIONS.length > 0 ? (
                             (row.description === "" || MEP_TEAM_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (

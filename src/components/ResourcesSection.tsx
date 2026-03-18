@@ -266,6 +266,7 @@ const ResourcesSection = ({
           unitOptions={Units}
           inputNumberOnly={true}
           descriptionUnitMap={MATERIAL_UNIT_MAP}
+          enableDragDrop={true}
         />
 
         <ResourceTable
@@ -279,6 +280,7 @@ const ResourcesSection = ({
           unitOptions={Units}
           descriptionUnitMap={MACHINERY_UNIT_MAP}
           inputNumberOnly={true}
+          enableDragDrop={true}
         />
       </div>
     </div>

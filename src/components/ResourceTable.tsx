@@ -1,4 +1,4 @@
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -87,6 +87,7 @@ interface ResourceTableProps {
     value: string | number | boolean,
   ) => void;
   unitNumberOnly?: boolean;
+  enableDragDrop?: boolean;
 }
 
 const ResourceTable = ({
@@ -107,7 +108,31 @@ const ResourceTable = ({
   customHeaders = {},
   customUpdateRow,
   unitNumberOnly = false,
+  enableDragDrop = false,
 }: ResourceTableProps) => {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      const newArray = [...rows];
+      const [draggedItem] = newArray.splice(draggedIndex, 1);
+      newArray.splice(dropIndex, 0, draggedItem);
+      setRows(newArray);
+    }
+    
+    setDraggedIndex(null);
+  };
+
   const addRow = () => {
     const newRow: ResourceRow = {
       id: crypto.randomUUID(),
@@ -244,6 +269,9 @@ const ResourceTable = ({
               {showAddButtons && (
                 <th className="text-center px-4 py-2.5 text-sm font-medium w-16">No</th>
               )}
+              {enableDragDrop && (
+                <th className="text-center px-4 py-2.5 text-sm font-medium w-12"></th>
+              )}
               <th className="text-left px-4 py-2.5 text-sm font-medium min-w-[200px]">
                 {customHeaders.description || "Description"}
               </th>
@@ -277,11 +305,35 @@ const ResourceTable = ({
                   colSpan={
                     showAddButtons
                       ? showUnit
-                        ? showExtraColumns ? 9 : 7
-                        : showExtraColumns ? 8 : 6
+                        ? showExtraColumns
+                          ? enableDragDrop
+                            ? 10
+                            : 9
+                          : enableDragDrop
+                            ? 9
+                            : 8
+                        : showExtraColumns
+                          ? enableDragDrop
+                            ? 9
+                            : 8
+                          : enableDragDrop
+                            ? 8
+                            : 7
                       : showUnit
-                        ? showExtraColumns ? 8 : 6
-                        : showExtraColumns ? 7 : 5
+                        ? showExtraColumns
+                          ? enableDragDrop
+                            ? 9
+                            : 8
+                          : enableDragDrop
+                            ? 8
+                            : 7
+                        : showExtraColumns
+                          ? enableDragDrop
+                            ? 8
+                            : 7
+                          : enableDragDrop
+                            ? 7
+                            : 6
                   }
                   className="text-center py-8 text-muted-foreground"
                 >
@@ -289,7 +341,7 @@ const ResourceTable = ({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => {
+              rows.map((row, index) => {
                 const filteredOptions = dropdownOptions.filter((option) =>
                   option.toLowerCase().includes((row.searchTerm || "").toLowerCase()),
                 );
@@ -298,8 +350,14 @@ const ResourceTable = ({
                   <tr
                     key={`${title}-${row.id}`}
                     className={`border-t border-border hover:bg-muted/30 transition-colors ${
+                      draggedIndex === index ? "opacity-50" : ""
+                    } ${
                       row.rowType === "title" ? "bg-muted dark:bg-muted" : ""
                     }`}
+                    draggable={enableDragDrop}
+                    onDragStart={() => enableDragDrop && handleDragStart(index)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => enableDragDrop && handleDrop(e, index)}
                   >
                     {showAddButtons && (
                       <td className="px-3 py-2 text-center font-medium text-muted-foreground">
@@ -318,6 +376,15 @@ const ResourceTable = ({
                           }
                           return "";
                         })()}
+                      </td>
+                    )}
+                    {enableDragDrop && (
+                      <td className="px-2 py-2">
+                        <div className="flex justify-center">
+                          <div className="cursor-move text-muted-foreground hover:text-foreground">
+                            <GripVertical className="w-4 h-4" />
+                          </div>
+                        </div>
                       </td>
                     )}
                     {/* Description / Dropdown */}
