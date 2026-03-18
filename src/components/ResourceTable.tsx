@@ -65,6 +65,8 @@ interface ResourceTableProps {
   useDropdown?: boolean;
   dropdownOptions?: string[];
   unitOptions?: string[];
+  /** Map of description → default unit. When user picks a description, unit auto-fills. */
+  descriptionUnitMap?: Record<string, string>;
   inputNumberOnly?: boolean;
   showAddButtons?: boolean;
   addTitleRow?: () => void;
@@ -96,6 +98,7 @@ const ResourceTable = ({
   useDropdown = false,
   dropdownOptions = [],
   unitOptions = [],
+  descriptionUnitMap = {},
   inputNumberOnly = false,
   showAddButtons = false,
   addTitleRow,
@@ -145,7 +148,21 @@ const ResourceTable = ({
             if (field === "isCustomUnit" && value === false) {
               return { ...row, isCustomUnit: false, unit: unitOptions[0] || "" };
             }
+
             const updatedRow = { ...row, [field]: value };
+
+            // ── AUTO-FILL UNIT when a description is selected from dropdown ──
+            if (
+              field === "description" &&
+              typeof value === "string" &&
+              value !== "__custom__" &&
+              showUnit &&
+              descriptionUnitMap[value]
+            ) {
+              updatedRow.unit = descriptionUnitMap[value];
+              updatedRow.isCustomUnit = false;
+            }
+
             if (field === "prev" || field === "today") {
               const prev = field === "prev" ? Number(value) || 0 : row.prev;
               const today = field === "today" ? Number(value) || 0 : row.today;
@@ -221,42 +238,36 @@ const ResourceTable = ({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-  <tr className="bg-muted dark:bg-muted">
-    {showAddButtons && (
-      <th className="text-center px-4 py-2.5 text-sm font-medium w-16">No</th>
-    )}
-
-    {/* REMOVED w-full here so it doesn't squash others */}
-    <th className="text-left px-4 py-2.5 text-sm font-medium min-w-[200px]">
-      {customHeaders.description || "Description"}
-    </th>
-
-    {showUnit && (
-      <th className="text-center px-4 py-2.5 text-sm font-medium whitespace-nowrap w-24">
-        {customHeaders.unit || "Unit"}
-      </th>
-    )}
-
-    {/* Added specific widths to create the "space" you want */}
-    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
-      {customHeaders.prev || "Prev"}
-    </th>
-    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
-      {customHeaders.today || "Today"}
-    </th>
-    <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
-      {customHeaders.accumulated || "Accum"}
-    </th>
-
-    {showExtraColumns && (
-      <>
-        <th className="text-center px-4 py-2.5 text-sm font-medium w-32">Next Plan</th>
-        <th className="text-center px-4 py-2.5 text-sm font-medium w-32">Up Next</th>
-      </>
-    )}
-    <th className="w-12"></th>
-  </tr>
-</thead>
+            <tr className="bg-muted dark:bg-muted">
+              {showAddButtons && (
+                <th className="text-center px-4 py-2.5 text-sm font-medium w-16">No</th>
+              )}
+              <th className="text-left px-4 py-2.5 text-sm font-medium min-w-[200px]">
+                {customHeaders.description || "Description"}
+              </th>
+              {showUnit && (
+                <th className="text-center px-4 py-2.5 text-sm font-medium whitespace-nowrap w-24">
+                  {customHeaders.unit || "Unit"}
+                </th>
+              )}
+              <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+                {customHeaders.prev || "Prev"}
+              </th>
+              <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+                {customHeaders.today || "Today"}
+              </th>
+              <th className="text-center px-4 py-2.5 text-sm font-medium w-28 min-w-[110px]">
+                {customHeaders.accumulated || "Accum"}
+              </th>
+              {showExtraColumns && (
+                <>
+                  <th className="text-center px-4 py-2.5 text-sm font-medium w-32">Next Plan</th>
+                  <th className="text-center px-4 py-2.5 text-sm font-medium w-32">Up Next</th>
+                </>
+              )}
+              <th className="w-12"></th>
+            </tr>
+          </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr key="empty-row">
@@ -264,19 +275,11 @@ const ResourceTable = ({
                   colSpan={
                     showAddButtons
                       ? showUnit
-                        ? showExtraColumns
-                          ? 9
-                          : 7
-                        : showExtraColumns
-                          ? 8
-                          : 6
+                        ? showExtraColumns ? 9 : 7
+                        : showExtraColumns ? 8 : 6
                       : showUnit
-                        ? showExtraColumns
-                          ? 8
-                          : 6
-                        : showExtraColumns
-                          ? 7
-                          : 5
+                        ? showExtraColumns ? 8 : 6
+                        : showExtraColumns ? 7 : 5
                   }
                   className="text-center py-8 text-muted-foreground"
                 >
@@ -286,44 +289,36 @@ const ResourceTable = ({
             ) : (
               rows.map((row) => {
                 const filteredOptions = dropdownOptions.filter((option) =>
-                  option
-                    .toLowerCase()
-                    .includes((row.searchTerm || "").toLowerCase()),
+                  option.toLowerCase().includes((row.searchTerm || "").toLowerCase()),
                 );
 
                 return (
                   <tr
                     key={`${title}-${row.id}`}
-                    className={`border-t border-border hover:bg-muted/30 transition-colors ${row.rowType === "title" ? "bg-muted dark:bg-muted" : ""
-                      }`}
+                    className={`border-t border-border hover:bg-muted/30 transition-colors ${
+                      row.rowType === "title" ? "bg-muted dark:bg-muted" : ""
+                    }`}
                   >
                     {showAddButtons && (
                       <td className="px-3 py-2 text-center font-medium text-muted-foreground">
                         {(() => {
                           let titleCount = 0;
                           let detailCount = 0;
-
                           for (let i = 0; i < rows.length; i++) {
                             if (rows[i].rowType === "title") {
                               titleCount++;
                               detailCount = 0;
-
-                              if (rows[i].id === row.id) {
-                                return toRoman(titleCount);
-                              }
+                              if (rows[i].id === row.id) return toRoman(titleCount);
                             } else {
                               detailCount++;
-
-                              if (rows[i].id === row.id) {
-                                return detailCount;
-                              }
+                              if (rows[i].id === row.id) return detailCount;
                             }
                           }
-
                           return "";
                         })()}
                       </td>
                     )}
+
                     {/* Description / Dropdown */}
                     <td className="px-3 py-2">
                       {useDropdown && dropdownOptions.length > 0 ? (
@@ -343,11 +338,7 @@ const ResourceTable = ({
                                   placeholder="Search..."
                                   value={row.searchTerm || ""}
                                   onChange={(e) =>
-                                    updateRow(
-                                      row.id,
-                                      "searchTerm",
-                                      e.target.value,
-                                    )
+                                    updateRow(row.id, "searchTerm", e.target.value)
                                   }
                                   className="h-8"
                                 />
@@ -361,9 +352,7 @@ const ResourceTable = ({
                                 </SelectItem>
                               ))}
                               <SelectItem key="custom-entry" value="__custom__">
-                                <span className="text-primary">
-                                  + Custom Entry
-                                </span>
+                                <span className="text-primary">+ Custom Entry</span>
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -382,9 +371,7 @@ const ResourceTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() =>
-                                updateRow(row.id, "isCustomInput", false)
-                              }
+                              onClick={() => updateRow(row.id, "isCustomInput", false)}
                               className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                             >
                               <X className="w-4 h-4" />
@@ -404,27 +391,25 @@ const ResourceTable = ({
                             )
                           }
                           placeholder="Enter description..."
-                          className={`border-0 bg-transparent focus-visible:ring-1 w-full ${row.rowType === "title"
-                            ? "font-bold text-foreground"
-                            : ""
-                            }`}
+                          className={`border-0 bg-transparent focus-visible:ring-1 w-full ${
+                            row.rowType === "title" ? "font-bold text-foreground" : ""
+                          }`}
                           showIndicator={false}
                         />
                       )}
                     </td>
 
-                    {/* Unit */}
+                    {/* Unit — shows auto-filled value, still editable */}
                     {showUnit && (
                       <td className="px-3 py-2 whitespace-nowrap">
                         {unitOptions.length > 0 ? (
-                          // Check the boolean flag here
                           !row.isCustomUnit ? (
                             <Select
                               value={String(row.unit || "")}
                               onValueChange={(value) => updateRow(row.id, "unit", value)}
                             >
                               <SelectTrigger className="border-0 bg-transparent focus:ring-1 min-w-[80px] w-full">
-                                <SelectValue placeholder="Select unit..." />
+                                <SelectValue placeholder="Unit..." />
                               </SelectTrigger>
                               <SelectContent>
                                 {unitOptions.map((unit, index) => (
@@ -448,25 +433,21 @@ const ResourceTable = ({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => {
-                                  // Reset custom mode
-                                  updateRow(row.id, "isCustomUnit", false);
-                                }}
+                                onClick={() => updateRow(row.id, "isCustomUnit", false)}
                               >
                                 <X className="w-4 h-4" />
                               </Button>
                             </div>
                           )
                         ) : (
-                          // NO DROPDOWN PROVIDED: Fallback to basic input
                           <Input
-                            type={unitNumberOnly ? "number" : "text"} // Only force number if explicitly asked
+                            type={unitNumberOnly ? "number" : "text"}
                             value={row.unit || ""}
                             onChange={(e) =>
                               updateRow(
                                 row.id,
                                 "unit",
-                                unitNumberOnly ? Number(e.target.value) || 0 : e.target.value
+                                unitNumberOnly ? Number(e.target.value) || 0 : e.target.value,
                               )
                             }
                             placeholder="Unit"
@@ -496,11 +477,7 @@ const ResourceTable = ({
                         type="number"
                         value={row.today || ""}
                         onChange={(e) =>
-                          updateRow(
-                            row.id,
-                            "today",
-                            Number(e.target.value) || 0,
-                          )
+                          updateRow(row.id, "today", Number(e.target.value) || 0)
                         }
                         placeholder="0"
                         className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
@@ -515,11 +492,7 @@ const ResourceTable = ({
                         showIndicator={false}
                         value={row.accumulated || ""}
                         onChange={(e) =>
-                          updateRow(
-                            row.id,
-                            "accumulated",
-                            Number(e.target.value) || 0,
-                          )
+                          updateRow(row.id, "accumulated", Number(e.target.value) || 0)
                         }
                         placeholder="0"
                         className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1 w-full"
@@ -534,11 +507,7 @@ const ResourceTable = ({
                             type="number"
                             value={row.nextWeekPlan || ""}
                             onChange={(e) =>
-                              updateRow(
-                                row.id,
-                                "nextWeekPlan",
-                                Number(e.target.value) || 0,
-                              )
+                              updateRow(row.id, "nextWeekPlan", Number(e.target.value) || 0)
                             }
                             placeholder="0"
                             className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
@@ -550,11 +519,7 @@ const ResourceTable = ({
                             type="number"
                             value={row.upNextWeekPlan || ""}
                             onChange={(e) =>
-                              updateRow(
-                                row.id,
-                                "upNextWeekPlan",
-                                Number(e.target.value) || 0,
-                              )
+                              updateRow(row.id, "upNextWeekPlan", Number(e.target.value) || 0)
                             }
                             placeholder="0"
                             className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
