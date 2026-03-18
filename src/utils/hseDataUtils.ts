@@ -2,67 +2,95 @@
  * Utility functions for handling HSE data processing
  */
 
-// Helper to process small images to base64 for database storage
-export const processImageToBase64 = async (
+// Helper to process small images to Supabase URLs for database storage
+export const processImageToSupabase = async (
   image: any
 ): Promise<string | null> => {
   if (!image) {
     return null;
   }
 
-  // If it's already base64, return as-is
-  if (typeof image === "string" && image.startsWith("data:")) {
-    return image;
-  }
-
-  // If it's a blob URL, try to convert to base64 (but only if it's not too large)
-  if (typeof image === "string" && image.startsWith("blob:")) {
-    try {
-      const response = await fetch(image);
-      const blob = await response.blob();
-
-      // Check size - only process if less than 15MB to avoid timeouts
-      if (blob.size > 15 * 1024 * 1024) {
-        return image; // Return blob URL instead
-      }
-
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          resolve(reader.result as string);
-        };
-        reader.onerror = (error) => {
-          reject(error);
-        };
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      return image; // Return original blob URL on failure
+  // If it's already a Supabase URL or HTTP URL, return as-is
+  if (typeof image === "string") {
+    if (image.startsWith("http")) {
+      return image; // Already a URL
     }
+    if (image.startsWith("data:")) {
+      return image; // Legacy base64 - return as-is for compatibility
+    }
+    if (image.startsWith("blob:")) {
+      // Convert blob URL to Supabase URL
+      try {
+        const response = await fetch(image);
+        const blob = await response.blob();
+        
+        // Upload blob to Supabase
+        const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+        const userId = localStorage.getItem('userId') || 'unknown';
+        const fileName = `hse-${Date.now()}.jpg`;
+        const supabasePath = `temp-uploads/${userId}/${fileName}`;
+        
+        try {
+          const uploadResult = await uploadImageToSupabase(blob, 'daily-reports', supabasePath);
+          if (uploadResult.error) {
+            console.error('Upload failed:', uploadResult.error);
+            return image; // Return original blob URL on failure
+          }
+          return uploadResult.publicUrl;
+        } catch (uploadError) {
+          console.error('Error uploading blob:', uploadError);
+          return image; // Return original blob URL on failure
+        }
+      } catch {
+        return image; // Return original blob URL on failure
+      }
+    }
+    return image; // Return as-is for other string types
   }
 
-  // If it's a File object, try to convert to base64 (but only if small)
+  // If it's a File object, upload to Supabase
   if (image instanceof File) {
-    // Check size - only process if less than 15MB
-    if (image.size > 15 * 1024 * 1024) {
+    const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+    const userId = localStorage.getItem('userId') || 'unknown';
+    const fileName = `hse-${Date.now()}.jpg`;
+    const supabasePath = `temp-uploads/${userId}/${fileName}`;
+    
+    try {
+      const uploadResult = await uploadImageToSupabase(image, 'daily-reports', supabasePath);
+      if (uploadResult.error) {
+        console.error('Upload failed:', uploadResult.error);
+        return null;
+      }
+      return uploadResult.publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
       return null;
     }
-
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        resolve(reader.result as string);
-      };
-      reader.onerror = (error) => {
-        reject(error);
-      };
-      reader.readAsDataURL(image);
-    });
   }
 
-  // For HTTP URLs, return as-is
-  if (typeof image === "string" && image.startsWith("http")) {
-    return image;
+  // If it's an object with supabaseUrl
+  if (typeof image === "object" && image && typeof image === 'object' && 'supabaseUrl' in image) {
+    return (image as any).supabaseUrl;
+  }
+
+  // If it's an object with file property
+  if (typeof image === "object" && image && 'file' in image && (image as any).file instanceof File) {
+    const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+    const userId = localStorage.getItem('userId') || 'unknown';
+    const fileName = `hse-${Date.now()}.jpg`;
+    const supabasePath = `temp-uploads/${userId}/${fileName}`;
+    
+    try {
+      const uploadResult = await uploadImageToSupabase((image as any).file, 'daily-reports', supabasePath);
+      if (uploadResult.error) {
+        console.error('Upload failed:', uploadResult.error);
+        return null;
+      }
+      return uploadResult.publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
+    }
   }
 
   // For any other type, try to convert to string
@@ -94,7 +122,7 @@ export const extractImageForDBAsync = async (
 
   // Try to process to base64 for better persistence
   try {
-    const result = await processImageToBase64(image);
+    const result = await processImageToSupabase(image);
     return result;
   } catch (error) {
     return null;
@@ -335,7 +363,7 @@ export const processHSEForDB = async (
 
   const finalResult = {
     hse_title: tableTitle || "",
-    hse_ref: processedHSE, // ✅ Match backend field name
+    hse: processedHSE, // ✅ Match backend field name
   };
 
   return finalResult;

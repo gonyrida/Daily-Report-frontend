@@ -1,25 +1,22 @@
-// Convert file to data URL (base64)
-export const fileToDataUrl = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      resolve(result);
-    };
-    reader.onerror = (e) => {
-      reject(new Error('Failed to read file'));
-    };
-    reader.readAsDataURL(file);
-  });
-};
-
-// Handle file upload with callback
+// Handle file upload with callback - pass File object directly
 export const handleFileUpload = (
   event: React.ChangeEvent<HTMLInputElement>,
-  callback: (dataUrl: string) => void
+  callback: (file: File) => void
 ) => {
   const file = event.target.files?.[0];
   if (file) {
-    fileToDataUrl(file).then(callback).catch(console.error);
+    callback(file);
   }
+};
+
+// Validate file type
+export const validateImageFile = (file: File): boolean => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  return allowedTypes.includes(file.type);
+};
+
+// Validate file size (in MB)
+export const validateFileSize = (file: File, maxSizeMB: number = 10): boolean => {
+  const maxSizeBytes = maxSizeMB * 1024 * 1024;
+  return file.size <= maxSizeBytes;
 };

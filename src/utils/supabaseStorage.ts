@@ -27,7 +27,7 @@ export interface ImageMetadata {
  */
 export const uploadImageToSupabase = async (
   file: File,
-  bucket: string = 'daily-reports',
+  bucket: string = 'daily-report',
   folder?: string
 ): Promise<UploadResult> => {
   try {
