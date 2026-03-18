@@ -320,19 +320,24 @@ const ResourceTable = ({
                         })()}
                       </td>
                     )}
-
                     {/* Description / Dropdown */}
                     <td className="px-3 py-2">
                       {useDropdown && dropdownOptions.length > 0 ? (
-                        dropdownOptions.includes(row.description) ? (
+                        !row.isCustomInput && (dropdownOptions.includes(row.description) || row.description === "") ? (
                           <Select
                             value={row.description}
                             onValueChange={(value) =>
                               updateRow(row.id, "description", value)
                             }
+                            onOpenChange={(open) => {
+                              if (!open) {
+                                // Clear search when dropdown closes
+                                updateRow(row.id, "searchTerm", "");
+                              }
+                            }}
                           >
                             <SelectTrigger className="border-0 bg-transparent focus:ring-1">
-                              <SelectValue placeholder="Select..." />
+                              <SelectValue placeholder="Select Items..." />
                             </SelectTrigger>
                             <SelectContent>
                               <div className="p-2">
@@ -343,6 +348,14 @@ const ResourceTable = ({
                                     updateRow(row.id, "searchTerm", e.target.value)
                                   }
                                   className="h-8"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => {
+                                    // Prevent Select keyboard handling when typing in search
+                                    e.stopPropagation();
+                                  }}
+                                  onFocus={(e) => {
+                                    e.stopPropagation();
+                                  }}
                                 />
                               </div>
                               {filteredOptions.map((option, index) => (
@@ -373,7 +386,18 @@ const ResourceTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => updateRow(row.id, "isCustomInput", false)}
+                              onClick={() => {
+                                if (customUpdateRow) {
+                                  customUpdateRow(row.id, "description", "");
+                                  customUpdateRow(row.id, "isCustomInput", false);
+                                } else {
+                                  setRows(rows.map(r => 
+                                    r.id === row.id 
+                                      ? { ...r, description: "", isCustomInput: false }
+                                      : r
+                                  ));
+                                }
+                              }}
                               className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                             >
                               <X className="w-4 h-4" />
@@ -548,7 +572,7 @@ const ResourceTable = ({
             )}
           </tbody>
         </table>
-        <div className="flex justify-center">
+        <div className="flex justify-end py-3 px-3">
           <Button
             variant="ghost"
             size="sm"
