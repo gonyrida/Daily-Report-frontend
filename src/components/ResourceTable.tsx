@@ -222,15 +222,17 @@ const ResourceTable = ({
             </Button>
           </div>
         ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={addRow}
-            className="text-primary hover:text-primary hover:bg-primary/10"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Add Row
-          </Button>
+          <div></div> // Add div as a placeholder
+          // Comment out this button for now
+          // <Button
+          //   variant="ghost"
+          //   size="sm"
+          //   onClick={addRow}
+          //   className="text-primary hover:text-primary hover:bg-primary/10"
+          // >
+          //   <Plus className="w-4 h-4 mr-1" />
+          //   Add Row
+          // </Button>
         )}
       </div>
 
@@ -322,7 +324,7 @@ const ResourceTable = ({
                     {/* Description / Dropdown */}
                     <td className="px-3 py-2">
                       {useDropdown && dropdownOptions.length > 0 ? (
-                        !row.isCustomInput ? (
+                        dropdownOptions.includes(row.description) ? (
                           <Select
                             value={row.description}
                             onValueChange={(value) =>
@@ -546,6 +548,17 @@ const ResourceTable = ({
             )}
           </tbody>
         </table>
+        <div className="flex justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={addRow}
+            className="text-primary hover:text-primary hover:bg-primary/10"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Row
+          </Button>
+        </div>
       </div>
     </div>
   );
