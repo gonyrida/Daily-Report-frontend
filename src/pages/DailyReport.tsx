@@ -2062,35 +2062,59 @@ const DailyReport = () => {
   const handleExportReferenceWithFilename = async (fileName: string) => {
     setIsExportingReference(true);
     try {
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        // Case 1: already a string (Supabase URL, blob URL, http URL, etc.)
         if (typeof img === "string") {
-          if (!img.startsWith("blob:")) return img;
-
-          const resp = await fetch(img);
-          const blob = await resp.blob();
-
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
+          return img;
         }
 
-        // Case 2: File object (common)
+        // Case 2: File object - upload to Supabase first
         if (img instanceof File) {
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(img);
-          });
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `export-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase(img, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
         }
 
-        // Case 3: unknown object shape (skip it safely)
+        // Case 3: Object with supabaseUrl
+        if (typeof img === "object" && img && typeof img === 'object' && 'supabaseUrl' in img) {
+          return (img as any).supabaseUrl;
+        }
+
+        // Case 4: Object with file property
+        if (typeof img === "object" && img && 'file' in img && (img as any).file instanceof File) {
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `export-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase((img as any).file, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
+        }
+
         return null;
       };
 
@@ -2102,7 +2126,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2142,7 +2166,7 @@ const DailyReport = () => {
       // Get current report data
       const rawData = getReportData();
 
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2182,7 +2206,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2200,7 +2224,7 @@ const DailyReport = () => {
         (carSheet.photo_groups || []).map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2211,7 +2235,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Save basic data to database (without large image data)
       const basicCleanedData = {
@@ -2297,7 +2321,7 @@ const DailyReport = () => {
       );
 
       // ADD THIS right after line 2031 (before the CAR processing):
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2325,9 +2349,9 @@ const DailyReport = () => {
           images: await Promise.all(
             (g.images || []).map(async (img: any) => {
               if (img && typeof img === "object" && img instanceof File) {
-                return await toBase64DataUrl(img);
+                return await toImageUrl(img);
               }
-              return img; // Already base64 or null
+              return img; // Already Supabase URL or null
             })
           ),
         }))
@@ -2340,7 +2364,7 @@ const DailyReport = () => {
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP), // ✅ correct
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
-        // Override with processed sections (images now base64)
+        // Override with processed sections (images now Supabase URLs)
         referenceSections: processedReferenceSections,
         site_ref: siteRefData,
         carSheet: {
@@ -2401,7 +2425,7 @@ const DailyReport = () => {
       // Step 1: Save report to database first (same logic as submit)
       const rawData = getReportData();
 
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2441,7 +2465,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2467,7 +2491,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2478,7 +2502,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Save basic data to database (without large image data)
       const basicCleanedData = {
@@ -2607,7 +2631,7 @@ const DailyReport = () => {
       // Step 1: Save report to database first (same logic as combined Excel)
       const rawData = getReportData();
 
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2647,7 +2671,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2673,7 +2697,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2684,7 +2708,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Save basic data to database (without large image data)
       const basicCleanedData = {
@@ -2756,37 +2780,58 @@ const DailyReport = () => {
     if (!validateReport()) return;
     setIsPreviewingCombined(true); // Start loading
     try {
-      // Process images to base64 data URLs (same as export)
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      // Process images to Supabase URLs (no base64 conversion)
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        // Case 1: already a string (Supabase URL, blob URL, http URL, etc.)
         if (typeof img === "string") {
-          if (img.startsWith("data:")) return img; // Already a data URL
-          if (img.startsWith("blob:")) {
-            // Convert blob URL to data URL
-            try {
-              const response = await fetch(img);
-              const blob = await response.blob();
-              return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-              });
-            } catch {
-              return null;
-            }
-          }
-          return img; // Return as-is for http URLs etc.
+          return img; // Return URLs directly
         }
 
-        // Case 2: File object
+        // Case 2: File object - upload to Supabase first
         if (img instanceof File) {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(img);
-          });
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `preview-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase(img, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
+        }
+
+        // Case 3: Object with supabaseUrl
+        if (typeof img === "object" && img && typeof img === 'object' && 'supabaseUrl' in img) {
+          return (img as any).supabaseUrl;
+        }
+
+        // Case 4: Object with file property
+        if (typeof img === "object" && img && 'file' in img && (img as any).file instanceof File) {
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `preview-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase((img as any).file, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
         }
 
         return null;
@@ -2800,7 +2845,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2826,7 +2871,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2837,7 +2882,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Use same payload as export
       const payload = {
@@ -2955,7 +3000,7 @@ const DailyReport = () => {
       // Save to database
       // await saveReportToDB(basicCleanedData);
       // Process images for both exports
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         if (typeof img === "string") {
@@ -2995,7 +3040,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -3021,7 +3066,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -3032,7 +3077,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Generate both files
       const reportPayload = {
@@ -3295,8 +3340,8 @@ const DailyReport = () => {
         processedSiteActivitiesSections
       );
 
-      // ADD toBase64DataUrl function:
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      // ADD toImageUrl function:
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         if (typeof img === "string") {
@@ -3328,7 +3373,7 @@ const DailyReport = () => {
             images: await Promise.all(
               (g.images || []).map(async (img: any) => {
                 if (img && typeof img === "object" && img instanceof File) {
-                  return await toBase64DataUrl(img);
+                  return await toImageUrl(img);
                 }
                 return img;
               })
