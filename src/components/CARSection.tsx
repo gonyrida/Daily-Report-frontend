@@ -198,19 +198,19 @@ export default function CARSection({ car, setCar }: Props) {
         {/* Decorative top gradient */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500 opacity-80"></div>
         
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Instruction text */}
           <div className="text-center mb-6">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">Upload Images</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">Upload Images</h3>
           </div>
           
-          <div className="grid grid-cols-2 gap-4 w-full px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full px-2 sm:px-4">
             {/* Before Upload Button */}
             <div className="group relative">
               <button
                 type="button"
                 onClick={() => beforeFileInputRef.current?.click()}
-                className="relative flex flex-col items-center gap-3 p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-2 border-blue-200 dark:border-blue-700 rounded-2xl hover:border-blue-400 dark:hover:border-blue-500 transform hover:-translate-y-1 transition-all duration-300 w-full"
+                className="relative flex flex-col items-center gap-3 p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-2 border-blue-200 dark:border-blue-700 rounded-2xl hover:border-blue-400 dark:hover:border-blue-500 transform hover:-translate-y-1 transition-all duration-300 w-full"
               >
                 <div className="relative">
                   <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
@@ -227,7 +227,7 @@ export default function CARSection({ car, setCar }: Props) {
                 </div>
               </button>
               {/* Tooltip hint */}
-              <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
                 <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">Click to upload</span>
               </div>
             </div>

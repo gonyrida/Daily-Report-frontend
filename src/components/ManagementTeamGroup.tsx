@@ -1,4 +1,4 @@
-import { Users, Wrench,Trash2, X, GripVertical } from "lucide-react";
+import { Users, Wrench, Trash2, X, GripVertical } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,20 +32,20 @@ const ManagementTeamGroup = ({
 
   const handleDrop = (e: React.DragEvent, type: 'management' | 'mep', dropIndex: number) => {
     e.preventDefault();
-    
+
     if (!draggedRow) return;
-    
+
     if (draggedRow.type === type && draggedRow.index !== dropIndex) {
       const sourceArray = type === 'management' ? managementTeam : mepTeam;
       const setSourceArray = type === 'management' ? setManagementTeam : setMepTeam;
-      
+
       const newArray = [...sourceArray];
       const [draggedItem] = newArray.splice(draggedRow.index, 1);
       newArray.splice(dropIndex, 0, draggedItem);
-      
+
       setSourceArray(newArray);
     }
-    
+
     setDraggedRow(null);
   };
   return (
@@ -97,11 +97,10 @@ const ManagementTeamGroup = ({
                     {managementTeam.map((row, index) => (
                       <tr
                         key={`management-${row.id}`}
-                        className={`border-t border-table-border hover:bg-muted/30 transition-colors ${
-                          draggedRow?.type === 'management' && draggedRow.index === index
+                        className={`border-t border-table-border hover:bg-muted/30 transition-colors ${draggedRow?.type === 'management' && draggedRow.index === index
                             ? 'opacity-50'
                             : ''
-                        }`}
+                          }`}
                         draggable
                         onDragStart={() => handleDragStart('management', index)}
                         onDragOver={handleDragOver}
@@ -118,37 +117,37 @@ const ManagementTeamGroup = ({
                           {MANAGEMENT_OPTIONS.length > 0 ? (
                             (row.description === "" || MANAGEMENT_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
                               <Select
-                              value={row.description}
-                              onValueChange={(value) => {
-                                if (value === "__custom__") {
-                                  setManagementTeam(
-                                    managementTeam.map((r) =>
-                                      r.id === row.id
-                                        ? { ...r, description: "__custom_input__" }
-                                        : r
-                                    )
-                                  );
-                                } else {
-                                  setManagementTeam(
-                                    managementTeam.map((r) =>
-                                      r.id === row.id ? { ...r, description: value } : r
-                                    )
-                                  );
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1">
-                                <SelectValue placeholder="Select position..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {MANAGEMENT_OPTIONS.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                                <SelectItem value="__custom__">+ Custom Entry</SelectItem>
-                              </SelectContent>
-                            </Select>
+                                value={row.description}
+                                onValueChange={(value) => {
+                                  if (value === "__custom__") {
+                                    setManagementTeam(
+                                      managementTeam.map((r) =>
+                                        r.id === row.id
+                                          ? { ...r, description: "__custom_input__" }
+                                          : r
+                                      )
+                                    );
+                                  } else {
+                                    setManagementTeam(
+                                      managementTeam.map((r) =>
+                                        r.id === row.id ? { ...r, description: value } : r
+                                      )
+                                    );
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1">
+                                  <SelectValue placeholder="Select position..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {MANAGEMENT_OPTIONS.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                      {option}
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem value="__custom__">+ Custom Entry</SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : (
                               <div className="flex items-center gap-1">
                                 <input
@@ -245,7 +244,7 @@ const ManagementTeamGroup = ({
                             }
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
                           >
-                             <X className="w-4 h-4" />
+                            <X className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
@@ -254,7 +253,7 @@ const ManagementTeamGroup = ({
                 )}
               </tbody>
             </table>
-            <div className="flex justify-center">
+            <div className="flex justify-end">
               <button
                 onClick={() => {
                   const newRow: ResourceRow = {
@@ -272,7 +271,7 @@ const ManagementTeamGroup = ({
               </button>
             </div>
           </div>
-          
+
         </div>
 
         {/* MEP Team Sub-section */}
@@ -312,11 +311,10 @@ const ManagementTeamGroup = ({
                     {mepTeam.map((row, index) => (
                       <tr
                         key={`mep-${row.id}`}
-                        className={`border-t border-table-border hover:bg-muted/30 transition-colors ${
-                          draggedRow?.type === 'mep' && draggedRow.index === index
+                        className={`border-t border-table-border hover:bg-muted/30 transition-colors ${draggedRow?.type === 'mep' && draggedRow.index === index
                             ? 'opacity-50'
                             : ''
-                        }`}
+                          }`}
                         draggable
                         onDragStart={() => handleDragStart('mep', index)}
                         onDragOver={handleDragOver}
@@ -352,18 +350,18 @@ const ManagementTeamGroup = ({
                                   }
                                 }}
                               >
-                              <SelectTrigger className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1">
-                                <SelectValue placeholder="Select position..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {MEP_TEAM_OPTIONS.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                                <SelectItem value="__custom__">+ Custom Entry</SelectItem>
-                              </SelectContent>
-                            </Select>
+                                <SelectTrigger className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1">
+                                  <SelectValue placeholder="Select position..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {MEP_TEAM_OPTIONS.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                      {option}
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem value="__custom__">+ Custom Entry</SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : (
                               <div className="flex items-center gap-1">
                                 <input
@@ -392,7 +390,7 @@ const ManagementTeamGroup = ({
                                   }
                                   className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0 rounded"
                                 >
-                                   <X className="w-4 h-4" />
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             )
@@ -469,33 +467,7 @@ const ManagementTeamGroup = ({
                 )}
               </tbody>
             </table>
-          </div>
-          
-        </div>
-      </div>
-
-      {/* Combined Total Row */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <tbody>
-            <tr className="border-t-2 border-primary/30 bg-primary/5">
-              <td className="px-4 py-3 font-semibold text-foreground" style={{width: '40%'}}>
-                Total
-              </td>
-              <td className="px-3 py-3 text-center font-bold text-foreground" style={{width: '12%'}}>
-                {managementTeam.reduce((sum, row) => sum + row.prev, 0) + mepTeam.reduce((sum, row) => sum + row.prev, 0)}
-              </td>
-              <td className="px-3 py-3 text-center font-bold text-foreground" style={{width: '12%'}}>
-                {managementTeam.reduce((sum, row) => sum + row.today, 0) + mepTeam.reduce((sum, row) => sum + row.today, 0)}
-              </td>
-              <td className="px-3 py-3 text-center font-bold text-primary" style={{width: '12%'}}>
-                {managementTeam.reduce((sum, row) => sum + row.accumulated, 0) + mepTeam.reduce((sum, row) => sum + row.accumulated, 0)}
-              </td>
-              <td className="px-2 py-3" style={{width: '8%'}}></td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="flex justify-center">
+            <div className="flex justify-end">
           <button
             onClick={() => {
               const newRow: ResourceRow = {
@@ -512,6 +484,33 @@ const ManagementTeamGroup = ({
             + Add Row
           </button>
         </div>
+
+          </div>
+
+        </div>
+      </div>
+
+      {/* Combined Total Row */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <tbody>
+            <tr className="border-t-2 border-primary/30 bg-primary/5">
+              <td className="px-4 py-3 font-semibold text-foreground" style={{ width: '40%' }}>
+                Total
+              </td>
+              <td className="px-3 py-3 text-center font-bold text-foreground" style={{ width: '12%' }}>
+                {managementTeam.reduce((sum, row) => sum + row.prev, 0) + mepTeam.reduce((sum, row) => sum + row.prev, 0)}
+              </td>
+              <td className="px-3 py-3 text-center font-bold text-foreground" style={{ width: '12%' }}>
+                {managementTeam.reduce((sum, row) => sum + row.today, 0) + mepTeam.reduce((sum, row) => sum + row.today, 0)}
+              </td>
+              <td className="px-3 py-3 text-center font-bold text-primary" style={{ width: '12%' }}>
+                {managementTeam.reduce((sum, row) => sum + row.accumulated, 0) + mepTeam.reduce((sum, row) => sum + row.accumulated, 0)}
+              </td>
+              <td className="px-2 py-3" style={{ width: '8%' }}></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

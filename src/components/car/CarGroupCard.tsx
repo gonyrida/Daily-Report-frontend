@@ -36,17 +36,17 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
 
   const handlePaste = (e: React.ClipboardEvent, slotIndex: number) => {
     e.preventDefault();
-    
+
     const items = Array.from(e.clipboardData?.items || []);
     const files: File[] = [];
-    
+
     items.forEach((item) => {
       if (item.kind === 'file' && item.type.startsWith('image/')) {
         const file = item.getAsFile();
         if (file) files.push(file);
       }
     });
-    
+
     if (files.length > 0) {
       handleImageUpload(files[0], slotIndex);
     }
@@ -72,37 +72,37 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
     <motion.div ref={containerRef} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-slate-200/60 dark:border-slate-700/60 ${isTopLinked ? "rounded-t-none border-t-0 -mt-px" : ""} ${isBottomLinked ? "rounded-b-none border-b-0" : ""}`}>
       {/* Modern header */}
       <div className="flex items-center justify-between gap-4 p-6 border-b border-slate-200/40 dark:border-slate-700/40">
-          {/* Left side: Enhanced date section */}
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">CAR Group #{index + 1}</span>
-              <div className="flex items-center gap-3 mt-1">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 tracking-wider">DateLine:</p>
-                <input 
-                  type="date" 
-                  value={group.date} 
-                  onChange={handleDateChange} 
-                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
-                  aria-label={`Group ${index + 1} date`} 
-                />
-              </div>
+        {/* Left side: Enhanced date section */}
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">CAR Group #{index + 1}</span>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 tracking-wider">DateLine:</p>
+              <input
+                type="date"
+                value={group.date}
+                onChange={handleDateChange}
+                className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                aria-label={`Group ${index + 1} date`}
+              />
             </div>
           </div>
+        </div>
 
-          {/* Right side: Modern delete button */}
-          <button
-            type="button"
-            onClick={() => onRemove(group.id)}
-            className="group relative px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2 text-sm"
-          >
-            <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-            <span>Delete</span>
-            <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-200"></div>
-          </button>
+        {/* Right side: Modern delete button */}
+        <button
+          type="button"
+          onClick={() => onRemove(group.id)}
+          className="group relative w-full sm:w-auto px-3 py-3 sm:px-4 sm:py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center sm:justify-start gap-2 text-sm"
+        >
+          <Trash2 className="w-4 h-4  md:w-5 md:h-5 group-hover:scale-110 transition-transform duration-200" />
+          <span className="hidden md:inline">Delete</span>
+          <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-200"></div>
+        </button>
       </div>
 
       {/* Modern two-column layout */}
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="p-6 grid grid-cols-2 lg:grid-cols-2 md:grid-cols-2 sm:grid-cols-2 gap-6">
         {/* Left Column - Before */}
         <div className="flex flex-col space-y-4">
           <div className="flex flex-col space-y-2">
@@ -121,8 +121,8 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
               </div>
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`relative group w-full aspect-[4/3] overflow-hidden rounded-2xl border-2 ${imagePreviewSrc(group.images?.[0]) ? "border-blue-300 dark:border-blue-600 p-0" : "border-dashed border-blue-300 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6"} flex items-center justify-center transition-all duration-300 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer`}
             onPaste={(e) => handlePaste(e, 0)}
             onDrop={(e) => {
@@ -181,8 +181,8 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
               </div>
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`relative group w-full aspect-[4/3] overflow-hidden rounded-2xl border-2 ${imagePreviewSrc(group.images?.[1]) ? "border-emerald-300 dark:border-emerald-600 p-0" : "border-dashed border-emerald-300 dark:border-emerald-600 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 p-6"} flex items-center justify-center transition-all duration-300 hover:border-emerald-400 dark:hover:border-emerald-500 cursor-pointer`}
             onPaste={(e) => handlePaste(e, 1)}
             onDrop={(e) => {
@@ -223,7 +223,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
           </div>
         </div>
       </div>
-      
+
       {/* Hidden file inputs for click-to-upload */}
       <input
         ref={beforeFileInputRef}
