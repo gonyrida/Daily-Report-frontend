@@ -370,7 +370,7 @@ const loadMostRecentReportForProjectAndLocation = async (
     );
 
     // Use the location-specific endpoint to get reports for this location
-    const response = await apiGet(`/daily-reports/by-location?location=${encodeURIComponent(location)}`);
+    const response = await apiGet(`/daily-reports/by-location?location=${encodeURIComponent(location)}&projectName=${encodeURIComponent(projectName)}`);
     if (!response.ok) return null;
 
     const apiResponse = await response.json();
@@ -961,15 +961,16 @@ const DailyReport = () => {
                 setProjectName(projectFromUrl);
                 setReportDate(new Date());
                 setReportStatus("draft");
+                setLocation(projectRecentReport.location || ""); // Set location from report or URL
 
                 // Load data from project's most recent report
-                // setWeatherAM(projectRecentReport.weatherAM || "");
-                // setWeatherPM(projectRecentReport.weatherPM || "");
-                // setTempAM(projectRecentReport.tempAM || "");
-                // setTempPM(projectRecentReport.tempPM || "");
-                // setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
-                // setActivityToday(projectRecentReport.activityToday || "");
-                // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                setWeatherAM(projectRecentReport.weatherAM || "");
+                setWeatherPM(projectRecentReport.weatherPM || "");
+                setTempAM(projectRecentReport.tempAM || "");
+                setTempPM(projectRecentReport.tempPM || "");
+                setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
+                setActivityToday(projectRecentReport.activityToday || "");
+                setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
                   ensureRowIds(projectRecentReport.managementTeam || []).map(
                     (item) => ({
@@ -1038,36 +1039,36 @@ const DailyReport = () => {
                     })
                   )
                 );
-                // setReferenceSections(
-                //   projectRecentReport.referenceSections &&
-                //     projectRecentReport.referenceSections.length > 0
-                //     ? projectRecentReport.referenceSections
-                //     : createDefaultHSESections()
-                // );
+                setReferenceSections(
+                  projectRecentReport.referenceSections &&
+                    projectRecentReport.referenceSections.length > 0
+                    ? projectRecentReport.referenceSections
+                    : createDefaultHSESections()
+                );
 
                 // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-                // if (
-                //   projectRecentReport.site_ref &&
-                //   projectRecentReport.site_ref.length > 0
-                // ) {
-                //   // Convert DB format back to frontend format (splits images into entries of 2 slots each)
-                //   const convertedSiteActivities = convertFromSiteRefFormat(
-                //     projectRecentReport.site_ref
-                //   );
-                //   setSiteActivitiesSections(convertedSiteActivities);
-                // } else {
-                //   setSiteActivitiesSections(
-                //     projectRecentReport.siteActivitiesSections &&
-                //       projectRecentReport.siteActivitiesSections.length > 0
-                //       ? projectRecentReport.siteActivitiesSections
-                //       : createDefaultSiteActivitiesSections()
-                //   );
-                // }
+                if (
+                  projectRecentReport.site_ref &&
+                  projectRecentReport.site_ref.length > 0
+                ) {
+                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                  const convertedSiteActivities = convertFromSiteRefFormat(
+                    projectRecentReport.site_ref
+                  );
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  setSiteActivitiesSections(
+                    projectRecentReport.siteActivitiesSections &&
+                      projectRecentReport.siteActivitiesSections.length > 0
+                      ? projectRecentReport.siteActivitiesSections
+                      : createDefaultSiteActivitiesSections()
+                  );
+                }
                 setSiteActivitiesTitle(
                   projectRecentReport.siteActivitiesTitle ||
                     "Site Activities Photos"
                 );
-                // setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
                 setProjectLogo(projectRecentReport.projectLogo || null);
 
                 // Set ownership for new reports (always editable for the creator)
