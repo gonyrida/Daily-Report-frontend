@@ -443,8 +443,8 @@ function calculateProgressAmount(
  */
 function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgressItem[] {
   if (!items || items.length === 0) return items ?? [];
-  const result = items.map(item => ({ 
-    ...item, 
+  const result = items.map(item => ({
+    ...item,
     boQ: { ...item.boQ },
     previousWeek: { ...item.previousWeek },
     thisWeek: { ...item.thisWeek },
@@ -474,12 +474,12 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
     if (type === 'alpha') {
       let boQSum = 0, previousWeekSum = 0, thisWeekSum = 0, upToThisWeekSum = 0;
       let remainingSum = 0, nextWeekPlanSum = 0, upToNextWeekPlanSum = 0;
-      
+
       for (let j = i + 1; j < result.length; j++) {
         const jId = result[j].id;
         const jType = isRomanId(jId) ? 'roman' : detectIdType(jId);
         if (jType === 'alpha') break; // stop at next Alpha
-        
+
         boQSum += result[j].boQ.amount || 0;
         previousWeekSum += result[j].previousWeek.amount || 0;
         thisWeekSum += result[j].thisWeek.amount || 0;
@@ -488,7 +488,7 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
         nextWeekPlanSum += result[j].nextWeekPlan.amount || 0;
         upToNextWeekPlanSum += result[j].upToNextWeekPlan.amount || 0;
       }
-      
+
       result[i].boQ.amount = Math.round(boQSum * 100) / 100;
       result[i].previousWeek.amount = Math.round(previousWeekSum * 100) / 100;
       result[i].thisWeek.amount = Math.round(thisWeekSum * 100) / 100;
@@ -496,7 +496,7 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
       result[i].remaining.amount = Math.round(remainingSum * 100) / 100;
       result[i].nextWeekPlan.amount = Math.round(nextWeekPlanSum * 100) / 100;
       result[i].upToNextWeekPlan.amount = Math.round(upToNextWeekPlanSum * 100) / 100;
-      
+
       // Calculate percentages for Alpha rows
       const boQAmount = result[i].boQ.amount || 0;
       result[i].previousWeek.percentage = boQAmount > 0 ? Math.round((result[i].previousWeek.amount / boQAmount) * 100 * 10) / 10 : 0;
@@ -505,7 +505,7 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
       result[i].remaining.percentage = boQAmount > 0 ? Math.round((result[i].remaining.amount / boQAmount) * 100 * 10) / 10 : 0;
       result[i].nextWeekPlan.percentage = boQAmount > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmount) * 100 * 10) / 10 : 0;
       result[i].upToNextWeekPlan.percentage = boQAmount > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmount) * 100 * 10) / 10 : 0;
-      
+
       // Alpha rows should preserve their unitRate - don't recalculate from material/labor rates
       continue;
     }
@@ -520,13 +520,16 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
       result[i].boQ.amount = Math.round((boQ.qty || 0) * calculatedUnitRate * 100) / 100;
       result[i].previousWeek.amount = Math.round((result[i].previousWeek.qty || 0) * calculatedUnitRate * 100) / 100;
       result[i].thisWeek.amount = Math.round((result[i].thisWeek.qty || 0) * calculatedUnitRate * 100) / 100;
-      
+
       // Calculate cumulative amounts from their components
       result[i].upToThisWeek.amount = Math.round((result[i].previousWeek.amount + result[i].thisWeek.amount) * 100) / 100;
+      result[i].upToThisWeek.qty = Math.round(((result[i].previousWeek.qty || 0) + (result[i].thisWeek.qty || 0)) * 100) / 100;
+      result[i].remaining.qty = Math.round(((result[i].boQ.qty || 0) - (result[i].upToThisWeek.qty || 0)) * 100) / 100;
       result[i].remaining.amount = Math.round((result[i].boQ.amount - result[i].upToThisWeek.amount) * 100) / 100;
       result[i].nextWeekPlan.amount = Math.round((result[i].nextWeekPlan.qty || 0) * boQ.unitRate * 100) / 100;
       result[i].upToNextWeekPlan.amount = Math.round((result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount) * 100) / 100;
-      
+      result[i].upToNextWeekPlan.qty = Math.round(((result[i].upToThisWeek.qty || 0) + (result[i].nextWeekPlan.qty || 0)) * 100) / 100;
+
       // Calculate percentages for rows with material/labor rates
       const boQAmountMatLabor = result[i].boQ.amount || 0;
       result[i].previousWeek.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].previousWeek.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
@@ -535,7 +538,7 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
       result[i].remaining.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].remaining.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
       result[i].nextWeekPlan.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
       result[i].upToNextWeekPlan.percentage = boQAmountMatLabor > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmountMatLabor) * 100 * 10) / 10 : 0;
-      
+
       continue;
     }
 
@@ -544,13 +547,16 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
       result[i].boQ.amount = Math.round((boQ.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
       result[i].previousWeek.amount = Math.round((result[i].previousWeek.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
       result[i].thisWeek.amount = Math.round((result[i].thisWeek.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
-      
+
       // Calculate cumulative amounts from their components
       result[i].upToThisWeek.amount = Math.round((result[i].previousWeek.amount + result[i].thisWeek.amount) * 100) / 100;
+      result[i].upToThisWeek.qty = Math.round(((result[i].previousWeek.qty || 0) + (result[i].thisWeek.qty || 0)) * 100) / 100;
+      result[i].remaining.qty = Math.round(((result[i].boQ.qty || 0) - (result[i].upToThisWeek.qty || 0)) * 100) / 100;
       result[i].remaining.amount = Math.round((result[i].boQ.amount - result[i].upToThisWeek.amount) * 100) / 100;
       result[i].nextWeekPlan.amount = Math.round((result[i].nextWeekPlan.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
+      result[i].upToNextWeekPlan.qty = Math.round(((result[i].upToThisWeek.qty || 0) + (result[i].nextWeekPlan.qty || 0)) * 100) / 100;
       result[i].upToNextWeekPlan.amount = Math.round((result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount) * 100) / 100;
-      
+
       // Calculate percentages for rows with unitRate
       const boQAmountUnitRate = result[i].boQ.amount || 0;
       result[i].previousWeek.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].previousWeek.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
@@ -559,7 +565,7 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
       result[i].remaining.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].remaining.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
       result[i].nextWeekPlan.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
       result[i].upToNextWeekPlan.percentage = boQAmountUnitRate > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmountUnitRate) * 100 * 10) / 10 : 0;
-      
+
       continue;
     }
 
@@ -572,11 +578,14 @@ function computeAllAmounts(items: ConstructionProgressItem[]): ConstructionProgr
     result[i].boQ.amount = Math.round(childrenBoQAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
     result[i].previousWeek.amount = Math.round(childrenPreviousWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
     result[i].thisWeek.amount = Math.round(childrenThisWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].remaining.qty = Math.round(children.map(ci => (result[ci].boQ.qty || 0) - (result[ci].upToThisWeek.qty || 0)).reduce((acc, qty) => acc + qty, 0) * 100) / 100;
     result[i].upToThisWeek.amount = Math.round(childrenUpToThisWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].upToThisWeek.qty = Math.round(children.map(ci => result[ci].upToThisWeek.qty || 0).reduce((acc, qty) => acc + qty, 0) * 100) / 100;
     result[i].remaining.amount = Math.round(childrenRemainingAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].upToNextWeekPlan.qty = Math.round(children.map(ci => (result[ci].upToThisWeek.qty || 0) + (result[ci].nextWeekPlan.qty || 0)).reduce((acc, qty) => acc + qty, 0) * 100) / 100;
     result[i].nextWeekPlan.amount = Math.round(childrenNextWeekPlanAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
     result[i].upToNextWeekPlan.amount = Math.round(childrenUpToNextWeekPlanAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
-    
+
     // Calculate percentages for rows that aggregate children
     const boQAmountChildren = result[i].boQ.amount || 0;
     result[i].previousWeek.percentage = boQAmountChildren > 0 ? Math.round((result[i].previousWeek.amount / boQAmountChildren) * 100 * 10) / 10 : 0;
@@ -697,7 +706,7 @@ const defaultData: ConstructionProgressData = {
       remaining: { qty: 0, amount: 0, percentage: 0 },
       nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
       upToNextWeekPlan: { qty: 1, amount: 1, percentage: 100 },
-      
+
     },
     {
       id: "2", scopeOfWorks: "Drawing (Existing & Construction)", detailDescription: "", unit: "Ls",
@@ -788,10 +797,10 @@ const defaultData: ConstructionProgressData = {
       boQ: { qty: 62, materialRate: 2.6, laborRate: 1.8, unitRate: 0, amount: 0 }, remark: "",
       previousWeek: { qty: 10, amount: 0, percentage: 0 },
       thisWeek: { qty: 10, amount: 0, percentage: 0 },
-      upToThisWeek: { qty: 20, amount: 0, percentage: 0 },
-      remaining: { qty: 42, amount: 0, percentage: 0 },
+      upToThisWeek: { qty: 0, amount: 0, percentage: 0 },
+      remaining: { qty: 0, amount: 0, percentage: 0 },
       nextWeekPlan: { qty: 5, amount: 0, percentage: 0 },
-      upToNextWeekPlan: { qty: 25, amount: 0, percentage: 0 },
+      upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
     },
     {
       id: "", scopeOfWorks: "Wall Finish", detailDescription: "", unit: "",
@@ -1013,7 +1022,7 @@ const defaultData: ConstructionProgressData = {
       remaining: { qty: 1.00, amount: 0, percentage: 0 },
       nextWeekPlan: { qty: 0, amount: 0, percentage: 0 },
       upToNextWeekPlan: { qty: 0, amount: 0, percentage: 0 }
-    }, 
+    },
 
   ]
 };
@@ -1142,19 +1151,19 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
   const getRowBg = (item: ConstructionProgressItem, rowIndex: number) => {
     // Check if any percentage exceeds 100%
-    const hasOver100Percentage = 
+    const hasOver100Percentage =
       item.previousWeek.percentage > 100 ||
       item.thisWeek.percentage > 100 ||
       item.upToThisWeek.percentage > 100 ||
       item.remaining.percentage > 100 ||
       item.nextWeekPlan.percentage > 100 ||
       item.upToNextWeekPlan.percentage > 100;
-    
+
     // If any percentage is over 100%, return red background
     if (hasOver100Percentage) {
       return 'bg-red-100';
     }
-    
+
     return rowBackgrounds[rowIndex] ?? getDefaultRowBg(item.id);
   };
 
@@ -1477,17 +1486,17 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
       // For percentage fields, add background color based on value
       const percentageValue = typeof value === 'number' ? value : 0;
-      const bgColorClass = percentageValue === 100 
-        ? 'bg-green-200 dark:bg-green-400/70' 
+      const bgColorClass = percentageValue === 100
+        ? 'bg-green-200 dark:bg-green-400/70'
         : 'bg-yellow-200 dark:bg-yellow-400/70';
-      const textColorClass = percentageValue === 100 
-        ? 'text-green-800 dark:text-green-300 font-semibold' 
+      const textColorClass = percentageValue === 100
+        ? 'text-green-800 dark:text-green-300 font-semibold'
         : 'text-yellow-800 dark:text-yellow-300';
 
       if (isEditing) {
         return (
           <div className="relative w-full">
-            <div 
+            <div
               className={`absolute inset-0 rounded transition-all duration-300 ${bgColorClass}`}
               style={{ width: `${Math.min(percentageValue, 100)}%` }}
             />
@@ -1498,7 +1507,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={saveEdit}
               onKeyDown={handleKeyDown}
-              className={`relative bg-transparent z-10 dark:text-foreground text-center w-full px-1 py-0.5 text-[10px] ${textColorClass}`}
+              className={`relative bg-transparent z-10 dark:text-foreground text-center w-full px-1 py-0.5 text-sm ${textColorClass}`}
               inputSize="sm"
               showIndicator={false}
               style={{ border: 'none', outline: 'none' }}
@@ -1510,12 +1519,12 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       if (isReadOnly) {
         return (
           <div className="relative w-full">
-            <div 
+            <div
               className={`absolute inset-0 rounded transition-all duration-300 ${bgColorClass}`}
               style={{ width: `${Math.min(percentageValue, 100)}%` }}
             />
             <div
-              className={`relative bg-transparent z-10 px-1 py-0.5 rounded text-[10px] text-center whitespace-nowrap select-none cursor-not-allowed ${textColorClass}`}
+              className={`relative bg-transparent z-10 px-1 py-0.5 rounded text-sm text-center whitespace-nowrap select-none cursor-not-allowed ${textColorClass}`}
               title="Auto-calculated from children"
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
@@ -1523,7 +1532,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                 const b = item.boQ;
                 const hr = (b.materialRate || 0) > 0 || (b.laborRate || 0) > 0 || (b.unitRate || 0) > 0;
                 const isBoldEmptyRow = item.isBold && (detectIdType(item.id) === 'empty' || item.id.trim() === '');
-                if (hr) return <span className="mr-0.5 text-blue-300 text-[8px]" title="qty × unit rate"></span>;
+                if (hr) return <span className="mr-0.5 text-blue-300 text-xs" title="qty × unit rate"></span>;
                 if (isBoldEmptyRow) return <span className="mr-0.5 text-slate-600 font-bold" title="Bold-empty sum"></span>;
                 return <span className="mr-0.5 text-slate-400" title="Auto-sum from children"></span>;
               })()}
@@ -1535,13 +1544,13 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
       return (
         <div className="relative w-full">
-          <div 
+          <div
             className={`absolute inset-0 rounded transition-all duration-300 ${bgColorClass}`}
             style={{ width: `${Math.min(percentageValue, 100)}%` }}
           />
           <div
             onClick={() => startEditing(rowIndex, field)}
-            className={`relative bg-transparent z-10 cursor-pointer hover:bg-blue-50/50 rounded text-[10px] text-center whitespace-nowrap px-1 py-0.5 ${textColorClass}`}
+            className={`relative bg-transparent z-10 cursor-pointer hover:bg-blue-50/50 rounded text-sm text-center whitespace-nowrap px-1 py-0.5 ${textColorClass}`}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             {display}
@@ -1553,7 +1562,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     if (isReadOnly) {
       return (
         <div
-          className="px-1 py-0.5 rounded text-[10px] text-center whitespace-nowrap select-none bg-slate-100 text-slate-500 cursor-not-allowed"
+          className="px-1 py-0.5 rounded text-sm text-center whitespace-nowrap select-none bg-slate-100 text-slate-500 cursor-not-allowed"
           title="Auto-calculated from children"
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
@@ -1561,7 +1570,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
             const b = item.boQ;
             const hr = (b.materialRate || 0) > 0 || (b.laborRate || 0) > 0 || (b.unitRate || 0) > 0;
             const isBoldEmptyRow = item.isBold && (detectIdType(item.id) === 'empty' || item.id.trim() === '');
-            if (hr) return <span className="mr-0.5 text-blue-300 text-[8px]" title="qty × unit rate"></span>;
+            if (hr) return <span className="mr-0.5 text-blue-300 text-xs" title="qty × unit rate"></span>;
             if (isBoldEmptyRow) return <span className="mr-0.5 text-slate-600 font-bold" title="Bold-empty sum"></span>;
             return <span className="mr-0.5 text-slate-400" title="Auto-sum from children"></span>;
           })()}
@@ -1577,12 +1586,12 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       return (
         <div
           onClick={() => startEditing(rowIndex, field)}
-          className={`px-1 py-0.5 cursor-pointer rounded text-[10px] text-center whitespace-nowrap
+          className={`px-1 py-0.5 cursor-pointer rounded text-sm text-center whitespace-nowrap
             ${isOverridden ? 'bg-orange-50 text-orange-700 hover:bg-orange-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
           title={isOverridden ? `Overridden (Mat+Lab = ${formatNum(computedRate)})` : 'Unit Rate = Mat. Rate + Labor Rate — click to override'}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          {isOverridden && <span className="mr-0.5 text-[8px]">✎</span>}
+          {isOverridden && <span className="mr-0.5 text-xs">✎</span>}
           {display}
         </div>
       );
@@ -1591,7 +1600,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     return (
       <div
         onClick={() => startEditing(rowIndex, field)}
-        className={`px-1 py-0.5 cursor-pointer hover:bg-blue-50 rounded text-[10px] ${isText ? 'text-left whitespace-normal break-words' : 'text-center whitespace-nowrap'}`}
+        className={`px-1 py-0.5 cursor-pointer hover:bg-blue-50 rounded text-sm ${isText ? 'text-left whitespace-normal break-words' : 'text-center whitespace-nowrap'}`}
         style={{ display: 'flex', alignItems: 'center' }}
       >
         {display}
@@ -1655,71 +1664,108 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
         {/* Table */}
         <div className="bg-white rounded-xl shadow-lg border border-slate-200">
-          <div className="overflow-auto">
-            <style>{`.sticky-col { position: sticky; left: 0; z-index: 20; background-color: inherit; }`}</style>
-            <table ref={tableRef} className="text-[10px] text-left border-collapse" style={{ tableLayout: 'fixed', minWidth: 'max-content' }}>
-              <colgroup>
-                <col style={{ width: '95px' }} /><col style={{ width: '250px' }} /><col style={{ width: '301px' }} />
-                <col style={{ width: '52px' }} /><col style={{ width: '57px' }} /><col style={{ width: '77px' }} />
-                <col style={{ width: '77px' }} /><col style={{ width: '77px' }} /><col style={{ width: '112px' }} />
-                <col style={{ width: '203px' }} /><col style={{ width: '57px' }} />
-                <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
-                <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
-                <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
-                <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
-                <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
-                <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '60px' }} />
-              </colgroup>
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-[#34495e] text-white">
-                  <th className="px-4 py-3 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>ID</th>
-                  <th className="px-2 py-2 border-r border-slate-600 font-bold" rowSpan={2}>Scope of Works</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" rowSpan={2}>Detail Description</th>
-                  <th className="px-3 py-2 border-r border-slate-600 text-center font-bold" rowSpan={2}>Unit</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" colSpan={5}>BoQ</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" rowSpan={2}>Remark</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to Previous Week</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" colSpan={3}>% This Week</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to This Week</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" colSpan={3}>% Remaining</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" colSpan={3}>% Next Week Plan</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to Next Week Plan</th>
-                  <th className="px-2 py-2 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>Actions</th>
-                </tr>
-                <tr className="bg-[#34495e]/90 text-white/90">
-                  {['QTY', 'Mat. Rate', 'Labor Rate', 'Unit Rate', 'Amount', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%'].map((h, i) => (
-                    <th key={i} className="px-1 py-1 border-r border-slate-600 text-center text-[9px]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {filteredItems.map((item, index) => (
-                  <tr key={index} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
-                    {['id', 'scopeOfWorks', 'detailDescription', 'unit',
-                      'boQ.qty', 'boQ.materialRate', 'boQ.laborRate', 'boQ.unitRate', 'boQ.amount', 'remark',
-                      'previousWeek.qty', 'previousWeek.amount', 'previousWeek.percentage',
-                      'thisWeek.qty', 'thisWeek.amount', 'thisWeek.percentage',
-                      'upToThisWeek.qty', 'upToThisWeek.amount', 'upToThisWeek.percentage',
-                      'remaining.qty', 'remaining.amount', 'remaining.percentage',
-                      'nextWeekPlan.qty', 'nextWeekPlan.amount', 'nextWeekPlan.percentage',
-                      'upToNextWeekPlan.qty', 'upToNextWeekPlan.amount', 'upToNextWeekPlan.percentage'
-                    ].map(field => (
-                      <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''}`}>
-                        {renderCell(item, index, field)}
-                      </td>
-                    ))}
-                    <td className="px-1.5 py-2 text-center border-r border-slate-200">
-                      <button
-                        onClick={(e) => handleDropdownToggle(index, e)}
-                        className="dropdown-button p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                      >
-                        <MoreVertical size={14} />
-                      </button>
-                    </td>
+          <div className="bg-white rounded-xl shadow-lg border border-slate-200">
+            <div className="overflow-auto max-h-[600px] relative">
+              <style>{`
+                .sticky-col { 
+                  position: sticky; 
+                  z-index: 15; 
+                  background-color: white; 
+                  border-right: 1px solid rgb(226 232 240);
+                }
+                .sticky-col:nth-child(1) { left: 0px; }
+                .sticky-col:nth-child(2) { left: 95px; }
+
+                /* First header row sticks at top */
+                thead tr:nth-child(1) th {
+                  position: sticky;
+                  top: 0;
+                  z-index: 20;
+                  background-color: rgb(52 73 94);
+                }
+
+                /* Second header row sticks BELOW the first row (first row is ~38px tall) */
+                thead tr:nth-child(2) th {
+                  position: sticky;
+                  top: 38px;
+                  z-index: 20;
+                  background-color: rgb(52 73 94);
+                }
+
+                /* Header corner cells that are also horizontally sticky */
+                thead tr:nth-child(1) th:nth-child(1) {
+                  left: 0px;
+                  z-index: 40;
+                }
+                thead tr:nth-child(1) th:nth-child(2) {
+                  left: 95px;
+                  z-index: 40;
+                }
+              `}</style>
+              <table ref={tableRef} className="text-sm text-left border-collapse" style={{ tableLayout: 'fixed', minWidth: 'max-content' }}>
+                <colgroup>
+                  <col style={{ width: '95px' }} /><col style={{ width: '250px' }} /><col style={{ width: '301px' }} />
+                  <col style={{ width: '52px' }} /><col style={{ width: '57px' }} /><col style={{ width: '77px' }} />
+                  <col style={{ width: '77px' }} /><col style={{ width: '77px' }} /><col style={{ width: '112px' }} />
+                  <col style={{ width: '203px' }} /><col style={{ width: '57px' }} />
+                  <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
+                  <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
+                  <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
+                  <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
+                  <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '57px' }} />
+                  <col style={{ width: '112px' }} /><col style={{ width: '77px' }} /><col style={{ width: '60px' }} />
+                </colgroup>
+                <thead className="sticky top-0 z-20 bg-[#34495e] shadow-md">
+                  <tr className="bg-[#34495e] text-white">
+                    <th className="px-4 py-4 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>ID</th>
+                    <th className="px-2 py-4 border-r border-slate-600 font-bold" rowSpan={2}>Scope of Works</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Detail Description</th>
+                    <th className="px-3 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Unit</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={5}>BoQ</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Remark</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to Previous Week</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% This Week</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to This Week</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% Remaining</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% Next Week Plan</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to Next Week Plan</th>
+                    <th className="px-2 py-4 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  <tr className="bg-[#34495e]/90 text-white/90 py-4">
+                    {['QTY', 'Mat. Rate', 'Labor Rate', 'Unit Rate', 'Amount', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%'].map((h, i) => (
+                      <th key={i} className="px-1 py-1 border-r border-slate-600 text-center text-sm">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredItems.map((item, index) => (
+                    <tr key={index} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
+                      {['id', 'scopeOfWorks', 'detailDescription', 'unit',
+                        'boQ.qty', 'boQ.materialRate', 'boQ.laborRate', 'boQ.unitRate', 'boQ.amount', 'remark',
+                        'previousWeek.qty', 'previousWeek.amount', 'previousWeek.percentage',
+                        'thisWeek.qty', 'thisWeek.amount', 'thisWeek.percentage',
+                        'upToThisWeek.qty', 'upToThisWeek.amount', 'upToThisWeek.percentage',
+                        'remaining.qty', 'remaining.amount', 'remaining.percentage',
+                        'nextWeekPlan.qty', 'nextWeekPlan.amount', 'nextWeekPlan.percentage',
+                        'upToNextWeekPlan.qty', 'upToNextWeekPlan.amount', 'upToNextWeekPlan.percentage'
+                      ].map(field => (
+                        <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks'].includes(field) ? 'sticky-col' : ''}`}>
+                          {renderCell(item, index, field)}
+                        </td>
+                      ))}
+                      <td className="px-1.5 py-2 text-center border-r border-slate-200">
+                        <button
+                          onClick={(e) => handleDropdownToggle(index, e)}
+                          className="dropdown-button p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -1769,7 +1815,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                 className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
               >
                 <span className="font-bold text-slate-500 text-xs w-3.5">B</span>
-                {activeDropdown !== null && filteredItems[activeDropdown]?.isBold ? 'Remove bold' : 'Bold row'} <span className="ml-auto text-[10px] text-slate-400">Ctrl+B</span>
+                {activeDropdown !== null && filteredItems[activeDropdown]?.isBold ? 'Remove bold' : 'Bold row'} <span className="ml-auto text-sm text-slate-400">Ctrl+B</span>
               </button>
             </div>
             <button
@@ -1788,7 +1834,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
-              <h2 className="text-base font-bold text-slate-800">
+              <h2 className="text-sm font-bold text-slate-800">
                 {insertMode === 'before' ? 'Insert Row Above' : insertMode === 'after' && addRowsAfter !== items.length - 1 && addRowsAfter !== -1 ? 'Insert Row Below' : 'Add Rows'}
               </h2>
               <button onClick={() => setShowAddRows(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -1806,14 +1852,14 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                       key={cfg.type}
                       onClick={() => setAddRowsType(cfg.type)}
                       className={`flex flex-col items-start px-3 py-2.5 rounded-lg border-2 transition-all text-left ${addRowsType === cfg.type
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
                         }`}
                     >
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded mb-1 ${cfg.color} text-slate-700`}>
+                      <span className={`text-sm font-bold px-1.5 py-0.5 rounded mb-1 ${cfg.color} text-slate-700`}>
                         {cfg.label}
                       </span>
-                      <span className="text-[11px] text-slate-500 font-mono">{cfg.example}</span>
+                      <span className="text-sm text-slate-500 font-mono">{cfg.example}</span>
                     </button>
                   ))}
                 </div>
@@ -1823,7 +1869,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Step 2 — Insert Position</p>
                 {(insertMode === 'before' || insertMode === 'after') && addRowsAfter !== -1 && addRowsAfter !== items.length - 1 && (
-                  <p className="text-[11px] text-blue-500 mb-2">
+                  <p className="text-sm text-blue-500 mb-2">
                     ✦ Pre-filled from row click — change if needed.
                   </p>
                 )}
@@ -1876,7 +1922,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                       </span>
                     ))}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">
+                  <p className="text-sm text-slate-400 mt-1.5">
                     ✦ Rows below will be auto-renumbered, including children.
                   </p>
                 </div>
