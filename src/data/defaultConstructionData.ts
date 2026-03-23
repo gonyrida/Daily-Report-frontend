@@ -4,7 +4,7 @@ export const defaultData: ConstructionProgressData = {
   projectInfo: {
     project: "Renovation Works of The Project for Building Capacity and Establishing Enabling Environment in ICT Majors of TVET in Cambodia",
     subtitle: "Battambang Institute of Technology (BIT) - A-TYPE Renovation",
-    date: "13-Mar-26",
+    date: "2026-03-13",
     revision: "Rev.01"
   },
   items: [

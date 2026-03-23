@@ -20,7 +20,6 @@ import {
 import {
   computeAllAmounts
 } from '../../utils/calculationEngine';
-import { defaultData } from '../../data/defaultConstructionData';
 import { ConstructionProgressTable } from './ConstructionProgressTable';
 import { AddRowsModal } from './AddRowsModal';
 
@@ -29,6 +28,8 @@ import { AddRowsModal } from './AddRowsModal';
 const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgressProps> = ({
   data, onDataChange, reportId
 }) => {
+  console.log('🔧 WeeklyReportConstructionProgress rendered with data:', data);
+  console.log('🔧 WeeklyReportConstructionProgress reportId:', reportId);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingCell, setEditingCell] = useState<EditableCell | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -39,15 +40,6 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const [rowBackgrounds, setRowBackgrounds] = useState<Record<number, string>>({});
 
-  // ── Sample Data Loading ──
-  const loadSampleData = () => {
-    const computedItems = computeAllAmounts(defaultData.items);
-    setItems(computedItems);
-    setLocalProjectInfo(defaultData.projectInfo);
-    if (onDataChange) {
-      onDataChange({ ...defaultData, items: computedItems });
-    }
-  };
 
   // ── Add Rows Popup State ──
   const [showAddRows, setShowAddRows] = useState(false);
@@ -58,10 +50,11 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   // -1 means "at end"; otherwise index to insert after
   const [addRowsAfter, setAddRowsAfter] = useState<number>(-1);
 
-  const currentData = data || defaultData;
+  const currentData = data;
+
 
   useEffect(() => {
-    if (currentData.items?.length) {
+    if (currentData?.items?.length) {
       const computed = computeAllAmounts(currentData.items);
       setItems(computed);
 
@@ -83,9 +76,9 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     } else {
       setItems([]);
     }
-  }, [currentData.items]);
+  }, [currentData?.items]);
 
-  const [localProjectInfo, setLocalProjectInfo] = useState(currentData.projectInfo);
+  const [localProjectInfo, setLocalProjectInfo] = useState(currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' });
   useEffect(() => { if (data?.projectInfo) setLocalProjectInfo(data.projectInfo); }, [data?.projectInfo]);
 
   // Close row-action dropdown on outside click
@@ -103,18 +96,19 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const handleProjectInfoChange = (field: keyof typeof localProjectInfo, value: string) => {
     const updated = { ...localProjectInfo, [field]: value };
     setLocalProjectInfo(updated);
-    if (onDataChange) onDataChange({ ...currentData, projectInfo: updated });
+    console.log('🔧 handleProjectInfoChange calling onDataChange with:', { ...currentData, projectInfo: updated, items: currentData?.items || [] });
+    if (onDataChange) onDataChange({ ...currentData, projectInfo: updated, items: currentData?.items || [] });
   };
 
   const filteredItems = useMemo(() => {
-    const src = items.length > 0 ? items : currentData.items;
+    const src = items.length > 0 ? items : currentData?.items || [];
     if (!searchTerm) return src;
     return src.filter(i =>
       i.scopeOfWorks.toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.detailDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [items, currentData.items, searchTerm]);
+  }, [items, currentData?.items, searchTerm]);
 
   // Round to 2dp then format with comma thousands separator
   const formatNum = (v: number): string => {
@@ -217,7 +211,10 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     newItems[items.findIndex(i => i.id === item.id && i.scopeOfWorks === item.scopeOfWorks)] = finalItem;
     const computed = computeAllAmounts(newItems);
     setItems(computed);
-    if (onDataChange) onDataChange({ ...currentData, items: computed });
+    
+    const updatedData = { ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } };
+    console.log('🔧 saveEdit calling onDataChange with updatedData:', updatedData);
+    if (onDataChange) onDataChange(updatedData);
     setEditingCell(null); setEditValue('');
   };
 
@@ -249,7 +246,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     newItems[idx] = { ...item, isBold: !item.isBold };
     const computed = computeAllAmounts(newItems);
     setItems(computed);
-    if (onDataChange) onDataChange({ ...currentData, items: computed });
+    if (onDataChange) onDataChange({ ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -340,7 +337,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
     const computedItems = computeAllAmounts(newItems);
     setItems(computedItems);
-    if (onDataChange) onDataChange({ ...currentData, items: computedItems });
+    if (onDataChange) onDataChange({ ...currentData, items: computedItems, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
     setShowAddRows(false);
     setTimeout(() => startEditing(insertAfterIndex + 1, 'scopeOfWorks'), 0);
 
@@ -348,14 +345,12 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     const newAlphaIndices: number[] = [];
     for (let i = insertAfterIndex + 1; i <= insertAfterIndex + addRowsCount; i++) {
       const itemType = detectIdType(computedItems[i].id);
-      console.log(`Row ${i}: ID="${computedItems[i].id}", Type="${itemType}", isAlpha=${itemType === 'alpha'}`);
       if (itemType === 'alpha') {
         newAlphaIndices.push(i);
       }
     }
 
     if (newAlphaIndices.length > 0) {
-      console.log('Clearing backgrounds for Alpha rows:', newAlphaIndices);
       setRowBackgrounds(prev => {
         const updated = { ...prev };
         newAlphaIndices.forEach(idx => delete updated[idx]);
@@ -424,7 +419,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
     const computed = computeAllAmounts(renumbered);
     setItems(computed);
-    if (onDataChange) onDataChange({ ...currentData, items: computed });
+    if (onDataChange) onDataChange({ ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
     if (editingCell?.rowIndex === rowIndex) { setEditingCell(null); setEditValue(''); }
     setRowBackgrounds(prev => { const n = { ...prev }; delete n[rowIndex]; return n; });
     setActiveDropdown(null); setDropdownPosition(null);
@@ -471,16 +466,31 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           />
           <button
-            onClick={loadSampleData}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2"
-          >
-            Load Sample Data
-          </button>
-          <button
             onClick={() => { setInsertMode('after'); setAddRowsAfter(-1); setAddRowsCount(1); setShowAddRows(true); }}
             className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex items-center gap-2"
           >
             <Plus size={16} /> Add Rows
+          </button>
+          {/* Debug test button */}
+          <button
+            onClick={() => {
+              console.log('🔧 Test button clicked - current data:', currentData);
+              if (onDataChange) {
+                const testData = {
+                  ...currentData,
+                  projectInfo: {
+                    ...currentData?.projectInfo,
+                    project: currentData?.projectInfo?.project + ' (test)'
+                  },
+                  items: currentData?.items || []
+                };
+                console.log('🔧 Calling onDataChange with test data:', testData);
+                onDataChange(testData);
+              }
+            }}
+            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+          >
+            Test Data Change
           </button>
         </div>
 
@@ -540,7 +550,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                   newItems[idx] = { ...item, isBold: !item.isBold };
                   const computed = computeAllAmounts(newItems);
                   setItems(computed);
-                  if (onDataChange) onDataChange({ ...currentData, items: computed });
+                  if (onDataChange) onDataChange({ ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
                   setActiveDropdown(null);
                 }}
                 className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"

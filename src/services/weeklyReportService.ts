@@ -339,14 +339,6 @@ export const validateWeeklyReport = async (id: string): Promise<ApiResponse<{ is
   return handleApiResponse<{ isValid: boolean; errors: string[]; warnings: string[] }>(response);
 };
 
-/**
- * Auto-save weekly report (for real-time saving)
- */
-export const autoSaveWeeklyReport = async (id: string, data: Partial<UpdateWeeklyReportRequest>): Promise<ApiResponse<WeeklyReport>> => {
-  const response = await apiPatch(`${WEEKLY_REPORTS_BASE_URL}/${id}/auto-save`, data);
-  return handleApiResponse<WeeklyReport>(response);
-};
-
 // ============================================================================
 // Batch Operations
 // ============================================================================

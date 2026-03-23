@@ -322,7 +322,7 @@ const WeeklyReportDashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {filteredReports.map((report) => (
-                    <Card key={report.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenReport(report.id)}>
+                    <Card key={report._id || report.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenReport(report._id || report.id)}>
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">

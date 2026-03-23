@@ -411,7 +411,7 @@ export const createNewReport = async (projectName?: string, date?: string) => {
   console.log("🔒 CREATE NEW REPORT: Creating new report", { projectName, date });
 
   const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.BASE, { 
-    projectName: projectName || "Default Project", 
+    projectName: projectName, 
     date: date || new Date().toISOString().split('T')[0] 
   });
 

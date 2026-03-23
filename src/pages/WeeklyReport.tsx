@@ -20,6 +20,8 @@ import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
 import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { useIssues } from "@/hooks/useIssues";
+import { useConstructionProgress } from "@/hooks/useConstructionProgress";
+import { ConstructionProgressData } from "@/types/constructionProgress";
 import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
 import { convertScheduleEntriesToSupabase } from '@/utils/weeklyReportSupabase';
@@ -57,9 +59,51 @@ const WeeklyReport = () => {
   const [searchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
   const reportId = searchParams.get('reportId');
+  const createNew = searchParams.get('createNew');
+  
+  console.log('🔍 WeeklyReport - Full URL:', window.location.href);
+  console.log('🔍 WeeklyReport - URL searchParams string:', searchParams.toString());
+  console.log('🔍 WeeklyReport - URL reportId param:', reportId);
+  console.log('🔍 WeeklyReport - createNew param:', createNew);
+  console.log('🔍 WeeklyReport - Full URL searchParams:', Object.fromEntries(searchParams.entries()));
+  
+  // List all available parameters
+  console.log('🔍 WeeklyReport - All URL parameters:');
+  for (const [key, value] of searchParams.entries()) {
+    console.log(`  - ${key}: "${value}"`);
+  }
   const [projectLogo, setProjectLogo] = useState<string>("/koica_logo.png");
   const [showIntroduction, setShowIntroduction] = useState(false);
-  const [currentReportId, setCurrentReportId] = useState<string | null>(reportId || null);
+  const [currentReportId, setCurrentReportId] = useState<string | null>(
+  (reportId && reportId !== 'undefined' && reportId !== 'null') ? reportId : null
+);
+  console.log('🔍 WeeklyReport - currentReportId initialized to:', currentReportId);
+
+  // Sync currentReportId with URL searchParams and handle createNew
+  useEffect(() => {
+    const urlReportId = searchParams.get('reportId');
+    const urlCreateNew = searchParams.get('createNew');
+    console.log('🔍 WeeklyReport useEffect - urlReportId:', urlReportId);
+    console.log('🔍 WeeklyReport useEffect - urlCreateNew:', urlCreateNew);
+    console.log('🔍 WeeklyReport useEffect - currentReportId before update:', currentReportId);
+    
+    // Handle createNew parameter
+    if (urlCreateNew === 'true' && !urlReportId) {
+      console.log('🔍 WeeklyReport useEffect - Creating new weekly report...');
+      handleCreateNewWeeklyReport();
+      return;
+    }
+    
+    // Convert 'undefined' string to null for proper comparison
+    const normalizedUrlId = urlReportId === 'undefined' || urlReportId === 'null' || !urlReportId ? null : urlReportId;
+    console.log('🔍 WeeklyReport useEffect - normalizedUrlId:', normalizedUrlId);
+    if (normalizedUrlId !== currentReportId) {
+      console.log('🔍 WeeklyReport useEffect - Updating currentReportId to:', normalizedUrlId);
+      setCurrentReportId(normalizedUrlId);
+    } else {
+      console.log('🔍 WeeklyReport useEffect - No update needed, IDs are the same');
+    }
+  }, [searchParams]);
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
@@ -154,8 +198,8 @@ const WeeklyReport = () => {
   //   { id: crypto.randomUUID(), issueNumber: 1 }
   // ]);
 
-  // Construction Progress state
-  const [constructionProgressData, setConstructionProgressData] = useState(null);
+  // Construction Progress hook - use this as the single source of truth
+  const constructionProgressHook = useConstructionProgress({ reportId: currentReportId });
 
   // Schedule sections state
   const [scheduleSections, setScheduleSections] = useState([
@@ -167,8 +211,35 @@ const WeeklyReport = () => {
 
   // Save, Preview, Export states
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Helper function to format date to yyyy-MM-dd
+  const formatDateToYYYYMMDD = (dateStr: string): string => {
+    if (!dateStr) return new Date().toISOString().split("T")[0];
+    
+    // If already in correct format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    
+    // Try to parse DD-MMM-YY format
+    const match = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/);
+    if (match) {
+      const day = match[1].padStart(2, "0");
+      const monthMap: { [key: string]: string } = {
+        Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+        Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12"
+      };
+      const month = monthMap[match[2]] || "01";
+      const year = "20" + match[3];
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Fallback to today's date
+    return new Date().toISOString().split("T")[0];
+  };
 
   // NEW: Add activities state to WeeklyReport page
   const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
@@ -205,6 +276,12 @@ const WeeklyReport = () => {
     clearHsesDataRef.current = clearFn;
   };
 
+  // Callback function for handling construction progress data changes
+  const handleConstructionProgressChange = (data: any) => {
+    console.log('🔧 handleConstructionProgressChange called with data:', data);
+    constructionProgressHook.updateConstructionData(data);
+  };
+
   // Overall Progress hook
   const overallProgressHook = useOverallProgress();
 
@@ -221,19 +298,12 @@ const WeeklyReport = () => {
     }
   }, [selectedProject]);
 
-  // Sync Issues data changes to parent state (like other sections)
-  useEffect(() => {
-    if (setIssuesData && issuesHook.issuesData) {
-      setIssuesData(issuesHook.issuesData);
-    }
-  }, [issuesHook.issuesData]); // Remove setIssuesData to prevent infinite loop
-
   // Load master schedule data when reportId changes or component mounts
   useEffect(() => {
     const loadMasterSchedule = async () => {
-      if (reportId) {
+      if (currentReportId) {
         try {
-          const response = await getWeeklyReportById(reportId);
+          const response = await getWeeklyReportById(currentReportId);
           if (response.success && response.data) {
             const report = response.data;
             if (report.sections?.masterSchedule) {
@@ -252,17 +322,26 @@ const WeeklyReport = () => {
     };
 
     loadMasterSchedule();
-  }, [reportId]); // Reload when reportId changes
+  }, [currentReportId]); // Reload when currentReportId changes
 
   // Load existing report data when reportId is present
   useEffect(() => {
     const loadExistingReport = async () => {
-      if (reportId) {
+      console.log('🔍 FRONTEND loadExistingReport called');
+      console.log('🔍 FRONTEND currentReportId:', currentReportId);
+      
+      if (currentReportId) {
+        console.log('🔍 FRONTEND currentReportId exists, proceeding with API call');
         try {
-          const response = await getWeeklyReportById(reportId);
+          console.log('🔍 FRONTEND Calling getWeeklyReportById with:', currentReportId);
+          const response = await getWeeklyReportById(currentReportId);
+          console.log('🔍 FRONTEND API response:', response);
+          
           if (response.success && response.data) {
             const report = response.data;
-            setCurrentReportId(report.id);
+            console.log('🔍 FRONTEND Report data loaded successfully');
+            const reportId = (report as any)._id || report.id;
+            setCurrentReportId(reportId);
             setReportStatus(report.status || 'draft');
 
             // Update shared data with existing report data
@@ -278,7 +357,7 @@ const WeeklyReport = () => {
               designNConstruction: report.sections?.introduction?.designNConstruction || '',
               // Load letter data
               refNoPrefix: report.sections?.letter?.refNoPrefix || '',
-              reportDate: report.sections?.letter?.reportDate || '',
+              reportDate: report.sections?.letter?.reportDate ? formatDateToYYYYMMDD(report.sections?.letter?.reportDate) : '',
               recipientCompany: report.sections?.letter?.recipientCompany || '',
               recipientLocation: report.sections?.letter?.recipientLocation || '',
               recipientName: report.sections?.letter?.recipientName || '',
@@ -421,18 +500,28 @@ const WeeklyReport = () => {
             }
           }
         } catch (error) {
-          console.error('Error loading report:', error);
+          console.error('🔍 FRONTEND Error loading report:', error);
+          console.error('🔍 FRONTEND Error details:', {
+            message: error.message,
+            stack: error.stack,
+            currentReportId,
+            timestamp: new Date().toISOString()
+          });
           toast({
             title: "Error",
             description: "Failed to load existing report.",
             variant: "destructive",
           });
         }
+      } else {
+        console.log('🔍 FRONTEND No currentReportId available, skipping API call');
+        console.log('🔍 FRONTEND currentReportId value:', currentReportId);
+        console.log('🔍 FRONTEND currentReportId type:', typeof currentReportId);
       }
     };
 
     loadExistingReport();
-  }, [reportId, selectedProject, toast]);
+  }, [currentReportId, selectedProject, toast]);
 
   // Internal save logic that can be called from both save and submit functions
   const handleSaveAsDraftInternal = async () => {
@@ -708,9 +797,21 @@ const WeeklyReport = () => {
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
           // NEW: Add Schedule section to save payload
-          masterSchedule: scheduleDataForSave
+          masterSchedule: scheduleDataForSave,
+          // NEW: Add Construction Progress section to save payload
+          constructionProgress: constructionProgressHook.constructionData || {
+            projectInfo: {
+              project: "",
+              subtitle: "",
+              date: "",
+              revision: ""
+            },
+            items: []
+          }
         }
       };
+      
+      console.log('🔧 Saving report with constructionProgress:', reportData.sections.constructionProgress);
 
       // Convert HSES photo references to base64 before saving
       if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
@@ -726,14 +827,25 @@ const WeeklyReport = () => {
           status: 'draft' as const
         };
         response = await updateWeeklyReport(currentReportId, updateData);
+        // Ensure currentReportId is set after successful update
+        if (response.success) {
+          const updatedId = (response.data as any)?._id || response.data?.id || currentReportId;
+          setCurrentReportId(updatedId);
+          // Update URL to include the report ID
+          const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+          window.history.replaceState({}, '', newUrl);
+        }
       } else {
         // Create new report
         response = await createWeeklyReport(reportData);
-        if (response.success && response.data?._id) {
-          setCurrentReportId(response.data._id);
-          // Update URL to include new report ID
-          const newUrl = `${window.location.pathname}?reportId=${response.data._id}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
-          window.history.replaceState({}, '', newUrl);
+        if (response.success && response.data) {
+          const newId = (response.data as any)._id || response.data.id;
+          if (newId) {
+            setCurrentReportId(newId);
+            // Update URL to include new report ID
+            const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+            window.history.replaceState({}, '', newUrl);
+          }
         }
       }
 
@@ -790,7 +902,7 @@ const WeeklyReport = () => {
   };
 
   const handleSubmit = async () => {
-    setIsSaving(true);
+    setIsSubmitting(true);
     try {
       let reportId = currentReportId;
       
@@ -803,11 +915,17 @@ const WeeklyReport = () => {
         console.log('DEBUG: Save response data:', saveResponse?.data);
         console.log('DEBUG: Save response data keys:', saveResponse?.data ? Object.keys(saveResponse.data) : 'no data');
         
-        if (saveResponse?.success && saveResponse?.data?._id) {
-          reportId = saveResponse.data._id;
-          console.log('DEBUG: Successfully saved, new report ID:', reportId);
+        if (saveResponse?.success && saveResponse?.data) {
+          const newId = (saveResponse.data as any)._id || saveResponse.data.id;
+          if (newId) {
+            reportId = newId;
+            console.log('DEBUG: Successfully saved, new report ID:', reportId);
+          } else {
+            console.log('DEBUG: Save succeeded but no ID found in response');
+            throw new Error('Save succeeded but no report ID was returned');
+          }
         } else {
-          console.log('DEBUG: Save failed or no ID in response');
+          console.log('DEBUG: Save failed or no data in response');
           throw new Error('Failed to save report before submission');
         }
       }
@@ -838,7 +956,7 @@ const WeeklyReport = () => {
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -1235,11 +1353,10 @@ const WeeklyReport = () => {
 
               {activeTab === "construction-progress" && (
                 <>
-                  {console.log("construction-progress tab is active")}
                   <div className="flex flex-col bg-card rounded-lg border">
                     <WeeklyReportConstructionProgress
-                      data={constructionProgressData}
-                      onDataChange={(data) => setConstructionProgressData(data)}
+                      data={constructionProgressHook.constructionData}
+                      onDataChange={handleConstructionProgressChange}
                       reportId={currentReportId}
                     />
                   </div>
@@ -1528,10 +1645,10 @@ const WeeklyReport = () => {
                     <Button
                       variant="outline"
                       className="min-w-[140px]"
-                      disabled={isSaving}
+                      disabled={isSaving || isSubmitting}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? "Processing..." : "Save As..."}
+                      {isSaving || isSubmitting ? "Processing..." : "Save As..."}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -1540,7 +1657,10 @@ const WeeklyReport = () => {
                   >
                     <DropdownMenuItem
                       onClick={handleSaveAsDraft}
-                      disabled={isSaving}
+                      disabled={
+                        isSaving ||
+                        reportStatus === "submitted"
+                      }
                       className={
                         reportStatus === "submitted"
                           ? "opacity-50 cursor-not-allowed"
@@ -1555,7 +1675,7 @@ const WeeklyReport = () => {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleSubmit}
-                      disabled={isSaving}
+                      disabled={isSubmitting}
                       className={
                         reportStatus === "submitted"
                           ? "bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer"
@@ -1563,7 +1683,7 @@ const WeeklyReport = () => {
                       }
                     >
                       <Send className="w-4 h-4 mr-2" />
-                      {isSaving ? "Submitting..." : "Submitted"}
+                      {isSubmitting ? "Submitting..." : "Submitted"}
                       {reportStatus === "submitted" && (
                         <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
                       )}
