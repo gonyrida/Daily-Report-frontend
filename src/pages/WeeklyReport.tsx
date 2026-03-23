@@ -434,9 +434,9 @@ const WeeklyReport = () => {
     loadExistingReport();
   }, [reportId, selectedProject, toast]);
 
-  // Handler functions
-  const handleSaveAsDraft = async () => {
-    setIsSaving(true);
+  // Internal save logic that can be called from both save and submit functions
+  const handleSaveAsDraftInternal = async () => {
+    console.log('DEBUG: handleSaveAsDraftInternal called');
     let reportData: any;
     try {
       // Helper function to format rows with displayIndex
@@ -729,22 +729,20 @@ const WeeklyReport = () => {
       } else {
         // Create new report
         response = await createWeeklyReport(reportData);
-        if (response.success && response.data?.id) {
-          setCurrentReportId(response.data.id);
+        if (response.success && response.data?._id) {
+          setCurrentReportId(response.data._id);
           // Update URL to include new report ID
-          const newUrl = `${window.location.pathname}?reportId=${response.data.id}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+          const newUrl = `${window.location.pathname}?reportId=${response.data._id}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
           window.history.replaceState({}, '', newUrl);
         }
       }
 
       if (response.success) {
-        toast({
-          title: "Saved",
-          description: currentReportId
-            ? "Weekly report updated successfully."
-            : "Weekly report created successfully.",
-        });
+        // Return the response for the calling function to handle
+        console.log('DEBUG: Save successful, returning response:', response);
+        return response;
       } else {
+        console.log('DEBUG: Save failed with response:', response);
         throw new Error(response.error || 'Save failed');
       }
     } catch (error) {
@@ -762,6 +760,25 @@ const WeeklyReport = () => {
         }
       }
 
+      // Re-throw the error for the calling function to handle
+      throw error;
+    }
+  };
+
+  // Public save function that includes loading state
+  const handleSaveAsDraft = async () => {
+    setIsSaving(true);
+    try {
+      await handleSaveAsDraftInternal();
+      
+      toast({
+        title: "Saved",
+        description: currentReportId
+          ? "Weekly report updated successfully."
+          : "Weekly report created successfully.",
+      });
+    } catch (error) {
+      console.error('Save error:', error);
       toast({
         title: "Save Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -773,18 +790,29 @@ const WeeklyReport = () => {
   };
 
   const handleSubmit = async () => {
-    if (!currentReportId) {
-      toast({
-        title: "Cannot Submit",
-        description: "Please save the report as draft first before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSaving(true);
     try {
-      const response = await submitWeeklyReport(currentReportId);
+      let reportId = currentReportId;
+      
+      // If no report ID exists, save as draft first
+      if (!currentReportId) {
+        // Call the same save logic as handleSaveAsDraft
+        console.log('DEBUG: No report ID found, attempting to save first...');
+        const saveResponse = await handleSaveAsDraftInternal();
+        console.log('DEBUG: Save response:', saveResponse);
+        console.log('DEBUG: Save response data:', saveResponse?.data);
+        console.log('DEBUG: Save response data keys:', saveResponse?.data ? Object.keys(saveResponse.data) : 'no data');
+        
+        if (saveResponse?.success && saveResponse?.data?._id) {
+          reportId = saveResponse.data._id;
+          console.log('DEBUG: Successfully saved, new report ID:', reportId);
+        } else {
+          console.log('DEBUG: Save failed or no ID in response');
+          throw new Error('Failed to save report before submission');
+        }
+      }
+
+      const response = await submitWeeklyReport(reportId);
 
       if (response.success) {
         setReportStatus("submitted");
