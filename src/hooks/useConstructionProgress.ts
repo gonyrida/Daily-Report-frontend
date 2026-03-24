@@ -71,8 +71,21 @@ export const useConstructionProgress = (options: UseConstructionProgressOptions 
       return;
     }
 
+    // Copy upToThisWeek data to previousWeek before saving
+    const dataWithPreviousWeek = {
+      ...dataToSave,
+      items: dataToSave.items.map(item => ({
+        ...item,
+        previousWeek: {
+          qty: item.upToThisWeek.qty,
+          amount: item.upToThisWeek.amount,
+          percentage: item.upToThisWeek.percentage
+        }
+      }))
+    };
+
     // Validate data before saving
-    const validationErrors = ConstructionProgressService.validateConstructionProgressData(dataToSave);
+    const validationErrors = ConstructionProgressService.validateConstructionProgressData(dataWithPreviousWeek);
     if (validationErrors.length > 0) {
       setError('Validation failed');
       toast({
@@ -87,9 +100,11 @@ export const useConstructionProgress = (options: UseConstructionProgressOptions 
     setError(null);
 
     try {
-      const result = await ConstructionProgressService.saveConstructionProgress(reportId, dataToSave);
+      const result = await ConstructionProgressService.saveConstructionProgress(reportId, dataWithPreviousWeek);
       
       if (result.success) {
+        // Update local state with the saved data (including previousWeek updates)
+        setConstructionData(dataWithPreviousWeek);
         setLastSaved(new Date());
         isModifiedRef.current = false;
         toast({

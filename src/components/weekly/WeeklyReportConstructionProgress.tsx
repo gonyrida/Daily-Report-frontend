@@ -178,6 +178,10 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
   const startEditing = (rowIndex: number, field: string) => {
     if (rowIndex < 0 || rowIndex >= filteredItems.length) return;
+    
+    // Prevent editing of read-only fields
+    if (field === 'boQ.unitRate' || field === 'boQ.amount' || field.startsWith('previousWeek.') || field.startsWith('remaining.') || field === 'nextWeekPlan.percentage' || field.startsWith('upToNextWeekPlan.') || field === 'upToThisWeek.percentage' || field === 'thisWeek.percentage') return;
+    
     const value = getItemValue(filteredItems[rowIndex], field);
     setEditingCell({ rowIndex, field });
     setEditValue(String(value));

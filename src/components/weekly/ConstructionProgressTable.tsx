@@ -61,13 +61,25 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
     const isText = ['scopeOfWorks', 'detailDescription', 'remark'].includes(field);
 
     // Determine read-only state:
-    // boQ.amount is read-only for auto-calculated parent rows
+    // boQ.amount is always read-only (auto-calculated)
     // boQ.unitRate is always read-only (derived from materialRate + laborRate)
+    // previousWeek columns are always read-only (gets data from upToThisWeek after save)
+    // remaining columns are always read-only (calculated: boQ - upToThisWeek)
+    // nextWeekPlan percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
+    // upToNextWeekPlan columns are always read-only (calculated: upToThisWeek + nextWeekPlan)
+    // upToThisWeek percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
+    // thisWeek percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
     // All progress period amounts are read-only when auto-calculated
     const isBoQAmount = field === 'boQ.amount';
     const isUnitRate = field === 'boQ.unitRate';
+    const isPreviousWeek = field.startsWith('previousWeek.');
+    const isRemaining = field.startsWith('remaining.');
+    const isNextWeekPlanPercentage = field === 'nextWeekPlan.percentage';
+    const isUpToNextWeekPlan = field.startsWith('upToNextWeekPlan.');
+    const isUpToThisWeekPercentage = field === 'upToThisWeek.percentage';
+    const isThisWeekPercentage = field === 'thisWeek.percentage';
     const isProgressAmount = field.includes('.amount') && !field.startsWith('boQ.');
-    const isReadOnly = (isBoQAmount || isProgressAmount) && isAutoCalculated(filteredItems, item);
+    const isReadOnly = isBoQAmount || isUnitRate || isPreviousWeek || isRemaining || isNextWeekPlanPercentage || isUpToNextWeekPlan || isUpToThisWeekPercentage || isThisWeekPercentage || ((isProgressAmount) && isAutoCalculated(filteredItems, item));
 
     if (isEditing) {
       return (
@@ -180,24 +192,6 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             if (isBoldEmptyRow) return <span className="mr-0.5 text-slate-600 font-bold" title="Bold-empty sum"></span>;
             return <span className="mr-0.5 text-slate-400" title="Auto-sum from children"></span>;
           })()}
-          {display}
-        </div>
-      );
-    }
-
-    // unitRate: editable + amber hint showing mat+lab relationship
-    if (isUnitRate && !isEditing) {
-      const computedRate = (item.boQ.materialRate || 0) + (item.boQ.laborRate || 0);
-      const isOverridden = Math.abs((item.boQ.unitRate || 0) - computedRate) > 0.001;
-      return (
-        <div
-          onClick={() => startEditing(rowIndex, field)}
-          className={`px-1 py-0.5 cursor-pointer rounded text-sm text-center whitespace-nowrap
-            ${isOverridden ? 'bg-orange-50 text-orange-700 hover:bg-orange-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
-          title={isOverridden ? `Overridden (Mat+Lab = ${formatNum(computedRate)})` : 'Unit Rate = Mat. Rate + Labor Rate — click to override'}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          {isOverridden && <span className="mr-0.5 text-xs">✎</span>}
           {display}
         </div>
       );

@@ -253,6 +253,7 @@ const WeeklyReport = () => {
 
   // Callback function for handling construction progress data changes
   const handleConstructionProgressChange = (data: any) => {
+    // Update the construction data in the hook
     constructionProgressHook.updateConstructionData(data);
   };
 
@@ -876,16 +877,39 @@ const WeeklyReport = () => {
           constructionIssues: issuesDataForSave,
           // NEW: Add Schedule section to save payload
           masterSchedule: scheduleDataForSave,
-          // NEW: Add Construction Progress section to save payload
-          constructionProgress: constructionProgressHook.constructionData || {
-            projectInfo: {
-              project: "",
-              subtitle: "",
-              date: "",
-              revision: ""
-            },
-            items: []
-          }
+          // NEW: Add Construction Progress section to save payload with rolling total logic
+          constructionProgress: (() => {
+            const data = constructionProgressHook.constructionData;
+            if (!data || !data.items) {
+              return {
+                projectInfo: {
+                  project: "",
+                  subtitle: "",
+                  date: "",
+                  revision: ""
+                },
+                items: []
+              };
+            }
+            
+            // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
+            return {
+              ...data,
+              items: data.items.map(item => ({
+                ...item,
+                previousWeek: {
+                  qty: item.upToThisWeek.qty,
+                  amount: item.upToThisWeek.amount,
+                  percentage: item.upToThisWeek.percentage
+                },
+                thisWeek: {
+                  qty: 0,
+                  amount: 0,
+                  percentage: 0
+                }
+              }))
+            };
+          })()
         }
       };
       
@@ -913,6 +937,28 @@ const WeeklyReport = () => {
           // Update URL to include the report ID
           const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
           window.history.replaceState({}, '', newUrl);
+          
+          // Update local construction progress state with rolling total and This Week reset
+          const currentData = constructionProgressHook.constructionData;
+          if (currentData && currentData.items) {
+            const updatedData = {
+              ...currentData,
+              items: currentData.items.map(item => ({
+                ...item,
+                previousWeek: {
+                  qty: item.upToThisWeek.qty,
+                  amount: item.upToThisWeek.amount,
+                  percentage: item.upToThisWeek.percentage
+                },
+                thisWeek: {
+                  qty: 0,
+                  amount: 0,
+                  percentage: 0
+                }
+              }))
+            };
+            constructionProgressHook.updateConstructionData(updatedData);
+          }
         }
       } else {
         // Create new report
@@ -924,6 +970,28 @@ const WeeklyReport = () => {
             // Update URL to include new report ID
             const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
             window.history.replaceState({}, '', newUrl);
+            
+            // Update local construction progress state with rolling total and This Week reset
+            const currentData = constructionProgressHook.constructionData;
+            if (currentData && currentData.items) {
+              const updatedData = {
+                ...currentData,
+                items: currentData.items.map(item => ({
+                  ...item,
+                  previousWeek: {
+                    qty: item.upToThisWeek.qty,
+                    amount: item.upToThisWeek.amount,
+                    percentage: item.upToThisWeek.percentage
+                  },
+                  thisWeek: {
+                    qty: 0,
+                    amount: 0,
+                    percentage: 0
+                  }
+                }))
+              };
+              constructionProgressHook.updateConstructionData(updatedData);
+            }
           }
         }
       }
