@@ -11,4 +11,5 @@ export const QAQC_SECTIONS = [
   { id: "4.10", title: "Field Change Request (FCR)" },
   { id: "4.11", title: "Variation Order (VO)" },
   { id: "4.12", title: "Transmittal (TR)" },
+  { id: "4.13", title: "Material Inspection Approval (MIR)" },
 ];

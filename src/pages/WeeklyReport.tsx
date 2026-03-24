@@ -904,7 +904,6 @@ const WeeklyReport = () => {
         };
         // DEBUG: Log HSES data being sent
         if (updateData.sections?.hses) {
-          console.log('🔍 FRONTEND - HSES data being sent:', JSON.stringify(updateData.sections.hses, null, 2));
         }
         response = await updateWeeklyReport(currentReportId, updateData);
         // Ensure currentReportId is set after successful update

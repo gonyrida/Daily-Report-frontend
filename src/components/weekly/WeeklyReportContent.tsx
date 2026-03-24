@@ -93,7 +93,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       "4.9": "rfa",
       "4.10": "fcr",
       "4.11": "vo",
-      "4.12": "tr"
+      "4.12": "tr",
+      "4.13": "mir"
     };
     
     // Example data for each section
@@ -134,6 +135,11 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       ],
       tr: [
         { code: "TR-001", description: "Technical specification review", status: "Closed", dateResponse: "2024-01-11", comment: "Approved with comments" }
+      ],
+      mir: [
+        { code: "MIR-001", description: "Steel material inspection and approval", status: "Open", dateResponse: "2024-01-30", comment: "Pending laboratory results" },
+        { code: "MIR-002", description: "Cement quality inspection", status: "Approved", dateResponse: "2024-01-25", comment: "All tests passed - material approved for use" },
+        { code: "MIR-003", description: "Reinforcement bar inspection", status: "In Review", dateResponse: "2024-01-28", comment: "Awaiting final approval from quality team" }
       ]
     };
     
@@ -258,7 +264,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       const sectionIdMap: Record<string, string> = {
         "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
         "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
-        "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr"
+        "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
       };
       
       // Reverse mapping for frontend to backend
@@ -413,7 +419,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
               const sectionIdMap: Record<string, string> = {
                 "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
                 "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
-                "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr"
+                "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
               };
               
               Object.entries(data).forEach(([sectionId, rows]) => {
@@ -797,6 +803,22 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 }}
               >
                 Transmittal (TR)
+              </a>
+            </li>
+            <li className="text-primary dark:text-primary">
+              <a
+                href="#material-inspection-approval-mir"
+                className="text-primary dark:text-primary hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
+                  if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.13")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
+                }}
+              >
+                Material Inspection Approval (MIR)
               </a>
             </li>
           </ol>

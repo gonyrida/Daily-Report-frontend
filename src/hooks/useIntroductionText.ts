@@ -39,7 +39,6 @@ export const useIntroductionText = (projectLogo: string = "") => {
       const saved = localStorage.getItem(INTRODUCTION_STORAGE_KEY);
       if (saved) {
         const data = JSON.parse(saved);
-        console.log('[useIntroductionText] Loaded saved coverImage:', data.coverImage);
         return data.coverImage || projectLogo || "";
       }
     } catch (e) {

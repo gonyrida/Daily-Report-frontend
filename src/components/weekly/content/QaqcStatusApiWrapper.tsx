@@ -52,7 +52,7 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
             </span>
             <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
           </div>
-          {rows.length > 0 && (
+          {rows && rows.length > 0 && (
             <span className="px-2 py-1 bg-muted text-muted-foreground text-xs font-medium rounded">
               {rows.length} {rows.length === 1 ? "item" : "items"}
             </span>
@@ -79,7 +79,7 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, idx) => (
+              {(rows || []).map((row, idx) => (
               <tr key={row.id} className="border-b hover:bg-muted/20 transition-colors">
                 <td className="py-2 px-2 text-center text-muted-foreground font-medium text-xs">
                   {idx + 1}
@@ -144,18 +144,18 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                 </td>
               </tr>
             ))}
-            {rows.length > 0 && (
-              <tr className="bg-muted/10">
-                <td colSpan={6} className="py-3 px-2">
-                  <table className="w-full">
-                    <tbody>
-                      <tr>
-                        <td className="flex-1">
-                          <div className="mb-2">
-                            <span className="text-sm font-semibold text-foreground">Comments</span>
-                          </div>
-                          <textarea
-                            value={rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n')}
+              {rows && rows.length > 0 && (
+                <tr className="bg-muted/10">
+                  <td colSpan={6} className="py-3 px-2">
+                    <table className="w-full">
+                      <tbody>
+                        <tr>
+                          <td className="flex-1">
+                            <div className="mb-2">
+                              <span className="text-sm font-semibold text-foreground">Comments</span>
+                            </div>
+                            <textarea
+                              value={rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n')}
                             onChange={(e) => {
                               const value = e.target.value;
                               const comments = value.split('\n\n---\n\n');

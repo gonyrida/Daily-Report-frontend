@@ -205,7 +205,6 @@ export const convertScheduleEntriesToSupabase = async (
       convertedEntry.fileData = entry.fileData;
     } else {
       // Handle legacy entries with fileData
-      console.log('DEBUG: Converting legacy entry with fileData:', entry.fileName);
       convertedEntry.fileData = entry.fileData;
     }
 
