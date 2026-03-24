@@ -1,8 +1,8 @@
 export interface ConstructionIssueProps {
   issueNumber?: number;
-  siteLocation?: string;
-  photoReference?: string;
-  problems?: string;
+  location?: string;
+  photo?: string | File | null;
+  problem?: string;
   actionBy?: string;
   onRemove?: () => void;
 }

@@ -115,13 +115,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     const getUserInfo = async () => {
       try {
         const response = await apiGet('/auth/profile');
-        const data = await response.json();  // ← ADD THIS LINE
-
-        console.log("DEBUG: Full user response:", data);  // ← ADD THIS
+        const data = await response.json();
 
         if (data.success && data.user?._id) {
-          console.log("DEBUG: Setting currentUserId to:", data.user._id);
-          setCurrentUserId(data.user._id);  // ← Use _id instead of userId
+          setCurrentUserId(data.user._id);
         }
       } catch (error) {
         console.error('Failed to get user info:', error);
@@ -617,7 +614,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                     <Collapsible open={weeklyReportOpen} onOpenChange={setWeeklyReportOpen}>
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
-                          <span className="flex items-center gap-2">
+                          <span 
+                            className="flex items-center gap-2 flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate('/weekly-report-projects');
+                            }}
+                          >
                             <Calendar className="h-3 w-3" />
                             Weekly Report
                           </span>

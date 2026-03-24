@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HsesData } from "@/types/hses.types";
 import { createHSESections } from "@/utils/hseSectionUtils";
 
@@ -28,6 +28,13 @@ export const useHsesData = (initialData?: HsesData, isEditing: boolean = false) 
   const [hsesData, setHsesData] = useState<HsesData>(() => {
     return initialData || defaultData;
   });
+
+  // Sync with external data when it changes (e.g., after loading from database)
+  useEffect(() => {
+    if (initialData) {
+      setHsesData(initialData);
+    }
+  }, [initialData]);
 
   const updateData = (section: keyof HsesData, value: any) => {
     const newData = { ...hsesData, [section]: value };

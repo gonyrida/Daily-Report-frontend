@@ -5,23 +5,22 @@ import { ConstructionIssueProps } from "@/types/constructionIssue.types";
 
 const ConstructionIssue = ({
   issueNumber = 1,
-  siteLocation = "",
-  photoReference = null,
-  problems = "",
+  location = "",
+  photo = null,
+  problem = "",
   actionBy = "",
   onRemove,
   onDataChange,
 }: ConstructionIssueProps & { 
   onDataChange?: (data: any) => void;
-  photoReference?: string | File | null;
 }) => {
   const [fields, setFields] = useState({
-    siteLocation,
-    problems,
+    location,
+    problem,
     actionBy,
   });
   const [slots, setSlots] = useState([
-    { id: "construction-issue-photo", image: photoReference, caption: "" },
+    { id: "construction-issue-photo", image: photo, caption: "" },
   ]);
 
   const update = (key) => (e) =>
@@ -38,8 +37,8 @@ const ConstructionIssue = ({
     if (onDataChange) {
       const data = {
         issueNumber,
-        location: fields.siteLocation,
-        problem: fields.problems,
+        location: fields.location,
+        problem: fields.problem,
         actionBy: fields.actionBy,
         photo: slots[0]?.image || null
       };
@@ -73,8 +72,8 @@ const ConstructionIssue = ({
               Site Location:
             </label>
             <input
-              value={fields.siteLocation}
-              onChange={update("siteLocation")}
+              value={fields.location}
+              onChange={update("location")}
               placeholder="Enter site location..."
               className="flex-1 bg-transparent border-0 border-input p-1 text-sm text-foreground outline-none dark:bg-card"
             />
@@ -87,8 +86,8 @@ const ConstructionIssue = ({
               Problems / Descriptions
             </label>
             <textarea
-              value={fields.problems}
-              onChange={update("problems")}
+              value={fields.problem}
+              onChange={update("problem")}
               placeholder="Describe the issue in detail..."
               className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none dark:bg-card"
 

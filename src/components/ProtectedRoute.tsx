@@ -22,17 +22,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     const checkAuth = async () => {
       try {
-        console.log("🔒 PROTECTED ROUTE: Checking authentication");
-        
         const result = await verifyAuth();
         
         if (!isMounted) return;
         
         if (result.success) {
-          console.log("🔒 PROTECTED ROUTE: Auth confirmed, allowing access");
           setIsAuthenticated(true);
         } else {
-          console.log("🔒 PROTECTED ROUTE: Auth failed, redirecting");
           setIsAuthenticated(false);
           toast({
             title: "Authentication Required",
@@ -42,7 +38,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           navigate(fallbackPath);
         }
       } catch (error) {
-        console.error("🔒 PROTECTED ROUTE: Auth error:", error);
         if (!isMounted) return;
         
         setIsAuthenticated(false);

@@ -101,7 +101,7 @@ const ReportDashboard: React.FC = () => {
             name: "Weekly Report", 
             icon: <BarChart3 className="h-6 w-6" />,
             description: "Weekly summaries and project's progress",
-            path: "/weekly-report",
+            path: "/weekly-report-projects",
             count: weeklyReports.length,
             lastReportDate: weeklyReports.length > 0 
               ? weeklyReports[0]?.reportDate

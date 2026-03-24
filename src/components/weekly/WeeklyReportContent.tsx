@@ -93,7 +93,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       "4.9": "rfa",
       "4.10": "fcr",
       "4.11": "vo",
-      "4.12": "tr"
+      "4.12": "tr",
+      "4.13": "mir"
     };
     
     // Example data for each section
@@ -134,6 +135,11 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       ],
       tr: [
         { code: "TR-001", description: "Technical specification review", status: "Closed", dateResponse: "2024-01-11", comment: "Approved with comments" }
+      ],
+      mir: [
+        { code: "MIR-001", description: "Steel material inspection and approval", status: "Open", dateResponse: "2024-01-30", comment: "Pending laboratory results" },
+        { code: "MIR-002", description: "Cement quality inspection", status: "Approved", dateResponse: "2024-01-25", comment: "All tests passed - material approved for use" },
+        { code: "MIR-003", description: "Reinforcement bar inspection", status: "In Review", dateResponse: "2024-01-28", comment: "Awaiting final approval from quality team" }
       ]
     };
     
@@ -164,13 +170,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     });
     
     // Set parent state directly
-    console.log("🔧 DEBUG: Setting parent state with:", exampleData);
-    console.log("🔧 DEBUG: Setting hook state with:", frontendExampleData);
-    
     setQaqcData(exampleData);
     qaqcTableHook.setTableData(frontendExampleData);
-    
-    console.log("🔧 DEBUG: QAQC example data loaded to both states");
   };
 
   // Load example data for HSES sections
@@ -200,7 +201,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     exampleData.hsePhotoReferences = currentPhotoReferences;
 
     // Set parent state directly
-    console.log("🔧 DEBUG: Setting HSES example data:", exampleData);
     setHsesData(exampleData);
   };
 
@@ -264,7 +264,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       const sectionIdMap: Record<string, string> = {
         "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
         "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
-        "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr"
+        "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
       };
       
       // Reverse mapping for frontend to backend
@@ -333,7 +333,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   };
 
   if (showIntroduction) {
-    console.log("WeeklyReportContent: Showing Introduction");
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -378,7 +377,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle activities tab
   if (activeTab === "activities") {
-    console.log("WeeklyReportContent: Showing Activities, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -397,7 +395,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle qaqc-status tab
   if (activeTab === "qaqc-status") {
-    console.log("WeeklyReportContent: Showing QAQC Status, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <div className="flex items-center justify-between mb-3">
@@ -422,7 +419,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
               const sectionIdMap: Record<string, string> = {
                 "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
                 "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
-                "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr"
+                "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
               };
               
               Object.entries(data).forEach(([sectionId, rows]) => {
@@ -462,7 +459,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle hses tab
   if (activeTab === "hses") {
-    console.log("WeeklyReportContent: Showing HSES, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <div className="flex items-center justify-between mb-3">
@@ -487,7 +483,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle resource tab
   if (activeTab === "resource") {
-    console.log("WeeklyReportContent: Showing Resource, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -509,7 +504,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle overall-progress tab
   if (activeTab === "overall-progress") {
-    console.log("WeeklyReportContent: Showing OverallProgress, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -528,7 +522,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Only show table of content if activeTab is table-of-content and not showing introduction
   if (activeTab !== "table-of-content") {
-    console.log("WeeklyReportContent: Not rendering, activeTab:", activeTab);
     return null;
   }
 
@@ -810,6 +803,22 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                 }}
               >
                 Transmittal (TR)
+              </a>
+            </li>
+            <li className="text-primary dark:text-primary">
+              <a
+                href="#material-inspection-approval-mir"
+                className="text-primary dark:text-primary hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (setActiveTab) setActiveTab("qaqc-status");
+                  if (setShowSecondNav) setShowSecondNav(true);
+                  setTimeout(() => {
+                    document.getElementById("section-4.13")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
+                }}
+              >
+                Material Inspection Approval (MIR)
               </a>
             </li>
           </ol>

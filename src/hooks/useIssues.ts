@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export interface IssueData {
   id: string;
@@ -28,33 +28,42 @@ export const useIssues = (initialData?: IssueData[]): UseIssuesReturn => {
     return initialData || defaultData;
   });
 
-  const addIssue = (): void => {
-    const newIssue: IssueData = {
-      id: crypto.randomUUID(),
-      issueNumber: issuesData.length + 1,
-      location: "",
-      problem: "",
-      actionBy: "",
-      photo: null
-    };
-    setIssuesData(prev => [...prev, newIssue]);
-  };
+  // Sync with external data when it changes (e.g., after loading from database)
+  useEffect(() => {
+    if (initialData && initialData.length > 0) {
+      setIssuesData(initialData);
+    }
+  }, [initialData]);
 
-  const removeIssue = (index: number): void => {
+  const addIssue = useCallback((): void => {
+    setIssuesData(prev => {
+      const newIssue: IssueData = {
+        id: crypto.randomUUID(),
+        issueNumber: prev.length + 1,
+        location: "",
+        problem: "",
+        actionBy: "",
+        photo: null
+      };
+      return [...prev, newIssue];
+    });
+  }, []);
+
+  const removeIssue = useCallback((index: number): void => {
     setIssuesData(prev => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const updateIssue = (index: number, data: Partial<IssueData>): void => {
+  const updateIssue = useCallback((index: number, data: Partial<IssueData>): void => {
     setIssuesData(prev => 
       prev.map((issue, i) => 
         i === index ? { ...issue, ...data } : issue
       )
     );
-  };
+  }, []);
 
-  const clearIssuesData = (): void => {
+  const clearIssuesData = useCallback((): void => {
     setIssuesData(defaultData);
-  };
+  }, []);
 
   return {
     issuesData,

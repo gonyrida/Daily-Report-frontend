@@ -48,7 +48,8 @@ export const useQaqcApi = (sections: Section[], reportId?: string) => {
           "4.9": "rfa",
           "4.10": "fcr",
           "4.11": "vo",
-          "4.12": "tr"
+          "4.12": "tr",
+          "4.13": "mir"
         };
         
         sections.forEach(section => {
@@ -107,7 +108,8 @@ export const useQaqcApi = (sections: Section[], reportId?: string) => {
         "4.9": "rfa",
         "4.10": "fcr",
         "4.11": "vo",
-        "4.12": "tr"
+        "4.12": "tr",
+        "4.13": "mir"
       };
       
       Object.entries(tableData).forEach(([sectionId, rows]) => {

@@ -3,6 +3,7 @@
 
 import { ProgressRow } from './progress.types';
 import { Resources } from './resources.types';
+import { ConstructionProgressData } from './constructionProgress';
 
 // ============================================================================
 // API Response Types
@@ -80,6 +81,7 @@ export interface WeeklyReportSections {
   photos: any;
   constructionIssues: ConstructionIssue[];
   masterSchedule: MasterScheduleEntry[];
+  constructionProgress: ConstructionProgressData;
 }
 
 // ============================================================================
@@ -308,6 +310,17 @@ export interface CreateWeeklyReportRequest {
 export interface UpdateWeeklyReportRequest {
   sections?: Partial<WeeklyReportSections>;
   status?: WeeklyReportStatus;
+}
+
+/**
+ * Construction issue entry - matches backend schema
+ */
+export interface ConstructionIssue {
+  no: string;
+  location: string;
+  problem: string;
+  actionBy: string;
+  photo: string;
 }
 
 /**

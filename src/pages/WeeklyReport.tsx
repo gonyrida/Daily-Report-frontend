@@ -6,9 +6,8 @@ import WeeklyReportCover from "@/components/weekly/WeeklyReportCover";
 import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
 import { ActivityRow } from "@/types/activity.types";
 import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
-import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import ReferenceSection from "@/components/ReferenceSection";
-import ConstructionIssue from "@/components/weekly/content/ConstructionIssue";
+import ConstructionIssueComponent from "@/components/weekly/content/ConstructionIssue";
 import { createDefaultSiteActivitiesSections } from "@/utils/referenceHelpers";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -20,11 +19,13 @@ import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
 import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { useIssues } from "@/hooks/useIssues";
+import { useConstructionProgress } from "@/hooks/useConstructionProgress";
+import { ConstructionProgressData } from "@/types/constructionProgress";
 import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
 import { convertScheduleEntriesToSupabase } from '@/utils/weeklyReportSupabase';
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
-import { constructionProgress } from '@/components/weekly/ConstructionProgress';
+import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import {
   createWeeklyReport,
   updateWeeklyReport,
@@ -57,9 +58,32 @@ const WeeklyReport = () => {
   const [searchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
   const reportId = searchParams.get('reportId');
+  const createNew = searchParams.get('createNew');
+  
   const [projectLogo, setProjectLogo] = useState<string>("/koica_logo.png");
   const [showIntroduction, setShowIntroduction] = useState(false);
-  const [currentReportId, setCurrentReportId] = useState<string | null>(reportId || null);
+  const [currentReportId, setCurrentReportId] = useState<string | null>(
+  (reportId && reportId !== 'undefined' && reportId !== 'null') ? reportId : null
+);
+
+  // Sync currentReportId with URL searchParams and handle createNew
+  useEffect(() => {
+    const urlReportId = searchParams.get('reportId');
+    const urlCreateNew = searchParams.get('createNew');
+    
+    // Handle createNew parameter
+    if (urlCreateNew === 'true' && !urlReportId) {
+      handleCreateNewWeeklyReport();
+      return;
+    }
+    
+    // Convert 'undefined' string to null for proper comparison
+    const normalizedUrlId = urlReportId === 'undefined' || urlReportId === 'null' || !urlReportId ? null : urlReportId;
+    if (normalizedUrlId !== currentReportId) {
+      setCurrentReportId(normalizedUrlId);
+    } else {
+    }
+  }, [searchParams]);
 
   // Active tab state for section filtering
   const [activeTab, setActiveTab] = useState<
@@ -77,12 +101,7 @@ const WeeklyReport = () => {
     | "schedule"
   >("construction-progress");
 
-  // Debug logging for activeTab changes
-  const debugSetActiveTab = (tab: any) => {
-    console.log("ActiveTab changing from", activeTab, "to", tab);
-    setActiveTab(tab);
-  };
-
+  
   // State for second navigation bar visibility
   const [showSecondNav, setShowSecondNav] = useState(false);
 
@@ -154,8 +173,8 @@ const WeeklyReport = () => {
   //   { id: crypto.randomUUID(), issueNumber: 1 }
   // ]);
 
-  // Construction Progress state
-  const [constructionProgressData, setConstructionProgressData] = useState(null);
+  // Construction Progress hook - use this as the single source of truth
+  const constructionProgressHook = useConstructionProgress({ reportId: currentReportId });
 
   // Schedule sections state
   const [scheduleSections, setScheduleSections] = useState([
@@ -167,8 +186,35 @@ const WeeklyReport = () => {
 
   // Save, Preview, Export states
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Helper function to format date to yyyy-MM-dd
+  const formatDateToYYYYMMDD = (dateStr: string): string => {
+    if (!dateStr) return new Date().toISOString().split("T")[0];
+    
+    // If already in correct format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    
+    // Try to parse DD-MMM-YY format
+    const match = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/);
+    if (match) {
+      const day = match[1].padStart(2, "0");
+      const monthMap: { [key: string]: string } = {
+        Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+        Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12"
+      };
+      const month = monthMap[match[2]] || "01";
+      const year = "20" + match[3];
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Fallback to today's date
+    return new Date().toISOString().split("T")[0];
+  };
 
   // NEW: Add activities state to WeeklyReport page
   const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
@@ -205,6 +251,12 @@ const WeeklyReport = () => {
     clearHsesDataRef.current = clearFn;
   };
 
+  // Callback function for handling construction progress data changes
+  const handleConstructionProgressChange = (data: any) => {
+    // Update the construction data in the hook
+    constructionProgressHook.updateConstructionData(data);
+  };
+
   // Overall Progress hook
   const overallProgressHook = useOverallProgress();
 
@@ -221,23 +273,15 @@ const WeeklyReport = () => {
     }
   }, [selectedProject]);
 
-  // Sync Issues data changes to parent state (like other sections)
-  useEffect(() => {
-    if (setIssuesData && issuesHook.issuesData) {
-      setIssuesData(issuesHook.issuesData);
-    }
-  }, [issuesHook.issuesData]); // Remove setIssuesData to prevent infinite loop
-
   // Load master schedule data when reportId changes or component mounts
   useEffect(() => {
     const loadMasterSchedule = async () => {
-      if (reportId) {
+      if (currentReportId) {
         try {
-          const response = await getWeeklyReportById(reportId);
+          const response = await getWeeklyReportById(currentReportId);
           if (response.success && response.data) {
             const report = response.data;
             if (report.sections?.masterSchedule) {
-              console.log('DEBUG: Loading master schedule from saved report:', report.sections.masterSchedule);
               setScheduleSections([{
                 id: crypto.randomUUID(),
                 title: "Master Schedule",
@@ -252,17 +296,19 @@ const WeeklyReport = () => {
     };
 
     loadMasterSchedule();
-  }, [reportId]); // Reload when reportId changes
+  }, [currentReportId]); // Reload when currentReportId changes
 
   // Load existing report data when reportId is present
   useEffect(() => {
     const loadExistingReport = async () => {
-      if (reportId) {
+      if (currentReportId) {
         try {
-          const response = await getWeeklyReportById(reportId);
+          const response = await getWeeklyReportById(currentReportId);
+          
           if (response.success && response.data) {
             const report = response.data;
-            setCurrentReportId(report.id);
+            const reportId = (report as any)._id || report.id;
+            setCurrentReportId(reportId);
             setReportStatus(report.status || 'draft');
 
             // Update shared data with existing report data
@@ -278,7 +324,7 @@ const WeeklyReport = () => {
               designNConstruction: report.sections?.introduction?.designNConstruction || '',
               // Load letter data
               refNoPrefix: report.sections?.letter?.refNoPrefix || '',
-              reportDate: report.sections?.letter?.reportDate || '',
+              reportDate: report.sections?.letter?.reportDate ? formatDateToYYYYMMDD(report.sections?.letter?.reportDate) : '',
               recipientCompany: report.sections?.letter?.recipientCompany || '',
               recipientLocation: report.sections?.letter?.recipientLocation || '',
               recipientName: report.sections?.letter?.recipientName || '',
@@ -298,6 +344,16 @@ const WeeklyReport = () => {
             // Load overall progress data
             if (report.sections?.overallProgress?.rows) {
               overallProgressHook.setRows(report.sections.overallProgress.rows);
+            }
+
+            // Load activities data
+            if (report.sections?.activities) {
+              setWeeklyActivities(report.sections.activities.weeklyActivities || []);
+              setNextWeekPlan(report.sections.activities.nextWeekPlan || []);
+            } else {
+              // Create empty activities structure if none exists
+              setWeeklyActivities([]);
+              setNextWeekPlan([]);
             }
 
             // Load master schedule data
@@ -381,11 +437,11 @@ const WeeklyReport = () => {
               if (report.sections.constructionIssues.length > 0) {
                 const convertedIssues = report.sections.constructionIssues.map(issue => ({
                   id: crypto.randomUUID(),
-                  issueNumber: issue.issueNumber || 1,
-                  location: issue.siteLocation || "",
-                  problem: issue.problems || "",
+                  issueNumber: issue.no || 1,
+                  location: issue.location || "",
+                  problem: issue.problem || "",
                   actionBy: issue.actionBy || "",
-                  photo: issue.photoReference || null
+                  photo: issue.photo || null
                 }));
                 issuesHook.setIssuesData(convertedIssues);
               }
@@ -421,22 +477,140 @@ const WeeklyReport = () => {
             }
           }
         } catch (error) {
-          console.error('Error loading report:', error);
+          console.error('🔍 FRONTEND Error loading report:', error);
+          console.error('🔍 FRONTEND Error details:', {
+            message: error.message,
+            stack: error.stack,
+            currentReportId,
+            timestamp: new Date().toISOString()
+          });
           toast({
             title: "Error",
             description: "Failed to load existing report.",
             variant: "destructive",
           });
         }
+      } else {
       }
     };
 
     loadExistingReport();
-  }, [reportId, selectedProject, toast]);
+  }, [currentReportId, selectedProject, toast]);
 
-  // Handler functions
-  const handleSaveAsDraft = async () => {
-    setIsSaving(true);
+  // Create new weekly report function
+  const handleCreateNewWeeklyReport = async () => {
+    try {
+      // Initialize with default data for a new report
+      const newReportData = {
+        projectName: selectedProject || 'Default Project',
+        weekNumber: 1,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        sections: {
+          cover: {
+            projectName: selectedProject || 'Default Project',
+            reportTitle: 'Weekly Progress Report',
+            weekNumber: '1',
+            dateRange: '',
+            contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+            clientName: 'Client Name',
+            contractNumber: '',
+            coverImage: '',
+            projectTitle: selectedProject || 'Default Project',
+            employer: 'Client Name'
+          },
+          letter: {
+            refNoPrefix: 'ICT-CPM-LETTER',
+            weekNumber: '1',
+            reportDate: new Date().toISOString().split('T')[0],
+            recipientCompany: '',
+            recipientLocation: '',
+            recipientName: '',
+            ccList: [],
+            letterBody: '',
+            signatureImage: '',
+            signatoryName: '',
+            signatoryPosition: '',
+            constructorName: '',
+            companyLocation: '',
+            companyPhone1: '',
+            companyPhone2: '',
+            companyEmail1: '',
+            companyEmail2: ''
+          },
+          introduction: {
+            projectOverview: '',
+            designNConstruction: '',
+            coverImage: ''
+          },
+          overallProgress: {
+            rows: []
+          },
+          activities: {
+            weeklyActivities: [],
+            nextWeekPlan: []
+          },
+          qaqcStatus: [],
+          hses: {
+            training: [
+              { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' },
+              { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' },
+              { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' }
+            ],
+            inspection: [
+              { typeOfInspection: '', date: '', inspector: '', remarks: '' },
+              { typeOfInspection: '', date: '', inspector: '', remarks: '' },
+              { typeOfInspection: '', date: '', inspector: '', remarks: '' }
+            ],
+            permit: [
+              { typeOfPermit: '', startDate: '', endDate: '', inspector: '', approver: '', remarks: '' },
+              { typeOfPermit: '', startDate: '', endDate: '', inspector: '', approver: '', remarks: '' },
+              { typeOfPermit: '', startDate: '', endDate: '', inspector: '', approver: '', remarks: '' }
+            ],
+            firstAidAccident: '',
+            otherActivities: '',
+            hsePhotoReferences: []
+          },
+          photos: {
+            title: 'Site Activities Photos',
+            locations: []
+          },
+          constructionIssues: [],
+          masterSchedule: [],
+          constructionProgress: {
+            projectInfo: {
+              project: '',
+              subtitle: '',
+              date: '',
+              revision: ''
+            },
+            items: []
+          }
+        }
+      };
+
+      const response = await createWeeklyReport(newReportData);
+      if (response.success && response.data) {
+        const newId = (response.data as any)._id || response.data.id;
+        if (newId) {
+          setCurrentReportId(newId);
+          // Update URL to include new report ID
+          const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+          window.history.replaceState({}, '', newUrl);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error creating new weekly report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create new weekly report.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Internal save logic that can be called from both save and submit functions
+  const handleSaveAsDraftInternal = async () => {
     let reportData: any;
     try {
       // Helper function to format rows with displayIndex
@@ -497,20 +671,7 @@ const WeeklyReport = () => {
       };
 
       // Use QAQC data from state (like other sections)
-      const qaqcDataForSave = qaqcData || {
-        ncr: { items: [], comments: "" },
-        car: { items: [], comments: "" },
-        scar: { items: [], comments: "" },
-        pmsi: { items: [], comments: "" },
-        csi: { items: [], comments: "" },
-        ir: { items: [], comments: "" },
-        mfa: { items: [], comments: "" },
-        rfi: { items: [], comments: "" },
-        rfa: { items: [], comments: "" },
-        fcr: { items: [], comments: "" },
-        vo: { items: [], comments: "" },
-        tr: { items: [], comments: "" }
-      };
+      const qaqcDataForSave = qaqcData || [];
 
       // Helper function to convert File objects to base64 strings
       const convertImagesToBase64 = async (photoReferences: any[]) => {
@@ -608,18 +769,25 @@ const WeeklyReport = () => {
       // Convert Schedule data to backend format using Supabase
       let scheduleDataForSave = [];
 
-      if (scheduleSections && scheduleSections.length > 0) {
-        // Convert entries to Supabase URLs
-        scheduleDataForSave = await convertScheduleEntriesToSupabase(
-          scheduleSections[0].entries,
-          currentReportId || 'temp-report-id'
+      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
+        // Filter out empty entries before conversion
+        const validEntries = scheduleSections[0].entries.filter(entry => 
+          entry.title || entry.file || entry.fileName || entry.supabaseUrl
         );
+        
+        if (validEntries.length > 0) {
+          // Convert entries to Supabase URLs
+          scheduleDataForSave = await convertScheduleEntriesToSupabase(
+            validEntries,
+            currentReportId || 'temp-report-id'
+          );
 
-        // Remove file objects that shouldn't be sent to backend
-        scheduleDataForSave = scheduleDataForSave.map(entry => {
-          const { file, ...entryWithoutFile } = entry;
-          return entryWithoutFile;
-        });
+          // Remove file objects that shouldn't be sent to backend
+          scheduleDataForSave = scheduleDataForSave.map(entry => {
+            const { file, ...entryWithoutFile } = entry;
+            return entryWithoutFile;
+          });
+        }
       }
 
       if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
@@ -650,21 +818,21 @@ const WeeklyReport = () => {
 
       // Collect all form data
       reportData = {
-        projectName: sharedData.projectName,
+        projectName: sharedData.projectName || 'Default Project',
         weekNumber: parseInt(sharedData.weekNumber) || 1,
         startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
         endDate: new Date().toISOString().split('T')[0],
         sections: {
           cover: {
-            projectName: sharedData.projectName,
+            projectName: sharedData.projectName || 'Default Project',
             reportTitle: 'Weekly Progress Report',
-            weekNumber: sharedData.weekNumber,
-            dateRange: sharedData.dateRange,
+            weekNumber: sharedData.weekNumber || '1',
+            dateRange: sharedData.dateRange || '',
             contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
             clientName: sharedData.employer || 'Client Name',
             contractNumber: '', // Add contract number field if needed
             coverImage: sharedData.coverImage || '',
-            projectTitle: sharedData.projectName,
+            projectTitle: sharedData.projectName || 'Default Project',
             employer: sharedData.employer || 'Client Name'
           },
           letter: {
@@ -708,10 +876,43 @@ const WeeklyReport = () => {
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
           // NEW: Add Schedule section to save payload
-          masterSchedule: scheduleDataForSave
+          masterSchedule: scheduleDataForSave,
+          // NEW: Add Construction Progress section to save payload with rolling total logic
+          constructionProgress: (() => {
+            const data = constructionProgressHook.constructionData;
+            if (!data || !data.items) {
+              return {
+                projectInfo: {
+                  project: "",
+                  subtitle: "",
+                  date: "",
+                  revision: ""
+                },
+                items: []
+              };
+            }
+            
+            // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
+            return {
+              ...data,
+              items: data.items.map(item => ({
+                ...item,
+                previousWeek: {
+                  qty: item.upToThisWeek.qty,
+                  amount: item.upToThisWeek.amount,
+                  percentage: item.upToThisWeek.percentage
+                },
+                thisWeek: {
+                  qty: 0,
+                  amount: 0,
+                  percentage: 0
+                }
+              }))
+            };
+          })()
         }
       };
-
+      
       // Convert HSES photo references to base64 before saving
       if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
         hsesDataForSave.hsePhotoReferences = await convertImagesToBase64(hsesDataForSave.hsePhotoReferences);
@@ -725,25 +926,79 @@ const WeeklyReport = () => {
           sections: reportData.sections,
           status: 'draft' as const
         };
+        // DEBUG: Log HSES data being sent
+        if (updateData.sections?.hses) {
+        }
         response = await updateWeeklyReport(currentReportId, updateData);
+        // Ensure currentReportId is set after successful update
+        if (response.success) {
+          const updatedId = (response.data as any)?._id || response.data?.id || currentReportId;
+          setCurrentReportId(updatedId);
+          // Update URL to include the report ID
+          const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+          window.history.replaceState({}, '', newUrl);
+          
+          // Update local construction progress state with rolling total and This Week reset
+          const currentData = constructionProgressHook.constructionData;
+          if (currentData && currentData.items) {
+            const updatedData = {
+              ...currentData,
+              items: currentData.items.map(item => ({
+                ...item,
+                previousWeek: {
+                  qty: item.upToThisWeek.qty,
+                  amount: item.upToThisWeek.amount,
+                  percentage: item.upToThisWeek.percentage
+                },
+                thisWeek: {
+                  qty: 0,
+                  amount: 0,
+                  percentage: 0
+                }
+              }))
+            };
+            constructionProgressHook.updateConstructionData(updatedData);
+          }
+        }
       } else {
         // Create new report
         response = await createWeeklyReport(reportData);
-        if (response.success && response.data?.id) {
-          setCurrentReportId(response.data.id);
-          // Update URL to include new report ID
-          const newUrl = `${window.location.pathname}?reportId=${response.data.id}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
-          window.history.replaceState({}, '', newUrl);
+        if (response.success && response.data) {
+          const newId = (response.data as any)._id || response.data.id;
+          if (newId) {
+            setCurrentReportId(newId);
+            // Update URL to include new report ID
+            const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+            window.history.replaceState({}, '', newUrl);
+            
+            // Update local construction progress state with rolling total and This Week reset
+            const currentData = constructionProgressHook.constructionData;
+            if (currentData && currentData.items) {
+              const updatedData = {
+                ...currentData,
+                items: currentData.items.map(item => ({
+                  ...item,
+                  previousWeek: {
+                    qty: item.upToThisWeek.qty,
+                    amount: item.upToThisWeek.amount,
+                    percentage: item.upToThisWeek.percentage
+                  },
+                  thisWeek: {
+                    qty: 0,
+                    amount: 0,
+                    percentage: 0
+                  }
+                }))
+              };
+              constructionProgressHook.updateConstructionData(updatedData);
+            }
+          }
         }
       }
 
       if (response.success) {
-        toast({
-          title: "Saved",
-          description: currentReportId
-            ? "Weekly report updated successfully."
-            : "Weekly report created successfully.",
-        });
+        // Return the response for the calling function to handle
+        return response;
       } else {
         throw new Error(response.error || 'Save failed');
       }
@@ -754,14 +1009,45 @@ const WeeklyReport = () => {
       // Log specific validation errors
       if (error.message && error.message.includes('Validation failed')) {
         console.error('Validation error - checking data structure...');
-        console.log('Report data being sent:', JSON.stringify(reportData, null, 2));
 
         // Check each section for potential issues
         if (reportData.sections?.masterSchedule) {
-          console.log('Master schedule data:', JSON.stringify(reportData.sections.masterSchedule, null, 2));
+          // Validate each master schedule entry
+          reportData.sections.masterSchedule.forEach((entry, index) => {
+            if (!entry.id) console.error(`Entry ${index}: Missing id`);
+            if (!entry.type) console.error(`Entry ${index}: Missing type`);
+            if (!entry.title) console.error(`Entry ${index}: Missing title`);
+            if (!entry.date) console.error(`Entry ${index}: Missing date`);
+            if (!entry.fileName) console.error(`Entry ${index}: Missing fileName`);
+          });
         }
+        
+        // Check other required fields
+        if (!reportData.projectName) console.error('Missing projectName');
+        if (!reportData.weekNumber) console.error('Missing weekNumber');
+        if (!reportData.startDate) console.error('Missing startDate');
+        if (!reportData.endDate) console.error('Missing endDate');
       }
 
+      // Re-throw the error for the calling function to handle
+      throw error;
+    }
+  };
+
+  // Public save function that includes loading state
+  const handleSaveAsDraft = async () => {
+    setIsSaving(true);
+    try {
+      await handleSaveAsDraftInternal();
+      
+      toast({
+        title: "Saved",
+        description: currentReportId
+          ? "Weekly report updated successfully."
+          : "Weekly report created successfully.",
+      });
+    } catch (error) {
+      console.error('Save error:', error);
       toast({
         title: "Save Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -773,18 +1059,28 @@ const WeeklyReport = () => {
   };
 
   const handleSubmit = async () => {
-    if (!currentReportId) {
-      toast({
-        title: "Cannot Submit",
-        description: "Please save the report as draft first before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSaving(true);
+    setIsSubmitting(true);
     try {
-      const response = await submitWeeklyReport(currentReportId);
+      let reportId = currentReportId;
+      
+      // If no report ID exists, save as draft first
+      if (!currentReportId) {
+        // Call the same save logic as handleSaveAsDraft
+        const saveResponse = await handleSaveAsDraftInternal();
+        
+        if (saveResponse?.success && saveResponse?.data) {
+          const newId = (saveResponse.data as any)._id || saveResponse.data.id;
+          if (newId) {
+            reportId = newId;
+          } else {
+            throw new Error('Save succeeded but no report ID was returned');
+          }
+        } else {
+          throw new Error('Failed to save report before submission');
+        }
+      }
+
+      const response = await submitWeeklyReport(reportId);
 
       if (response.success) {
         setReportStatus("submitted");
@@ -810,7 +1106,7 @@ const WeeklyReport = () => {
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -971,11 +1267,11 @@ const WeeklyReport = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full overflow-hidden">
+      <div className="flex min-h-screen w-full">
         <HierarchicalSidebar />
 
         <SidebarInset>
-          <div className="h-screen flex flex-col bg-background">
+          <div className="flex flex-col bg-background">
             {/* Report Header with Company and Client Logos */}
             <ReportHeader
               projectLogo={projectLogo}
@@ -984,7 +1280,7 @@ const WeeklyReport = () => {
             />
 
             {/* Navigation Bar */}
-            <div className="w-full px-4 sm:px-6 py-4 sticky top-0 z-5 bg-background/95 backdrop-blur-sm border-b shadow-sm">
+            <div className="w-full px-4 sm:px-6 py-4 sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <SidebarTrigger />
@@ -1019,7 +1315,6 @@ const WeeklyReport = () => {
                     variant={activeTab === "construction-progress" ? "default" : "outline"}
                     size="sm"
                     onClick={() => {
-                      console.log("Con.Prog tab clicked, setting activeTab to construction-progress");
                       setActiveTab("construction-progress");
                       setShowSecondNav(false);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1058,7 +1353,7 @@ const WeeklyReport = () => {
                     }
                     size="sm"
                     onClick={() => {
-                      debugSetActiveTab("table-of-content");
+                      setActiveTab("table-of-content");
                       setShowSecondNav(true);
                       setShowIntroduction(false); // Always reset intro view when switching to TOC tab
                       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1085,7 +1380,7 @@ const WeeklyReport = () => {
               activeTab === "issues" ||
               activeTab === "schedule") &&
               showSecondNav && (
-                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-4 bg-background/95 backdrop-blur-sm border-b shadow-sm">
+                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
                   <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                     {tableOfContentSections.map((section) => {
                       // Determine if this section is currently active
@@ -1106,57 +1401,53 @@ const WeeklyReport = () => {
                           variant={isActiveSection ? "default" : "outline"}
                           size="sm"
                           onClick={() => {
-                            console.log(
-                              "Second nav button clicked, section.id:",
-                              section.id,
-                            );
                             if (section.id === 1) {
                               setShowIntroduction(true);
-                              debugSetActiveTab("table-of-content");
+                              setActiveTab("table-of-content");
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 2) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("overall-progress");
+                              setActiveTab("overall-progress");
                               if (setShowSecondNav) setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 3) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("activities");
+                              setActiveTab("activities");
                               if (setShowSecondNav) setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 4) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("qaqc-status");
+                              setActiveTab("qaqc-status");
                               if (setShowSecondNav) setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 5) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("hses");
+                              setActiveTab("hses");
                               setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 6) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("resource");
+                              setActiveTab("resource");
                               setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 7) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("photos");
+                              setActiveTab("photos");
                               setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 8) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("issues");
+                              setActiveTab("issues");
                               setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (section.id === 9) {
                               setShowIntroduction(false);
-                              debugSetActiveTab("schedule");
+                              setActiveTab("schedule");
                               setShowSecondNav(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             } else {
                               setShowIntroduction(false);
-                              debugSetActiveTab("table-of-content");
+                              setActiveTab("table-of-content");
                               const element = document.querySelector(
                                 section.href,
                               );
@@ -1207,11 +1498,10 @@ const WeeklyReport = () => {
 
               {activeTab === "construction-progress" && (
                 <>
-                  {console.log("construction-progress tab is active")}
                   <div className="flex flex-col bg-card rounded-lg border">
                     <WeeklyReportConstructionProgress
-                      data={constructionProgressData}
-                      onDataChange={(data) => setConstructionProgressData(data)}
+                      data={constructionProgressHook.constructionData}
+                      onDataChange={handleConstructionProgressChange}
                       reportId={currentReportId}
                     />
                   </div>
@@ -1225,7 +1515,7 @@ const WeeklyReport = () => {
                       showIntroduction={showIntroduction}
                       setShowIntroduction={setShowIntroduction}
                       projectLogo={sharedData.coverImage}
-                      setActiveTab={debugSetActiveTab}
+                      setActiveTab={setActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
@@ -1255,7 +1545,7 @@ const WeeklyReport = () => {
                       showIntroduction={showIntroduction}
                       setShowIntroduction={setShowIntroduction}
                       projectLogo={sharedData.coverImage}
-                      setActiveTab={debugSetActiveTab}
+                      setActiveTab={setActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
@@ -1300,7 +1590,7 @@ const WeeklyReport = () => {
                       showIntroduction={showIntroduction}
                       setShowIntroduction={setShowIntroduction}
                       projectLogo={sharedData.coverImage}
-                      setActiveTab={debugSetActiveTab}
+                      setActiveTab={setActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
@@ -1325,7 +1615,7 @@ const WeeklyReport = () => {
                       showIntroduction={showIntroduction}
                       setShowIntroduction={setShowIntroduction}
                       projectLogo={sharedData.coverImage}
-                      setActiveTab={debugSetActiveTab}
+                      setActiveTab={setActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
@@ -1350,7 +1640,7 @@ const WeeklyReport = () => {
                       showIntroduction={showIntroduction}
                       setShowIntroduction={setShowIntroduction}
                       projectLogo={sharedData.coverImage}
-                      setActiveTab={debugSetActiveTab}
+                      setActiveTab={setActiveTab}
                       setShowSecondNav={setShowSecondNav}
                       activeTab={activeTab}
                       sharedData={sharedData}
@@ -1443,13 +1733,13 @@ const WeeklyReport = () => {
                         </div>
                       </div>
                       {issuesHook.issuesData.map((issue, index) => (
-                        <ConstructionIssue
+                        <ConstructionIssueComponent
                           key={issue.id}
                           issueNumber={index + 1}
-                          siteLocation={issue.location}
-                          problems={issue.problem}
+                          location={issue.location}
+                          problem={issue.problem}
                           actionBy={issue.actionBy}
-                          photoReference={issue.photo as string | null}
+                          photo={issue.photo as string | null}
                           onRemove={() => {
                             issuesHook.removeIssue(index);
                           }}
@@ -1500,10 +1790,10 @@ const WeeklyReport = () => {
                     <Button
                       variant="outline"
                       className="min-w-[140px]"
-                      disabled={isSaving}
+                      disabled={isSaving || isSubmitting}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? "Processing..." : "Save As..."}
+                      {isSaving || isSubmitting ? "Processing..." : "Save As..."}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -1512,7 +1802,10 @@ const WeeklyReport = () => {
                   >
                     <DropdownMenuItem
                       onClick={handleSaveAsDraft}
-                      disabled={isSaving}
+                      disabled={
+                        isSaving ||
+                        reportStatus === "submitted"
+                      }
                       className={
                         reportStatus === "submitted"
                           ? "opacity-50 cursor-not-allowed"
@@ -1527,7 +1820,7 @@ const WeeklyReport = () => {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleSubmit}
-                      disabled={isSaving}
+                      disabled={isSubmitting}
                       className={
                         reportStatus === "submitted"
                           ? "bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer"
@@ -1535,7 +1828,7 @@ const WeeklyReport = () => {
                       }
                     >
                       <Send className="w-4 h-4 mr-2" />
-                      {isSaving ? "Submitting..." : "Submitted"}
+                      {isSubmitting ? "Submitting..." : "Submitted"}
                       {reportStatus === "submitted" && (
                         <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
                       )}

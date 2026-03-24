@@ -30,11 +30,37 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === "dark";
 
+  // Helper function to format date to yyyy-MM-dd
+  const formatDateToYYYYMMDD = (dateStr: string): string => {
+    if (!dateStr) return new Date().toISOString().split("T")[0];
+    
+    // If already in correct format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    
+    // Try to parse DD-MMM-YY format
+    const match = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/);
+    if (match) {
+      const day = match[1].padStart(2, "0");
+      const monthMap: { [key: string]: string } = {
+        Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+        Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12"
+      };
+      const month = monthMap[match[2]] || "01";
+      const year = "20" + match[3];
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Fallback to today's date
+    return new Date().toISOString().split("T")[0];
+  };
+
   const [letterData, setLetterData] = useState({
     weekNumber: data.weekNumber || "",
     dateRange: data.dateRange || "",
     projectName: data.projectName || "",
-    reportDate: data.reportDate || new Date().toISOString().split("T")[0],
+    reportDate: data.reportDate ? formatDateToYYYYMMDD(data.reportDate) : new Date().toISOString().split("T")[0],
     recipientCompany: data.recipientCompany || "",
     recipientLocation: data.recipientLocation || "",
     recipientName: data.recipientName || "",
@@ -99,6 +125,10 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
         dateRange: data.dateRange || prev.dateRange,
         projectName: data.projectName || prev.projectName,
         refNoPrefix: data.refNoPrefix || prev.refNoPrefix,
+        // Preserve signatory data if it exists in parent data, otherwise keep current values
+        signatureImage: data.signatureImage !== undefined ? data.signatureImage : prev.signatureImage,
+        signatoryName: data.signatoryName !== undefined ? data.signatoryName : prev.signatoryName,
+        companyEmail1: data.companyEmail1 !== undefined ? data.companyEmail1 : prev.companyEmail1,
       };
 
       // Auto-update recipientCompany with employer data
@@ -114,54 +144,19 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
     data.projectName,
     data.refNoPrefix,
     data.employer,
+    data.signatureImage,
+    data.signatoryName,
+    data.companyEmail1,
   ]);
 
-  // Auto-set report date based on date range
+  // Always use today's date for report date
   useEffect(() => {
-    if (letterData.dateRange) {
-      // Extract the last day from date range format "DD-MMM-YY ~ DD-MMM-YY"
-      const match = letterData.dateRange.match(
-        /(\d{1,2}-[A-Za-z]{3}-\d{2})\s*~\s*(\d{1,2}-[A-Za-z]{3}-\d{2})/,
-      );
-      if (match && match[2]) {
-        // Convert "DD-MMM-YY" to "YYYY-MM-DD" format
-        const lastDayStr = match[2];
-        const parts = lastDayStr.split("-");
-        if (parts.length === 3) {
-          const day = parts[0].padStart(2, "0");
-          const monthMap: { [key: string]: string } = {
-            Jan: "01",
-            Feb: "02",
-            Mar: "03",
-            Apr: "04",
-            May: "05",
-            Jun: "06",
-            Jul: "07",
-            Aug: "08",
-            Sep: "09",
-            Oct: "10",
-            Nov: "11",
-            Dec: "12",
-          };
-          const month = monthMap[parts[1]] || "01";
-          const year = "20" + parts[2]; // Convert YY to YYYY
-          const formattedDate = `${year}-${month}-${day}`;
-
-          if (formattedDate !== letterData.reportDate) {
-            setLetterData((prev) => ({ ...prev, reportDate: formattedDate }));
-            onDataChange?.({ ...letterData, reportDate: formattedDate });
-          }
-        }
-      }
-    } else {
-      // If no date range, use today's date
-      const today = new Date().toISOString().split("T")[0];
-      if (today !== letterData.reportDate) {
-        setLetterData((prev) => ({ ...prev, reportDate: today }));
-        onDataChange?.({ ...letterData, reportDate: today });
-      }
+    const today = new Date().toISOString().split("T")[0];
+    if (today !== letterData.reportDate) {
+      setLetterData((prev) => ({ ...prev, reportDate: today }));
+      onDataChange?.({ ...letterData, reportDate: today });
     }
-  }, [letterData.dateRange]);
+  }, []);
 
   return (
     <div
@@ -236,7 +231,7 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
                     value={letterData.reportDate}
                     showIndicator={false}
                     onChange={(e) =>
-                      handleFieldChange("reportDate", e.target.value)
+                      handleFieldChange("reportDate", e.target.value, letterData, setLetterData, onDataChange)
                     }
                     className={`pl-8 sm:pl-10 w-full border-2 focus:border-blue-500 focus:outline-none transition-colors text-sm ${isDark ? "bg-slate-800/50 border-slate-600/50 text-white" : "bg-white/80 border-slate-200/60 text-slate-900"}`}
                   />

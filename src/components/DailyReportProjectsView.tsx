@@ -57,36 +57,26 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
     try {
       setLoading(true);
       
-      console.log("🔍 DEBUG: Fetching company reports...");
       let response;
       
       if (selectedLocation) {
         // Use location-specific endpoint
-        console.log("🔍 DEBUG: Fetching reports for location:", selectedLocation);
         response = await getReportsByLocation(selectedLocation);
       } else {
         // Use regular company reports endpoint
-        console.log("🔍 DEBUG: Fetching all company reports");
         response = await getCompanyReports();
       }
       
       console.log("🔍 DEBUG: Company reports response:", response);
       
       const allReports = response.reports || response || [];
-      console.log("🔍 DEBUG: All reports count:", allReports.length);
-      console.log("🔍 DEBUG: All reports:", allReports.map(r => ({
-        projectName: r.projectName,
-        location: r.location,
-        userId: r.userId,
-        userName: r.userId?.firstName ? `${r.userId.firstName} ${r.userId.lastName}` : 'Unknown'
-      })));
+      
       
       // Group reports by project
       const projectMap = new Map<string, Project>();
       
       allReports.forEach((report: Report) => {
         const projectName = report.projectName || 'Untitled Project';
-        console.log("🔍 DEBUG: Processing report for project:", projectName, "location:", report.location);
         
         if (!projectMap.has(projectName)) {
           projectMap.set(projectName, {
@@ -112,7 +102,6 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
       });
       
       const projects = Array.from(projectMap.values());
-      console.log("🔍 DEBUG: Final projects:", projects);
       
       setProjects(projects);
     } catch (error) {
