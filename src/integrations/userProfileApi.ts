@@ -23,8 +23,6 @@ export interface UpdateProfileData {
 
 export const getUserProfile = async (): Promise<{ success: boolean; data: UserProfile }> => {
   try {
-    console.log("DEBUG FRONTEND: Fetching user profile");
-    
     const response = await apiGet(API_ENDPOINTS.USER.PROFILE);
     
     if (!response.ok) {
@@ -33,7 +31,6 @@ export const getUserProfile = async (): Promise<{ success: boolean; data: UserPr
     }
     
     const result = await response.json();
-    console.log("DEBUG FRONTEND: Profile fetched successfully:", result);
 
     // 🔥 TRANSFORM: Handle both response formats for compatibility
     if (result.success) {
@@ -54,15 +51,12 @@ export const getUserProfile = async (): Promise<{ success: boolean; data: UserPr
 
     return result;
   } catch (error) {
-    console.error("DEBUG FRONTEND: Error fetching profile:", error);
     throw error;
   }
 };
 
 export const updateUserProfile = async (profileData: UpdateProfileData): Promise<{ success: boolean; data: UserProfile }> => {
   try {
-    console.log("DEBUG FRONTEND: Updating user profile:", profileData);
-    
     const response = await apiPut(API_ENDPOINTS.USER.PROFILE, profileData);
     
     if (!response.ok) {
@@ -71,7 +65,6 @@ export const updateUserProfile = async (profileData: UpdateProfileData): Promise
     }
     
     const result = await response.json();
-    console.log("DEBUG FRONTEND: Profile updated successfully:", result);
 
     // 🔥 TRANSFORM: Handle both response formats for compatibility
     if (result.success) {
@@ -92,15 +85,12 @@ export const updateUserProfile = async (profileData: UpdateProfileData): Promise
 
     return result;
   } catch (error) {
-    console.error("DEBUG FRONTEND: Error updating profile:", error);
     throw error;
   }
 };
 
 export const uploadProfilePicture = async (file: File): Promise<{ success: boolean; data: { path: string } }> => {
   try {
-    console.log("DEBUG FRONTEND: Uploading profile picture");
-    
     const formData = new FormData();
     formData.append('profilePicture', file);
     
@@ -126,10 +116,8 @@ export const uploadProfilePicture = async (file: File): Promise<{ success: boole
     }
     
     const result = await response.json();
-    console.log("DEBUG FRONTEND: Profile picture uploaded successfully:", result);
     return result;
   } catch (error) {
-    console.error("DEBUG FRONTEND: Error uploading profile picture:", error);
     throw error;
   }
 };

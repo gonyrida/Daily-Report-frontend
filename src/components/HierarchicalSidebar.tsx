@@ -115,13 +115,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     const getUserInfo = async () => {
       try {
         const response = await apiGet('/auth/profile');
-        const data = await response.json();  // ← ADD THIS LINE
-
-        console.log("DEBUG: Full user response:", data);  // ← ADD THIS
+        const data = await response.json();
 
         if (data.success && data.user?._id) {
-          console.log("DEBUG: Setting currentUserId to:", data.user._id);
-          setCurrentUserId(data.user._id);  // ← Use _id instead of userId
+          setCurrentUserId(data.user._id);
         }
       } catch (error) {
         console.error('Failed to get user info:', error);

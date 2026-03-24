@@ -313,6 +313,17 @@ export interface UpdateWeeklyReportRequest {
 }
 
 /**
+ * Construction issue entry - matches backend schema
+ */
+export interface ConstructionIssue {
+  no: string;
+  location: string;
+  problem: string;
+  actionBy: string;
+  photo: string;
+}
+
+/**
  * Section-specific update requests
  */
 export interface UpdateActivitiesRequest {

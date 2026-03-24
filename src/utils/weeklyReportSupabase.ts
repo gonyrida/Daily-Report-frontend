@@ -152,16 +152,22 @@ export const convertScheduleEntriesToSupabase = async (
   const convertedEntries: MasterScheduleEntry[] = [];
 
   for (const entry of entries) {
+    // Skip entries that are completely empty (no title, no file, no data)
+    if (!entry.title && !entry.file && !entry.fileName && !entry.supabaseUrl) {
+      console.log('DEBUG: Skipping empty entry:', entry);
+      continue;
+    }
+
     let convertedEntry: MasterScheduleEntry = {
       id: entry.id || crypto.randomUUID(),
       type: entry.type || 'document',
-      title: entry.title || '',
+      title: entry.title || 'Untitled Document',
       description: entry.description || '',
       date: entry.date || new Date().toISOString().split('T')[0],
       caption: entry.caption || '',
-      fileName: entry.fileName || '',
+      fileName: entry.fileName || (entry.file ? entry.file.name : 'document.pdf'),
       fileSize: entry.fileSize || 0,
-      fileType: entry.fileType || ''
+      fileType: entry.fileType || 'application/pdf'
     };
 
     // Handle file upload if File object exists

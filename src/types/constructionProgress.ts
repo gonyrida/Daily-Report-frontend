@@ -26,6 +26,9 @@ export interface ConstructionProgressItem {
   remaining: ProgressData;
   nextWeekPlan: ProgressData;
   upToNextWeekPlan: ProgressData;
+  source?: 'manual' | 'bulk';
+  bulkImportId?: string;
+  addedAt?: Date;
 }
 
 export interface ProjectInfo { 

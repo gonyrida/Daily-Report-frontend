@@ -26,7 +26,6 @@ export const useIntroductionText = (projectLogo: string = "") => {
       const saved = localStorage.getItem(INTRODUCTION_STORAGE_KEY);
       if (saved) {
         const data = JSON.parse(saved);
-        console.log('[useIntroductionText] Loaded saved designNConstruction:', data.designNConstruction);
         return data.designNConstruction || "";
       }
     } catch (e) {
@@ -61,7 +60,6 @@ export const useIntroductionText = (projectLogo: string = "") => {
     const timeoutId = setTimeout(() => {
       try {
         localStorage.setItem(INTRODUCTION_STORAGE_KEY, JSON.stringify(dataToSave));
-        console.log('[useIntroductionText] Saved data to localStorage:', dataToSave);
       } catch (e) {
         console.error('[useIntroductionText] Failed to save data:', e);
       }

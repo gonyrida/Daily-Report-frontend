@@ -32,6 +32,7 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false); // Track if initial data has loaded
 
   // Save schedule to database
   const saveScheduleToDatabase = async (updatedEntries: MasterScheduleEntry[]) => {
@@ -42,7 +43,6 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
 
     setIsSaving(true);
     try {
-      console.log('Saving schedule to database:', updatedEntries);
       
       // Convert entries to backend format (remove file objects if present)
       const entriesForSave = updatedEntries.map(entry => {
@@ -67,7 +67,6 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
         });
       }
     } catch (error) {
-      console.error('Error saving schedule to database:', error);
       toast({
         title: "Save Error",
         description: "An error occurred while saving the schedule",
@@ -98,18 +97,19 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   const handleChange = (updatedEntries: MasterScheduleEntry[]) => {
     onChange(updatedEntries);
     
-    if (reportId) {
+    // Only save to database if we've already loaded initial data
+    if (reportId && hasLoaded) {
       debouncedSave(updatedEntries);
     }
   };
 
   // Save schedule when reportId changes from undefined to real ID
   useEffect(() => {
-    if (reportId && entries.length > 0) {
+    if (reportId && entries.length > 0 && hasLoaded) {
       console.log('ReportId changed to valid ID, saving schedule to database');
       saveScheduleToDatabase(entries);
     }
-  }, [reportId]);
+  }, [reportId, hasLoaded]);
 
   const handleFileUpload = async (files: FileList | null, entryType: 'document' | 'image' | 'chart') => {
     if (!files || files.length === 0) return;
@@ -215,10 +215,18 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
     return `${mb.toFixed(1)} MB`;
   };
 
-  // Debug: Log current entries state
+  // Debug: Log current entries state and track initial load
   useEffect(() => {
-    // Component state monitoring
-  }, [entries, reportId]);
+    // Mark as loaded once we receive entries (initial data load)
+    if (entries.length > 0 && !hasLoaded) {
+      console.log('Initial entries loaded, count:', entries.length);
+      setHasLoaded(true);
+    }
+    // Also mark as loaded if we have no entries (empty state is also a valid loaded state)
+    if (entries.length === 0 && !hasLoaded) {
+      setHasLoaded(true);
+    }
+  }, [entries, hasLoaded]);
 
   return (
     <div className="space-y-4">

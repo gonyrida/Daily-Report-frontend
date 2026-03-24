@@ -28,8 +28,6 @@ import { AddRowsModal } from './AddRowsModal';
 const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgressProps> = ({
   data, onDataChange, reportId
 }) => {
-  console.log('🔧 WeeklyReportConstructionProgress rendered with data:', data);
-  console.log('🔧 WeeklyReportConstructionProgress reportId:', reportId);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingCell, setEditingCell] = useState<EditableCell | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -96,7 +94,6 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const handleProjectInfoChange = (field: keyof typeof localProjectInfo, value: string) => {
     const updated = { ...localProjectInfo, [field]: value };
     setLocalProjectInfo(updated);
-    console.log('🔧 handleProjectInfoChange calling onDataChange with:', { ...currentData, projectInfo: updated, items: currentData?.items || [] });
     if (onDataChange) onDataChange({ ...currentData, projectInfo: updated, items: currentData?.items || [] });
   };
 
@@ -213,7 +210,6 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     setItems(computed);
     
     const updatedData = { ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } };
-    console.log('🔧 saveEdit calling onDataChange with updatedData:', updatedData);
     if (onDataChange) onDataChange(updatedData);
     setEditingCell(null); setEditValue('');
   };
@@ -470,27 +466,6 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
             className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex items-center gap-2"
           >
             <Plus size={16} /> Add Rows
-          </button>
-          {/* Debug test button */}
-          <button
-            onClick={() => {
-              console.log('🔧 Test button clicked - current data:', currentData);
-              if (onDataChange) {
-                const testData = {
-                  ...currentData,
-                  projectInfo: {
-                    ...currentData?.projectInfo,
-                    project: currentData?.projectInfo?.project + ' (test)'
-                  },
-                  items: currentData?.items || []
-                };
-                console.log('🔧 Calling onDataChange with test data:', testData);
-                onDataChange(testData);
-              }
-            }}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
-          >
-            Test Data Change
           </button>
         </div>
 

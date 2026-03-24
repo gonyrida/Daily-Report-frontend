@@ -10,8 +10,6 @@ interface UseConstructionProgressOptions {
 export const useConstructionProgress = (options: UseConstructionProgressOptions = {}) => {
   const { reportId } = options;
   
-  console.log('🔍 useConstructionProgress hook called with reportId:', reportId);
-  
   const [constructionData, setConstructionData] = useState<ConstructionProgressData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -27,25 +25,19 @@ export const useConstructionProgress = (options: UseConstructionProgressOptions 
    */
   const loadConstructionProgress = useCallback(async () => {
     if (!reportId) {
-      console.log('🔍 loadConstructionProgress: No reportId provided, skipping load');
       return;
     }
 
-    console.log('🔍 loadConstructionProgress: Starting load for reportId:', reportId);
     setIsLoading(true);
     setError(null);
 
     try {
-      console.log('🔍 Loading construction progress for reportId:', reportId);
       const result = await ConstructionProgressService.getConstructionProgress(reportId);
-      console.log('🔍 Construction progress result:', result);
       
       if (result.success && result.data) {
-        console.log('🔍 Setting construction data:', result.data);
         setConstructionData(result.data);
         isModifiedRef.current = false;
       } else {
-        console.log('🔍 Failed to load construction progress:', result.error);
         setError(result.error || 'Failed to load construction progress');
         toast({
           title: "Error",
@@ -55,7 +47,7 @@ export const useConstructionProgress = (options: UseConstructionProgressOptions 
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('🔍 Exception in loadConstructionProgress:', error);
+      console.error('Exception in loadConstructionProgress:', error);
       setError(errorMessage);
       toast({
         title: "Error",
@@ -164,15 +156,11 @@ export const useConstructionProgress = (options: UseConstructionProgressOptions 
 
   // Load data when reportId changes
   useEffect(() => {
-    console.log('🔍 useConstructionProgress useEffect triggered with reportId:', reportId);
-    
     // Only reset if reportId changed from a valid value to null (user explicitly creating new report)
     // Don't reset on initial mount when reportId is null (URL params not yet parsed)
     if (reportId === undefined && prevReportIdRef.current !== undefined) {
-      console.log('🔍 reportId changed from valid to null, resetting construction data');
       resetConstructionData();
     } else if (reportId) {
-      console.log('🔍 Calling loadConstructionProgress...');
       loadConstructionProgress();
     }
     

@@ -24,10 +24,15 @@ export const useImageUpload = ({ coverData, setCoverData, onDataChange }: UseIma
       }
 
       try {
-        // For now, just store the file object - let the backend handle Supabase upload
-        const updatedData = { ...coverData, coverImage: file };
-        setCoverData(updatedData);
-        onDataChange?.(updatedData);
+        // Convert file to data URL for immediate display
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const updatedData = { ...coverData, coverImage: dataUrl };
+          setCoverData(updatedData);
+          onDataChange?.(updatedData);
+        };
+        reader.readAsDataURL(file);
       } catch (error) {
         console.error('Failed to process image:', error);
       }

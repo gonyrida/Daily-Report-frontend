@@ -1,17 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ConstructionIssueProps } from "@/types/constructionIssue.types";
 
 export const useConstructionIssue = (initialProps: ConstructionIssueProps) => {
   const [fields, setFields] = useState({
-    siteLocation: initialProps.siteLocation || "",
-    photoReference: initialProps.photoReference || "",
-    problems: initialProps.problems || "",
+    location: initialProps.location || "",
+    photo: initialProps.photo || "",
+    problem: initialProps.problem || "",
     actionBy: initialProps.actionBy || "",
   });
 
   const [slots, setSlots] = useState([
     { id: "construction-issue-photo", image: null, caption: "" },
   ]);
+
+  // Sync with external data when it changes (e.g., after loading from database)
+  useEffect(() => {
+    setFields({
+      location: initialProps.location || "",
+      photo: initialProps.photo || "",
+      problem: initialProps.problem || "",
+      actionBy: initialProps.actionBy || "",
+    });
+  }, [initialProps.location, initialProps.photo, initialProps.problem, initialProps.actionBy]);
 
   const update = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFields((f) => ({ ...f, [key]: e.target.value }));

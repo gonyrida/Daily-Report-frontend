@@ -40,24 +40,19 @@ export class ConstructionProgressService {
     reportId: string
   ): Promise<{ success: boolean; data?: ConstructionProgressData; error?: string }> {
     try {
-      console.log('🔍 ConstructionProgressService.getConstructionProgress: Starting API call for reportId:', reportId);
       const response = await apiGet(`/weekly-reports/${reportId}/construction-progress`);
-      console.log('🔍 ConstructionProgressService.getConstructionProgress: API response status:', response.status);
       
       const result = await response.json();
-      console.log('🔍 ConstructionProgressService.getConstructionProgress: API response data:', result);
 
       if (!response.ok) {
         throw new Error(result.error || 'Failed to get construction progress');
       }
 
-      console.log('🔍 ConstructionProgressService.getConstructionProgress: Success, returning data');
       return {
         success: true,
         data: result.data
       };
     } catch (error) {
-      console.error('🔍 ConstructionProgressService.getConstructionProgress: Error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'

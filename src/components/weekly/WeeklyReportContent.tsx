@@ -164,13 +164,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     });
     
     // Set parent state directly
-    console.log("🔧 DEBUG: Setting parent state with:", exampleData);
-    console.log("🔧 DEBUG: Setting hook state with:", frontendExampleData);
-    
     setQaqcData(exampleData);
     qaqcTableHook.setTableData(frontendExampleData);
-    
-    console.log("🔧 DEBUG: QAQC example data loaded to both states");
   };
 
   // Load example data for HSES sections
@@ -200,7 +195,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     exampleData.hsePhotoReferences = currentPhotoReferences;
 
     // Set parent state directly
-    console.log("🔧 DEBUG: Setting HSES example data:", exampleData);
     setHsesData(exampleData);
   };
 
@@ -333,7 +327,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   };
 
   if (showIntroduction) {
-    console.log("WeeklyReportContent: Showing Introduction");
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -378,7 +371,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle activities tab
   if (activeTab === "activities") {
-    console.log("WeeklyReportContent: Showing Activities, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -397,7 +389,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle qaqc-status tab
   if (activeTab === "qaqc-status") {
-    console.log("WeeklyReportContent: Showing QAQC Status, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <div className="flex items-center justify-between mb-3">
@@ -462,7 +453,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle hses tab
   if (activeTab === "hses") {
-    console.log("WeeklyReportContent: Showing HSES, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <div className="flex items-center justify-between mb-3">
@@ -487,7 +477,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle resource tab
   if (activeTab === "resource") {
-    console.log("WeeklyReportContent: Showing Resource, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -509,7 +498,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle overall-progress tab
   if (activeTab === "overall-progress") {
-    console.log("WeeklyReportContent: Showing OverallProgress, activeTab:", activeTab);
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -528,7 +516,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Only show table of content if activeTab is table-of-content and not showing introduction
   if (activeTab !== "table-of-content") {
-    console.log("WeeklyReportContent: Not rendering, activeTab:", activeTab);
     return null;
   }
 
