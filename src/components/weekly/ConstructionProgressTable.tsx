@@ -226,6 +226,9 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           }
           .sticky-col:nth-child(1) { left: 0px; }
           .sticky-col:nth-child(2) { left: 95px; }
+          .sticky-col:nth-child(3) { left: 345px; }
+          .sticky-col:nth-child(4) { left: 646px; }
+          .sticky-col:nth-child(5) { left: 698px; }
 
           /* First header row sticks at top */
           thead tr:nth-child(1) th {
@@ -252,6 +255,35 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             left: 95px;
             z-index: 40;
           }
+          thead tr:nth-child(1) th:nth-child(3) {
+            left: 345px;
+            z-index: 40;
+          }
+          thead tr:nth-child(1) th:nth-child(4) {
+            left: 646px;
+            z-index: 40;
+          }
+            thead tr:nth-child(2) th:nth-child(1) {
+            position: sticky;
+            left: 698px;
+            z-index: 40;
+          }
+            /* Second header row sticks BELOW the first row */
+        thead tr:nth-child(2) th {
+          position: sticky;
+          top: 38px;
+          z-index: 20;
+          background-color: rgb(52 73 94);
+        }
+
+        /* BoQ QTY sub-header also sticky horizontally */
+        thead tr:nth-child(2) th:nth-child(1) {
+          position: sticky;
+          top: 38px;
+          left: 698px;
+          z-index: 40;
+          background-color: rgb(52 73 94);
+        }
         `}</style>
         <table className="text-sm text-left border-collapse" style={{ tableLayout: 'fixed', minWidth: 'max-content' }}>
           <colgroup>
@@ -292,7 +324,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             {filteredItems.map((item, index) => (
               <tr key={index} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
                 {ALL_COLUMNS.map(field => (
-                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks'].includes(field) ? 'sticky-col' : ''}`}>
+                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks', 'detailDescription', 'unit', 'boQ.qty'].includes(field) ? 'sticky-col' : ''}`}>
                     {renderCell(item, index, field)}
                   </td>
                 ))}

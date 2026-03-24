@@ -614,7 +614,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                     <Collapsible open={weeklyReportOpen} onOpenChange={setWeeklyReportOpen}>
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
-                          <span className="flex items-center gap-2">
+                          <span 
+                            className="flex items-center gap-2 flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate('/weekly-report-projects');
+                            }}
+                          >
                             <Calendar className="h-3 w-3" />
                             Weekly Report
                           </span>

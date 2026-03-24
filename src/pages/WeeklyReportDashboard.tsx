@@ -12,19 +12,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  LayoutDashboard,
-  FileText,
   Plus,
+  Search,
   Calendar,
   TrendingUp,
   Clock,
-  Loader2,
-  Search,
-  ArrowLeft,
+  FileText,
   Edit,
-  Trash2,
+  Loader2,
   Building2,
   User,
+  CheckCircle,
+  LayoutDashboard,
+  ArrowLeft,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
@@ -32,6 +33,114 @@ import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getWeeklyReports } from "@/services/weeklyReportService";
 import type { WeeklyReport } from "@/types/weeklyReport.types";
+
+// Helper function to get the ISO week number
+const getWeekNumber = (date: Date): number => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+};
+
+// Helper function to count submitted reports this month
+const getSubmittedReportsThisMonth = (reports: WeeklyReport[]): number => {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  
+  return reports.filter(report => {
+    const reportDate = new Date(report.createdAt || report.startDate);
+    return (
+      (report.status === 'submitted' || report.status === 'approved') &&
+      reportDate.getMonth() === currentMonth &&
+      reportDate.getFullYear() === currentYear
+    );
+  }).length;
+};
+
+// Helper function to get last submitted report this month
+const getLastSubmittedThisMonth = (reports: WeeklyReport[]): WeeklyReport | null => {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  
+  const submittedThisMonth = reports.filter(report => {
+    const reportDate = new Date(report.createdAt || report.startDate);
+    return (
+      (report.status === 'submitted' || report.status === 'approved') &&
+      reportDate.getMonth() === currentMonth &&
+      reportDate.getFullYear() === currentYear &&
+      report.submittedAt // Must have a submitted date
+    );
+  });
+  
+  if (submittedThisMonth.length === 0) return null;
+  
+  // Sort by submittedAt date (most recent first)
+  return submittedThisMonth.sort((a, b) => 
+    new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+  )[0];
+};
+
+// Helper function to get the current week based on date ranges
+const getCurrentWeekBasedOnDate = (reports: WeeklyReport[]): number => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+  
+  // Find all reports with valid date ranges
+  const reportsWithDates = reports.filter(report => 
+    report.startDate && report.endDate && 
+    new Date(report.startDate) <= new Date(report.endDate)
+  );
+  
+  // Sort reports by start date to find the most recent
+  const sortedReports = reportsWithDates.sort((a, b) => 
+    new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+  );
+  
+  for (const report of sortedReports) {
+    const startDate = new Date(report.startDate);
+    const endDate = new Date(report.endDate);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999); // End of day
+    
+    // Check if today falls within this report's date range
+    if (today >= startDate && today <= endDate) {
+      return report.weekNumber;
+    }
+  }
+  
+  // If no matching date range found, find the next week number
+  return getNextWeekNumber(reports);
+};
+
+// Helper function to get next week number from last submitted report
+const getNextWeekNumber = (reports: WeeklyReport[]): number => {
+  const submittedReports = reports.filter(report => 
+    report.status === 'submitted' || report.status === 'approved'
+  );
+  
+  if (submittedReports.length === 0) {
+    // If no submitted reports, find the maximum week number from all reports
+    const maxWeek = Math.max(...reports.map(report => report.weekNumber), 0);
+    return maxWeek > 0 ? maxWeek + 1 : getWeekNumber(new Date());
+  }
+  
+  // Find the report with the highest week number among submitted reports
+  const lastSubmittedReport = submittedReports.reduce((latest, current) => 
+    current.weekNumber > latest.weekNumber ? current : latest
+  );
+  
+  let nextWeek = lastSubmittedReport.weekNumber + 1;
+  
+  // Make sure this week number doesn't conflict with any existing report
+  while (reports.some(report => report.weekNumber === nextWeek)) {
+    nextWeek++;
+  }
+  
+  return nextWeek;
+};
 
 const WeeklyReportDashboard = () => {
   const { toast } = useToast();
@@ -123,9 +232,7 @@ const WeeklyReportDashboard = () => {
   };
 
   const weeklyTotal = weeklyReports.filter(r => r.status === 'submitted').length;
-  const lastSubmitted = weeklyReports
-    .filter(r => r.status === 'submitted')
-    .sort((a, b) => new Date(b.submittedAt || b.updatedAt).getTime() - new Date(a.submittedAt || a.updatedAt).getTime())[0];
+  const lastSubmitted = getLastSubmittedThisMonth(filteredReports);
 
   return (
     <SidebarProvider>
@@ -201,7 +308,7 @@ const WeeklyReportDashboard = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-2xl font-bold">
-                        Week {Math.ceil(new Date().getDate() / 7)}
+                        Week {getCurrentWeekBasedOnDate(filteredReports)}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">Status:</span>
@@ -220,9 +327,9 @@ const WeeklyReportDashboard = () => {
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{weeklyTotal}</div>
+                  <div className="text-2xl font-bold">{getSubmittedReportsThisMonth(filteredReports)}</div>
                   <p className="text-xs text-muted-foreground">
-                    Weekly reports submitted
+                    Weekly reports submitted this month
                   </p>
                 </CardContent>
               </Card>
@@ -236,10 +343,10 @@ const WeeklyReportDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {lastSubmitted ? new Date(lastSubmitted.submittedAt || lastSubmitted.updatedAt).toLocaleDateString() : "None"}
+                    {lastSubmitted ? new Date(lastSubmitted.submittedAt).toLocaleDateString() : "None"}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Most recent submission
+                    Most recent submission this month
                   </p>
                 </CardContent>
               </Card>
