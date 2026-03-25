@@ -59,12 +59,14 @@ const WeeklyReport = () => {
   const selectedProject = searchParams.get('project');
   const reportId = searchParams.get('reportId');
   const createNew = searchParams.get('createNew');
+  const readOnly = searchParams.get('readOnly') === 'true';
   
   const [projectLogo, setProjectLogo] = useState<string>("/koica_logo.png");
   const [showIntroduction, setShowIntroduction] = useState(false);
   const [currentReportId, setCurrentReportId] = useState<string | null>(
-  (reportId && reportId !== 'undefined' && reportId !== 'null') ? reportId : null
-);
+    (reportId && reportId !== 'undefined' && reportId !== 'null') ? reportId : null
+  );
+  const [isReadOnly, setIsReadOnly] = useState(readOnly);
 
   // Sync currentReportId with URL searchParams and handle createNew
   useEffect(() => {
@@ -626,6 +628,16 @@ const WeeklyReport = () => {
 
   // Internal save logic that can be called from both save and submit functions
   const handleSaveAsDraftInternal = async () => {
+    // Prevent saving in read-only mode
+    if (isReadOnly) {
+      toast({
+        title: "Read-Only Mode",
+        description: "Cannot save another user's report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     let reportData: any;
     try {
       // Helper function to format rows with displayIndex
@@ -1074,6 +1086,16 @@ const WeeklyReport = () => {
   };
 
   const handleSubmit = async () => {
+    // Prevent submission in read-only mode
+    if (isReadOnly) {
+      toast({
+        title: "Read-Only Mode",
+        description: "Cannot submit another user's report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let reportId = currentReportId;
@@ -1485,6 +1507,20 @@ const WeeklyReport = () => {
                 This page is still implement
               </div>
 
+              {/* Read-Only Banner */}
+              {isReadOnly && (
+                <div className="bg-background border-l-4 border-yellow-400 p-4 m-4">
+                  <div className="flex items-center bg-background">
+                    <div className="ml-3">
+                      <p className="text-sm text-yellow-700">
+                        <strong>🔒 View Only Mode:</strong> You are viewing
+                        another user's report.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Tab-based content rendering */}
               {activeTab === "cover" && (
                 <>
@@ -1802,10 +1838,10 @@ const WeeklyReport = () => {
                     <Button
                       variant="outline"
                       className="min-w-[140px]"
-                      disabled={isSaving || isSubmitting}
+                      disabled={isSaving || isSubmitting || isReadOnly}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {isSaving || isSubmitting ? "Processing..." : "Save As..."}
+                      {isSaving || isSubmitting ? "Processing..." : (isReadOnly ? "Read-Only" : "Save As...")}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -1816,10 +1852,11 @@ const WeeklyReport = () => {
                       onClick={handleSaveAsDraft}
                       disabled={
                         isSaving ||
-                        reportStatus === "submitted"
+                        reportStatus === "submitted" ||
+                        isReadOnly
                       }
                       className={
-                        reportStatus === "submitted"
+                        reportStatus === "submitted" || isReadOnly
                           ? "opacity-50 cursor-not-allowed"
                           : ""
                       }
@@ -1832,9 +1869,9 @@ const WeeklyReport = () => {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleSubmit}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isReadOnly}
                       className={
-                        reportStatus === "submitted"
+                        reportStatus === "submitted" || isReadOnly
                           ? "bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer"
                           : ""
                       }

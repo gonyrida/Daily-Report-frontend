@@ -84,7 +84,7 @@ const handlePaginatedResponse = async <T>(response: Response): Promise<Paginated
 
     return {
       success: true,
-      data: data.data || data.items || [],
+      data: data.data || data.reports || data.items || [],  // ← ADD 'reports' fallback
       message: data.message,
       pagination: data.pagination || {
         page: data.page || 1,
@@ -101,6 +101,41 @@ const handlePaginatedResponse = async <T>(response: Response): Promise<Paginated
       pagination: {
         page: 1,
         limit: 10,
+        total: 0,
+        totalPages: 0
+      }
+    };
+  }
+};
+
+/**
+ * Get company-wide weekly reports (submitted only)
+ * Similar to getCompanyReports in reportsApi
+ */
+export const getCompanyWeeklyReports = async (
+  page: number = 1,
+  limit: number = 20,
+  search: string = "",
+  projectFilter?: string
+): Promise<PaginatedResponse<WeeklyReport>> => {
+  try {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search && { search }),
+      ...(projectFilter && { project: projectFilter }),
+    });
+
+    const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/company?${queryParams}`);
+    return handlePaginatedResponse<WeeklyReport>(response);
+  } catch (error) {
+    console.error("Error fetching company weekly reports:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch company weekly reports",
+      pagination: {
+        page: 1,
+        limit: 20,
         total: 0,
         totalPages: 0
       }
