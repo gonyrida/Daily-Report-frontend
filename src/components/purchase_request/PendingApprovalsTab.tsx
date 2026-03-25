@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet } from '@/lib/apiFetch';
-
+import PurchaseRequestDetail from './PurchaseRequestDetail';
 
 const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, onRefresh }) => {
   const [selectedRequests, setSelectedRequests] = useState([]);
@@ -227,10 +227,6 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
     
     // Find the first pending step in order
     const pendingStep = request.approvalWorkflow?.find(step => step.status === 'pending');
-    
-    console.log('request', request);
-    console.log('pendingStep', pendingStep);
-    console.log('approvalWorkflow', request.approvalWorkflow);
 
     if (!pendingStep) return 'Pending';
     
@@ -238,13 +234,10 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
     let userDetails = null;
     if (pendingStep.role === 'prepared') {
       userDetails = preparers.find(user => user._id === pendingStep.approver);
-      console.log('This is preparer',userDetails)
     } else if (pendingStep.role === 'checked') {
       userDetails = checkers.find(user => user._id === pendingStep.approver);
-      console.log('approver', pendingStep.approver)
     } else if (pendingStep.role === 'verified') {
       userDetails = verifiers.find(user => user._id === pendingStep.approver);
-      console.log('This is verifier',userDetails)
     } else if (pendingStep.role === 'approved') {
       userDetails = approvers.find(user => user._id === pendingStep.approver);
     }
@@ -447,255 +440,17 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
 						</table>
 
             {/* Request Detail Dialog */}
-            <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Purchase Request Details</DialogTitle>
-                </DialogHeader>
-                {detailRequest && (
-                  <div className="space-y-6">
-                    {/* 1. Document Header (MR Number Info) */}
-                    <div className="bg-muted/30 p-4 rounded-lg border-l-4 border-blue-500">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-bold text-lg">MR-{detailRequest.id}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Created: {new Date(detailRequest.createdAt || detailRequest.date).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            detailRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            detailRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            detailRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                            detailRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {getPendingStatusText(detailRequest)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 2. Request Information (Updated) */}
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-4 text-blue-700">Request Information</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-blue-700">Project Name</label>
-                          <p className="text-sm font-semibold">{detailRequest.projectName}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-blue-700">Internal Project Code</label>
-                          <p className="text-sm">{detailRequest.id}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-blue-700">Category</label>
-                          <div className="flex gap-1 flex-wrap">
-                            {detailRequest.categories.admin && (
-                              <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">Admin</span>
-                            )}
-                            {detailRequest.categories.construction && (
-                              <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">Construction</span>
-                            )}
-                            {detailRequest.categories.material && (
-                              <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">Material</span>
-                            )}
-                            {detailRequest.categories.services && (
-                              <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">Services</span>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-blue-700">Purpose</label>
-                          <p className="text-sm">{detailRequest.purpose}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 3. Stakeholder Data (Requester Info) */}
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-4 text-green-700">Requester Information</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-green-700">Full Name</label>
-                          <p className="text-sm font-semibold">{detailRequest.requesterName}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-green-700">Department</label>
-                          <p className="text-sm">{detailRequest.requesterDepartment}</p>
-                        </div>
-                        {/* <div>
-                          <label className="text-sm font-medium text-green-700">Contact</label>
-                          <p className="text-sm">{profile?.email}</p>
-                        </div> */}
-                        <div>
-                          <label className="text-sm font-medium text-green-700">Request Date</label>
-                          <p className="text-sm">{new Date(detailRequest.createdAt || detailRequest.date).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 4. Delivery Place (Updated from Logistics) */}
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-4 text-orange-700">Delivery Place</h3>
-                      <div className="bg-white p-4 rounded border-l-4 border-orange-500">
-                        <p className="text-sm leading-relaxed">
-                          {detailRequest.deliveryPlace || 'Main Office - Reception Area'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 5. Financial Core (Item List Table) */}
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-4 text-cyan-700">Item List</h3>
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="text-left p-2 text-xs font-medium w-8">No</th>
-                              <th className="text-left p-2 text-xs font-medium">Description</th>
-                              <th className="text-left p-2 text-xs font-medium">Unit</th>
-                              <th className="text-left p-2 text-xs font-medium">Qty</th>
-                              <th className="text-left p-2 text-xs font-medium">Unit Price</th>
-                              <th className="text-left p-2 text-xs font-medium">Total Price</th>
-                              <th className="text-left p-2 text-xs font-medium">Brand</th>
-                              <th className="text-left p-2 text-xs font-medium">Reference</th>
-                              <th className="text-left p-2 text-xs font-medium">Note</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {detailRequest.items.map((item, index) => (
-                              <tr key={index} className="border-t hover:bg-muted/30 transition-colors">
-                                <td className="p-2 text-xs">{index + 1}</td>
-                                <td className="p-2 text-xs">{item.description || 'Item ' + (index + 1)}</td>
-                                <td className="p-2 text-xs">{item.unit || 'pcs'}</td>
-                                <td className="p-2 text-xs">{item.quantity || ''}</td>
-                                <td className="p-2 text-xs">${(item.unitPrice || 0).toFixed(2)}</td>
-                                <td className="p-2 text-xs font-medium">
-                                  ${((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
-                                </td>
-                                <td className="p-2 text-xs">{item.brand || '-'}</td>
-                                <td className="p-2 text-xs">{item.reference || '-'}</td>
-                                <td className="p-2 text-xs">{item.note || '-'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* 6. Validation (Grand Total & Amount in Words) */}
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-4 text-green-700">Financial Validation</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium">Grand Total</label>
-                          <p className="text-2xl font-bold">${(detailRequest.grandTotal || '0.00').toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Amount in Words</label>
-                          <p className="text-lg font-semibold capitalize">
-                            {(() => {
-                              const total = detailRequest.grandTotal || '0';
-                              
-                              if (isNaN(total)) return 'Zero Dollars';
-                              
-                              const dollars = Math.floor(total);
-                              const cents = Math.round((total - dollars) * 100);
-                              
-                              const wordResult = numberToWords(dollars);
-                              const centsStr = cents.toString().padStart(2, '0');
-                              
-                              return `${wordResult} and ${centsStr}/100 Dollars`;
-                            })()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 7. Workflow State (Approval Info & Status) */}
-                    <div className="bg-muted/30 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-4 text-gray-700">Approval Workflow</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span className="text-sm font-medium">Current Status</span>
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            detailRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            detailRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            detailRequest.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                            detailRequest.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {getPendingStatusText(detailRequest)}
-                          </span>
-                        </div>
-
-                        {/* NEW: Workflow Table Display */}
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            {detailRequest.approvalWorkflow?.map((step, index) => {
-
-                              // Find the user details based on the approver ID
-                              let userDetails = null;
-                              if (step.role === 'prepared') {
-                                userDetails = preparers.find(user => user._id === step.approver);
-                              } else if (step.role === 'checked') {
-                                userDetails = checkers.find(user => user._id === step.approver);
-                              } else if (step.role === 'verified') {
-                                userDetails = verifiers.find(user => user._id === step.approver);
-                              } else if (step.role === 'approved') {
-                                userDetails = approvers.find(user => user._id === step.approver);
-                              }
-
-                              return (
-                                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2">
-                                      <span className="font-medium capitalize">{step.role}</span>
-                                      <span className={`px-2 py-1 rounded text-xs ${
-                                        step.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                        step.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                        step.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                        step.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                        'bg-gray-100 text-gray-800'
-                                      }`}>
-                                        {step.status}
-                                      </span>
-                                    </div>
-                                    <div className="text-sm text-gray-600 mt-1">
-                                      {userDetails ? `${userDetails.firstName} ${userDetails.lastName}` : 'Not Assigned'}
-                                      {userDetails?.role && (
-                                        <span className="ml-1">({userDetails.role})</span>
-                                      )}
-                                    </div>
-                                    {step.notes && (
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        Note: {step.notes}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="text-right text-sm text-gray-600">
-                                    {step.timestamp ? new Date(step.timestamp).toLocaleString() : 'Pending'}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex justify-end gap-2 pt-4 border-t">
-                      <Button variant="outline" onClick={() => setShowDetailsModal(false)}>
-                        Close
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
+            <PurchaseRequestDetail
+              selectedRequest={detailRequest}
+              showDetailsModal={showDetailsModal}
+              setShowDetailsModal={setShowDetailsModal}
+              onEdit={() => {}} // No edit in pending approvals
+              getPendingStatusText={getPendingStatusText}
+              preparers={preparers}
+              checkers={checkers}
+              verifiers={verifiers}
+              approvers={approvers}
+            />
 
 					</div>
 				</CardContent>
