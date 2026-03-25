@@ -1,4 +1,4 @@
-export type StatusKey = "Open" | "In Review" | "Pending" | "Approved" | "Issued" | "Closed" | "Rejected" | "";
+export type StatusKey = "Pending" | "Respond" | "Submit" | "Resubmit" | "Approved" | "Approved with Condition" | "Not Approved" | "";
 
 export interface QaqcRow {
   id: string;

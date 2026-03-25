@@ -12,19 +12,19 @@ interface ExtendedQaqcStatusNewProps extends QaqcStatusNewProps {
 
 const StatusIcon: React.FC<{ status: StatusKey }> = ({ status }) => {
   switch (status) {
-    case "Open":
-      return <AlertCircle className="w-4 h-4 text-yellow-600" />;
-    case "In Review":
-      return <Clock className="w-4 h-4 text-purple-600" />;
     case "Pending":
+      return <AlertCircle className="w-4 h-4 text-yellow-600" />;
+    case "Respond":
+      return <Clock className="w-4 h-4 text-purple-600" />;
+    case "Submit":
       return <Clock className="w-4 h-4 text-blue-600" />;
-    case "Approved":
+    case "Resubmit":
       return <CheckCircle className="w-4 h-4 text-green-600" />;
-    case "Issued":
+    case "Approved":
       return <FileText className="w-4 h-4 text-cyan-600" />;
-    case "Closed":
+    case "Approved with Condition":
       return <CheckCircle className="w-4 h-4 text-gray-600" />;
-    case "Rejected":
+    case "Not Approved":
       return <XCircle className="w-4 h-4 text-red-600" />;
     default:
       return <div className="w-4 h-4 text-gray-400" />;
@@ -70,7 +70,7 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                 <th className="text-left py-2 px-2">Code</th>
                 <th className="text-left py-2 px-2 min-w-48">Description</th>
                 <th className="text-left py-2 px-2 w-32">Status</th>
-                <th className="text-left py-2 px-2 w-32">Date Response</th>
+                <th className="text-left py-2 px-2 w-32">Date Submit/Response</th>
                 <th className="text-left py-2 px-2 w-12"></th>
               </tr>
             </thead>
@@ -103,17 +103,17 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                       value={row.status}
                       onChange={(e) => onCellChange(section.id, row.id, "status", e.target.value as StatusKey)}
                       className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${
-                        row.status === "Open" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
-                        row.status === "In Review" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
-                        row.status === "Pending" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
+                        row.status === "Pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
+                        row.status === "Respond" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
+                        row.status === "Submit" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
+                        row.status === "Resubmit" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-700" :
                         row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
-                        row.status === "Issued" ? "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 border-cyan-200 dark:border-cyan-700" :
-                        row.status === "Closed" ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700" :
-                        row.status === "Rejected" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
+                        row.status === "Approved with Condition" ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700" :
+                        row.status === "Not Approved" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
                         "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                       }`}
                     >
-                      <option value="">— Select —</option>
+                      <option value="">Select</option>
                       {STATUS_OPTIONS.map((status) => (
                         <option key={status} value={status}>
                           {status}
@@ -245,7 +245,7 @@ export default function QaqcStatusNew({
   };
 
   const totalRowsCount = Object.values(localTableData).reduce((a, r) => a + r.length, 0);
-  const openRowsCount = Object.values(localTableData).flat().filter((r) => r.status === "Open").length;
+  const openRowsCount = Object.values(localTableData).flat().filter((r) => r.status === "Pending").length;
 
   const filteredSectionsList = sections.filter(
     (s) =>
