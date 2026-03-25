@@ -475,6 +475,21 @@ const WeeklyReport = () => {
               // Create empty Schedule structure if none exists
               setScheduleData([]);
             }
+            // Load Construction Progress data
+            if (report.sections?.constructionProgress) {
+              constructionProgressHook.updateConstructionData(report.sections.constructionProgress);
+            } else {
+              // Create empty Construction Progress structure if none exists
+              constructionProgressHook.updateConstructionData({
+                projectInfo: {
+                  project: '',
+                  subtitle: '',
+                  date: '',
+                  revision: ''
+                },
+                items: []
+              });
+            }
           }
         } catch (error) {
           console.error('🔍 FRONTEND Error loading report:', error);
@@ -1063,21 +1078,18 @@ const WeeklyReport = () => {
     try {
       let reportId = currentReportId;
       
-      // If no report ID exists, save as draft first
-      if (!currentReportId) {
-        // Call the same save logic as handleSaveAsDraft
-        const saveResponse = await handleSaveAsDraftInternal();
-        
-        if (saveResponse?.success && saveResponse?.data) {
-          const newId = (saveResponse.data as any)._id || saveResponse.data.id;
-          if (newId) {
-            reportId = newId;
-          } else {
-            throw new Error('Save succeeded but no report ID was returned');
-          }
+      // Always save the current data before submitting (for both new and existing reports)
+      const saveResponse = await handleSaveAsDraftInternal();
+      
+      if (saveResponse?.success && saveResponse?.data) {
+        const newId = (saveResponse.data as any)._id || saveResponse.data.id;
+        if (newId) {
+          reportId = newId;
         } else {
-          throw new Error('Failed to save report before submission');
+          throw new Error('Save succeeded but no report ID was returned');
         }
+      } else {
+        throw new Error('Failed to save report before submission');
       }
 
       const response = await submitWeeklyReport(reportId);
@@ -1828,7 +1840,7 @@ const WeeklyReport = () => {
                       }
                     >
                       <Send className="w-4 h-4 mr-2" />
-                      {isSubmitting ? "Submitting..." : "Submitted"}
+                      {isSubmitting ? "Submitting..." : reportStatus === "submitted" ? "Submit Again" : "Submit"}
                       {reportStatus === "submitted" && (
                         <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
                       )}
