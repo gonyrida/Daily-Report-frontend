@@ -125,7 +125,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
                     }, 200);
                     return;
                   }
-                  
+
                   const finalValue = (customUnitInputValues[customKey] ?? unitValue).trim();
                   if (finalValue) {
                     updateUnitDirectly(rowIndex, finalValue);
@@ -192,7 +192,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
       // Normal dropdown — show current value if it's predefined, else show placeholder
       const isCurrentlyCustomValue = unitValue !== '' && !PREDEFINED.includes(unitValue);
       const selectValue = isCurrentlyCustomValue ? unitValue : (unitValue || 'empty');
-      
+
 
       return (
         <div className="relative group">
@@ -231,11 +231,12 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
     }
 
     if (isEditing && !isReadOnly) {
+      const isNumericField = field.includes('qty') || field.includes('rate') || field.includes('amount');
       return (
         <input
           ref={(el) => { if (el) inputRefs.current.set(key, el); }}
-          type="text"
-          value={editValue}
+          type={isNumericField ? 'number' : 'text'}
+          value={editValue ?? ''}
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={saveEdit}
           onKeyDown={handleKeyDown}
@@ -291,7 +292,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
               style={{ width: `${Math.min(percentageValue, 100)}%` }}
             />
             <div
-              className={`relative bg-transparent z-10 px-1 py-0.5 rounded text-sm text-center whitespace-nowrap select-none cursor-not-allowed ${textColorClass}`}
+              className={`relative bg-transparent z-5 px-1 py-0.5 rounded text-sm text-center whitespace-nowrap select-none cursor-not-allowed ${textColorClass}`}
               title="Auto-calculated from children"
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
@@ -363,102 +364,29 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
         <style>{`
           .sticky-col { 
             position: sticky; 
-            z-index: 15; 
-            background-color: white; 
+            background-clip: padding-box;
             border-right: 1px solid rgb(226 232 240);
+            z-index: 10;
           }
-          .sticky-col:nth-child(1) { left: 0px; }
-          .sticky-col:nth-child(2) { left: 95px; }
-          .sticky-col:nth-child(3) { left: 345px; }
-          .sticky-col:nth-child(4) { left: 596px; }
-          .sticky-col:nth-child(5) { left: 698px; }
-          .sticky-col:nth-child(6) { left: 775px; }
-          .sticky-col:nth-child(7) { left: 852px; }
 
-          /* First header row sticks at top */
-          thead tr:nth-child(1) th {
-            position: sticky;
-            top: 0;
-            z-index: 20;
+          tbody .sticky-col {
+            background-color: inherit;
+          }
+
+          thead .sticky-col {
             background-color: rgb(52 73 94);
+            z-index: 60;
           }
 
-          /* Second header row sticks BELOW the first row (first row is ~38px tall) */
-          thead tr:nth-child(2) th {
-            position: sticky;
-            top: 38px;
-            z-index: 20;
-            background-color: rgb(52 73 94);
-          }
-
-          /* Header corner cells that are also horizontally sticky */
-          thead tr:nth-child(1) th:nth-child(1) {
-            left: 0px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(2) {
-            left: 95px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(3) {
-            left: 345px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(4) {
-            left: 596px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(5) {
-            left: 698px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(6) {
-            left: 775px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(7) {
-            left: 852px;
-            z-index: 40;
-          }
-            thead tr:nth-child(2) th:nth-child(1) {
-            position: sticky;
-            left: 698px;
-            z-index: 40;
-          }
-            /* Second header row sticks BELOW the first row */
-        thead tr:nth-child(2) th {
-          position: sticky;
-          top: 38px;
-          z-index: 20;
-          background-color: rgb(52 73 94);
-        }
-
-        /* BoQ QTY sub-header also sticky horizontally */
-        thead tr:nth-child(2) th:nth-child(1) {
-          position: sticky;
-          top: 38px;
-          left: 698px;
-          z-index: 40;
-          background-color: rgb(52 73 94);
-        }
-        thead tr:nth-child(2) th:nth-child(2) {
-          position: sticky;
-          top: 38px;
-          left: 775px;
-          z-index: 40;
-          background-color: rgb(52 73 94);
-        }
-        thead tr:nth-child(2) th:nth-child(3) {
-          position: sticky;
-          top: 38px;
-          left: 852px;
-          z-index: 40;
-          background-color: rgb(52 73 94);
-        }
+          .sticky-col-1 { left: 0px; }
+          .sticky-col-2 { left: 95px; }
+          .sticky-col-3 { left: 345px; }
+          .sticky-col-4 { left: 665px; }
+          .sticky-col-5 { left: 748px; }
         `}</style>
         <table className="text-sm text-left border-collapse" style={{ tableLayout: 'fixed', minWidth: 'max-content' }}>
           <colgroup>
-            <col style={{ width: '95px' }} /><col style={{ width: '250px' }} /><col style={{ width: '301px' }} />
+            <col style={{ width: '95px' }} /><col style={{ width: '250px' }} /><col style={{ width: '320px' }} />
             <col style={{ width: '52px' }} /><col style={{ width: '57px' }} /><col style={{ width: '77px' }} />
             <col style={{ width: '77px' }} /><col style={{ width: '77px' }} /><col style={{ width: '112px' }} />
             <col style={{ width: '203px' }} /><col style={{ width: '57px' }} />
@@ -471,10 +399,10 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           </colgroup>
           <thead className="sticky top-0 z-20 bg-[#34495e] shadow-md">
             <tr className="bg-[#34495e] text-white">
-              <th className="px-4 py-4 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>ID</th>
-              <th className="px-2 py-4 border-r border-slate-600 font-bold" rowSpan={2}>Scope of Works</th>
-              <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Detail Description</th>
-              <th className="px-3 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Unit</th>
+              <th className="px-4 sticky-col sticky-col-1 py-4 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>ID</th>
+              <th className="px-2 sticky-col sticky-col-2 py-4 border-r border-slate-600 font-bold" rowSpan={2}>Scope of Works</th>
+              <th className="px-2 sticky-col sticky-col-3 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Detail Description</th>
+              <th className="px-3 sticky-col sticky-col-4 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Unit</th>
               <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={5}>BoQ</th>
               <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Remark</th>
               <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to Previous Week</th>
@@ -487,15 +415,28 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             </tr>
             <tr className="bg-[#34495e]/90 text-white/90 py-4">
               {['QTY', 'Mat. Rate', 'Labor Rate', 'Unit Rate', 'Amount', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%'].map((h, i) => (
-                <th key={i} className="px-1 py-1 border-r border-slate-600 text-center text-sm">{h}</th>
-              ))}
+              <th
+                key={i}
+                className={`px-1 py-1 border-r border-slate-600 text-center text-sm ${
+                  i === 0 ? 'sticky-col sticky-col-5' : ''
+                }`}
+              >
+                {h}
+              </th>
+            ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {filteredItems.map((item, index) => (
               <tr key={`${item.id || 'empty'}-${index}-${item.scopeOfWorks.slice(0, 10)}-${item.unit}`} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
                 {ALL_COLUMNS.map(field => (
-                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks', 'detailDescription', 'unit', 'boQ.qty', 'boQ.materialRate', 'boQ.laborRate'].includes(field) ? 'sticky-col' : ''}`}>
+                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${
+                    field === 'id'                ? 'sticky-col sticky-col-1' :
+                    field === 'scopeOfWorks'      ? 'sticky-col sticky-col-2' :
+                    field === 'detailDescription' ? 'sticky-col sticky-col-3' :
+                    field === 'unit'              ? 'sticky-col sticky-col-4' :
+                    field === 'boQ.qty'           ? 'sticky-col sticky-col-5' : ''
+                  }`}>
                     {renderCell(item, index, field)}
                   </td>
                 ))}

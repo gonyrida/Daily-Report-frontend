@@ -222,7 +222,27 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       val = parseFloat(editValue.replace(/,/g, '')) || 0;
     }
 
-    let updated = setItemValue(filteredItem, field, val);
+    // Handle nested updates
+    const keys = field.split('.');
+    let updated;
+    
+    if (keys.length === 2) {
+      const [parent, child] = keys;
+      const parentValue = filteredItem[parent as keyof ConstructionProgressItem];
+      updated = {
+        ...filteredItem,
+        [parent]: {
+          ...(typeof parentValue === 'object' && parentValue !== null ? parentValue : {}),
+          [child]: val
+        }
+      };
+    } else {
+      updated = {
+        ...filteredItem,
+        [field]: val
+      };
+    }
+
     if (field === 'boQ.materialRate' || field === 'boQ.laborRate') {
       const mat = field === 'boQ.materialRate' ? val : updated.boQ.materialRate;
       const lab = field === 'boQ.laborRate' ? val : updated.boQ.laborRate;
