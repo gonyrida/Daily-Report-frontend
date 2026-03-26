@@ -62,7 +62,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
   };
   const formatCurrency = formatNum;
 
-  const UNIT_OPTIONS = ['LS', 'Lot', 'Set', 'Pcs', 'm', 'm2', 'm3', 'Nos', 'Kg', 'Custom'];
+  const UNIT_OPTIONS = ['LS', 'Lot', 'Set', 'Pcs', 'm', 'm2', 'm3', 'Sq.m', 'Nos', 'Kg', 'Custom'];
 
   const [customUnitValues, setCustomUnitValues] = useState<Record<string, string>>({});
   const [customUnitInputValues, setCustomUnitInputValues] = useState<Record<string, string>>({});
@@ -92,10 +92,11 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
       // Use more stable key that includes item.id or scopeOfWorks to avoid conflicts
       const uniqueKey = item.id || item.scopeOfWorks || `row-${rowIndex}`;
       const customKey = `${uniqueKey}-unit`;
-      const showCustomInput = isCustom || customUnitValues[customKey];
+      const showCustomInput = isCustom || customUnitValues[customKey] === 'true';
       
       // Force show custom input if we're typing in it
       const forceShowCustom = customUnitInputValues[customKey] !== undefined;
+      
       return (
         <div className="relative group">
           {(showCustomInput || forceShowCustom) ? (
@@ -104,13 +105,11 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
               <Input
                 value={customUnitInputValues[customKey] || unitValue || ''}
                 onChange={(e) => {
-                  
                   setCustomUnitInputValues(prev => ({ ...prev, [customKey]: e.target.value }));
                   // Keep custom input mode active while typing
                   setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
                 }}
                 onBlur={() => {
-                  
                   setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
                   // Save the custom unit value
                   const finalValue = customUnitInputValues[customKey] || unitValue;
@@ -120,9 +119,16 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
                     // Escape key returns to dropdown
+                    e.preventDefault();
                     setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
-                    setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
-                    setEditValue('');
+                    // Remove the key entirely from customUnitInputValues
+                    setCustomUnitInputValues(prev => {
+                      const newState = { ...prev };
+                      delete newState[customKey];
+                      return newState;
+                    });
+                    // Reset editValue to current unit value to avoid saving empty
+                    setEditValue(unitValue || '');
                   } else {
                     handleKeyDown(e);
                   }
@@ -135,11 +141,16 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
               />
               <button
                 onClick={(e) => {
-                  
                   e.stopPropagation();
                   setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
-                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
-                  setEditValue('');
+                  // Remove the key entirely from customUnitInputValues
+                  setCustomUnitInputValues(prev => {
+                    const newState = { ...prev };
+                    delete newState[customKey];
+                    return newState;
+                  });
+                  // Reset editValue to current unit value to avoid saving empty
+                  setEditValue(unitValue || '');
                 }}
                 className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                 title="Back to dropdown"
@@ -154,7 +165,6 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             <Select
               value={isCustom ? 'Custom' : (unitValue || 'empty')}
               onValueChange={(selectedValue) => {
-                
                 if (selectedValue === 'Custom') {
                   setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
                   setCustomUnitInputValues(prev => ({ ...prev, [customKey]: unitValue })); // Initialize with current value
