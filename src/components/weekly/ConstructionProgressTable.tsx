@@ -25,6 +25,7 @@ interface ConstructionProgressTableProps {
   handleDropdownToggle: (rowIndex: number, e: React.MouseEvent<HTMLButtonElement>) => void;
   getItemValue: (item: ConstructionProgressItem, field: string) => any;
   getRowBg: (item: ConstructionProgressItem, rowIndex: number) => string;
+  updateUnitDirectly: (rowIndex: number, unitValue: string) => void;
 }
 
 export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps> = ({
@@ -39,7 +40,8 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
   handleKeyDown,
   handleDropdownToggle,
   getItemValue,
-  getRowBg
+  getRowBg,
+  updateUnitDirectly
 }) => {
   const ALL_COLUMNS = [
     'id', 'scopeOfWorks', 'detailDescription', 'unit',
@@ -66,10 +68,12 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
 
   const [customUnitValues, setCustomUnitValues] = useState<Record<string, string>>({});
   const [customUnitInputValues, setCustomUnitInputValues] = useState<Record<string, string>>({});
+  const [justEnteredCustomMode, setJustEnteredCustomMode] = useState<Record<string, boolean>>({});
 
   const renderCell = (item: ConstructionProgressItem, rowIndex: number, field: string) => {
     const isUnitField = field === 'unit';
-    const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.field === field;
+    const stableId = item.id || `${item.scopeOfWorks}-${rowIndex}`;
+    const isEditing = editingCell?.itemId === stableId && editingCell?.field === field;
     const value = getItemValue(item, field);
     const key = `${rowIndex}-${field}`;
     const isText = ['scopeOfWorks', 'detailDescription', 'remark'].includes(field);
@@ -87,50 +91,74 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
 
     // For unit field, always show dropdown (no click required)
     if (isUnitField && !isReadOnly) {
-      const unitValue = String(value);
-      const isCustom = !UNIT_OPTIONS.slice(0, -1).includes(unitValue) && unitValue !== '';
-      // Use more stable key that includes item.id or scopeOfWorks to avoid conflicts
+      const rawValue = String(value ?? '');
+      const unitValue = rawValue.trim();
+
       const uniqueKey = item.id || item.scopeOfWorks || `row-${rowIndex}`;
       const customKey = `${uniqueKey}-unit`;
-      const showCustomInput = isCustom || customUnitValues[customKey] === 'true';
-      
-      // Force show custom input if we're typing in it
-      const forceShowCustom = customUnitInputValues[customKey] !== undefined;
-      
-      return (
-        <div className="relative group">
-          {(showCustomInput || forceShowCustom) ? (
-            // Custom input mode
+
+      // A value is custom ONLY if:
+      // 1. It is non-empty
+      // 2. It is NOT in the predefined list (excluding the sentinel 'Custom' entry)
+      // 3. The user has explicitly activated custom mode via the dropdown
+      const PREDEFINED = UNIT_OPTIONS.slice(0, -1); // ['LS','Lot','Set','Pcs','m','m2','m3','Sq.m','Nos','Kg']
+      const isExplicitlyCustomMode = customUnitValues[customKey] === 'true';
+
+      // Never auto-enter custom mode on render — only enter if user clicked 'Custom'
+      const showCustomInput = isExplicitlyCustomMode;
+
+      if (showCustomInput) {
+        return (
+          <div className="relative group">
             <div className="flex items-center gap-1">
               <Input
-                value={customUnitInputValues[customKey] || unitValue || ''}
+                value={customUnitInputValues[customKey] ?? unitValue}
                 onChange={(e) => {
                   setCustomUnitInputValues(prev => ({ ...prev, [customKey]: e.target.value }));
-                  // Keep custom input mode active while typing
-                  setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
                 }}
                 onBlur={() => {
+                  // Don't process blur if we just entered custom mode
+                  if (justEnteredCustomMode[customKey]) {
+                    // Clear the flag after a short delay
+                    setTimeout(() => {
+                      setJustEnteredCustomMode(prev => ({ ...prev, [customKey]: false }));
+                    }, 200);
+                    return;
+                  }
+                  
+                  const finalValue = (customUnitInputValues[customKey] ?? unitValue).trim();
+                  if (finalValue) {
+                    updateUnitDirectly(rowIndex, finalValue);
+                  }
+                  // Exit custom mode
                   setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
-                  // Save the custom unit value
-                  const finalValue = customUnitInputValues[customKey] || unitValue;
-                  setEditValue(finalValue);
-                  saveEdit();
+                  setCustomUnitInputValues(prev => {
+                    const next = { ...prev };
+                    delete next[customKey];
+                    return next;
+                  });
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    // Escape key returns to dropdown
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const finalValue = (customUnitInputValues[customKey] ?? unitValue).trim();
+                    if (finalValue) {
+                      updateUnitDirectly(rowIndex, finalValue);
+                    }
+                    setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                    setCustomUnitInputValues(prev => {
+                      const next = { ...prev };
+                      delete next[customKey];
+                      return next;
+                    });
+                  } else if (e.key === 'Escape') {
                     e.preventDefault();
                     setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
-                    // Remove the key entirely from customUnitInputValues
                     setCustomUnitInputValues(prev => {
-                      const newState = { ...prev };
-                      delete newState[customKey];
-                      return newState;
+                      const next = { ...prev };
+                      delete next[customKey];
+                      return next;
                     });
-                    // Reset editValue to current unit value to avoid saving empty
-                    setEditValue(unitValue || '');
-                  } else {
-                    handleKeyDown(e);
                   }
                 }}
                 placeholder="Enter custom unit"
@@ -143,14 +171,11 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
                 onClick={(e) => {
                   e.stopPropagation();
                   setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
-                  // Remove the key entirely from customUnitInputValues
                   setCustomUnitInputValues(prev => {
-                    const newState = { ...prev };
-                    delete newState[customKey];
-                    return newState;
+                    const next = { ...prev };
+                    delete next[customKey];
+                    return next;
                   });
-                  // Reset editValue to current unit value to avoid saving empty
-                  setEditValue(unitValue || '');
                 }}
                 className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
                 title="Back to dropdown"
@@ -160,40 +185,47 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
                 </svg>
               </button>
             </div>
-          ) : (
-            // Normal dropdown mode
-            <Select
-              value={isCustom ? 'Custom' : (unitValue || 'empty')}
-              onValueChange={(selectedValue) => {
-                if (selectedValue === 'Custom') {
-                  setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
-                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: unitValue })); // Initialize with current value
-                } else if (selectedValue === 'empty') {
-                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
-                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
-                  setEditValue('');
-                  // Save directly
-                  setTimeout(() => saveEdit(), 0);
-                } else {
-                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
-                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
-                  setEditValue(selectedValue);
-                  // Save directly
-                  setTimeout(() => saveEdit(), 0);
-                }
-              }}
-            >
-              <SelectTrigger className="border border-gray-300 bg-white focus-visible:ring-1 w-[70px] h-8 text-center hover:border-gray-400">
-                <SelectValue placeholder="-" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="empty">-</SelectItem>
-                {UNIT_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          </div>
+        );
+      }
+
+      // Normal dropdown — show current value if it's predefined, else show placeholder
+      const isCurrentlyCustomValue = unitValue !== '' && !PREDEFINED.includes(unitValue);
+      const selectValue = isCurrentlyCustomValue ? unitValue : (unitValue || 'empty');
+      
+
+      return (
+        <div className="relative group">
+          <Select
+            value={selectValue}
+            onValueChange={(selectedValue) => {
+              if (selectedValue === 'Custom') {
+                // Set flag to prevent immediate blur
+                setJustEnteredCustomMode(prev => ({ ...prev, [customKey]: true }));
+                // Enter custom mode — initialise input with current value
+                setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
+                setCustomUnitInputValues(prev => ({ ...prev, [customKey]: unitValue }));
+              } else if (selectedValue === 'empty') {
+                updateUnitDirectly(rowIndex, '');
+              } else {
+                // Predefined value — save directly, never touch customUnitValues
+                updateUnitDirectly(rowIndex, selectedValue);
+              }
+            }}
+          >
+            <SelectTrigger className="border border-gray-300 bg-white focus-visible:ring-1 w-[70px] h-8 text-center hover:border-gray-400">
+              <SelectValue placeholder="-" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="empty">-</SelectItem>
+              {isCurrentlyCustomValue && (
+                <SelectItem value={unitValue}>{unitValue}</SelectItem>
+              )}
+              {UNIT_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option}>{option}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       );
     }
@@ -340,6 +372,8 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           .sticky-col:nth-child(3) { left: 345px; }
           .sticky-col:nth-child(4) { left: 596px; }
           .sticky-col:nth-child(5) { left: 698px; }
+          .sticky-col:nth-child(6) { left: 775px; }
+          .sticky-col:nth-child(7) { left: 852px; }
 
           /* First header row sticks at top */
           thead tr:nth-child(1) th {
@@ -374,6 +408,18 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             left: 596px;
             z-index: 40;
           }
+          thead tr:nth-child(1) th:nth-child(5) {
+            left: 698px;
+            z-index: 40;
+          }
+          thead tr:nth-child(1) th:nth-child(6) {
+            left: 775px;
+            z-index: 40;
+          }
+          thead tr:nth-child(1) th:nth-child(7) {
+            left: 852px;
+            z-index: 40;
+          }
             thead tr:nth-child(2) th:nth-child(1) {
             position: sticky;
             left: 698px;
@@ -392,6 +438,20 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           position: sticky;
           top: 38px;
           left: 698px;
+          z-index: 40;
+          background-color: rgb(52 73 94);
+        }
+        thead tr:nth-child(2) th:nth-child(2) {
+          position: sticky;
+          top: 38px;
+          left: 775px;
+          z-index: 40;
+          background-color: rgb(52 73 94);
+        }
+        thead tr:nth-child(2) th:nth-child(3) {
+          position: sticky;
+          top: 38px;
+          left: 852px;
           z-index: 40;
           background-color: rgb(52 73 94);
         }
@@ -433,9 +493,9 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {filteredItems.map((item, index) => (
-              <tr key={`${item.id || 'empty'}-${index}-${item.scopeOfWorks.slice(0, 10)}`} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
+              <tr key={`${item.id || 'empty'}-${index}-${item.scopeOfWorks.slice(0, 10)}-${item.unit}`} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
                 {ALL_COLUMNS.map(field => (
-                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks', 'detailDescription', 'unit', 'boQ.qty'].includes(field) ? 'sticky-col' : ''}`}>
+                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks', 'detailDescription', 'unit', 'boQ.qty', 'boQ.materialRate', 'boQ.laborRate'].includes(field) ? 'sticky-col' : ''}`}>
                     {renderCell(item, index, field)}
                   </td>
                 ))}

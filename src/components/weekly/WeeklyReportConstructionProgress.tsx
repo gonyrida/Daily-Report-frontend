@@ -115,7 +115,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     );
 
     return filtered;
-  }, [items, currentData?.items, searchTerm]); // Remove editingCell from dependencies to prevent re-renders during editing
+  }, [items, currentData, searchTerm]); // Remove editingCell from dependencies to prevent re-renders during editing
 
   // Round to 2dp then format with comma thousands separator
   const formatNum = (v: number): string => {
@@ -191,68 +191,81 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
   const startEditing = (rowIndex: number, field: string) => {
     if (rowIndex < 0 || rowIndex >= filteredItems.length) return;
-
-    // Prevent editing of read-only fields
     if (field === 'boQ.unitRate' || field === 'boQ.amount' || field.startsWith('previousWeek.') || field.startsWith('remaining.') || field === 'nextWeekPlan.percentage' || field.startsWith('upToNextWeekPlan.') || field === 'upToThisWeek.percentage' || field === 'thisWeek.percentage') return;
 
-    const value = getItemValue(filteredItems[rowIndex], field);
-    setEditingCell({ rowIndex, field });
+    const currentItem = filteredItems[rowIndex];
+    const value = getItemValue(currentItem, field);
+
+    setEditingCell({
+      rowIndex,
+      field,
+      itemId: currentItem.id || `${currentItem.scopeOfWorks}-${rowIndex}`
+    });
     setEditValue(String(value));
 
-    // Only try to focus for non-unit fields (unit fields handle their own focus)
     if (field !== 'unit') {
       setTimeout(() => {
         const input = inputRefs.current.get(`${rowIndex}-${field}`);
-        if (input) {
-          input.focus();
-          input.select();
-        }
+        if (input) { input.focus(); input.select(); }
       }, 0);
     }
   };
 
   const saveEdit = () => {
-    if (!editingCell) {
-      return;
-    }
-
-    const { rowIndex, field } = editingCell;
-    const item = filteredItems[rowIndex];
-
+    if (!editingCell) return;
+    const { rowIndex, field, itemId } = editingCell;
+    const filteredItem = filteredItems[rowIndex];
+    if (!filteredItem) return;
 
     let val: any = editValue;
     if (field.includes('qty') || field.includes('Rate') || field.includes('amount') || field.includes('percentage')) {
       val = parseFloat(editValue.replace(/,/g, '')) || 0;
     }
 
-    const updated = setItemValue(item, field, val);
-    // If mat or labor rate changed → sync unitRate = mat+lab (unless user overrode it)
-    // If unitRate edited directly → keep as override (computeAllAmounts will preserve it)
-    let finalItem = updated;
+    let updated = setItemValue(filteredItem, field, val);
     if (field === 'boQ.materialRate' || field === 'boQ.laborRate') {
       const mat = field === 'boQ.materialRate' ? val : updated.boQ.materialRate;
       const lab = field === 'boQ.laborRate' ? val : updated.boQ.laborRate;
-      finalItem = { ...updated, boQ: { ...updated.boQ, unitRate: (mat || 0) + (lab || 0) } };
+      updated = { ...updated, boQ: { ...updated.boQ, unitRate: (mat || 0) + (lab || 0) } };
     }
 
-    const newItems = [...items];
-    const itemIndex = items.findIndex(i => i.id === item.id && i.scopeOfWorks === item.scopeOfWorks);
+    const newItems = items.map((item) =>
+      item === filteredItem   // ← match by reference
+        ? updated
+        : item
+    );
 
-    if (itemIndex === -1) {
-      return;
-    }
-
-    newItems[itemIndex] = finalItem;
     const computed = computeAllAmounts(newItems);
     setItems(computed);
-
-
-
-    const updatedData = { ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } };
-    if (onDataChange) onDataChange(updatedData);
+    if (onDataChange) onDataChange({
+      ...currentData,
+      items: computed,
+      projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' }
+    });
 
     setEditingCell(null);
     setEditValue('');
+  };
+
+  const updateUnitDirectly = (rowIndex: number, unitValue: string) => {
+    const filteredItem = filteredItems[rowIndex];
+    if (!filteredItem) return;
+
+    const newItems = items.map((item) =>
+      item === filteredItem   // ← match by object reference, not index
+        ? { ...item, unit: unitValue }
+        : item
+    );
+
+    const computed = computeAllAmounts(newItems);
+    setItems(computed);
+
+    const updatedData = {
+      ...currentData,
+      items: computed,
+      projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' }
+    };
+    if (onDataChange) onDataChange(updatedData);
   };
 
   const cancelEdit = () => {
@@ -529,6 +542,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
           handleDropdownToggle={handleDropdownToggle}
           getItemValue={getItemValue}
           getRowBg={memoizedGetRowBg}
+          updateUnitDirectly={updateUnitDirectly}
         />
 
         {/* Row Action Dropdown */}

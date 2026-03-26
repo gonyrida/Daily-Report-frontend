@@ -60,7 +60,7 @@ export const loadReportFromDB = async (reportDate: Date) => {
     if (response.status === 404) {
       return null;
     }
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Failed to load report: ${response.statusText}`);
@@ -84,7 +84,7 @@ export const generatePythonExcel = async (
     if (mode === "report" || mode === "combined") {
       const cacpmLogo = localStorage.getItem("customCacpmLogo");
       const koicaLogo = localStorage.getItem("customKoicaLogo");
-      
+
       enhancedPayload = {
         ...payload,
         cacpm_logo: cacpmLogo,
@@ -119,16 +119,13 @@ export const generatePythonExcel = async (
     const filename = fileName
       ? `${fileName}.xlsx`
       : mode === "report"
-      ? `report-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
+        ? `report-${payload.projectName || "export"}-${new Date().toISOString().split("T")[0]
         }.xlsx`
-      : mode === "reference"
-      ? `reference-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`
-      : `combined-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`;
+        : mode === "reference"
+          ? `reference-${payload.projectName || "export"}-${new Date().toISOString().split("T")[0]
+          }.xlsx`
+          : `combined-${payload.projectName || "export"}-${new Date().toISOString().split("T")[0]
+          }.xlsx`;
 
     link.download = filename;
     document.body.appendChild(link);
@@ -386,9 +383,9 @@ export const getAllUserReports = async () => {
 export const createNewReport = async (projectName?: string, date?: string) => {
   console.log("🔒 CREATE NEW REPORT: Creating new report", { projectName, date });
 
-  const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.BASE, { 
-    projectName: projectName, 
-    date: date || new Date().toISOString().split('T')[0] 
+  const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.BASE, {
+    projectName: projectName,
+    date: date || new Date().toISOString().split('T')[0]
   });
 
   console.log(`🔒 CREATE NEW REPORT: Response ${response.status}`);
@@ -417,7 +414,7 @@ export const loadReportById = async (reportId: string) => {
     console.log("🔒 LOAD REPORT BY ID: Report not found (404)");
     return null;
   }
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error("🔒 LOAD REPORT BY ID: Error:", response.status, errorText);
@@ -440,7 +437,7 @@ export const deleteReport = async (reportId: string) => {
     console.log("🔒 DELETE REPORT: Report not found (404)");
     throw new Error("Report not found");
   }
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error("🔒 DELETE REPORT: Error:", response.status, errorText);
@@ -456,8 +453,8 @@ export const deleteReport = async (reportId: string) => {
 export const createBlankReport = async (projectName?: string) => {
   console.log("🔒 CREATE BLANK REPORT: Creating blank report", { projectName });
 
-  const response = await apiPost(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/blank`, { 
-    projectName: projectName || "Untitled Report" 
+  const response = await apiPost(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/blank`, {
+    projectName: projectName || "Untitled Report"
   });
 
   console.log(`🔒 CREATE BLANK REPORT: Response ${response.status}`);
@@ -630,14 +627,14 @@ export const getReportsByLocation = async (location?: string) => {
   try {
     const queryParams = location ? `?location=${encodeURIComponent(location)}` : '';
     const response = await apiGet(`/daily-reports/by-location${queryParams}`);
-    
+
     if (!response.ok) {
       const error = await response
         .json()
         .catch(() => ({ message: "Failed to fetch reports by location" }));
       throw new Error(error.message || "Failed to fetch reports by location");
     }
-    
+
     const result = await response.json();
     console.log("🔒 GET REPORTS BY LOCATION: Success:", result);
     return result;
@@ -707,7 +704,7 @@ export const getCompanyProjects = async () => {
     //     },
     //   }
     // );
-    
+
     // Cookie-based authentication - use apiGet instead of manual fetch
     const response = await apiGet(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/projects`);
 
