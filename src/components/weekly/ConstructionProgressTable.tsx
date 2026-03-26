@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { ConstructionProgressItem, EditableCell } from '../../types/constructionProgress';
 import { isAutoCalculated } from '../../utils/calculationEngine';
 import { detectIdType, isRomanId } from '../../utils/idEngine';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ConstructionProgressTableProps {
   filteredItems: ConstructionProgressItem[];
@@ -17,6 +25,7 @@ interface ConstructionProgressTableProps {
   handleDropdownToggle: (rowIndex: number, e: React.MouseEvent<HTMLButtonElement>) => void;
   getItemValue: (item: ConstructionProgressItem, field: string) => any;
   getRowBg: (item: ConstructionProgressItem, rowIndex: number) => string;
+  updateUnitDirectly: (rowIndex: number, unitValue: string) => void;
 }
 
 export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps> = ({
@@ -31,7 +40,8 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
   handleKeyDown,
   handleDropdownToggle,
   getItemValue,
-  getRowBg
+  getRowBg,
+  updateUnitDirectly
 }) => {
   const ALL_COLUMNS = [
     'id', 'scopeOfWorks', 'detailDescription', 'unit',
@@ -54,22 +64,20 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
   };
   const formatCurrency = formatNum;
 
+  const UNIT_OPTIONS = ['LS', 'Lot', 'Set', 'Pcs', 'm', 'm2', 'm3', 'Sq.m', 'Nos', 'Kg', 'Custom'];
+
+  const [customUnitValues, setCustomUnitValues] = useState<Record<string, string>>({});
+  const [customUnitInputValues, setCustomUnitInputValues] = useState<Record<string, string>>({});
+  const [justEnteredCustomMode, setJustEnteredCustomMode] = useState<Record<string, boolean>>({});
+
   const renderCell = (item: ConstructionProgressItem, rowIndex: number, field: string) => {
-    const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.field === field;
+    const isUnitField = field === 'unit';
+    const stableId = item.id || `${item.scopeOfWorks}-${rowIndex}`;
+    const isEditing = editingCell?.itemId === stableId && editingCell?.field === field;
     const value = getItemValue(item, field);
     const key = `${rowIndex}-${field}`;
     const isText = ['scopeOfWorks', 'detailDescription', 'remark'].includes(field);
 
-    // Determine read-only state:
-    // boQ.amount is always read-only (auto-calculated)
-    // boQ.unitRate is always read-only (derived from materialRate + laborRate)
-    // previousWeek columns are always read-only (gets data from upToThisWeek after save)
-    // remaining columns are always read-only (calculated: boQ - upToThisWeek)
-    // nextWeekPlan percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
-    // upToNextWeekPlan columns are always read-only (calculated: upToThisWeek + nextWeekPlan)
-    // upToThisWeek percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
-    // thisWeek percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
-    // All progress period amounts are read-only when auto-calculated
     const isBoQAmount = field === 'boQ.amount';
     const isUnitRate = field === 'boQ.unitRate';
     const isPreviousWeek = field.startsWith('previousWeek.');
@@ -81,12 +89,154 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
     const isProgressAmount = field.includes('.amount') && !field.startsWith('boQ.');
     const isReadOnly = isBoQAmount || isUnitRate || isPreviousWeek || isRemaining || isNextWeekPlanPercentage || isUpToNextWeekPlan || isUpToThisWeekPercentage || isThisWeekPercentage || ((isProgressAmount) && isAutoCalculated(filteredItems, item));
 
-    if (isEditing) {
+    // For unit field, always show dropdown (no click required)
+    if (isUnitField && !isReadOnly) {
+      const rawValue = String(value ?? '');
+      const unitValue = rawValue.trim();
+
+      const uniqueKey = item.id || item.scopeOfWorks || `row-${rowIndex}`;
+      const customKey = `${uniqueKey}-unit`;
+
+      // A value is custom ONLY if:
+      // 1. It is non-empty
+      // 2. It is NOT in the predefined list (excluding the sentinel 'Custom' entry)
+      // 3. The user has explicitly activated custom mode via the dropdown
+      const PREDEFINED = UNIT_OPTIONS.slice(0, -1); // ['LS','Lot','Set','Pcs','m','m2','m3','Sq.m','Nos','Kg']
+      const isExplicitlyCustomMode = customUnitValues[customKey] === 'true';
+
+      // Never auto-enter custom mode on render — only enter if user clicked 'Custom'
+      const showCustomInput = isExplicitlyCustomMode;
+
+      if (showCustomInput) {
+        return (
+          <div className="relative group">
+            <div className="flex items-center gap-1">
+              <Input
+                value={customUnitInputValues[customKey] ?? unitValue}
+                onChange={(e) => {
+                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: e.target.value }));
+                }}
+                onBlur={() => {
+                  // Don't process blur if we just entered custom mode
+                  if (justEnteredCustomMode[customKey]) {
+                    // Clear the flag after a short delay
+                    setTimeout(() => {
+                      setJustEnteredCustomMode(prev => ({ ...prev, [customKey]: false }));
+                    }, 200);
+                    return;
+                  }
+
+                  const finalValue = (customUnitInputValues[customKey] ?? unitValue).trim();
+                  if (finalValue) {
+                    updateUnitDirectly(rowIndex, finalValue);
+                  }
+                  // Exit custom mode
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                  setCustomUnitInputValues(prev => {
+                    const next = { ...prev };
+                    delete next[customKey];
+                    return next;
+                  });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const finalValue = (customUnitInputValues[customKey] ?? unitValue).trim();
+                    if (finalValue) {
+                      updateUnitDirectly(rowIndex, finalValue);
+                    }
+                    setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                    setCustomUnitInputValues(prev => {
+                      const next = { ...prev };
+                      delete next[customKey];
+                      return next;
+                    });
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                    setCustomUnitInputValues(prev => {
+                      const next = { ...prev };
+                      delete next[customKey];
+                      return next;
+                    });
+                  }
+                }}
+                placeholder="Enter custom unit"
+                className="border border-gray-300 bg-white focus-visible:ring-1 w-[70px] text-center h-8 px-2"
+                showIndicator={false}
+                inputSize="sm"
+                autoFocus
+              />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                  setCustomUnitInputValues(prev => {
+                    const next = { ...prev };
+                    delete next[customKey];
+                    return next;
+                  });
+                }}
+                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                title="Back to dropdown"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // Normal dropdown — show current value if it's predefined, else show placeholder
+      const isCurrentlyCustomValue = unitValue !== '' && !PREDEFINED.includes(unitValue);
+      const selectValue = isCurrentlyCustomValue ? unitValue : (unitValue || 'empty');
+
+
+      return (
+        <div className="relative group">
+          <Select
+            value={selectValue}
+            onValueChange={(selectedValue) => {
+              if (selectedValue === 'Custom') {
+                // Set flag to prevent immediate blur
+                setJustEnteredCustomMode(prev => ({ ...prev, [customKey]: true }));
+                // Enter custom mode — initialise input with current value
+                setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
+                setCustomUnitInputValues(prev => ({ ...prev, [customKey]: unitValue }));
+              } else if (selectedValue === 'empty') {
+                updateUnitDirectly(rowIndex, '');
+              } else {
+                // Predefined value — save directly, never touch customUnitValues
+                updateUnitDirectly(rowIndex, selectedValue);
+              }
+            }}
+          >
+            <SelectTrigger className="border border-gray-300 bg-white focus-visible:ring-1 w-[70px] h-8 text-center hover:border-gray-400">
+              <SelectValue placeholder="-" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="empty">-</SelectItem>
+              {isCurrentlyCustomValue && (
+                <SelectItem value={unitValue}>{unitValue}</SelectItem>
+              )}
+              {UNIT_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option}>{option}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+
+    if (isEditing && !isReadOnly) {
+      const isNumericField = field.includes('qty') || field.includes('rate') || field.includes('amount');
       return (
         <input
           ref={(el) => { if (el) inputRefs.current.set(key, el); }}
-          type="text"
-          value={editValue}
+          type={isNumericField ? 'number' : 'text'}
+          value={editValue ?? ''}
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={saveEdit}
           onKeyDown={handleKeyDown}
@@ -142,7 +292,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
               style={{ width: `${Math.min(percentageValue, 100)}%` }}
             />
             <div
-              className={`relative bg-transparent z-10 px-1 py-0.5 rounded text-sm text-center whitespace-nowrap select-none cursor-not-allowed ${textColorClass}`}
+              className={`relative bg-transparent z-5 px-1 py-0.5 rounded text-sm text-center whitespace-nowrap select-none cursor-not-allowed ${textColorClass}`}
               title="Auto-calculated from children"
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
@@ -214,74 +364,29 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
         <style>{`
           .sticky-col { 
             position: sticky; 
-            z-index: 15; 
-            background-color: white; 
+            background-clip: padding-box;
             border-right: 1px solid rgb(226 232 240);
+            z-index: 10;
           }
-          .sticky-col:nth-child(1) { left: 0px; }
-          .sticky-col:nth-child(2) { left: 95px; }
-          .sticky-col:nth-child(3) { left: 345px; }
-          .sticky-col:nth-child(4) { left: 646px; }
-          .sticky-col:nth-child(5) { left: 698px; }
 
-          /* First header row sticks at top */
-          thead tr:nth-child(1) th {
-            position: sticky;
-            top: 0;
-            z-index: 20;
+          tbody .sticky-col {
+            background-color: inherit;
+          }
+
+          thead .sticky-col {
             background-color: rgb(52 73 94);
+            z-index: 60;
           }
 
-          /* Second header row sticks BELOW the first row (first row is ~38px tall) */
-          thead tr:nth-child(2) th {
-            position: sticky;
-            top: 38px;
-            z-index: 20;
-            background-color: rgb(52 73 94);
-          }
-
-          /* Header corner cells that are also horizontally sticky */
-          thead tr:nth-child(1) th:nth-child(1) {
-            left: 0px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(2) {
-            left: 95px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(3) {
-            left: 345px;
-            z-index: 40;
-          }
-          thead tr:nth-child(1) th:nth-child(4) {
-            left: 646px;
-            z-index: 40;
-          }
-            thead tr:nth-child(2) th:nth-child(1) {
-            position: sticky;
-            left: 698px;
-            z-index: 40;
-          }
-            /* Second header row sticks BELOW the first row */
-        thead tr:nth-child(2) th {
-          position: sticky;
-          top: 38px;
-          z-index: 20;
-          background-color: rgb(52 73 94);
-        }
-
-        /* BoQ QTY sub-header also sticky horizontally */
-        thead tr:nth-child(2) th:nth-child(1) {
-          position: sticky;
-          top: 38px;
-          left: 698px;
-          z-index: 40;
-          background-color: rgb(52 73 94);
-        }
+          .sticky-col-1 { left: 0px; }
+          .sticky-col-2 { left: 95px; }
+          .sticky-col-3 { left: 345px; }
+          .sticky-col-4 { left: 665px; }
+          .sticky-col-5 { left: 748px; }
         `}</style>
         <table className="text-sm text-left border-collapse" style={{ tableLayout: 'fixed', minWidth: 'max-content' }}>
           <colgroup>
-            <col style={{ width: '95px' }} /><col style={{ width: '250px' }} /><col style={{ width: '301px' }} />
+            <col style={{ width: '95px' }} /><col style={{ width: '250px' }} /><col style={{ width: '320px' }} />
             <col style={{ width: '52px' }} /><col style={{ width: '57px' }} /><col style={{ width: '77px' }} />
             <col style={{ width: '77px' }} /><col style={{ width: '77px' }} /><col style={{ width: '112px' }} />
             <col style={{ width: '203px' }} /><col style={{ width: '57px' }} />
@@ -294,10 +399,10 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           </colgroup>
           <thead className="sticky top-0 z-20 bg-[#34495e] shadow-md">
             <tr className="bg-[#34495e] text-white">
-              <th className="px-4 py-4 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>ID</th>
-              <th className="px-2 py-4 border-r border-slate-600 font-bold" rowSpan={2}>Scope of Works</th>
-              <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Detail Description</th>
-              <th className="px-3 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Unit</th>
+              <th className="px-4 sticky-col sticky-col-1 py-4 border-r border-slate-600 text-center font-bold whitespace-nowrap" rowSpan={2}>ID</th>
+              <th className="px-2 sticky-col sticky-col-2 py-4 border-r border-slate-600 font-bold" rowSpan={2}>Scope of Works</th>
+              <th className="px-2 sticky-col sticky-col-3 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Detail Description</th>
+              <th className="px-3 sticky-col sticky-col-4 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Unit</th>
               <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={5}>BoQ</th>
               <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" rowSpan={2}>Remark</th>
               <th className="px-2 py-4 border-r border-slate-600 text-center font-bold" colSpan={3}>% Up to Previous Week</th>
@@ -310,15 +415,28 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             </tr>
             <tr className="bg-[#34495e]/90 text-white/90 py-4">
               {['QTY', 'Mat. Rate', 'Labor Rate', 'Unit Rate', 'Amount', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%', 'QTY', 'Amount', '%'].map((h, i) => (
-                <th key={i} className="px-1 py-1 border-r border-slate-600 text-center text-sm">{h}</th>
-              ))}
+              <th
+                key={i}
+                className={`px-1 py-1 border-r border-slate-600 text-center text-sm ${
+                  i === 0 ? 'sticky-col sticky-col-5' : ''
+                }`}
+              >
+                {h}
+              </th>
+            ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {filteredItems.map((item, index) => (
-              <tr key={index} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
+              <tr key={`${item.id || 'empty'}-${index}-${item.scopeOfWorks.slice(0, 10)}-${item.unit}`} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
                 {ALL_COLUMNS.map(field => (
-                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks', 'detailDescription', 'unit', 'boQ.qty'].includes(field) ? 'sticky-col' : ''}`}>
+                  <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${
+                    field === 'id'                ? 'sticky-col sticky-col-1' :
+                    field === 'scopeOfWorks'      ? 'sticky-col sticky-col-2' :
+                    field === 'detailDescription' ? 'sticky-col sticky-col-3' :
+                    field === 'unit'              ? 'sticky-col sticky-col-4' :
+                    field === 'boQ.qty'           ? 'sticky-col sticky-col-5' : ''
+                  }`}>
                     {renderCell(item, index, field)}
                   </td>
                 ))}

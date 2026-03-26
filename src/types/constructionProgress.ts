@@ -60,6 +60,7 @@ interface WeeklyReportConstructionProgressProps {
 interface EditableCell { 
   rowIndex: number; 
   field: string; 
+  itemId: string;
 }
 
 export type IdType = 'roman' | 'level1' | 'level2' | 'level3' | 'alpha' | 'empty';

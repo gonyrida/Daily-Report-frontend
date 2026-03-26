@@ -128,34 +128,26 @@ export const useReportForm = () => {
 
   const loadInitialReport = useCallback(async () => {
     if (!reportDate || initialLoadDoneRef.current) {
-      console.log("🔒 LOAD INITIAL: Skipping - no date or already loaded");
       return;
     }
     
     // CRITICAL: Only load after authentication is confirmed
-    console.log("🔒 LOAD INITIAL: Starting report load for date:", reportDate);
     initialLoadDoneRef.current = true;
 
     try {
       const dbReport = await loadReportFromDB(reportDate);
       if (dbReport) {
-        console.log("🔒 LOAD INITIAL: Found DB report, filling form");
         fillForm(dbReport);
       } else {
-        console.log("🔒 LOAD INITIAL: No DB report, checking local draft");
         const localDraft = loadDraftLocally(reportDate);
         if (localDraft) {
-          console.log("🔒 LOAD INITIAL: Found local draft, filling form");
           fillForm(localDraft);
         } else {
-          console.log("🔒 LOAD INITIAL: No draft found, using defaults");
         }
       }
     } catch (e) {
-      console.error("🔒 LOAD INITIAL: Failed to load report:", e);
       const localDraft = loadDraftLocally(reportDate);
       if (localDraft) {
-        console.log("🔒 LOAD INITIAL: Fallback to local draft");
         fillForm(localDraft);
       }
     }
@@ -188,7 +180,6 @@ export const useReportForm = () => {
   const createNewBlankReport = useCallback(async (projectName?: string) => {
     try {
       setIsSaving(true);
-      console.log("🔒 CREATE BLANK: Creating new blank report");
       
       const result = await createBlankReport(projectName);
       
@@ -198,7 +189,6 @@ export const useReportForm = () => {
         setReportDate(new Date(result.data.reportDate));
         setLastSavedAt(new Date(result.data.updatedAt));
         
-        console.log("🔒 CREATE BLANK: Success, reportId:", result.data._id);
         
         toast({
           title: "New Report Created",
@@ -208,7 +198,6 @@ export const useReportForm = () => {
         return result.data;
       }
     } catch (error: any) {
-      console.error("🔒 CREATE BLANK: Error:", error);
       toast({
         title: "Failed to Create Report",
         description: error.message || "Could not create new report. Please try again.",
@@ -224,7 +213,6 @@ export const useReportForm = () => {
   
   const triggerAutoSave = useCallback((partialData: Partial<ReportData>) => {
     if (!reportId) {
-      console.log("🔒 AUTO-SAVE: No reportId, skipping auto-save");
       return;
     }
 
@@ -235,16 +223,13 @@ export const useReportForm = () => {
     debouncedAutoSave.current = setTimeout(async () => {
       try {
         setIsAutoSaving(true);
-        console.log("🔒 AUTO-SAVE: Triggering auto-save for reportId:", reportId);
         
         const result = await autoSaveReport(reportId, partialData);
         
         if (result.success) {
           setLastSavedAt(new Date());
-          console.log("🔒 AUTO-SAVE: Success");
         }
       } catch (error: any) {
-        console.error("🔒 AUTO-SAVE: Error:", error);
         // Silent fail for auto-save to not interrupt user
       } finally {
         setIsAutoSaving(false);
@@ -333,7 +318,6 @@ export const useReportForm = () => {
             return;
           }
         } catch (e) {
-          console.error("Failed to load report for date:", e);
         }
         clearForm();
       };
@@ -345,7 +329,6 @@ export const useReportForm = () => {
 
   // CRITICAL: Only load data after auth success
   useEffect(() => {
-    console.log("🔒 USE FORM: Component mounted, waiting for auth confirmation");
     // Note: This will only execute if component is wrapped in ProtectedRoute
     // which ensures authentication is confirmed before rendering
     loadInitialReport();
@@ -391,7 +374,6 @@ export const useReportForm = () => {
         interval = setInterval(() => {
           saveDraft(true); // Silent save
         }, 30000); // 30 seconds
-        console.log("🔧 Auto-save enabled (30-second interval)");
       } else {
         console.log("🔧 Auto-save disabled by user preference");
       }
@@ -411,7 +393,6 @@ export const useReportForm = () => {
     const autoSaveEnabled = await getAutoSavePreference();
     
     if (!autoSaveEnabled) {
-      console.log("🔧 Debounced auto-save skipped - disabled by user preference");
       return;
     }
 

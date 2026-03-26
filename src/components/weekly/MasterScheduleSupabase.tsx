@@ -37,7 +37,6 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   // Save schedule to database
   const saveScheduleToDatabase = async (updatedEntries: MasterScheduleEntry[]) => {
     if (!reportId) {
-      console.log('No reportId provided, skipping database save');
       return;
     }
 
@@ -53,13 +52,11 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
       const response = await updateMasterSchedule(reportId, entriesForSave);
       
       if (response.success) {
-        console.log('Schedule saved successfully to database');
         toast({
           title: "Schedule Saved",
           description: "Master schedule has been saved to the database",
         });
       } else {
-        console.error('Failed to save schedule:', response.error);
         toast({
           title: "Save Failed",
           description: response.error || "Failed to save schedule to database",
@@ -106,7 +103,6 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   // Save schedule when reportId changes from undefined to real ID
   useEffect(() => {
     if (reportId && entries.length > 0 && hasLoaded) {
-      console.log('ReportId changed to valid ID, saving schedule to database');
       saveScheduleToDatabase(entries);
     }
   }, [reportId, hasLoaded]);
@@ -114,7 +110,6 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   const handleFileUpload = async (files: FileList | null, entryType: 'document' | 'image' | 'chart') => {
     if (!files || files.length === 0) return;
 
-    console.log('DEBUG: Starting file upload for', files.length, 'files of type:', entryType);
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -126,11 +121,9 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
         const file = files[i];
         setUploadProgress(Math.round(((i + 1) / files.length) * 90));
 
-        console.log('DEBUG: Uploading file:', file.name, 'size:', file.size);
 
         const uploadResult = await uploadScheduleFileToSupabase(file, reportIdToUse, entryType);
 
-        console.log('DEBUG: Upload result for', file.name, ':', uploadResult);
 
         if (uploadResult.success) {
           const newEntry: MasterScheduleEntry = {
@@ -219,7 +212,6 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   useEffect(() => {
     // Mark as loaded once we receive entries (initial data load)
     if (entries.length > 0 && !hasLoaded) {
-      console.log('Initial entries loaded, count:', entries.length);
       setHasLoaded(true);
     }
     // Also mark as loaded if we have no entries (empty state is also a valid loaded state)

@@ -45,6 +45,7 @@ export type WeeklyReportStatus = 'draft' | 'in-progress' | 'submitted' | 'approv
  */
 export interface WeeklyReportMeta {
   id: string;
+  _id?: string;  // MongoDB ID (for company reports)
   projectName: string;
   weekNumber: number;
   startDate: string;
@@ -57,6 +58,13 @@ export interface WeeklyReportMeta {
   approvedAt?: string;
   approvedBy?: string;
   version: number;
+  userId?: {
+    _id?: string;
+    id?: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  }; // Populated user info for company reports
 }
 
 /**

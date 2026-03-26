@@ -19,6 +19,7 @@ import {
   Clock,
   FileText,
   Edit,
+  Eye,
   Loader2,
   Building2,
   User,
@@ -31,8 +32,19 @@ import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getWeeklyReports } from "@/services/weeklyReportService";
+import { getWeeklyReports, getCompanyWeeklyReports, deleteWeeklyReport } from "@/services/weeklyReportService";
 import type { WeeklyReport } from "@/types/weeklyReport.types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Helper function to get the ISO week number
 const getWeekNumber = (date: Date): number => {
@@ -149,11 +161,17 @@ const WeeklyReportDashboard = () => {
   const projectFilter = searchParams.get('project');
   const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
   const [filteredReports, setFilteredReports] = useState<WeeklyReport[]>([]);
+  const [companyReports, setCompanyReports] = useState<WeeklyReport[]>([]);
+  const [filteredCompanyReports, setFilteredCompanyReports] = useState<WeeklyReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingCompany, setIsLoadingCompany] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<string | null>(null);
 
-  // Load weekly reports from API
+  // Load weekly reports from API (personal reports - all statuses)
   useEffect(() => {
     const loadWeeklyReports = async () => {
       try {
@@ -191,21 +209,97 @@ const WeeklyReportDashboard = () => {
     loadWeeklyReports();
   }, [projectFilter, toast]);
 
-  // Filter reports based on search term
+  // Fetch company reports when switching to company tab or when project filter changes
   useEffect(() => {
-    const filtered = weeklyReports.filter(report => {
-      const weekStr = report.weekNumber.toString();
-      const dateRange = `${new Date(report.startDate).toLocaleDateString()} - ${new Date(report.endDate).toLocaleDateString()}`;
-      const projectName = report.projectName || '';
-      
-      return (
-        weekStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dateRange.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        projectName.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    });
+    const fetchCompanyReports = async () => {
+      try {
+        setIsLoadingCompany(true);
+        const response = await getCompanyWeeklyReports(1, 20, searchTerm, projectFilter || undefined);
+        
+        if (response.success && response.data) {
+          setCompanyReports(response.data);
+        } else {
+          console.error("Failed to load company weekly reports:", response.error);
+          toast({
+            title: "Error",
+            description: response.error || "Failed to load company weekly reports",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to load company weekly reports:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load company weekly reports",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingCompany(false);
+      }
+    };
+
+    // Always fetch company reports when there's a project filter
+    if (projectFilter) {
+      fetchCompanyReports();
+    } else if (activeTab === 'company') {
+      // Also fetch when switching to company tab without project filter
+      fetchCompanyReports();
+    }
+  }, [activeTab, projectFilter, toast]);
+
+  // Filter personal reports based on search term and status
+  useEffect(() => {
+    let filtered = weeklyReports;
+
+    // Filter by status (case-insensitive)
+    if (filterStatus !== "all") {
+      filtered = filtered.filter(report => report.status.toLowerCase() === filterStatus.toLowerCase());
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const query = searchTerm.toLowerCase();
+      filtered = filtered.filter(report => {
+        const weekStr = report.weekNumber.toString();
+        const dateRange = `${new Date(report.startDate).toLocaleDateString()} - ${new Date(report.endDate).toLocaleDateString()}`;
+        const projectName = report.projectName || '';
+        
+        return (
+          weekStr.toLowerCase().includes(query) ||
+          dateRange.toLowerCase().includes(query) ||
+          projectName.toLowerCase().includes(query) ||
+          report.status.toLowerCase().includes(query)
+        );
+      });
+    }
+
     setFilteredReports(filtered);
-  }, [weeklyReports, searchTerm]);
+  }, [weeklyReports, searchTerm, filterStatus]);
+
+  // Filter company reports based on search term
+  useEffect(() => {
+    let filtered = companyReports;
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const query = searchTerm.toLowerCase();
+      filtered = filtered.filter(report => {
+        const weekStr = report.weekNumber.toString();
+        const dateRange = `${new Date(report.startDate).toLocaleDateString()} - ${new Date(report.endDate).toLocaleDateString()}`;
+        const projectName = report.projectName || '';
+        const userName = report.userId ? `${report.userId.firstName} ${report.userId.lastName}`.toLowerCase() : '';
+        
+        return (
+          weekStr.toLowerCase().includes(query) ||
+          dateRange.toLowerCase().includes(query) ||
+          projectName.toLowerCase().includes(query) ||
+          userName.includes(query)
+        );
+      });
+    }
+
+    setFilteredCompanyReports(filtered);
+  }, [companyReports, searchTerm]);
 
   const handleCreateWeeklyReport = () => {
     if (projectFilter) {
@@ -217,7 +311,17 @@ const WeeklyReportDashboard = () => {
 
   const handleOpenReport = (reportId: string) => {
     const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
-    navigate(`/weekly-report?reportId=${reportId}${projectParam}`);
+    
+    // Check if this is a company report and determine ownership
+    const currentUserId = getCurrentUserId();
+    const report = activeTab === 'company' 
+      ? companyReports.find(r => (r._id || r.id) === reportId)
+      : filteredReports.find(r => (r._id || r.id) === reportId);
+    
+    const isOwner = activeTab === 'personal' || (report?.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId));
+    const readOnlyParam = !isOwner ? '&readOnly=true' : '';
+    
+    navigate(`/weekly-report?reportId=${reportId}${projectParam}${readOnlyParam}`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -228,6 +332,57 @@ const WeeklyReportDashboard = () => {
         return <Badge className="bg-yellow-100 text-yellow-800">Draft</Badge>;
       default:
         return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
+    }
+  };
+
+  const getCurrentUserId = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        return user.id || user.userId;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+    return null;
+  };
+
+  const handleDeleteReport = async (reportId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    try {
+      await deleteWeeklyReport(reportId);
+      
+      toast({
+        title: "Report Deleted",
+        description: "The weekly report has been deleted successfully",
+      });
+      
+      // Refresh reports
+      const params: any = {};
+      if (projectFilter) {
+        params.projectName = projectFilter;
+      }
+      const response = await getWeeklyReports(params);
+      if (response.success && response.data) {
+        setWeeklyReports(response.data);
+      }
+      
+      // Refresh company reports if on company tab
+      if (activeTab === 'company') {
+        const companyResponse = await getCompanyWeeklyReports(1, 20, searchTerm, projectFilter || undefined);
+        if (companyResponse.success && companyResponse.data) {
+          setCompanyReports(companyResponse.data);
+        }
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Deletion Failed",
+        description: error instanceof Error ? error.message : "Failed to delete report",
+        variant: "destructive",
+      });
     }
   };
 
@@ -380,7 +535,7 @@ const WeeklyReportDashboard = () => {
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
                       My Weekly Reports
-                      {weeklyReports.length > 0 && (
+                      {filteredReports.length > 0 && (
                         <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
                           {filteredReports.length}
                         </span>
@@ -399,64 +554,210 @@ const WeeklyReportDashboard = () => {
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
                       Company Weekly Reports
+                      {filteredCompanyReports.length > 0 && (
+                        <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
+                          {filteredCompanyReports.length}
+                        </span>
+                      )}
                     </div>
                   </button>
                 </nav>
               </div>
             </div>
 
-            {/* Reports List */}
-            <div className="space-y-4">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  <span className="ml-2">Loading weekly reports...</span>
-                </div>
-              ) : filteredReports.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No weekly reports found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {searchTerm ? "Try adjusting your search terms" : "Create your first weekly report to get started"}
-                  </p>
-                  {!searchTerm && (
-                    <Button onClick={handleCreateWeeklyReport}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Weekly Report
-                    </Button>
+            {/* Recent Documents */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Recent Documents ({activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length})
+                  </div>
+                  {/* Filter Buttons - Only show in Personal tab */}
+                  {activeTab === 'personal' && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={filterStatus === 'all' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setFilterStatus('all')}
+                      >
+                        All
+                      </Button>
+                      <Button
+                        variant={filterStatus === 'draft' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setFilterStatus('draft')}
+                      >
+                        Draft
+                      </Button>
+                      <Button
+                        variant={filterStatus === 'submitted' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setFilterStatus('submitted')}
+                      >
+                        Submitted
+                      </Button>
+                    </div>
                   )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredReports.map((report) => (
-                    <Card key={report._id || report.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenReport(report._id || report.id)}>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length) > 0 ? (
+                  <div className="space-y-3">
+                    {(activeTab === 'personal' ? filteredReports : filteredCompanyReports).map((report) => {
+                      const currentUserId = getCurrentUserId();
+                      const isOwner = activeTab === 'personal' || (report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId));
+                      const userName = report.userId ? `${report.userId.firstName} ${report.userId.lastName}` : 'Unknown';
+                      
+                      return (
+                        <div
+                          key={report._id || report.id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => handleOpenReport(report._id || report.id)}
+                        >
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold">Week {report.weekNumber}</h3>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium">Week {report.weekNumber}</h4>
                               {getStatusBadge(report.status)}
+                              {/* User Info - Only show in Company tab */}
+                              {activeTab === 'company' && (
+                                <Badge variant="outline" className="text-xs">
+                                  <User className="h-3 w-3 mr-1" />
+                                  {userName}
+                                </Badge>
+                              )}
+                              {/* View-only indicator for company reports */}
+                              {activeTab === 'company' && !isOwner && (
+                                <Badge variant="secondary" className="text-xs ml-2">
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View Only
+                                </Badge>
+                              )}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-1">
-                              {new Date(report.startDate).toLocaleDateString()} - {new Date(report.endDate).toLocaleDateString()}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Last updated: {new Date(report.updatedAt).toLocaleDateString()}
-                            </p>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(report.startDate).toLocaleDateString()} - {new Date(report.endDate).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(report.updatedAt).toLocaleDateString()}
+                              </span>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit
-                            </Button>
+                            {/* Edit/Open Button - Only for owners */}
+                            {isOwner && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenReport(report._id || report.id);
+                                }}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            )}
+                            
+                            {/* View-only mode for non-owners in Company tab */}
+                            {!isOwner && activeTab === 'company' && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenReport(report._id || report.id);
+                                }}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            )}
+                            
+                            {/* Delete Button - Only for owners in Personal tab */}
+                            {isOwner && activeTab === 'personal' && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Weekly Report</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete Week {report.weekNumber} report? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={(e) => handleDeleteReport(report._id || report.id, e)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+
+                            {/* View Button for non-owners in Company tab */}
+                            {!isOwner && activeTab === 'company' && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenReport(report._id || report.id);
+                                }}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            )}
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      {projectFilter 
+                        ? `No Reports for ${projectFilter}` 
+                        : 'No Reports Found'
+                      }
+                    </h3>
+                    <p className="text-muted-foreground text-center mb-4">
+                      {activeTab === 'personal'
+                        ? (projectFilter 
+                            ? `No weekly reports found for ${projectFilter}. Create your first report for this project.`
+                            : 'Create your first weekly report to get started.')
+                        : (projectFilter
+                            ? `No submitted company reports found for ${projectFilter}.`
+                            : 'No submitted weekly reports from your company yet.')
+                      }
+                    </p>
+                    {activeTab === 'personal' && (
+                      <Button onClick={handleCreateWeeklyReport}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Weekly Report
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </main>
         </SidebarInset>
       </div>

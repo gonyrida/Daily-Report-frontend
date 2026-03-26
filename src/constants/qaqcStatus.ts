@@ -1,3 +1,3 @@
-export const STATUS_OPTIONS: ("Open" | "In Review" | "Pending" | "Approved" | "Issued" | "Closed" | "Rejected")[] = [
-  "Open", "In Review", "Pending", "Approved", "Issued", "Closed", "Rejected",
+export const STATUS_OPTIONS: ("Pending" | "Respond" | "Submit" | "Resubmit" | "Approved" | "Approved with Condition" | "Not Approved")[] = [
+  "Pending", "Respond", "Submit", "Resubmit", "Approved", "Approved with Condition", "Not Approved",
 ];
