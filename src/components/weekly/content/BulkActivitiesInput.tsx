@@ -137,7 +137,6 @@ export default function BulkActivitiesInput({ onImport, onClose, context }: Bulk
       }
     }
 
-    console.log("Bulk import:", { context, weeklyActivities, nextWeekPlan });
 
     onImport(weeklyActivities, nextWeekPlan);
     onClose?.();

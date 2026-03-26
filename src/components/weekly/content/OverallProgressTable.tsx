@@ -24,10 +24,10 @@ interface OverallProgressTableProps {
 
 export default function OverallProgressTable({
   rows = [],
-  setRows = () => {},
-  updateRows = () => {},
-  addTitleRow = () => {},
-  addDetailRow = () => {}
+  setRows = () => { },
+  updateRows = () => { },
+  addTitleRow = () => { },
+  addDetailRow = () => { }
 }: OverallProgressTableProps) {
   const [localRows, setLocalRows] = useState<ProgressRow[]>(rows || []);
 
@@ -36,10 +36,10 @@ export default function OverallProgressTable({
     // Only sync if the props rows are different and we don't have local changes
     if (rows && rows.length > 0) {
       // Check if we have any local rows that aren't in the props
-      const hasLocalChanges = localRows.some(localRow => 
+      const hasLocalChanges = localRows.some(localRow =>
         !rows.some(propRow => propRow.id === localRow.id)
       );
-      
+
       if (!hasLocalChanges) {
         setLocalRows(rows);
       }
@@ -57,8 +57,7 @@ export default function OverallProgressTable({
 
     const result = localRows.map((row, index) => {
       // Debug: log each row to see what's happening
-      console.log(`Processing row ${index}:`, row.rowType, row.displayIndex);
-      
+
       if (row.rowType === "title") {
         titleCount++;
         return {
@@ -142,7 +141,6 @@ export default function OverallProgressTable({
       return row;
     });
 
-    console.log("Final formatted rows:", result);
     return result;
   }, [localRows]);
 
@@ -185,7 +183,7 @@ export default function OverallProgressTable({
         // Handle percentage formatting for percentage columns
         const percentageFields = ["unit", "prev", "today", "nextWeekPlan", "upNextWeekPlan"];
         let processedValue = value;
-        
+
         if (percentageFields.includes(field) && typeof value === "string") {
           // Convert string input to number, but handle special cases
           if (value === "__custom_unit_input__") {
@@ -230,7 +228,7 @@ export default function OverallProgressTable({
       }
       return row;
     });
-    
+
     setLocalRows(newRows);
     setRows?.(newRows);
   };
@@ -309,177 +307,177 @@ export default function OverallProgressTable({
 
       <div className="border rounded-lg overflow-hidden">
         <div className="w-full overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-primary text-primary-foreground p-4 rounded-lg">
-              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[5%]">#</th>
-              <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[300px]">
-                Scope of work
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                % Up to Previous Week
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                % This Week
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                % Up to This Week
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                Remaining
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                % Next Week Plan
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                % Up Next Week Plan
-              </th>
-              <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[5%]">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {formattedRows.map((row) => (
-              <tr key={row.id} className={`border-b ${row.rowType === "title" ? "bg-slate-200 dark:bg-slate-800/50" : row.rowType === "subDetail" ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-muted/30"}`}>
-                <td className={`px-4 py-2 text-sm ${row.rowType === "title" ? "font-semibold text-muted-foreground" : "text-muted-foreground"}`}>
-                  {row.displayIndex || ""}
-                </td>
-                
-                {/* Description */}
-                <td className="px-3 py-2">
-                  {row.isCustomInput ? (
-                    <div className="flex items-center gap-1">
-                      <Input
-                        value={row.description}
-                        onChange={(e) =>
-                          customUpdateRow(row.id, "description", e.target.value)
-                        }
-                        placeholder="Enter custom..."
-                        className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
-                        showIndicator={false}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          customUpdateRow(row.id, "isCustomInput", false)
-                        }
-                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Select
-                      value={row.description}
-                      onValueChange={(value) =>
-                        customUpdateRow(row.id, "description", value)
-                      }
-                    >
-                      <SelectTrigger className={`border-0 bg-transparent focus:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}>
-                        <SelectValue placeholder="Select province..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <div className="max-h-60 overflow-y-auto">
-                          <Input
-                            placeholder="Search..."
-                            value={row.searchTerm || ""}
-                            onChange={(e) =>
-                              customUpdateRow(
-                                row.id,
-                                "searchTerm",
-                                e.target.value,
-                              )
-                            }
-                            className="border-b mb-2"
-                            showIndicator={false}
-                          />
-                          {CAMBODIA_PROVINCES.filter((province) =>
-                            province
-                              .toLowerCase()
-                              .includes((row.searchTerm || "").toLowerCase())
-                          ).map((province) => (
-                            <SelectItem key={province} value={province}>
-                              {province}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__custom__">+ Add Custom</SelectItem>
-                        </div>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </td>
-
-                {/* % Up to Previous Week */}
-                <PercentageCell
-                  value={0}
-                  onChange={(value) => customUpdateRow(row.id, "unit", value)}
-                  placeholder="0"
-                  showIndicator={false}
-                  backgroundType="none"
-                />
-
-                {/* % This Week */}
-                <PercentageCell
-                  value={row.prev}
-                  onChange={(value) => customUpdateRow(row.id, "prev", value)}
-                  placeholder="0"
-                  showIndicator={false}
-                  backgroundType="none"
-                />
-
-                {/* % Up to This Week */}
-                <PercentageCell
-                  value={row.today}
-                  placeholder="0"
-                  readOnly
-                  showIndicator={false}
-                  backgroundType="blue"
-                />
-
-                {/* Remaining */}
-                <PercentageCell
-                  value={row.accumulated}
-                  placeholder="0"
-                  readOnly
-                  showIndicator={false}
-                  backgroundType="orange"
-                />
-
-                {/* % Next Week Plan */}
-                <PercentageCell
-                  value={row.nextWeekPlan}
-                  onChange={(value) => customUpdateRow(row.id, "nextWeekPlan", value)}
-                  placeholder="0"
-                  showIndicator={false}
-                  backgroundType="none"
-                />
-
-                {/* % Up Next Week Plan */}
-                <PercentageCell
-                  value={row.upNextWeekPlan}
-                  placeholder="0"
-                  readOnly
-                  showIndicator={false}
-                  backgroundType="green"
-                />
-
-                {/* Actions */}
-                <td className="px-2 py-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeRow(row.id)}
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </td>
+          <table className="w-full">
+            <thead>
+              <tr className="bg-primary text-primary-foreground p-4 rounded-lg">
+                <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[5%]">#</th>
+                <th className="text-left px-4 py-2.5 text-sm font-medium text-base w-[300px]">
+                  Scope of work
+                </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                  % Up to Previous Week
+                </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                  % This Week
+                </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                  % Up to This Week
+                </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                  Remaining
+                </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                  % Next Week Plan
+                </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
+                  % Up Next Week Plan
+                </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[5%]">
+                  Actions
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {formattedRows.map((row) => (
+                <tr key={row.id} className={`border-b ${row.rowType === "title" ? "bg-slate-200 dark:bg-slate-800/50" : row.rowType === "subDetail" ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-muted/30"}`}>
+                  <td className={`px-4 py-2 text-sm ${row.rowType === "title" ? "font-semibold text-muted-foreground" : "text-muted-foreground"}`}>
+                    {row.displayIndex || ""}
+                  </td>
+
+                  {/* Description */}
+                  <td className="px-3 py-2">
+                    {row.isCustomInput ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={row.description}
+                          onChange={(e) =>
+                            customUpdateRow(row.id, "description", e.target.value)
+                          }
+                          placeholder="Enter custom..."
+                          className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
+                          showIndicator={false}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            customUpdateRow(row.id, "isCustomInput", false)
+                          }
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select
+                        value={row.description}
+                        onValueChange={(value) =>
+                          customUpdateRow(row.id, "description", value)
+                        }
+                      >
+                        <SelectTrigger className={`border-0 bg-transparent focus:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}>
+                          <SelectValue placeholder="Select province..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <div className="max-h-60 overflow-y-auto">
+                            <Input
+                              placeholder="Search..."
+                              value={row.searchTerm || ""}
+                              onChange={(e) =>
+                                customUpdateRow(
+                                  row.id,
+                                  "searchTerm",
+                                  e.target.value,
+                                )
+                              }
+                              className="border-b mb-2"
+                              showIndicator={false}
+                            />
+                            {CAMBODIA_PROVINCES.filter((province) =>
+                              province
+                                .toLowerCase()
+                                .includes((row.searchTerm || "").toLowerCase())
+                            ).map((province) => (
+                              <SelectItem key={province} value={province}>
+                                {province}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="__custom__">+ Add Custom</SelectItem>
+                          </div>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </td>
+
+                  {/* % Up to Previous Week */}
+                  <PercentageCell
+                    value={0}
+                    onChange={(value) => customUpdateRow(row.id, "unit", value)}
+                    placeholder="0"
+                    showIndicator={false}
+                    backgroundType="none"
+                  />
+
+                  {/* % This Week */}
+                  <PercentageCell
+                    value={row.prev}
+                    onChange={(value) => customUpdateRow(row.id, "prev", value)}
+                    placeholder="0"
+                    showIndicator={false}
+                    backgroundType="none"
+                  />
+
+                  {/* % Up to This Week */}
+                  <PercentageCell
+                    value={row.today}
+                    placeholder="0"
+                    readOnly
+                    showIndicator={false}
+                    backgroundType="blue"
+                  />
+
+                  {/* Remaining */}
+                  <PercentageCell
+                    value={row.accumulated}
+                    placeholder="0"
+                    readOnly
+                    showIndicator={false}
+                    backgroundType="orange"
+                  />
+
+                  {/* % Next Week Plan */}
+                  <PercentageCell
+                    value={row.nextWeekPlan}
+                    onChange={(value) => customUpdateRow(row.id, "nextWeekPlan", value)}
+                    placeholder="0"
+                    showIndicator={false}
+                    backgroundType="none"
+                  />
+
+                  {/* % Up Next Week Plan */}
+                  <PercentageCell
+                    value={row.upNextWeekPlan}
+                    placeholder="0"
+                    readOnly
+                    showIndicator={false}
+                    backgroundType="green"
+                  />
+
+                  {/* Actions */}
+                  <td className="px-2 py-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeRow(row.id)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { ConstructionProgressItem, EditableCell } from '../../types/constructionProgress';
 import { isAutoCalculated } from '../../utils/calculationEngine';
 import { detectIdType, isRomanId } from '../../utils/idEngine';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ConstructionProgressTableProps {
   filteredItems: ConstructionProgressItem[];
@@ -54,22 +62,18 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
   };
   const formatCurrency = formatNum;
 
+  const UNIT_OPTIONS = ['LS', 'Lot', 'Set', 'Pcs', 'm', 'm2', 'm3', 'Nos', 'Kg', 'Custom'];
+
+  const [customUnitValues, setCustomUnitValues] = useState<Record<string, string>>({});
+  const [customUnitInputValues, setCustomUnitInputValues] = useState<Record<string, string>>({});
+
   const renderCell = (item: ConstructionProgressItem, rowIndex: number, field: string) => {
+    const isUnitField = field === 'unit';
     const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.field === field;
     const value = getItemValue(item, field);
     const key = `${rowIndex}-${field}`;
     const isText = ['scopeOfWorks', 'detailDescription', 'remark'].includes(field);
 
-    // Determine read-only state:
-    // boQ.amount is always read-only (auto-calculated)
-    // boQ.unitRate is always read-only (derived from materialRate + laborRate)
-    // previousWeek columns are always read-only (gets data from upToThisWeek after save)
-    // remaining columns are always read-only (calculated: boQ - upToThisWeek)
-    // nextWeekPlan percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
-    // upToNextWeekPlan columns are always read-only (calculated: upToThisWeek + nextWeekPlan)
-    // upToThisWeek percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
-    // thisWeek percentage is always read-only (calculated: amount ÷ boQ.amount × 100)
-    // All progress period amounts are read-only when auto-calculated
     const isBoQAmount = field === 'boQ.amount';
     const isUnitRate = field === 'boQ.unitRate';
     const isPreviousWeek = field.startsWith('previousWeek.');
@@ -81,7 +85,110 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
     const isProgressAmount = field.includes('.amount') && !field.startsWith('boQ.');
     const isReadOnly = isBoQAmount || isUnitRate || isPreviousWeek || isRemaining || isNextWeekPlanPercentage || isUpToNextWeekPlan || isUpToThisWeekPercentage || isThisWeekPercentage || ((isProgressAmount) && isAutoCalculated(filteredItems, item));
 
-    if (isEditing) {
+    // For unit field, always show dropdown (no click required)
+    if (isUnitField && !isReadOnly) {
+      const unitValue = String(value);
+      const isCustom = !UNIT_OPTIONS.slice(0, -1).includes(unitValue) && unitValue !== '';
+      // Use more stable key that includes item.id or scopeOfWorks to avoid conflicts
+      const uniqueKey = item.id || item.scopeOfWorks || `row-${rowIndex}`;
+      const customKey = `${uniqueKey}-unit`;
+      const showCustomInput = isCustom || customUnitValues[customKey];
+      
+      // Force show custom input if we're typing in it
+      const forceShowCustom = customUnitInputValues[customKey] !== undefined;
+      return (
+        <div className="relative group">
+          {(showCustomInput || forceShowCustom) ? (
+            // Custom input mode
+            <div className="flex items-center gap-1">
+              <Input
+                value={customUnitInputValues[customKey] || unitValue || ''}
+                onChange={(e) => {
+                  
+                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: e.target.value }));
+                  // Keep custom input mode active while typing
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
+                }}
+                onBlur={() => {
+                  
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                  // Save the custom unit value
+                  const finalValue = customUnitInputValues[customKey] || unitValue;
+                  setEditValue(finalValue);
+                  saveEdit();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    // Escape key returns to dropdown
+                    setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                    setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
+                    setEditValue('');
+                  } else {
+                    handleKeyDown(e);
+                  }
+                }}
+                placeholder="Enter custom unit"
+                className="border border-gray-300 bg-white focus-visible:ring-1 w-[70px] text-center h-8 px-2"
+                showIndicator={false}
+                inputSize="sm"
+                autoFocus
+              />
+              <button
+                onClick={(e) => {
+                  
+                  e.stopPropagation();
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
+                  setEditValue('');
+                }}
+                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                title="Back to dropdown"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            // Normal dropdown mode
+            <Select
+              value={isCustom ? 'Custom' : (unitValue || 'empty')}
+              onValueChange={(selectedValue) => {
+                
+                if (selectedValue === 'Custom') {
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: 'true' }));
+                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: unitValue })); // Initialize with current value
+                } else if (selectedValue === 'empty') {
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
+                  setEditValue('');
+                  // Save directly
+                  setTimeout(() => saveEdit(), 0);
+                } else {
+                  setCustomUnitValues(prev => ({ ...prev, [customKey]: '' }));
+                  setCustomUnitInputValues(prev => ({ ...prev, [customKey]: '' }));
+                  setEditValue(selectedValue);
+                  // Save directly
+                  setTimeout(() => saveEdit(), 0);
+                }
+              }}
+            >
+              <SelectTrigger className="border border-gray-300 bg-white focus-visible:ring-1 w-[70px] h-8 text-center hover:border-gray-400">
+                <SelectValue placeholder="-" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="empty">-</SelectItem>
+                {UNIT_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      );
+    }
+
+    if (isEditing && !isReadOnly) {
       return (
         <input
           ref={(el) => { if (el) inputRefs.current.set(key, el); }}
@@ -221,7 +328,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           .sticky-col:nth-child(1) { left: 0px; }
           .sticky-col:nth-child(2) { left: 95px; }
           .sticky-col:nth-child(3) { left: 345px; }
-          .sticky-col:nth-child(4) { left: 646px; }
+          .sticky-col:nth-child(4) { left: 596px; }
           .sticky-col:nth-child(5) { left: 698px; }
 
           /* First header row sticks at top */
@@ -254,7 +361,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
             z-index: 40;
           }
           thead tr:nth-child(1) th:nth-child(4) {
-            left: 646px;
+            left: 596px;
             z-index: 40;
           }
             thead tr:nth-child(2) th:nth-child(1) {
@@ -316,7 +423,7 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {filteredItems.map((item, index) => (
-              <tr key={index} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
+              <tr key={`${item.id || 'empty'}-${index}-${item.scopeOfWorks.slice(0, 10)}`} className={`${getRowBg(item, index)} transition-colors group${item.isBold ? ' font-bold' : ''}`}>
                 {ALL_COLUMNS.map(field => (
                   <td key={field} className={`px-1.5 py-2 border-r border-slate-200 ${field === 'remark' ? 'text-blue-600' : ''} ${['id', 'scopeOfWorks', 'detailDescription', 'unit', 'boQ.qty'].includes(field) ? 'sticky-col' : ''}`}>
                     {renderCell(item, index, field)}

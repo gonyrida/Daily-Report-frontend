@@ -11,22 +11,16 @@ const API_BASE_URL = API_ENDPOINTS.DAILY_REPORTS.BASE;
 // SECURITY: NO token handling, NO localStorage, NO Authorization headers
 
 export const saveReportToDB = async (reportData: any) => {
-  console.log("🔒 SAVE REPORT: Attempting to save report");
-
   const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.SAVE, reportData);
-
-  console.log(`🔒 SAVE REPORT: Response ${response.status}`);
 
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to save report" }));
-    console.error("🔒 SAVE REPORT: Failed:", error);
     throw new Error(error.message || "Failed to save report");
   }
 
   const result = await response.json();
-  console.log("🔒 SAVE REPORT: Success:", result);
   return result;
 };
 
@@ -39,55 +33,42 @@ export const submitReportToDB = async (
   const day = String(reportDate.getDate()).padStart(2, "0");
   const dateStr = `${year}-${month}-${day}`;
 
-  console.log("🔒 SUBMIT REPORT: Submitting for", { projectName, dateStr });
-
   const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.SUBMIT, { projectName, date: dateStr });
 
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to submit report" }));
-    console.error("🔒 SUBMIT REPORT: Failed:", error);
     throw new Error(error.message || "Failed to submit report");
   }
 
   const result = await response.json();
-  console.log("🔒 SUBMIT REPORT: Success:", result);
   return result;
 };
 
 export const loadReportFromDB = async (reportDate: Date) => {
-  console.log("🐛 DEBUG API: loadReportFromDB called with:", reportDate);
   try {
     const year = reportDate.getFullYear();
     const month = String(reportDate.getMonth() + 1).padStart(2, "0");
     const day = String(reportDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
 
-    console.log("🔒 LOAD REPORT: Loading for date:", dateStr);
-
     const url = API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr);
     const response = await apiGet(url);
 
-    console.log(`🔒 LOAD REPORT: Response ${response.status}`);
-
     // 404 means "no report exists" - this is expected behavior
     if (response.status === 404) {
-      console.log("🔒 LOAD REPORT: No report found (expected 404)");
       return null;
     }
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("🔒 LOAD REPORT: Error:", response.status, errorText);
       throw new Error(`Failed to load report: ${response.statusText}`);
     }
 
     const result = await response.json();
-    console.log("🐛 DEBUG API: loadReportFromDB result:", result);
     return result;
   } catch (err) {
-    console.error("🔒 LOAD REPORT: Exception:", err);
     throw err;
   }
 };
@@ -111,8 +92,6 @@ export const generatePythonExcel = async (
         // userId will be extracted from JWT cookie by Python backend
       };
     }
-
-    console.log("🔑 PYTHON EXCEL: Sending payload - userId will be validated by backend");
 
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-report`, {
       mode,
@@ -161,7 +140,6 @@ export const generatePythonExcel = async (
 
     return { success: true };
   } catch (error) {
-    console.error("Python Excel generation error:", error);
     throw error;
   }
 };
@@ -194,8 +172,6 @@ export const generateReferenceExcel = async (
       hse_title: tableTitle,
       hse: referenceEntries,
     };
-
-    console.log("🔑 REFERENCE EXCEL: Sending payload - userId will be validated by backend");
 
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-reference`, payload);
 

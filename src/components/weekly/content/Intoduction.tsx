@@ -21,15 +21,7 @@ const Introduction = ({
   const [localDesignConstruction, setLocalDesignConstruction] = useState(designConstruction);
   const [localDesignList, setLocalDesignList] = useState<string[]>(designList);
 
-  // Log component mount and initial props
-  useEffect(() => {
-    console.log('[Introduction] Component mounted with props:', {
-      projectOverview,
-      designConstruction,
-      designList,
-      projectLogo
-    });
-  }, []);
+  
 
   // Use project logo from Cover tab
   const coverImageUrl = projectLogo;
@@ -40,12 +32,10 @@ const Introduction = ({
 
   // Auto-resize on content change
   useEffect(() => {
-    console.log('[Introduction] Project Overview changed:', projectOverview);
     autoResize(projectOverviewRef);
   }, [projectOverview]);
 
   useEffect(() => {
-    console.log('[Introduction] Design Construction changed:', designConstruction);
     autoResize(designConstructionRef);
   }, [designConstruction]);
 
@@ -61,22 +51,16 @@ const Introduction = ({
     setter: React.Dispatch<React.SetStateAction<string>>,
     fieldName: string
   ) => {
-    console.log(`[Introduction] ${fieldName} text change:`, {
-      newValue: e.target.value,
-      previousValue: fieldName === 'projectOverview' ? projectOverview : designConstruction
-    });
     handleTextChange(e, setter);
   };
 
   // Handle Tab key for list indentation
   const handleTabKeyWrapper = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    console.log('[Introduction] Tab key pressed:', { key: e.key, target: e.currentTarget.name || 'unnamed textarea' });
     handleTabKey(e, setProjectOverview, setDesignConstruction, projectOverviewRef, designConstructionRef);
   };
 
   // Handle Alt+B for bold text (to avoid browser Ctrl+B conflict)
   const handleBoldWrapper = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    console.log('[Introduction] Key pressed for bold:', { key: e.key, altKey: e.altKey, target: e.currentTarget.name || 'unnamed textarea' });
     handleBold(e, setProjectOverview, setDesignConstruction, projectOverviewRef, designConstructionRef);
   };
 

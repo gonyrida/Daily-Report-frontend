@@ -9,7 +9,6 @@ const Activities = (props: ActivitiesProps) => {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [importContext, setImportContext] = useState<"weekly" | "next">("weekly");
   
-  console.log("🔍 DEBUG Activities: props.reportId =", props.reportId); // DEBUG: Log reportId
   
   // Helper function to detect indentation level
   const getIndentationLevel = (description: string): number => {
@@ -112,18 +111,12 @@ const Activities = (props: ActivitiesProps) => {
 
   // Handle bulk import
   const handleBulkImport = async (importedWeekly: ActivityRow[], importedNext: ActivityRow[]) => {
-    console.log("🔍 DEBUG Bulk Import: Starting import...");
-    console.log("🔍 DEBUG Bulk Import: props.reportId =", props.reportId);
-    console.log("🔍 DEBUG Bulk Import: importContext =", importContext);
-    console.log("🔍 DEBUG Bulk Import: importedWeekly =", importedWeekly);
-    console.log("🔍 DEBUG Bulk Import: importedNext =", importedNext);
-    
+   
     try {
       // Get current report ID (you'll need to pass this as a prop)
       const reportId = props.reportId; // Make sure to add reportId to ActivitiesProps
       
       if (!reportId) {
-        console.error("🔍 DEBUG Bulk Import: No report ID provided for bulk import");
         // Fallback to local state update
         if (importContext === "weekly") {
           const newWeeklyActivities = [...weeklyActivities, ...importedWeekly, ...importedNext];
@@ -135,14 +128,12 @@ const Activities = (props: ActivitiesProps) => {
         return;
       }
 
-      console.log("🔍 DEBUG Bulk Import: Calling bulkImportActivities API...");
       // Call bulk import API
       const result = await bulkImportActivities(reportId, {
         weeklyActivities: importContext === "weekly" ? importedWeekly : [],
         nextWeekPlan: importContext === "next" ? importedNext : []
       });
 
-      console.log("🔍 DEBUG Bulk Import: API result:", result);
 
       // Update local state with API response
       if (result.weeklyActivities) {
@@ -153,7 +144,6 @@ const Activities = (props: ActivitiesProps) => {
       }
 
     } catch (error) {
-      console.error("🔍 DEBUG Bulk Import: Error occurred:", error);
       // Fallback to local state update
       if (importContext === "weekly") {
         const newWeeklyActivities = [...weeklyActivities, ...importedWeekly, ...importedNext];

@@ -79,7 +79,7 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
             </tr>
           </thead>
           <tbody>
-              {(rows || []).map((row, idx) => (
+            {(rows || []).map((row, idx) => (
               <tr key={row.id} className="border-b hover:bg-muted/20 transition-colors">
                 <td className="py-2 px-2 text-center text-muted-foreground font-medium text-xs">
                   {idx + 1}
@@ -106,16 +106,15 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                   <select
                     value={row.status}
                     onChange={(e) => onCellChange(section.id, row.id, "status", e.target.value)}
-                    className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${
-                      row.status === "Open" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
-                      row.status === "In Review" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
-                      row.status === "Pending" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
-                      row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
-                      row.status === "Issued" ? "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 border-cyan-200 dark:border-cyan-700" :
-                      row.status === "Closed" ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700" :
-                      row.status === "Rejected" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
-                      "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
-                    }`}
+                    className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${row.status === "Open" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
+                        row.status === "In Review" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
+                          row.status === "Pending" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
+                            row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
+                              row.status === "Issued" ? "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 border-cyan-200 dark:border-cyan-700" :
+                                row.status === "Closed" ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700" :
+                                  row.status === "Rejected" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
+                                    "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                      }`}
                   >
                     <option value="">— Select —</option>
                     {STATUS_OPTIONS.map((status) => (
@@ -144,18 +143,18 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                 </td>
               </tr>
             ))}
-              {rows && rows.length > 0 && (
-                <tr className="bg-muted/10">
-                  <td colSpan={6} className="py-3 px-2">
-                    <table className="w-full">
-                      <tbody>
-                        <tr>
-                          <td className="flex-1">
-                            <div className="mb-2">
-                              <span className="text-sm font-semibold text-foreground">Comments</span>
-                            </div>
-                            <textarea
-                              value={rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n')}
+            {rows && rows.length > 0 && (
+              <tr className="bg-muted/10">
+                <td colSpan={6} className="py-3 px-2">
+                  <table className="w-full">
+                    <tbody>
+                      <tr>
+                        <td className="flex-1">
+                          <div className="mb-2">
+                            <span className="text-sm font-semibold text-foreground">Comments</span>
+                          </div>
+                          <textarea
+                            value={rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n')}
                             onChange={(e) => {
                               const value = e.target.value;
                               const comments = value.split('\n\n---\n\n');
@@ -191,7 +190,7 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
 }) => {
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  
+
   const {
     tableData,
     setTableData,
@@ -222,10 +221,8 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
       saveQaqcData()
         .then(() => {
           setLastSaved(new Date());
-          console.log("QAQC data auto-saved");
         })
         .catch((err) => {
-          console.error("Auto-save failed:", err);
         });
     }, 2000); // 2-second debounce
 
@@ -234,30 +231,25 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
 
   const handleManualSave = async () => {
     if (!weeklyReportId) {
-      console.error("No report ID available for saving");
       return;
     }
 
     try {
       await saveQaqcData();
       setLastSaved(new Date());
-      console.log("QAQC data saved successfully");
     } catch (err) {
-      console.error("Manual save failed:", err);
     }
   };
 
   const handleRefresh = async () => {
     if (!weeklyReportId) {
-      console.error("No report ID available for refreshing");
       return;
     }
 
     try {
       await loadQaqcData();
-      console.log("QAQC data refreshed");
     } catch (err) {
-      console.error("Refresh failed:", err);
+      // Handle refresh error silently or show user feedback
     }
   };
 
@@ -310,7 +302,7 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
               Auto-save {isSaving && "(saving...)"}
             </label>
           </div>
-          
+
           {lastSaved && (
             <span className="text-xs text-muted-foreground">
               Last saved: {lastSaved.toLocaleTimeString()}
@@ -326,7 +318,7 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
           >
             Refresh
           </button>
-          
+
           <button
             onClick={handleManualSave}
             disabled={isSaving || !weeklyReportId}
@@ -364,7 +356,7 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
           <span>Total Entries: <strong>{totalRows}</strong></span>
           <span>Open Items: <strong className="text-yellow-600">{openRows}</strong></span>
         </div>
-        
+
         {!weeklyReportId && (
           <span className="text-orange-600 text-xs">
             No report ID - changes won't be saved
