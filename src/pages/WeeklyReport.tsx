@@ -72,6 +72,7 @@ const WeeklyReport = () => {
   useEffect(() => {
     const urlReportId = searchParams.get('reportId');
     const urlCreateNew = searchParams.get('createNew');
+    const urlReadOnly = searchParams.get('readOnly');
     
     // Handle createNew parameter
     if (urlCreateNew === 'true' && !urlReportId) {
@@ -79,10 +80,25 @@ const WeeklyReport = () => {
       return;
     }
     
+    // Handle case where both reportId and createNew=true are provided
+    // This means we should load the existing report data but create a new one
+    if (urlCreateNew === 'true' && urlReportId) {
+      // Set the reportId to load the data, but we'll create a new report after loading
+      const normalizedUrlId = urlReportId === 'undefined' || urlReportId === 'null' || !urlReportId ? null : urlReportId;
+      if (normalizedUrlId !== currentReportId) {
+        setCurrentReportId(normalizedUrlId);
+      }
+      // Disable read-only mode when creating new report from existing data
+      setIsReadOnly(false);
+      return;
+    }
+    
     // Convert 'undefined' string to null for proper comparison
     const normalizedUrlId = urlReportId === 'undefined' || urlReportId === 'null' || !urlReportId ? null : urlReportId;
     if (normalizedUrlId !== currentReportId) {
       setCurrentReportId(normalizedUrlId);
+      // Set read-only mode based on URL parameter
+      setIsReadOnly(urlReadOnly === 'true');
     } else {
     }
   }, [searchParams]);
@@ -313,20 +329,24 @@ const WeeklyReport = () => {
             setCurrentReportId(reportId);
             setReportStatus(report.status || 'draft');
 
+            // Check if we're in "createNew" mode - if so, we'll load data but create a new report
+            const urlCreateNew = searchParams.get('createNew');
+            const isCreateNewMode = urlCreateNew === 'true';
+
             // Update shared data with existing report data
             setSharedData(prev => ({
               ...prev,
-              weekNumber: report.weekNumber?.toString() || '',
+              weekNumber: isCreateNewMode ? '' : (report.weekNumber?.toString() || ''), // Reset week number for new report
               projectName: report.projectName || selectedProject || 'Default Project Name',
               employer: report.sections?.cover?.employer || 'Client Name',
               coverImage: report.sections?.cover?.coverImage || '',
-              dateRange: report.sections?.cover?.dateRange || '',
+              dateRange: isCreateNewMode ? '' : (report.sections?.cover?.dateRange || ''), // Reset date range for new report
               // Load introduction data
               projectOverview: report.sections?.introduction?.projectOverview || '',
               designNConstruction: report.sections?.introduction?.designNConstruction || '',
               // Load letter data
               refNoPrefix: report.sections?.letter?.refNoPrefix || '',
-              reportDate: report.sections?.letter?.reportDate ? formatDateToYYYYMMDD(report.sections?.letter?.reportDate) : '',
+              reportDate: isCreateNewMode ? new Date().toISOString().split('T')[0] : (report.sections?.letter?.reportDate ? formatDateToYYYYMMDD(report.sections?.letter?.reportDate) : ''), // Use current date for new report
               recipientCompany: report.sections?.letter?.recipientCompany || '',
               recipientLocation: report.sections?.letter?.recipientLocation || '',
               recipientName: report.sections?.letter?.recipientName || '',
@@ -439,7 +459,7 @@ const WeeklyReport = () => {
               if (report.sections.constructionIssues.length > 0) {
                 const convertedIssues = report.sections.constructionIssues.map(issue => ({
                   id: crypto.randomUUID(),
-                  issueNumber: issue.no || 1,
+                  issueNumber: typeof issue.no === 'number' ? issue.no : (parseInt(issue.no) || 1),
                   location: issue.location || "",
                   problem: issue.problem || "",
                   actionBy: issue.actionBy || "",
@@ -491,6 +511,18 @@ const WeeklyReport = () => {
                 },
                 items: []
               });
+            }
+
+            // If we're in createNew mode, create a new report after loading the data
+            if (isCreateNewMode) {
+              console.log('🔧 CREATE NEW MODE: Creating new report with loaded data');
+              // Reset reportId to trigger new report creation
+              setCurrentReportId(null);
+              setReportStatus('draft');
+              
+              // Update URL to remove the reportId and createNew parameters
+              const newUrl = `${window.location.pathname}?${selectedProject ? `project=${encodeURIComponent(selectedProject)}` : ''}`;
+              window.history.replaceState({}, '', newUrl);
             }
           }
         } catch (error) {
