@@ -188,7 +188,7 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
   search: externalSearch,
   setSearch: externalSetSearch,
 }) => {
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const {

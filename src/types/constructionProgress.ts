@@ -55,6 +55,7 @@ interface WeeklyReportConstructionProgressProps {
   data?: ConstructionProgressData;
   onDataChange?: (data: ConstructionProgressData) => void;
   reportId?: string;
+  isCreateNewMode?: boolean;
 }
 
 interface EditableCell { 

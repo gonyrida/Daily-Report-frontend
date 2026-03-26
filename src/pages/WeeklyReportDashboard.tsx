@@ -264,7 +264,19 @@ const WeeklyReportDashboard = () => {
     filtered = filtered.filter(report => {
       // If it's a draft, only show to the owner
       if (report.status === 'draft') {
-        return report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId);
+        // Handle different userId formats
+        let isOwner = false;
+        if (!report.userId) {
+          // No userId - show to current user as fallback
+          isOwner = true;
+        } else if (typeof report.userId === 'string') {
+          // If userId is a string, compare directly
+          isOwner = report.userId === currentUserId;
+        } else {
+          // If userId is an object, check _id or id
+          isOwner = report.userId._id === currentUserId || report.userId.id === currentUserId;
+        }
+        return isOwner;
       }
       // Show submitted/approved reports to everyone
       return true;
@@ -274,7 +286,11 @@ const WeeklyReportDashboard = () => {
     if (filterStatus !== "all") {
       filtered = filtered.filter(report => {
         // Only apply status filter to user's own reports
-        const isOwner = report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId);
+        const isOwner = report.userId && (
+          typeof report.userId === 'string' 
+            ? report.userId === currentUserId
+            : report.userId._id === currentUserId || report.userId.id === currentUserId
+        );
         if (!isOwner) return true; // Don't filter other users' reports by status
         
         return report.status.toLowerCase() === filterStatus.toLowerCase();
@@ -310,7 +326,20 @@ const WeeklyReportDashboard = () => {
     filtered = filtered.filter(report => {
       // If it's a draft, only show to the owner
       if (report.status === 'draft') {
-        return report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId);
+        // Handle different userId formats
+        let isOwner = false;
+        if (!report.userId) {
+          console.log('🔧 TEMP FIX: Company Report has no userId, showing to current user');
+          isOwner = true;
+        } else if (typeof report.userId === 'string') {
+          // If userId is a string, compare directly
+          isOwner = report.userId === currentUserId;
+        } else {
+          // If userId is an object, check _id or id
+          isOwner = report.userId._id === currentUserId || report.userId.id === currentUserId;
+        }
+        
+        return isOwner;
       }
       // Show submitted/approved reports to everyone
       return true;
