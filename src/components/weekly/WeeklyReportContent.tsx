@@ -16,6 +16,7 @@ import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { useQaqcApi } from "@/hooks/useQaqcApi";
 import { useResourceTable } from "@/hooks/useResourceTable";
 import { ActivityRow } from "@/types/activity.types";
+import { createHSESections } from "@/utils/hseSectionUtils";
 
 const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   showIntroduction: externalShowIntroduction,
@@ -196,9 +197,9 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       otherActivities: "Environmental monitoring conducted on 2024-01-16. Waste segregation audit completed with satisfactory results."
     };
 
-    // Preserve existing hsePhotoReferences to keep section 5.6 UI unchanged
-    const currentPhotoReferences = hsesData?.hsePhotoReferences || [];
-    exampleData.hsePhotoReferences = currentPhotoReferences;
+    // Preserve existing hsePhotoReferences or initialize with proper structure
+    const currentPhotoReferences = currentHsesData?.hsePhotoReferences;
+    exampleData.hsePhotoReferences = currentPhotoReferences && currentPhotoReferences.length > 0 ? currentPhotoReferences : createHSESections();
 
     // Set parent state directly
     setHsesData(exampleData);
@@ -310,6 +311,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       hsesDataHook.setHsesData(hsesData);
     }
   }, [hsesData]); // Add hsesData dependency to sync when parent changes
+
+  // Ensure hook data is always available for the Hses component
+  const currentHsesData = (hsesData?.hsePhotoReferences && hsesData.hsePhotoReferences.length > 0) ? hsesData : hsesDataHook.hsesData;
+  console.log('WeeklyReportContent - hsesData:', hsesData);
+  console.log('WeeklyReportContent - hsesDataHook.hsesData:', hsesDataHook.hsesData);
+  console.log('WeeklyReportContent - currentHsesData:', currentHsesData);
 
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
@@ -465,7 +472,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
         </div>
         <Hses 
           isEditing={true}
-          data={hsesData}
+          data={currentHsesData}
           onChange={setHsesData}
         />
       </div>

@@ -6,6 +6,9 @@ import { HsesData, HsesProps } from "@/types/hses.types";
 import { createHSESections } from "@/utils/hseSectionUtils";
 
 const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
+  console.log('Hses component - data:', data);
+  console.log('Hses component - data.hsePhotoReferences:', data?.hsePhotoReferences);
+  
   const hsesData = data || {
     training: [
       { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
@@ -26,6 +29,8 @@ const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
     otherActivities: "",
     hsePhotoReferences: createHSESections(),
   };
+
+  console.log('Hses component - hsePhotoReferences after initialization:', hsesData.hsePhotoReferences);
 
   const updateData = (section: keyof HsesData, value: any) => {
     const newData = { ...hsesData, [section]: value };
@@ -185,7 +190,7 @@ const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
           </span>
         </h4>
         <ReferenceSection
-          sections={hsesData.hsePhotoReferences}
+          sections={hsesData.hsePhotoReferences?.length > 0 ? hsesData.hsePhotoReferences : createHSESections()}
           setSections={(sections) => updateData("hsePhotoReferences", sections)}
           hideTitle={false}
           hideShadow={true}
