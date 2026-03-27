@@ -24,7 +24,7 @@ import { ConstructionProgressData } from "@/types/constructionProgress";
 import { computeAllAmounts } from "@/utils/calculationEngine";
 import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
-import { convertScheduleEntriesToSupabase } from '@/utils/weeklyReportSupabase';
+import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import {
@@ -437,7 +437,7 @@ const WeeklyReport = () => {
                 ],
                 firstAidAccident: "",
                 otherActivities: "",
-                hsePhotoReferences: []
+                hsePhotoReferences: hsesData?.hsePhotoReferences || []
               });
             }
 
@@ -729,7 +729,7 @@ const WeeklyReport = () => {
             ],
             firstAidAccident: '',
             otherActivities: '',
-            hsePhotoReferences: []
+            hsePhotoReferences: hsesData?.hsePhotoReferences || []
           },
           photos: {
             title: 'Site Activities Photos',
@@ -911,7 +911,7 @@ const WeeklyReport = () => {
             ],
             firstAidAccident: '',
             otherActivities: '',
-            hsePhotoReferences: []
+            hsePhotoReferences: hsesData?.hsePhotoReferences || []
           },
           photos: {
             title: 'Site Activities Photos',
@@ -1130,7 +1130,7 @@ const WeeklyReport = () => {
         ],
         firstAidAccident: "",
         otherActivities: "",
-        hsePhotoReferences: []
+        hsePhotoReferences: hsesData?.hsePhotoReferences || []
       };
 
       // Convert Photos images to base64 before saving
@@ -1321,9 +1321,12 @@ const WeeklyReport = () => {
         }
       };
       
-      // Convert HSES photo references to base64 before saving
+      // Convert HSES photo references to Supabase URLs before saving (submit handler)
       if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
-        hsesDataForSave.hsePhotoReferences = await convertImagesToBase64(hsesDataForSave.hsePhotoReferences);
+        hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
+          hsesDataForSave.hsePhotoReferences,
+          currentReportId || 'temp-report-id'
+        );
       }
 
       let response;
@@ -1510,7 +1513,7 @@ const WeeklyReport = () => {
         ],
         firstAidAccident: "",
         otherActivities: "",
-        hsePhotoReferences: []
+        hsePhotoReferences: hsesData?.hsePhotoReferences || []
       };
 
       // Convert Photos images to base64 before saving
@@ -1699,9 +1702,12 @@ const WeeklyReport = () => {
         }
       };
       
-      // Convert HSES photo references to base64 before saving
+      // Convert HSES photo references to Supabase URLs before saving (draft handler)
       if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
-        hsesDataForSave.hsePhotoReferences = await convertImagesToBase64(hsesDataForSave.hsePhotoReferences);
+        hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
+          hsesDataForSave.hsePhotoReferences,
+          currentReportId || 'temp-report-id'
+        );
       }
 
 
