@@ -1,6 +1,6 @@
 import React from "react";
 import ResourceTableComponent from "./ResourceTableComponent";
-import ResourceTable, { ResourceRow } from "../../ResourceTable";
+import { SubRow, Section } from "@/types/resourceTable.types";
 import { Package, Download, RefreshCw } from "lucide-react";
 import { Resources } from "@/types/resources.types";
 import { generateWeekDates } from "@/lib/weekDateUtils";
@@ -37,43 +37,24 @@ const Resource: React.FC<{
     const [useAggregatedData, setUseAggregatedData] = React.useState(false);
 
     // Material delivery status data
-    const [materials, setMaterials] = React.useState<ResourceRow[]>([]);
-    const [machinery, setMachinery] = React.useState<ResourceRow[]>([]);
     const [isAggregating, setIsAggregating] = React.useState(false);
 
-    // Create sections for materials without titles
-    const materialSections = [
+    // State for aggregated material and machinery sections
+    const [materialSections, setMaterialSections] = React.useState<Section[]>([
       {
         title: "",
         subtitle: "",
-        subRows: [
-          {
-            description: "",
-            dailyData: ["", "", "", "", "", "", ""],
-            previousWeek: "",
-            thisWeek: "",
-            upToThisWeek: "",
-          },
-        ],
+        subRows: [],
       }
-    ];
+    ]);
 
-    // Create sections for machinery without titles
-    const machinerySections = [
+    const [machinerySections, setMachinerySections] = React.useState<Section[]>([
       {
         title: "",
         subtitle: "",
-        subRows: [
-          {
-            description: "",
-            dailyData: ["", "", "", "", "", "", ""],
-            previousWeek: "",
-            thisWeek: "",
-            upToThisWeek: "",
-          },
-        ],
+        subRows: [],
       }
-    ];
+    ]);
 
     // Generate dates from sharedData if available
     const getDateDisplay = () => {
@@ -104,7 +85,9 @@ const Resource: React.FC<{
           managementTeam: [],
           workingTeamInterior: [],
           workingTeamMEP: []
-        }
+        },
+        material: [],
+        machinery: []
       };
     };
 
@@ -153,14 +136,36 @@ const Resource: React.FC<{
             includeAccumulated: true
           });
 
-          if (result.success && result.data?.sections?.resources?.manPower) {
-            // Debug: Log the actual API response
-
-            // Transform the aggregated data to frontend format
-            const transformedSections = transformBackendToFrontendFormat(result.data.sections.resources.manPower);
-            setAggregatedSections(transformedSections);
-            setUseAggregatedData(true);
-            setSections(transformedSections);
+          if (result.success && result.data?.sections?.resources) {
+            const resources = result.data.sections.resources;
+            
+            // Transform manpower data
+            if (resources.manPower) {
+              const transformedSections = transformBackendToFrontendFormat(resources.manPower);
+              setAggregatedSections(transformedSections);
+              setUseAggregatedData(true);
+              setSections(transformedSections);
+            }
+            
+            // Transform and set materials data
+            if (resources.material) {
+              const transformedMaterials = transformMaterialsToFrontendFormat(resources.material);
+              setMaterialSections([{
+                title: "",
+                subtitle: "",
+                subRows: transformedMaterials
+              }]);
+            }
+            
+            // Transform and set machinery data
+            if (resources.machinery) {
+              const transformedMachinery = transformMachineryToFrontendFormat(resources.machinery);
+              setMachinerySections([{
+                title: "",
+                subtitle: "",
+                subRows: transformedMachinery
+              }]);
+            }
           } else {
             alert(`Aggregation failed: ${result.error}`);
           }
@@ -176,20 +181,37 @@ const Resource: React.FC<{
             }
           );
 
-          // Debug: Log the actual API response
-          console.log('Direct API Response data:', JSON.stringify(result.data, null, 2));
-          console.log('Direct ManPower data:', JSON.stringify(result.data?.manPower, null, 2));
-
-          if (result.success && result.data?.manPower) {
-            // Transform the aggregated data to frontend format
-            const transformedSections = transformBackendToFrontendFormat(result.data.manPower);
-            setAggregatedSections(transformedSections);
-            setUseAggregatedData(true);
-            setSections(transformedSections);
-            console.log('Manpower aggregated successfully');
+          if (result.success && result.data) {
+            // Transform manpower data
+            if (result.data.manPower) {
+              const transformedSections = transformBackendToFrontendFormat(result.data.manPower);
+              setAggregatedSections(transformedSections);
+              setUseAggregatedData(true);
+              setSections(transformedSections);
+            }
+            
+            // Transform and set materials data
+            if (result.data.material) {
+              const transformedMaterials = transformMaterialsToFrontendFormat(result.data.material);
+              setMaterialSections([{
+                title: "",
+                subtitle: "",
+                subRows: transformedMaterials
+              }]);
+            }
+            
+            // Transform and set machinery data
+            if (result.data.machinery) {
+              const transformedMachinery = transformMachineryToFrontendFormat(result.data.machinery);
+              setMachinerySections([{
+                title: "",
+                subtitle: "",
+                subRows: transformedMachinery
+              }]);
+            }
+            
           } else {
             console.error('Aggregation failed:', result.error);
-            console.log('Full direct API response:', JSON.stringify(result, null, 2));
             alert(`Aggregation failed: ${result.error}`);
           }
         }
@@ -263,8 +285,37 @@ const Resource: React.FC<{
         }
       ];
 
-      console.log('Transformed sections:', JSON.stringify(transformed, null, 2));
       return transformed;
+    };
+
+    // Transform materials to frontend format (no daily breakdown)
+    const transformMaterialsToFrontendFormat = (materials: any[]): SubRow[] => {
+      return materials.map((item: any) => ({
+        description: item.description || "",
+        dailyData: ["", "", "", "", "", "", ""], // No daily breakdown for materials
+        previousWeek: item.prevWeek?.toString() || "0",
+        thisWeek: item.thisWeek?.toString() || "0",
+        upToThisWeek: item.accumulated?.toString() || "0",
+      }));
+    };
+
+    // Transform machinery to frontend format (with daily breakdown)
+    const transformMachineryToFrontendFormat = (machinery: any[]): SubRow[] => {
+      return machinery.map((item: any) => ({
+        description: item.description || "",
+        dailyData: [
+          item.date?.fri?.toString() || "0",
+          item.date?.sat?.toString() || "0",
+          item.date?.sun?.toString() || "0",
+          item.date?.mon?.toString() || "0",
+          item.date?.tue?.toString() || "0",
+          item.date?.wed?.toString() || "0",
+          item.date?.thu?.toString() || "0"
+        ],
+        previousWeek: item.prevWeek?.toString() || "0",
+        thisWeek: item.thisWeek?.toString() || "0",
+        upToThisWeek: item.accumulated?.toString() || "0",
+      }));
     };
 
     return (
@@ -316,19 +367,6 @@ const Resource: React.FC<{
           <ResourceTableComponent
             sharedData={sharedData}
             sections={machinerySections}
-            setSections={() => { }}
-            handleInputChange={() => { }}
-            removeSubRow={() => { }}
-            monthYearDisplay={getDateDisplay()}
-            dates={getDates()}
-            showTitles={false}
-          />
-        </div>
-        <div id="section-6.4">
-          <h3 className="text-lg font-semibold mb-4"><span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">6.4</span> Other Resources</h3>
-          <ResourceTableComponent
-            sharedData={sharedData}
-            sections={materialSections}
             setSections={() => { }}
             handleInputChange={() => { }}
             removeSubRow={() => { }}

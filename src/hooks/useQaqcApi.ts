@@ -115,21 +115,28 @@ export const useQaqcApi = (sections: Section[], reportId?: string) => {
       Object.entries(tableData).forEach(([sectionId, rows]) => {
         const backendKey = sectionIdMap[sectionId];
         if (backendKey) {
+          // Filter out empty rows (only save rows with actual data)
+          const nonEmptyRows = rows.filter(row => 
+            row.code.trim() || 
+            row.description.trim() || 
+            row.status.trim() || 
+            row.dateResponse.trim() || 
+            row.comment.trim()
+          );
+          
           backendData[backendKey] = {
-            items: rows.map(row => ({
+            items: nonEmptyRows.map(row => ({
               code: row.code,
               description: row.description,
               status: row.status,
               dateResponded: row.dateResponse // Map frontend field to backend
             })),
-            comments: rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
+            comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
           };
         }
       });
 
-      console.log("🔧 DEBUG: Sending QAQC data to backend:", JSON.stringify(backendData, null, 2));
       await updateQaqcStatus(reportId, backendData);
-      console.log("QAQC data saved successfully");
     } catch (err) {
       console.error("Failed to save QAQC data:", err);
       setError(err instanceof Error ? err.message : "Failed to save QAQC data");
@@ -168,7 +175,7 @@ export const useQaqcApi = (sections: Section[], reportId?: string) => {
   };
 
   const totalRows = Object.values(tableData).reduce((a, r) => a + r.length, 0);
-  const openRows = Object.values(tableData).flat().filter((r) => r.status === "Open").length;
+  const openRows = Object.values(tableData).flat().filter((r) => r.status === "Pending").length;
 
   const filteredSections = sections.filter(
     (s) =>

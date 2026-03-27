@@ -26,7 +26,7 @@ import { AddRowsModal } from './AddRowsModal';
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgressProps> = ({
-  data, onDataChange, reportId
+  data, onDataChange, reportId, isCreateNewMode = false
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingCell, setEditingCell] = useState<EditableCell | null>(null);
@@ -37,6 +37,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const [rowBackgrounds, setRowBackgrounds] = useState<Record<number, string>>({});
+  const [allowCalculations, setAllowCalculations] = useState(false); // Control when calculations are allowed
 
 
   // ── Add Rows Popup State ──
@@ -53,9 +54,11 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
   useEffect(() => {
 
-
     if (currentData?.items?.length) {
-      const computed = computeAllAmounts(currentData.items);
+      // Enable calculations when creating new report OR when user starts editing
+      // For existing reports, initially use database values, but allow calculations when editing
+      const shouldCalculate = isCreateNewMode || allowCalculations;
+      const computed = shouldCalculate ? computeAllAmounts(currentData.items) : currentData.items;
 
       setItems(computed);
 
@@ -77,7 +80,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     } else {
       setItems([]);
     }
-  }, [currentData?.items]); // Remove editingCell from dependencies to prevent re-renders during editing
+  }, [currentData?.items, isCreateNewMode, allowCalculations]); // Add allowCalculations to dependencies
 
   const [localProjectInfo, setLocalProjectInfo] = useState(currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' });
   useEffect(() => { if (data?.projectInfo) setLocalProjectInfo(data.projectInfo); }, [data?.projectInfo]);
@@ -217,6 +220,11 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     const filteredItem = filteredItems[rowIndex];
     if (!filteredItem) return;
 
+    // Enable calculations when user starts editing an existing report
+    if (!isCreateNewMode && !allowCalculations) {
+      setAllowCalculations(true);
+    }
+
     let val: any = editValue;
     if (field.includes('qty') || field.includes('Rate') || field.includes('amount') || field.includes('percentage')) {
       val = parseFloat(editValue.replace(/,/g, '')) || 0;
@@ -255,7 +263,8 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
         : item
     );
 
-    const computed = computeAllAmounts(newItems);
+    // Always calculate when editing (new report or existing report with calculations enabled)
+    const computed = (isCreateNewMode || allowCalculations) ? computeAllAmounts(newItems) : newItems;
     setItems(computed);
     if (onDataChange) onDataChange({
       ...currentData,
@@ -271,13 +280,19 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     const filteredItem = filteredItems[rowIndex];
     if (!filteredItem) return;
 
+    // Enable calculations when user starts editing an existing report
+    if (!isCreateNewMode && !allowCalculations) {
+      setAllowCalculations(true);
+    }
+
     const newItems = items.map((item) =>
       item === filteredItem   // ← match by object reference, not index
         ? { ...item, unit: unitValue }
         : item
     );
 
-    const computed = computeAllAmounts(newItems);
+    // Always calculate when editing (new report or existing report with calculations enabled)
+    const computed = (isCreateNewMode || allowCalculations) ? computeAllAmounts(newItems) : newItems;
     setItems(computed);
 
     const updatedData = {
@@ -315,11 +330,18 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const toggleBold = (rowIndex: number) => {
     if (rowIndex < 0 || rowIndex >= filteredItems.length) return;
     const item = filteredItems[rowIndex];
+    
+    // Enable calculations when user starts editing an existing report
+    if (!isCreateNewMode && !allowCalculations) {
+      setAllowCalculations(true);
+    }
+    
     const newItems = [...items];
     const idx = items.findIndex(i => i === item);
     if (idx === -1) return;
     newItems[idx] = { ...item, isBold: !item.isBold };
-    const computed = computeAllAmounts(newItems);
+    // Always calculate when editing (new report or existing report with calculations enabled)
+    const computed = (isCreateNewMode || allowCalculations) ? computeAllAmounts(newItems) : newItems;
     setItems(computed);
     if (onDataChange) onDataChange({ ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
   };
@@ -380,6 +402,11 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   };
 
   const confirmAddRows = () => {
+    // Enable calculations when user starts editing an existing report
+    if (!isCreateNewMode && !allowCalculations) {
+      setAllowCalculations(true);
+    }
+
     const insertAfterIndex = addRowsAfter === -1 ? items.length - 1 : addRowsAfter;
     const emptyProgress = { qty: 0, amount: 0, percentage: 0 };
     const newRows: ConstructionProgressItem[] = previewIds.map((id) => ({
@@ -410,7 +437,8 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     // Cascade renumber below
     newItems = renumberBelow(newItems, insertAfterIndex + 1, addRowsCount, addRowsType);
 
-    const computedItems = computeAllAmounts(newItems);
+    // Always calculate when editing (new report or existing report with calculations enabled)
+    const computedItems = (isCreateNewMode || allowCalculations) ? computeAllAmounts(newItems) : newItems;
     setItems(computedItems);
     if (onDataChange) onDataChange({ ...currentData, items: computedItems, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
     setShowAddRows(false);
@@ -446,16 +474,13 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     { name: 'Orange', value: 'bg-orange-50', class: 'bg-orange-50' }
   ];
 
-  const handleDropdownToggle = (rowIndex: number, e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault(); e.stopPropagation();
-    if (activeDropdown === rowIndex) { setActiveDropdown(null); setDropdownPosition(null); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDropdownPosition({ top: rect.bottom + 2, left: rect.right - 160 + 2 });
-    setActiveDropdown(rowIndex);
-  };
-
   const deleteRow = (rowIndex: number) => {
     if (rowIndex < 0 || rowIndex >= items.length) return;
+
+    // Enable calculations when user starts editing an existing report
+    if (!isCreateNewMode && !allowCalculations) {
+      setAllowCalculations(true);
+    }
 
     // Detect the type of the row being deleted so we can renumber its siblings
     const deletedItem = items[rowIndex];
@@ -466,38 +491,26 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     // Remove the row first
     const filtered = items.filter((_, i) => i !== rowIndex);
 
-    // Renumber siblings below the deletion point (insertedAt = rowIndex, count = 0 means
-    // we pass rowIndex as the first affected position with count=0 sentinel —
-    // renumberBelow expects insertedAt+count as start, so pass rowIndex-1, count=0... 
-    // easier: just re-run renumberBelow with insertedAt=rowIndex, count=0 by
-    // treating the deletion point as if 0 new rows were inserted there)
+    // Renumber siblings below the deletion point
     let renumbered = filtered;
     if (deletedType !== 'empty') {
-      // renumberBelow scans from insertedAt+count onward.
-      // After deletion, the row that was at rowIndex+1 is now at rowIndex.
-      // So pass insertedAt = rowIndex-1, count = 0 → start = rowIndex-1+0 = rowIndex-1
-      // But renumberBelow skips inserted rows (count=0 means none inserted).
-      // Simplest: pass insertedAt = rowIndex - 1, count = 0.
-      // renumberBelow iterates from insertedAt+count = rowIndex-1+0... 
-      // Actually renumberBelow starts at insertedAt+count so we need:
-      // insertedAt + count = rowIndex  →  insertedAt = rowIndex, count = 0
-      // but it loops from insertedAt+count meaning it starts AT rowIndex.
-      // Let's just call it with insertedAt=rowIndex-1, count=1 on the filtered array
-      // but with 0 "new" rows — i.e. a no-op insert — to trigger renumbering from rowIndex.
-      // The cleanest: call renumberBelow(filtered, rowIndex - 1, 0, type) where
-      // the loop starts at rowIndex - 1 + 0 = rowIndex - 1... not right either.
-      // 
-      // Real fix: export a renumberFrom(items, startIndex, type) that renumbers
-      // all same-type siblings from startIndex onward.
       renumbered = renumberFromIndex(filtered, rowIndex, deletedType);
     }
 
-    const computed = computeAllAmounts(renumbered);
+    const computed = (isCreateNewMode || allowCalculations) ? computeAllAmounts(renumbered) : renumbered;
     setItems(computed);
     if (onDataChange) onDataChange({ ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
     if (editingCell?.rowIndex === rowIndex) { setEditingCell(null); setEditValue(''); }
     setRowBackgrounds(prev => { const n = { ...prev }; delete n[rowIndex]; return n; });
     setActiveDropdown(null); setDropdownPosition(null);
+  };
+
+  const handleDropdownToggle = (rowIndex: number, e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault(); e.stopPropagation();
+    if (activeDropdown === rowIndex) { setActiveDropdown(null); setDropdownPosition(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropdownPosition({ top: rect.bottom + 2, left: rect.right - 160 + 2 });
+    setActiveDropdown(rowIndex);
   };
 
   // ── Render ──
@@ -603,7 +616,9 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                   const idx = items.findIndex(i => i === item);
                   if (idx === -1) return;
                   newItems[idx] = { ...item, isBold: !item.isBold };
-                  const computed = computeAllAmounts(newItems);
+                  // Only compute rolling totals when creating a new report
+                  // For existing reports, just toggle bold without recalculating totals
+                  const computed = isCreateNewMode ? computeAllAmounts(newItems) : newItems;
                   setItems(computed);
                   if (onDataChange) onDataChange({ ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
                   setActiveDropdown(null);

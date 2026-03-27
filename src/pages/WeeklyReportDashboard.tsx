@@ -56,13 +56,17 @@ const getWeekNumber = (date: Date): number => {
 };
 
 // Helper function to count submitted reports this month
-const getSubmittedReportsThisMonth = (reports: WeeklyReport[]): number => {
+const getSubmittedReportsThisMonth = (reports: WeeklyReport[], currentUserId: string | null): number => {
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   
   return reports.filter(report => {
     const reportDate = new Date(report.createdAt || report.startDate);
+    const isOwner = report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId);
+    
+    // For non-owners, only count submitted/approved reports
+    // For owners, count submitted/approved reports
     return (
       (report.status === 'submitted' || report.status === 'approved') &&
       reportDate.getMonth() === currentMonth &&
@@ -72,13 +76,17 @@ const getSubmittedReportsThisMonth = (reports: WeeklyReport[]): number => {
 };
 
 // Helper function to get last submitted report this month
-const getLastSubmittedThisMonth = (reports: WeeklyReport[]): WeeklyReport | null => {
+const getLastSubmittedThisMonth = (reports: WeeklyReport[], currentUserId: string | null): WeeklyReport | null => {
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   
   const submittedThisMonth = reports.filter(report => {
     const reportDate = new Date(report.createdAt || report.startDate);
+    const isOwner = report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId);
+    
+    // For non-owners, only consider submitted/approved reports
+    // For owners, consider submitted/approved reports
     return (
       (report.status === 'submitted' || report.status === 'approved') &&
       reportDate.getMonth() === currentMonth &&
@@ -250,10 +258,43 @@ const WeeklyReportDashboard = () => {
   // Filter personal reports based on search term and status
   useEffect(() => {
     let filtered = weeklyReports;
+    const currentUserId = getCurrentUserId();
 
-    // Filter by status (case-insensitive)
+    // Hide draft reports from non-owners
+    filtered = filtered.filter(report => {
+      // If it's a draft, only show to the owner
+      if (report.status === 'draft') {
+        // Handle different userId formats
+        let isOwner = false;
+        if (!report.userId) {
+          // No userId - show to current user as fallback
+          isOwner = true;
+        } else if (typeof report.userId === 'string') {
+          // If userId is a string, compare directly
+          isOwner = report.userId === currentUserId;
+        } else {
+          // If userId is an object, check _id or id
+          isOwner = report.userId._id === currentUserId || report.userId.id === currentUserId;
+        }
+        return isOwner;
+      }
+      // Show submitted/approved reports to everyone
+      return true;
+    });
+
+    // Filter by status (case-insensitive) - only apply to user's own reports
     if (filterStatus !== "all") {
-      filtered = filtered.filter(report => report.status.toLowerCase() === filterStatus.toLowerCase());
+      filtered = filtered.filter(report => {
+        // Only apply status filter to user's own reports
+        const isOwner = report.userId && (
+          typeof report.userId === 'string' 
+            ? report.userId === currentUserId
+            : report.userId._id === currentUserId || report.userId.id === currentUserId
+        );
+        if (!isOwner) return true; // Don't filter other users' reports by status
+        
+        return report.status.toLowerCase() === filterStatus.toLowerCase();
+      });
     }
 
     // Filter by search term
@@ -279,6 +320,30 @@ const WeeklyReportDashboard = () => {
   // Filter company reports based on search term
   useEffect(() => {
     let filtered = companyReports;
+    const currentUserId = getCurrentUserId();
+
+    // Hide draft reports from non-owners in company view
+    filtered = filtered.filter(report => {
+      // If it's a draft, only show to the owner
+      if (report.status === 'draft') {
+        // Handle different userId formats
+        let isOwner = false;
+        if (!report.userId) {
+          console.log('🔧 TEMP FIX: Company Report has no userId, showing to current user');
+          isOwner = true;
+        } else if (typeof report.userId === 'string') {
+          // If userId is a string, compare directly
+          isOwner = report.userId === currentUserId;
+        } else {
+          // If userId is an object, check _id or id
+          isOwner = report.userId._id === currentUserId || report.userId.id === currentUserId;
+        }
+        
+        return isOwner;
+      }
+      // Show submitted/approved reports to everyone
+      return true;
+    });
 
     // Filter by search term
     if (searchTerm.trim()) {
@@ -301,11 +366,40 @@ const WeeklyReportDashboard = () => {
     setFilteredCompanyReports(filtered);
   }, [companyReports, searchTerm]);
 
-  const handleCreateWeeklyReport = () => {
-    if (projectFilter) {
-      navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}`);
-    } else {
-      navigate('/weekly-report');
+  const handleCreateWeeklyReport = async () => {
+    try {
+      // Find the most recent submitted report from both personal and company reports
+      const personalSubmittedReports = weeklyReports.filter(r => r.status === 'submitted' || r.status === 'approved');
+      const companySubmittedReports = filteredCompanyReports.filter(r => r.status === 'submitted' || r.status === 'approved');
+      
+      // Combine all submitted reports and find the most recent one
+      const allSubmittedReports = [...personalSubmittedReports, ...companySubmittedReports];
+      
+      if (allSubmittedReports.length > 0) {
+        // Sort by submittedAt date (most recent first)
+        const mostRecentSubmitted = allSubmittedReports.sort((a, b) => 
+          new Date(b.submittedAt || b.updatedAt).getTime() - new Date(a.submittedAt || a.updatedAt).getTime()
+        )[0];
+        
+        // Navigate to weekly report with the most recent submitted report ID for data fetching
+        const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
+        navigate(`/weekly-report?reportId=${mostRecentSubmitted._id || mostRecentSubmitted.id}${projectParam}&createNew=true`);
+      } else {
+        // No submitted reports, create new from scratch
+        if (projectFilter) {
+          navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}`);
+        } else {
+          navigate('/weekly-report');
+        }
+      }
+    } catch (error) {
+      console.error("Error handling create weekly report:", error);
+      // Fallback to basic navigation
+      if (projectFilter) {
+        navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}`);
+      } else {
+        navigate('/weekly-report');
+      }
     }
   };
 
@@ -387,7 +481,7 @@ const WeeklyReportDashboard = () => {
   };
 
   const weeklyTotal = weeklyReports.filter(r => r.status === 'submitted').length;
-  const lastSubmitted = getLastSubmittedThisMonth(filteredReports);
+  const lastSubmitted = getLastSubmittedThisMonth(filteredReports, getCurrentUserId());
 
   return (
     <SidebarProvider>
@@ -482,7 +576,7 @@ const WeeklyReportDashboard = () => {
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{getSubmittedReportsThisMonth(filteredReports)}</div>
+                  <div className="text-2xl font-bold">{getSubmittedReportsThisMonth(filteredReports, getCurrentUserId())}</div>
                   <p className="text-xs text-muted-foreground">
                     Weekly reports submitted this month
                   </p>
@@ -507,8 +601,8 @@ const WeeklyReportDashboard = () => {
               </Card>
             </div>
 
-            {/* Create New Report Button - Hide when no reports */}
-            {filteredReports.length > 0 && (
+            {/* Create New Report Button - Show when there are submitted reports (for all users) */}
+            {(weeklyReports.filter(r => r.status === 'submitted').length > 0 || filteredCompanyReports.filter(r => r.status === 'submitted' || r.status === 'approved').length > 0) && (
               <div className="mb-6">
                 <Button onClick={handleCreateWeeklyReport}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -516,11 +610,7 @@ const WeeklyReportDashboard = () => {
                 </Button>
               </div>
             )}
-            {/* Implementation Notice Banner */}
-            <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold mb-6">
-              This page is still implement
-            </div>
-            {/* Tabs */}
+                        {/* Tabs */}
             <div className="mb-6">
               <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-8">
@@ -748,7 +838,8 @@ const WeeklyReportDashboard = () => {
                             : 'No submitted weekly reports from your company yet.')
                       }
                     </p>
-                    {activeTab === 'personal' && (
+                    {/* Show create button for all users when there are submitted reports in company */}
+                    {(activeTab === 'personal' || filteredCompanyReports.filter(r => r.status === 'submitted' || r.status === 'approved').length > 0) && (
                       <Button onClick={handleCreateWeeklyReport}>
                         <Plus className="h-4 w-4 mr-2" />
                         Create Weekly Report

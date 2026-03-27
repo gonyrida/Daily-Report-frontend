@@ -21,6 +21,7 @@ import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { useIssues } from "@/hooks/useIssues";
 import { useConstructionProgress } from "@/hooks/useConstructionProgress";
 import { ConstructionProgressData } from "@/types/constructionProgress";
+import { computeAllAmounts } from "@/utils/calculationEngine";
 import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
 import { convertScheduleEntriesToSupabase } from '@/utils/weeklyReportSupabase';
@@ -30,7 +31,8 @@ import {
   createWeeklyReport,
   updateWeeklyReport,
   submitWeeklyReport,
-  getWeeklyReportById
+  getWeeklyReportById,
+  getWeeklyReports
 } from "@/services/weeklyReportService";
 import {
   SidebarInset,
@@ -67,15 +69,32 @@ const WeeklyReport = () => {
     (reportId && reportId !== 'undefined' && reportId !== 'null') ? reportId : null
   );
   const [isReadOnly, setIsReadOnly] = useState(readOnly);
+  const [isCreateNewMode, setIsCreateNewMode] = useState(false); // Track if we're creating a new report
 
   // Sync currentReportId with URL searchParams and handle createNew
   useEffect(() => {
     const urlReportId = searchParams.get('reportId');
     const urlCreateNew = searchParams.get('createNew');
+    const urlReadOnly = searchParams.get('readOnly');
     
     // Handle createNew parameter
     if (urlCreateNew === 'true' && !urlReportId) {
       handleCreateNewWeeklyReport();
+      setIsCreateNewMode(true);
+      return;
+    }
+    
+    // Handle case where both reportId and createNew=true are provided
+    // This means we should load the existing report data but create a new one
+    if (urlCreateNew === 'true' && urlReportId) {
+      // Set the reportId to load the data, but we'll create a new report after loading
+      const normalizedUrlId = urlReportId === 'undefined' || urlReportId === 'null' || !urlReportId ? null : urlReportId;
+      if (normalizedUrlId !== currentReportId) {
+        setCurrentReportId(normalizedUrlId);
+      }
+      // Disable read-only mode when creating new report from existing data
+      setIsReadOnly(false);
+      setIsCreateNewMode(true);
       return;
     }
     
@@ -83,6 +102,9 @@ const WeeklyReport = () => {
     const normalizedUrlId = urlReportId === 'undefined' || urlReportId === 'null' || !urlReportId ? null : urlReportId;
     if (normalizedUrlId !== currentReportId) {
       setCurrentReportId(normalizedUrlId);
+      // Set read-only mode based on URL parameter
+      setIsReadOnly(urlReadOnly === 'true');
+      setIsCreateNewMode(false); // Viewing existing report, not creating new
     } else {
     }
   }, [searchParams]);
@@ -313,20 +335,24 @@ const WeeklyReport = () => {
             setCurrentReportId(reportId);
             setReportStatus(report.status || 'draft');
 
+            // Check if we're in "createNew" mode - if so, we'll load data but create a new report
+            const urlCreateNew = searchParams.get('createNew');
+            const isCreateNewMode = urlCreateNew === 'true';
+
             // Update shared data with existing report data
             setSharedData(prev => ({
               ...prev,
-              weekNumber: report.weekNumber?.toString() || '',
+              weekNumber: isCreateNewMode ? '' : (report.weekNumber?.toString() || ''), // Reset week number for new report
               projectName: report.projectName || selectedProject || 'Default Project Name',
               employer: report.sections?.cover?.employer || 'Client Name',
               coverImage: report.sections?.cover?.coverImage || '',
-              dateRange: report.sections?.cover?.dateRange || '',
+              dateRange: isCreateNewMode ? '' : (report.sections?.cover?.dateRange || ''), // Reset date range for new report
               // Load introduction data
               projectOverview: report.sections?.introduction?.projectOverview || '',
               designNConstruction: report.sections?.introduction?.designNConstruction || '',
               // Load letter data
               refNoPrefix: report.sections?.letter?.refNoPrefix || '',
-              reportDate: report.sections?.letter?.reportDate ? formatDateToYYYYMMDD(report.sections?.letter?.reportDate) : '',
+              reportDate: isCreateNewMode ? new Date().toISOString().split('T')[0] : (report.sections?.letter?.reportDate ? formatDateToYYYYMMDD(report.sections?.letter?.reportDate) : ''), // Use current date for new report
               recipientCompany: report.sections?.letter?.recipientCompany || '',
               recipientLocation: report.sections?.letter?.recipientLocation || '',
               recipientName: report.sections?.letter?.recipientName || '',
@@ -439,7 +465,7 @@ const WeeklyReport = () => {
               if (report.sections.constructionIssues.length > 0) {
                 const convertedIssues = report.sections.constructionIssues.map(issue => ({
                   id: crypto.randomUUID(),
-                  issueNumber: issue.no || 1,
+                  issueNumber: typeof issue.no === 'number' ? issue.no : (parseInt(issue.no) || 1),
                   location: issue.location || "",
                   problem: issue.problem || "",
                   actionBy: issue.actionBy || "",
@@ -492,6 +518,103 @@ const WeeklyReport = () => {
                 items: []
               });
             }
+
+            // If we're in createNew mode, prepare the data but don't create report yet
+            if (isCreateNewMode) {
+              console.log('🔧 CREATE NEW MODE: Preparing new report with loaded data');
+              
+              // Check if the loaded report is a submitted report - use its data for rolling total
+              if (report.status === 'submitted' && report.sections?.constructionProgress?.items) {
+                console.log('🔄 Applying rolling total from loaded submitted report');
+                
+                const data = report.sections.constructionProgress;
+                
+                // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
+                const rolledItems = data.items.map(item => ({
+                  ...item,
+                  previousWeek: {
+                    qty: item.upToThisWeek.qty,
+                    amount: item.upToThisWeek.amount,
+                    percentage: item.upToThisWeek.percentage
+                  },
+                  thisWeek: {
+                    qty: 0,
+                    amount: 0,
+                    percentage: 0
+                  }
+                }));
+                
+                // Apply calculations and restore previousWeek amounts
+                const computedItems = computeAllAmounts(rolledItems);
+                const finalItems = computedItems.map((item, index) => ({
+                  ...item,
+                  previousWeek: rolledItems[index].previousWeek
+                }));
+                
+                // Update the construction progress data with rolled values
+                const updatedData = {
+                  ...data,
+                  items: finalItems
+                };
+                constructionProgressHook.updateConstructionData(updatedData);
+                console.log('✅ Rolling total applied from loaded submitted report');
+              } else {
+                // For non-submitted reports or no construction progress, check for any submitted reports in project
+                if (constructionProgressHook.constructionData?.items) {
+                  try {
+                    const reportsResponse = await getWeeklyReports({ 
+                      projectName: selectedProject || '', 
+                      status: 'submitted',
+                      limit: 1,
+                      sortBy: 'createdAt',
+                      sortOrder: 'desc'
+                    });
+                    
+                    if (reportsResponse.success && reportsResponse.data?.length > 0) {
+                      const submittedReportData = reportsResponse.data[0];
+                      console.log('✅ Found submitted report in project, applying rolling total');
+                      
+                      if (submittedReportData?.sections?.constructionProgress?.items) {
+                        const data = submittedReportData.sections.constructionProgress;
+                        const rolledItems = data.items.map(item => ({
+                          ...item,
+                          previousWeek: {
+                            qty: item.upToThisWeek.qty,
+                            amount: item.upToThisWeek.amount,
+                            percentage: item.upToThisWeek.percentage
+                          },
+                          thisWeek: {
+                            qty: 0,
+                            amount: 0,
+                            percentage: 0
+                          }
+                        }));
+                        
+                        const computedItems = computeAllAmounts(rolledItems);
+                        const finalItems = computedItems.map((item, index) => ({
+                          ...item,
+                          previousWeek: rolledItems[index].previousWeek
+                        }));
+                        
+                        const updatedData = {
+                          ...constructionProgressHook.constructionData,
+                          items: finalItems
+                        };
+                        constructionProgressHook.updateConstructionData(updatedData);
+                        console.log('✅ Rolling total applied from project submitted report');
+                      }
+                    }
+                  } catch (error) {
+                    console.log('⚠️ No submitted reports found in project');
+                  }
+                }
+              }
+              
+              // Reset reportId to indicate this is a new report (not saved yet)
+              setCurrentReportId(null);
+              setReportStatus('draft');
+              console.log('🔧 CREATE NEW MODE: Report prepared, ready for user to save');
+            }
           }
         } catch (error) {
           console.error('🔍 FRONTEND Error loading report:', error);
@@ -514,10 +637,30 @@ const WeeklyReport = () => {
     loadExistingReport();
   }, [currentReportId, selectedProject, toast]);
 
-  // Create new weekly report function
-  const handleCreateNewWeeklyReport = async () => {
+
+  // Create new weekly report function with rolling total logic
+  const handleCreateNewWeeklyReportWithRollingTotal = async () => {
     try {
-      // Initialize with default data for a new report
+      // First, check if there are any submitted reports for this project
+      let submittedReportData = null;
+      try {
+        const reportsResponse = await getWeeklyReports({ 
+          projectName: selectedProject || '', 
+          status: 'submitted',
+          limit: 1,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        });
+        
+        if (reportsResponse.success && reportsResponse.data?.length > 0) {
+          submittedReportData = reportsResponse.data[0];
+          console.log('✅ Found submitted report, applying rolling total');
+        }
+      } catch (error) {
+        console.log('⚠️ No submitted reports found, creating clean report');
+      }
+
+      // Initialize with default data or copy from submitted report with rolling total
       const newReportData = {
         projectName: selectedProject || 'Default Project',
         weekNumber: 1,
@@ -594,7 +737,247 @@ const WeeklyReport = () => {
           },
           constructionIssues: [],
           masterSchedule: [],
-          constructionProgress: {
+          constructionProgress: submittedReportData?.sections?.constructionProgress ? (() => {
+            // Apply rolling total logic when creating new report from submitted report
+            const data = submittedReportData.sections.constructionProgress;
+            if (!data || !data.items) {
+              return {
+                projectInfo: {
+                  project: '',
+                  subtitle: '',
+                  date: '',
+                  revision: ''
+                },
+                items: []
+              };
+            }
+            
+            console.log('🔄 Applying rolling total logic from database: upToThisWeek → previousWeek, thisWeek → 0');
+            console.log('📊 Source: Submitted report from database with ID:', submittedReportData._id);
+            
+            // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
+            const rolledItems = data.items.map(item => ({
+              ...item,
+              previousWeek: {
+                qty: item.upToThisWeek.qty,
+                amount: item.upToThisWeek.amount,
+                percentage: item.upToThisWeek.percentage
+              },
+              thisWeek: {
+                qty: 0,
+                amount: 0,
+                percentage: 0
+              }
+            }));
+            
+            // Apply calculations to the rolled items
+            const computedItems = computeAllAmounts(rolledItems);
+            
+            // Restore the previousWeek amounts that were overwritten by computeAllAmounts
+            const finalItems = computedItems.map((item, index) => ({
+              ...item,
+              previousWeek: rolledItems[index].previousWeek
+            }));
+            
+            console.log('✅ Rolling total applied successfully from database data');
+            console.log('📈 Previous Week now has values from submitted report upToThisWeek');
+            console.log('📝 This Week reset to 0 for new data entry');
+            
+            return {
+              ...data,
+              items: finalItems
+            };
+          })() : {
+            projectInfo: {
+              project: '',
+              subtitle: '',
+              date: '',
+              revision: ''
+            },
+            items: []
+          }
+        }
+      };
+
+      const response = await createWeeklyReport(newReportData);
+      if (response.success && response.data) {
+        const newId = (response.data as any)._id || response.data.id;
+        if (newId) {
+          setCurrentReportId(newId);
+          // Update URL to include new report ID and remove createNew parameter
+          const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+          window.history.replaceState({}, '', newUrl);
+          
+          console.log('✅ New report created successfully with rolling totals');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error creating new weekly report with rolling total:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create new weekly report.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Create new weekly report function
+  const handleCreateNewWeeklyReport = async () => {
+    try {
+      // First, check if there are any submitted reports for this project
+      let submittedReportData = null;
+      try {
+        const reportsResponse = await getWeeklyReports({ 
+          projectName: selectedProject || '', 
+          status: 'submitted',
+          limit: 1,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        });
+        
+        if (reportsResponse.success && reportsResponse.data?.length > 0) {
+          submittedReportData = reportsResponse.data[0];
+        }
+      } catch (error) {
+        console.log('No submitted reports found, creating new report');
+      }
+
+      // Initialize with default data or copy from submitted report
+      const newReportData = {
+        projectName: selectedProject || 'Default Project',
+        weekNumber: 1,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        sections: {
+          cover: {
+            projectName: selectedProject || 'Default Project',
+            reportTitle: 'Weekly Progress Report',
+            weekNumber: '1',
+            dateRange: '',
+            contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+            clientName: 'Client Name',
+            contractNumber: '',
+            coverImage: '',
+            projectTitle: selectedProject || 'Default Project',
+            employer: 'Client Name'
+          },
+          letter: {
+            refNoPrefix: 'ICT-CPM-LETTER',
+            weekNumber: '1',
+            reportDate: new Date().toISOString().split('T')[0],
+            recipientCompany: '',
+            recipientLocation: '',
+            recipientName: '',
+            ccList: [],
+            letterBody: '',
+            signatureImage: '',
+            signatoryName: '',
+            signatoryPosition: '',
+            constructorName: '',
+            companyLocation: '',
+            companyPhone1: '',
+            companyPhone2: '',
+            companyEmail1: '',
+            companyEmail2: ''
+          },
+          introduction: {
+            projectOverview: '',
+            designNConstruction: '',
+            coverImage: ''
+          },
+          overallProgress: {
+            rows: []
+          },
+          activities: {
+            weeklyActivities: [],
+            nextWeekPlan: []
+          },
+          qaqcStatus: [],
+          hses: {
+            training: [
+              { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' },
+              { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' },
+              { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' }
+            ],
+            inspection: [
+              { typeOfInspection: '', date: '', inspector: '', remarks: '' },
+              { typeOfInspection: '', date: '', inspector: '', remarks: '' },
+              { typeOfInspection: '', date: '', inspector: '', remarks: '' }
+            ],
+            permit: [
+              { typeOfPermit: '', startDate: '', endDate: '', inspector: '', approver: '', remarks: '' },
+              { typeOfPermit: '', startDate: '', endDate: '', inspector: '', approver: '', remarks: '' },
+              { typeOfPermit: '', startDate: '', endDate: '', inspector: '', approver: '', remarks: '' }
+            ],
+            firstAidAccident: '',
+            otherActivities: '',
+            hsePhotoReferences: []
+          },
+          photos: {
+            title: 'Site Activities Photos',
+            locations: []
+          },
+          constructionIssues: [],
+          masterSchedule: [],
+          constructionProgress: submittedReportData?.sections?.constructionProgress ? (() => {
+            // Apply rolling total logic when creating new report from submitted report
+            const data = submittedReportData.sections.constructionProgress;
+            if (!data || !data.items) {
+              return {
+                projectInfo: {
+                  project: '',
+                  subtitle: '',
+                  date: '',
+                  revision: ''
+                },
+                items: []
+              };
+            }
+            
+            // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
+            console.log('🔍 Debug: Original submitted report data:', data.items);
+            
+            const rolledItems = data.items.map(item => {
+              console.log('🔍 Debug: Processing item:', item.id);
+              console.log('🔍 Debug: upToThisWeek values:', item.upToThisWeek);
+              
+              const rolledItem = {
+                ...item,
+                previousWeek: {
+                  qty: item.upToThisWeek.qty,
+                  amount: item.upToThisWeek.amount,
+                  percentage: item.upToThisWeek.percentage
+                },
+                thisWeek: {
+                  qty: 0,
+                  amount: 0,
+                  percentage: 0
+                }
+              };
+              
+              console.log('🔍 Debug: Rolled item previousWeek:', rolledItem.previousWeek);
+              return rolledItem;
+            });
+            
+            console.log('🔍 Debug: Rolled items before computeAllAmounts:', rolledItems);
+            
+            // Apply calculations to the rolled items, but preserve the previousWeek amounts we just set
+            const computedItems = computeAllAmounts(rolledItems);
+            
+            // Restore the previousWeek amounts that were overwritten by computeAllAmounts
+            const finalItems = computedItems.map((item, index) => ({
+              ...item,
+              previousWeek: rolledItems[index].previousWeek
+            }));
+            
+            console.log('🔍 Debug: Final items after restoring previousWeek:', finalItems);
+            console.log('🔍 Debug: First item previousWeek final:', finalItems[0]?.previousWeek);
+            
+            return {
+              ...data,
+              items: finalItems
+            };
+          })() : {
             projectInfo: {
               project: '',
               subtitle: '',
@@ -621,6 +1004,386 @@ const WeeklyReport = () => {
       toast({
         title: "Error",
         description: "Failed to create new weekly report.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Internal save logic for submitted reports with rolling total logic
+  const handleSaveWithRollingTotal = async () => {
+    // Prevent saving in read-only mode
+    if (isReadOnly) {
+      toast({
+        title: "Read-Only Mode",
+        description: "Cannot save another user's report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let reportData: any;
+    try {
+      // Helper function to format rows with displayIndex
+      const formatRowsWithDisplayIndex = (rows: any[]) => {
+        let titleCount = 0;
+        return rows.map((row, index) => {
+          if (row.rowType === "title") {
+            titleCount++;
+            return {
+              ...row,
+              displayIndex: `${toRoman(titleCount)}.`,
+            };
+          }
+          if (row.rowType === "detail") {
+            let detailCount = 0;
+            for (let i = 0; i <= index; i++) {
+              if (rows[i].rowType === "title") {
+                detailCount = 0;
+              } else if (rows[i].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            return {
+              ...row,
+              displayIndex: `${detailCount}.`,
+            };
+          }
+          return row;
+        });
+      };
+
+      // Import toRoman function
+      const toRoman = (num: number): string => {
+        const romanNumerals = [
+          { value: 1000, numeral: "M" },
+          { value: 900, numeral: "CM" },
+          { value: 500, numeral: "D" },
+          { value: 400, numeral: "CD" },
+          { value: 100, numeral: "C" },
+          { value: 90, numeral: "XC" },
+          { value: 50, numeral: "L" },
+          { value: 40, numeral: "XL" },
+          { value: 10, numeral: "X" },
+          { value: 9, numeral: "IX" },
+          { value: 5, numeral: "V" },
+          { value: 4, numeral: "IV" },
+          { value: 1, numeral: "I" },
+        ];
+        let result = "";
+        let remaining = num;
+        for (const { value, numeral } of romanNumerals) {
+          while (remaining >= value) {
+            result += numeral;
+            remaining -= value;
+          }
+        }
+        return result;
+      };
+
+      // Use QAQC data from state (like other sections)
+      const qaqcDataForSave = qaqcData || [];
+
+      // Helper function to convert File objects to base64 strings
+      const convertImagesToBase64 = async (photoReferences: any[]) => {
+        const converted = await Promise.all(
+          photoReferences.map(async (section) => {
+            const convertedEntries = await Promise.all(
+              section.entries.map(async (entry) => {
+                const convertedSlots = await Promise.all(
+                  entry.slots.map(async (slot) => {
+                    if (slot.image instanceof File) {
+                      const base64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(slot.image);
+                      });
+                      return { ...slot, image: base64 };
+                    }
+                    return slot;
+                  })
+                );
+                return { ...entry, slots: convertedSlots };
+              })
+            );
+            return { ...section, entries: convertedEntries };
+          })
+        );
+        return converted;
+      };
+
+      // Use HSES data from state (like other sections)
+      const hsesDataForSave = hsesData || {
+        training: [
+          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
+        ],
+        inspection: [
+          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { typeOfInspection: "", date: "", inspector: "", remarks: "" }
+        ],
+        permit: [
+          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
+        ],
+        firstAidAccident: "",
+        otherActivities: "",
+        hsePhotoReferences: []
+      };
+
+      // Convert Photos images to base64 before saving
+      let photosDataForSave = {
+        title: "Site Activities Photos",
+        locations: []
+      };
+
+      if (siteActivitiesSections && siteActivitiesSections.length > 0) {
+        // Convert frontend format to backend format with base64 images
+        const locations = await Promise.all(
+          siteActivitiesSections.map(async (section) => {
+            const convertedEntries = await Promise.all(
+              (section.entries || []).map(async (entry) => {
+                const convertedSlots = await Promise.all(
+                  (entry.slots || []).map(async (slot) => {
+                    if (slot.image instanceof File) {
+                      const base64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(slot.image);
+                      });
+                      return { ...slot, image: base64 };
+                    }
+                    return slot;
+                  })
+                );
+                return { ...entry, slots: convertedSlots };
+              })
+            );
+            return {
+              location: section.title,
+              entries: convertedEntries
+            };
+          })
+        );
+        photosDataForSave = {
+          title: "Site Activities Photos",
+          locations: locations
+        };
+      }
+
+      // Convert Issues data to backend format
+      let issuesDataForSave = [];
+
+      // Convert Schedule data to backend format using Supabase
+      let scheduleDataForSave = [];
+
+      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
+        // Filter out empty entries before conversion
+        const validEntries = scheduleSections[0].entries.filter(entry => 
+          entry.title || entry.file || entry.fileName || entry.supabaseUrl
+        );
+        
+        if (validEntries.length > 0) {
+          // Convert entries to Supabase URLs
+          scheduleDataForSave = await convertScheduleEntriesToSupabase(
+            validEntries,
+            currentReportId || 'temp-report-id'
+          );
+
+          // Remove file objects that shouldn't be sent to backend
+          scheduleDataForSave = scheduleDataForSave.map(entry => {
+            const { file, ...entryWithoutFile } = entry;
+            return entryWithoutFile;
+          });
+        }
+      }
+
+      if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
+        // Convert frontend format to backend format with base64 images
+        issuesDataForSave = await Promise.all(
+          issuesHook.issuesData.map(async (issue) => {
+            let photoBase64 = issue.photo || "";
+
+            // Convert image to base64 if it's a File object
+            if (issue.photo instanceof File) {
+              photoBase64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(issue.photo as File);
+              });
+            }
+
+            return {
+              no: issue.issueNumber || "",
+              location: issue.location || "",
+              problem: issue.problem || "",
+              actionBy: issue.actionBy || "",
+              photo: photoBase64
+            };
+          })
+        );
+      }
+
+      // Collect all form data
+      reportData = {
+        projectName: sharedData.projectName || 'Default Project',
+        weekNumber: parseInt(sharedData.weekNumber) || 1,
+        startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
+        endDate: new Date().toISOString().split('T')[0],
+        sections: {
+          cover: {
+            projectName: sharedData.projectName || 'Default Project',
+            reportTitle: 'Weekly Progress Report',
+            weekNumber: sharedData.weekNumber || '1',
+            dateRange: sharedData.dateRange || '',
+            contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+            clientName: sharedData.employer || 'Client Name',
+            contractNumber: '', // Add contract number field if needed
+            coverImage: sharedData.coverImage || '',
+            projectTitle: sharedData.projectName || 'Default Project',
+            employer: sharedData.employer || 'Client Name'
+          },
+          letter: {
+            refNoPrefix: sharedData.refNoPrefix || "",
+            weekNumber: sharedData.weekNumber || "",
+            reportDate: sharedData.reportDate || new Date().toISOString().split("T")[0],
+            recipientCompany: sharedData.recipientCompany || "",
+            recipientLocation: sharedData.recipientLocation || "",
+            recipientName: sharedData.recipientName || "",
+            ccList: sharedData.ccList || [],
+            letterBody: sharedData.letterBody || "",
+          },
+          introduction: {
+            projectName: sharedData.projectName || 'Default Project',
+            reportTitle: 'Weekly Progress Report',
+            weekNumber: sharedData.weekNumber || '1',
+            dateRange: sharedData.dateRange || '',
+            contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+            clientName: sharedData.employer || 'Client Name',
+            contractNumber: '', // Add contract number field if needed
+            coverImage: sharedData.coverImage || '',
+            projectTitle: sharedData.projectName || 'Default Project',
+            employer: sharedData.employer || 'Client Name'
+          },
+          overallProgress: {
+            rows: formatRowsWithDisplayIndex(overallProgressHook.rows)
+          },
+          // NEW: Add activities section to save payload
+          activities: {
+            weeklyActivities: weeklyActivities || [],
+            nextWeekPlan: nextWeekPlan || []
+          },
+          // NEW: Add QAQC section to save payload (from state like other sections)
+          qaqcStatus: qaqcDataForSave,
+          // NEW: Add HSES section to save payload (from state like other sections)
+          hses: hsesDataForSave,
+          // NEW: Add Photos section to save payload (from state like other sections)
+          photos: photosDataForSave,
+          // NEW: Add Issues section to save payload (from state like other sections)
+          constructionIssues: issuesDataForSave,
+          // NEW: Add Schedule section to save payload
+          masterSchedule: scheduleDataForSave,
+          // NEW: Add Construction Progress section to save payload with rolling total logic for submitted reports
+          constructionProgress: (() => {
+            const data = constructionProgressHook.constructionData;
+            if (!data || !data.items) {
+              return {
+                projectInfo: {
+                  project: "",
+                  subtitle: "",
+                  date: "",
+                  revision: ""
+                },
+                items: []
+              };
+            }
+            
+            // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
+            return {
+              ...data,
+              items: data.items.map(item => ({
+                ...item,
+                previousWeek: {
+                  qty: item.upToThisWeek.qty,
+                  amount: item.upToThisWeek.amount,
+                  percentage: item.upToThisWeek.percentage
+                },
+                thisWeek: {
+                  qty: 0,
+                  amount: 0,
+                  percentage: 0
+                }
+              }))
+            };
+          })()
+        }
+      };
+      
+      // Convert HSES photo references to base64 before saving
+      if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
+        hsesDataForSave.hsePhotoReferences = await convertImagesToBase64(hsesDataForSave.hsePhotoReferences);
+      }
+
+      let response;
+      if (currentReportId) {
+        // Update existing report - only send sections that changed
+        const updateData = {
+          sections: reportData.sections,
+          status: 'submitted' as const
+        };
+        response = await updateWeeklyReport(currentReportId, updateData);
+        // Ensure currentReportId is set after successful update
+        if (response.success) {
+          const updatedId = (response.data as any)?._id || response.data?.id || currentReportId;
+          setCurrentReportId(updatedId);
+          // Update URL to include the report ID
+          const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+          window.history.replaceState({}, '', newUrl);
+          
+          // Update local construction progress state with rolling total and This Week reset for submitted reports
+          const currentData = constructionProgressHook.constructionData;
+          if (currentData && currentData.items) {
+            const updatedData = {
+              ...currentData,
+              items: currentData.items.map(item => ({
+                ...item,
+                previousWeek: {
+                  qty: item.upToThisWeek.qty,
+                  amount: item.upToThisWeek.amount,
+                  percentage: item.upToThisWeek.percentage
+                },
+                thisWeek: {
+                  qty: 0,
+                  amount: 0,
+                  percentage: 0
+                }
+              }))
+            };
+            constructionProgressHook.updateConstructionData(updatedData);
+          }
+        }
+      } else {
+        // Create new report
+        response = await createWeeklyReport(reportData);
+        if (response.success && response.data) {
+          const newId = (response.data as any)._id || response.data.id;
+          if (newId) {
+            setCurrentReportId(newId);
+            // Update URL to include new report ID
+            const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
+            window.history.replaceState({}, '', newUrl);
+          }
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.error('❌ Error saving weekly report with rolling total:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save weekly report.",
         variant: "destructive"
       });
     }
@@ -904,7 +1667,9 @@ const WeeklyReport = () => {
           constructionIssues: issuesDataForSave,
           // NEW: Add Schedule section to save payload
           masterSchedule: scheduleDataForSave,
-          // NEW: Add Construction Progress section to save payload with rolling total logic
+          // NEW: Add Construction Progress section to save payload
+          // For drafts: save data as-is without rolling total logic
+          // For submitted reports: apply rolling total logic (copy upToThisWeek to previousWeek and reset This Week)
           constructionProgress: (() => {
             const data = constructionProgressHook.constructionData;
             if (!data || !data.items) {
@@ -919,21 +1684,15 @@ const WeeklyReport = () => {
               };
             }
             
-            // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
+            // For drafts, save data as-is without rolling total logic
             return {
               ...data,
               items: data.items.map(item => ({
                 ...item,
-                previousWeek: {
-                  qty: item.upToThisWeek.qty,
-                  amount: item.upToThisWeek.amount,
-                  percentage: item.upToThisWeek.percentage
-                },
-                thisWeek: {
-                  qty: 0,
-                  amount: 0,
-                  percentage: 0
-                }
+                // Keep original values for draft - no rolling total logic applied
+                previousWeek: item.previousWeek,
+                thisWeek: item.thisWeek,
+                upToThisWeek: item.upToThisWeek
               }))
             };
           })()
@@ -947,13 +1706,14 @@ const WeeklyReport = () => {
 
 
       let response;
-      if (currentReportId) {
+      // In create new mode, always create a new report instead of updating
+      if (currentReportId && !isCreateNewMode) {
         // Update existing report - only send sections that changed
         const updateData = {
           sections: reportData.sections,
           status: 'draft' as const
         };
-        // DEBUG: Log HSES data being sent
+        // DEBUG: Log HSE data being sent
         if (updateData.sections?.hses) {
         }
         response = await updateWeeklyReport(currentReportId, updateData);
@@ -965,60 +1725,25 @@ const WeeklyReport = () => {
           const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
           window.history.replaceState({}, '', newUrl);
           
-          // Update local construction progress state with rolling total and This Week reset
+          // Update local construction progress state - for drafts, keep as-is without rolling total
           const currentData = constructionProgressHook.constructionData;
           if (currentData && currentData.items) {
-            const updatedData = {
-              ...currentData,
-              items: currentData.items.map(item => ({
-                ...item,
-                previousWeek: {
-                  qty: item.upToThisWeek.qty,
-                  amount: item.upToThisWeek.amount,
-                  percentage: item.upToThisWeek.percentage
-                },
-                thisWeek: {
-                  qty: 0,
-                  amount: 0,
-                  percentage: 0
-                }
-              }))
-            };
+            // For drafts, keep original data without applying rolling total logic
+            const updatedData = currentData;
             constructionProgressHook.updateConstructionData(updatedData);
           }
         }
       } else {
-        // Create new report
+        // Create new report (for create new mode or when no reportId exists)
         response = await createWeeklyReport(reportData);
         if (response.success && response.data) {
           const newId = (response.data as any)._id || response.data.id;
           if (newId) {
             setCurrentReportId(newId);
+            setIsCreateNewMode(false); // Exit create new mode after successful creation
             // Update URL to include new report ID
             const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
             window.history.replaceState({}, '', newUrl);
-            
-            // Update local construction progress state with rolling total and This Week reset
-            const currentData = constructionProgressHook.constructionData;
-            if (currentData && currentData.items) {
-              const updatedData = {
-                ...currentData,
-                items: currentData.items.map(item => ({
-                  ...item,
-                  previousWeek: {
-                    qty: item.upToThisWeek.qty,
-                    amount: item.upToThisWeek.amount,
-                    percentage: item.upToThisWeek.percentage
-                  },
-                  thisWeek: {
-                    qty: 0,
-                    amount: 0,
-                    percentage: 0
-                  }
-                }))
-              };
-              constructionProgressHook.updateConstructionData(updatedData);
-            }
           }
         }
       }
@@ -1100,16 +1825,11 @@ const WeeklyReport = () => {
     try {
       let reportId = currentReportId;
       
-      // Always save the current data before submitting (for both new and existing reports)
+      // For submitted reports, save WITHOUT rolling total logic (preserve original values)
       const saveResponse = await handleSaveAsDraftInternal();
       
       if (saveResponse?.success && saveResponse?.data) {
-        const newId = (saveResponse.data as any)._id || saveResponse.data.id;
-        if (newId) {
-          reportId = newId;
-        } else {
-          throw new Error('Save succeeded but no report ID was returned');
-        }
+        reportId = (saveResponse.data as any)._id || saveResponse.data.id || currentReportId;
       } else {
         throw new Error('Failed to save report before submission');
       }
@@ -1551,6 +2271,7 @@ const WeeklyReport = () => {
                       data={constructionProgressHook.constructionData}
                       onDataChange={handleConstructionProgressChange}
                       reportId={currentReportId}
+                      isCreateNewMode={isCreateNewMode}
                     />
                   </div>
                 </>

@@ -16,6 +16,30 @@ export interface ManPowerEntry {
   accumulated: number;
 }
 
+export interface MaterialEntry {
+  description: string;
+  unit: string;
+  prevWeek: number;
+  thisWeek: number;
+  accumulated: number;
+}
+
+export interface MachineryEntry {
+  description: string;
+  date: {
+    fri: number;
+    sat: number;
+    sun: number;
+    mon: number;
+    tue: number;
+    wed: number;
+    thu: number;
+  };
+  prevWeek: number;
+  thisWeek: number;
+  accumulated: number;
+}
+
 export interface ManPowerTeams {
   dateRange: string;
   managementTeam: ManPowerEntry[];
@@ -25,9 +49,8 @@ export interface ManPowerTeams {
 
 export interface Resources {
   manPower: ManPowerTeams;
-  // Add other resource types here if needed in the future
-  // materials?: MaterialEntry[];
-  // machinery?: MachineryEntry[];
+  material: MaterialEntry[];
+  machinery: MachineryEntry[];
 }
 
 export interface ResourceSection {

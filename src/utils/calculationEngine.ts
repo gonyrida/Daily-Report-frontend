@@ -187,16 +187,16 @@ export function computeAllAmounts(items: ConstructionProgressItem[]): Constructi
 
       // Rule 1: qty × unitRate for BoQ and individual progress periods only
       result[i].boQ.amount = Math.round((boQ.qty || 0) * calculatedUnitRate * 100) / 100;
-      result[i].previousWeek.amount = Math.round((result[i].previousWeek.qty || 0) * calculatedUnitRate * 100) / 100;
-      result[i].thisWeek.amount = Math.round((result[i].thisWeek.qty || 0) * calculatedUnitRate * 100) / 100;
+      result[i].previousWeek.amount = (result[i].previousWeek.qty || 0) * calculatedUnitRate;
+      result[i].thisWeek.amount = (result[i].thisWeek.qty || 0) * calculatedUnitRate;
 
       // Calculate cumulative amounts from their components
-      result[i].upToThisWeek.amount = Math.round((result[i].previousWeek.amount + result[i].thisWeek.amount) * 100) / 100;
-      result[i].upToThisWeek.qty = Math.round(((result[i].previousWeek.qty || 0) + (result[i].thisWeek.qty || 0)) * 100) / 100;
-      result[i].remaining.qty = Math.round(((result[i].boQ.qty || 0) - (result[i].upToThisWeek.qty || 0)) * 100) / 100;
-      result[i].remaining.amount = Math.round((result[i].boQ.amount - result[i].upToThisWeek.amount) * 100) / 100;
-      result[i].nextWeekPlan.amount = Math.round((result[i].nextWeekPlan.qty || 0) * boQ.unitRate * 100) / 100;
-      result[i].upToNextWeekPlan.amount = Math.round((result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount) * 100) / 100;
+      result[i].upToThisWeek.amount = result[i].previousWeek.amount + result[i].thisWeek.amount;
+      result[i].upToThisWeek.qty = (result[i].previousWeek.qty || 0) + (result[i].thisWeek.qty || 0);
+      result[i].remaining.qty = (result[i].boQ.qty || 0) - (result[i].upToThisWeek.qty || 0);
+      result[i].remaining.amount = result[i].boQ.amount - result[i].upToThisWeek.amount;
+      result[i].nextWeekPlan.amount = (result[i].nextWeekPlan.qty || 0) * boQ.unitRate;
+      result[i].upToNextWeekPlan.amount = result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount;
       result[i].upToNextWeekPlan.qty = Math.round(((result[i].upToThisWeek.qty || 0) + (result[i].nextWeekPlan.qty || 0)) * 100) / 100;
 
       // Calculate percentages for rows with material/labor rates
@@ -213,18 +213,18 @@ export function computeAllAmounts(items: ConstructionProgressItem[]): Constructi
 
     if ((boQ.unitRate || 0) > 0) {
       // Rule 1: qty × unitRate for BoQ and all progress periods
-      result[i].boQ.amount = Math.round((boQ.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
-      result[i].previousWeek.amount = Math.round((result[i].previousWeek.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
-      result[i].thisWeek.amount = Math.round((result[i].thisWeek.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
+      result[i].boQ.amount = (boQ.qty || 0) * (boQ.unitRate || 0);
+      result[i].previousWeek.amount = (result[i].previousWeek.qty || 0) * (boQ.unitRate || 0);
+      result[i].thisWeek.amount = (result[i].thisWeek.qty || 0) * (boQ.unitRate || 0);
 
       // Calculate cumulative amounts from their components
-      result[i].upToThisWeek.amount = Math.round((result[i].previousWeek.amount + result[i].thisWeek.amount) * 100) / 100;
-      result[i].upToThisWeek.qty = Math.round(((result[i].previousWeek.qty || 0) + (result[i].thisWeek.qty || 0)) * 100) / 100;
-      result[i].remaining.qty = Math.round(((result[i].boQ.qty || 0) - (result[i].upToThisWeek.qty || 0)) * 100) / 100;
-      result[i].remaining.amount = Math.round((result[i].boQ.amount - result[i].upToThisWeek.amount) * 100) / 100;
-      result[i].nextWeekPlan.amount = Math.round((result[i].nextWeekPlan.qty || 0) * (boQ.unitRate || 0) * 100) / 100;
-      result[i].upToNextWeekPlan.qty = Math.round(((result[i].upToThisWeek.qty || 0) + (result[i].nextWeekPlan.qty || 0)) * 100) / 100;
-      result[i].upToNextWeekPlan.amount = Math.round((result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount) * 100) / 100;
+      result[i].upToThisWeek.amount = result[i].previousWeek.amount + result[i].thisWeek.amount;
+      result[i].upToThisWeek.qty = (result[i].previousWeek.qty || 0) + (result[i].thisWeek.qty || 0);
+      result[i].remaining.qty = (result[i].boQ.qty || 0) - (result[i].upToThisWeek.qty || 0);
+      result[i].remaining.amount = result[i].boQ.amount - result[i].upToThisWeek.amount;
+      result[i].nextWeekPlan.amount = (result[i].nextWeekPlan.qty || 0) * (boQ.unitRate || 0);
+      result[i].upToNextWeekPlan.qty = (result[i].upToThisWeek.qty || 0) + (result[i].nextWeekPlan.qty || 0);
+      result[i].upToNextWeekPlan.amount = result[i].upToThisWeek.amount + result[i].nextWeekPlan.amount;
 
       // Calculate percentages for rows with unitRate
       const boQAmountUnitRate = result[i].boQ.amount || 0;
@@ -244,15 +244,15 @@ export function computeAllAmounts(items: ConstructionProgressItem[]): Constructi
     if (children.length === 0) continue; // Rule 3: keep manual
 
     // Aggregate children amounts for all periods
-    result[i].boQ.amount = Math.round(childrenBoQAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
-    result[i].previousWeek.amount = Math.round(childrenPreviousWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
-    result[i].thisWeek.amount = Math.round(childrenThisWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
-    result[i].remaining.qty = Math.round(children.map(ci => (result[ci].boQ.qty || 0) - (result[ci].upToThisWeek.qty || 0)).reduce((acc, qty) => acc + qty, 0) * 100) / 100;
-    result[i].upToThisWeek.amount = Math.round(childrenUpToThisWeekAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
-    result[i].upToThisWeek.qty = Math.round(children.map(ci => result[ci].upToThisWeek.qty || 0).reduce((acc, qty) => acc + qty, 0) * 100) / 100;
-    result[i].remaining.amount = Math.round(childrenRemainingAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
-    result[i].upToNextWeekPlan.qty = Math.round(children.map(ci => (result[ci].upToThisWeek.qty || 0) + (result[ci].nextWeekPlan.qty || 0)).reduce((acc, qty) => acc + qty, 0) * 100) / 100;
-    result[i].nextWeekPlan.amount = Math.round(childrenNextWeekPlanAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
+    result[i].boQ.amount = childrenBoQAmounts.reduce((acc, amount) => acc + amount, 0);
+    result[i].previousWeek.amount = childrenPreviousWeekAmounts.reduce((acc, amount) => acc + amount, 0);
+    result[i].thisWeek.amount = childrenThisWeekAmounts.reduce((acc, amount) => acc + amount, 0);
+    result[i].remaining.qty = children.map(ci => (result[ci].boQ.qty || 0) - (result[ci].upToThisWeek.qty || 0)).reduce((acc, qty) => acc + qty, 0);
+    result[i].upToThisWeek.amount = childrenUpToThisWeekAmounts.reduce((acc, amount) => acc + amount, 0);
+    result[i].upToThisWeek.qty = children.map(ci => result[ci].upToThisWeek.qty || 0).reduce((acc, qty) => acc + qty, 0);
+    result[i].remaining.amount = childrenRemainingAmounts.reduce((acc, amount) => acc + amount, 0);
+    result[i].nextWeekPlan.amount = childrenNextWeekPlanAmounts.reduce((acc, amount) => acc + amount, 0);
+    result[i].upToNextWeekPlan.qty = children.map(ci => (result[ci].upToThisWeek.qty || 0) + (result[ci].nextWeekPlan.qty || 0)).reduce((acc, qty) => acc + qty, 0);
     result[i].upToNextWeekPlan.amount = Math.round(childrenUpToNextWeekPlanAmounts.reduce((acc, amount) => acc + amount, 0) * 100) / 100;
 
     // Calculate percentages for rows that aggregate children
