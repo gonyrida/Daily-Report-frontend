@@ -779,43 +779,42 @@ export const getBulkImportStats = async () => {
   }
 
   const result = await response.json();
-  console.log("🔒 BULK STATS: Success:", result);
   return result;
 };
 
 // QAQC API functions
 export const updateQaqcStatus = async (reportId: string, qaqcData: any) => {
-  console.log("🔒 UPDATE QAQC: Updating QAQC status for report", reportId);
+  try {
+    const response = await apiPatch(`/weekly-reports/${reportId}/qaqc-status`, qaqcData);
 
-  const response = await apiPatch(`/weekly-reports/${reportId}/qaqc-status`, qaqcData);
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to update QAQC status" }));
+      throw new Error(error.message || "Failed to update QAQC status");
+    }
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Failed to update QAQC status" }));
-    console.error("🔒 UPDATE QAQC: Failed:", error);
-    throw new Error(error.message || "Failed to update QAQC status");
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    throw error;
   }
-
-  const result = await response.json();
-  console.log("🔒 UPDATE QAQC: Success:", result);
-  return result;
 };
 
 export const getQaqcStatus = async (reportId: string) => {
-  console.log("🔒 GET QAQC: Getting QAQC status for report", reportId);
+  try {
+    const response = await apiGet(`/weekly-reports/${reportId}`);
 
-  const response = await apiGet(`/weekly-reports/${reportId}`);
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to get QAQC status" }));
+      throw new Error(error.message || "Failed to get QAQC status");
+    }
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Failed to get QAQC status" }));
-    console.error("🔒 GET QAQC: Failed:", error);
-    throw new Error(error.message || "Failed to get QAQC status");
+    const result = await response.json();
+    return result.sections?.qaqcStatus || null;
+  } catch (error) {
+    throw error;
   }
-
-  const result = await response.json();
-  console.log("🔒 GET QAQC: Success:", result);
-  return result.sections?.qaqcStatus || null;
 };

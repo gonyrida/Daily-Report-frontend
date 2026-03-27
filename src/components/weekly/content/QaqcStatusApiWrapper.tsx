@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Section, TableData, QaqcTableProps } from "@/types/qaqc.types";
+import { Section, TableData, QaqcTableProps, QaqcRow } from "@/types/qaqc.types";
 import { useQaqcApi } from "@/hooks/useQaqcApi";
 import { STATUS_OPTIONS } from "@/constants/qaqcStatus";
 import { CheckCircle, AlertCircle, Clock, XCircle, FileText, Plus, Trash2 } from "lucide-react";
@@ -10,24 +10,25 @@ interface QaqcStatusApiWrapperProps {
   weeklyReportId?: string;
   search?: string;
   setSearch?: React.Dispatch<React.SetStateAction<string>>;
+  setTableData?: React.Dispatch<React.SetStateAction<TableData>>;
 }
 
 // Status Icon Component
 const StatusIcon: React.FC<{ status: string }> = ({ status }) => {
   switch (status) {
-    case "Open":
-      return <AlertCircle className="w-4 h-4 text-yellow-600" />;
-    case "In Review":
-      return <Clock className="w-4 h-4 text-purple-600" />;
     case "Pending":
+      return <AlertCircle className="w-4 h-4 text-yellow-600" />;
+    case "Respond":
+      return <Clock className="w-4 h-4 text-purple-600" />;
+    case "Submit":
       return <Clock className="w-4 h-4 text-blue-600" />;
-    case "Approved":
+    case "Resubmit":
       return <CheckCircle className="w-4 h-4 text-green-600" />;
-    case "Issued":
+    case "Approved":
       return <FileText className="w-4 h-4 text-cyan-600" />;
-    case "Closed":
+    case "Approved with Condition":
       return <CheckCircle className="w-4 h-4 text-gray-600" />;
-    case "Rejected":
+    case "Not Approved":
       return <XCircle className="w-4 h-4 text-red-600" />;
     default:
       return <div className="w-4 h-4 text-gray-400" />;
@@ -106,14 +107,15 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                   <select
                     value={row.status}
                     onChange={(e) => onCellChange(section.id, row.id, "status", e.target.value)}
-                    className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${row.status === "Open" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
-                        row.status === "In Review" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
-                          row.status === "Pending" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
-                            row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
-                              row.status === "Issued" ? "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 border-cyan-200 dark:border-cyan-700" :
-                                row.status === "Closed" ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700" :
-                                  row.status === "Rejected" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
-                                    "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                    className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${
+                        row.status === "Pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
+                        row.status === "Respond" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
+                        row.status === "Submit" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
+                        row.status === "Resubmit" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-700" :
+                        row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
+                        row.status === "Approved with Condition" ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700" :
+                        row.status === "Not Approved" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
+                        "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                       }`}
                   >
                     <option value="">— Select —</option>
@@ -187,18 +189,18 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
   weeklyReportId,
   search: externalSearch,
   setSearch: externalSetSearch,
+  setTableData: externalSetTableData, // Add setTableData prop
 }) => {
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const {
     tableData,
-    setTableData,
+    setTableData: internalSetTableData,
     search: internalSearch,
     setSearch: internalSetSearch,
     handleAddRow,
     handleDeleteRow,
-    handleCellChange,
+    handleCellChange: internalHandleCellChange,
     totalRows,
     openRows,
     filteredSections,
@@ -209,25 +211,28 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
     loadQaqcData,
   } = useQaqcApi(sections, weeklyReportId);
 
+  // Use external setTableData if provided, otherwise use internal
+  const setTableData = externalSetTableData || internalSetTableData;
+  
+  // Custom handleCellChange that updates both internal and external state
+  const handleCellChange = (sectionId: string, rowId: string, field: keyof QaqcRow, value: string) => {
+    // Update internal state
+    internalHandleCellChange(sectionId, rowId, field, value);
+    
+    // If external setTableData is provided, call it to update parent state
+    if (externalSetTableData) {
+      const updatedData = { ...tableData };
+      updatedData[sectionId] = updatedData[sectionId].map(row =>
+        row.id === rowId ? { ...row, [field]: value } : row
+      );
+      externalSetTableData(updatedData);
+    }
+  };
+
+
   // Use external search state if provided, otherwise use internal
   const search = externalSearch ?? internalSearch;
   const setSearch = externalSetSearch ?? internalSetSearch;
-
-  // Auto-save functionality
-  useEffect(() => {
-    if (!autoSaveEnabled || !weeklyReportId || isSaving) return;
-
-    const timeoutId = setTimeout(() => {
-      saveQaqcData()
-        .then(() => {
-          setLastSaved(new Date());
-        })
-        .catch((err) => {
-        });
-    }, 2000); // 2-second debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [tableData, autoSaveEnabled, weeklyReportId, isSaving]);
 
   const handleManualSave = async () => {
     if (!weeklyReportId) {
@@ -238,6 +243,7 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
       await saveQaqcData();
       setLastSaved(new Date());
     } catch (err) {
+      // Handle save error silently or show user feedback
     }
   };
 
@@ -287,47 +293,14 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="auto-save"
-              checked={autoSaveEnabled}
-              onChange={(e) => setAutoSaveEnabled(e.target.checked)}
-              className="rounded"
-            />
-            <label htmlFor="auto-save" className="text-sm">
-              Auto-save {isSaving && "(saving...)"}
-            </label>
-          </div>
-
-          {lastSaved && (
-            <span className="text-xs text-muted-foreground">
-              Last saved: {lastSaved.toLocaleTimeString()}
-            </span>
-          )}
+      {/* Status indicator */}
+      {lastSaved && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            Last saved: {lastSaved.toLocaleTimeString()}
+          </span>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={isLoading}
-            className="px-3 py-1 text-sm border rounded hover:bg-muted"
-          >
-            Refresh
-          </button>
-
-          <button
-            onClick={handleManualSave}
-            disabled={isSaving || !weeklyReportId}
-            className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
-          >
-            {isSaving ? "Saving..." : "Save"}
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Tables */}
       <div className="space-y-6">

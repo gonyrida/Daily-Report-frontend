@@ -637,6 +637,7 @@ const WeeklyReport = () => {
     loadExistingReport();
   }, [currentReportId, selectedProject, toast]);
 
+
   // Create new weekly report function with rolling total logic
   const handleCreateNewWeeklyReportWithRollingTotal = async () => {
     try {

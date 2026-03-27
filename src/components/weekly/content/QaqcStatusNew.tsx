@@ -301,12 +301,13 @@ export default function QaqcStatusNew({
           weeklyReportId={weeklyReportId}
           search={search}
           setSearch={setSearch}
+          setTableData={setTableData}
         />
       </div>
     );
   }
 
-  // Fallback to local state management when no reportId
+  // Fallback to local state management when no reportId - but still allow typing and parent state updates
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -323,8 +324,8 @@ export default function QaqcStatusNew({
             </span>
           </div>
           <div className="flex gap-6 text-sm">
-            <span>Total Entries: <strong>{totalRowsCount}</strong></span>
-            <span>Open Items: <strong className="text-yellow-300">{openRowsCount}</strong></span>
+            <span>Total Entries: <strong>{totalRows || 0}</strong></span>
+            <span>Open Items: <strong className="text-yellow-300">{openRows || 0}</strong></span>
           </div>
         </div>
       </div>
@@ -334,29 +335,39 @@ export default function QaqcStatusNew({
         <div className="flex-1 min-w-64">
           <input
             type="text"
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search sections here..."
             className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-card dark:border-border"
           />
         </div>
       </div>
 
-      {/* Tables */}
+      {/* Local Tables with parent state integration */}
       <div className="space-y-6">
-        {filteredSectionsList.map((section) => (
+        {filteredSections.map((section) => (
           <div key={section.id} id={`section-${section.id}`}>
             <QaqcTable
               section={section}
-              rows={localTableData[section.id] || []}
+              rows={tableData[section.id] || []}
               onAddRow={handleAddRowLocal}
               onDeleteRow={handleDeleteRowLocal}
-              onCellChange={handleCellChangeLocal}
+              onCellChange={(sectionId, rowId, field, value) => {
+                handleCellChangeLocal(sectionId, rowId, field, value);
+                // Also call parent setTableData if available
+                if (setTableData) {
+                  const updatedData = { ...tableData };
+                  updatedData[sectionId] = updatedData[sectionId].map(row =>
+                    row.id === rowId ? { ...row, [field]: value } : row
+                  );
+                  setTableData(updatedData);
+                }
+              }}
             />
           </div>
         ))}
 
-        {filteredSectionsList.length === 0 && (
+        {filteredSections.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             No sections match your filter.
           </div>

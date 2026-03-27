@@ -100,46 +100,46 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     // Example data for each section
     const examples: Record<string, any[]> = {
       ncr: [
-        { code: "NCR-001", description: "Concrete strength below specified grade", status: "Open", dateResponse: "2024-01-15", comment: "Waiting for re-testing results" },
-        { code: "NCR-002", description: "Reinforcement spacing deviation", status: "Closed", dateResponse: "2024-01-10", comment: "Corrected and approved" }
+        { code: "NCR-001", description: "Concrete strength below specified grade", status: "Pending", dateResponse: "2024-01-15", comment: "Waiting for re-testing results" },
+        { code: "NCR-002", description: "Reinforcement spacing deviation", status: "Approved", dateResponse: "2024-01-10", comment: "Corrected and approved" }
       ],
       car: [
-        { code: "CAR-001", description: "Improper curing procedures", status: "Open", dateResponse: "2024-01-12", comment: "Corrective action plan submitted" }
+        { code: "CAR-001", description: "Improper curing procedures", status: "Respond", dateResponse: "2024-01-12", comment: "Corrective action plan submitted" }
       ],
       scar: [
-        { code: "SCAR-001", description: "Site access road damage", status: "Closed", dateResponse: "2024-01-08", comment: "Repaired and inspected" }
+        { code: "SCAR-001", description: "Site access road damage", status: "Approved", dateResponse: "2024-01-08", comment: "Repaired and inspected" }
       ],
       pmsi: [
-        { code: "PMSI-001", description: "Material delivery delay", status: "Open", dateResponse: "2024-01-20", comment: "Supplier notified" }
+        { code: "PMSI-001", description: "Material delivery delay", status: "Pending", dateResponse: "2024-01-20", comment: "Supplier notified" }
       ],
       csi: [
-        { code: "CSI-001", description: "Safety barrier installation incomplete", status: "Open", dateResponse: "2024-01-18", comment: "Scheduled for completion" }
+        { code: "CSI-001", description: "Safety barrier installation incomplete", status: "Pending", dateResponse: "2024-01-18", comment: "Scheduled for completion" }
       ],
       ir: [
-        { code: "IR-001", description: "Monthly inspection report", status: "Closed", dateResponse: "2024-01-05", comment: "All items compliant" }
+        { code: "IR-001", description: "Monthly inspection report", status: "Approved", dateResponse: "2024-01-05", comment: "All items compliant" }
       ],
       mfa: [
-        { code: "MFA-001", description: "Equipment maintenance required", status: "Open", dateResponse: "2024-01-22", comment: "Maintenance team notified" }
+        { code: "MFA-001", description: "Equipment maintenance required", status: "Pending", dateResponse: "2024-01-22", comment: "Maintenance team notified" }
       ],
       rfi: [
-        { code: "RFI-001", description: "Clarification on foundation design", status: "Closed", dateResponse: "2024-01-03", comment: "Design clarification received" }
+        { code: "RFI-001", description: "Clarification on foundation design", status: "Approved", dateResponse: "2024-01-03", comment: "Design clarification received" }
       ],
       rfa: [
-        { code: "RFA-001", description: "Request for field change", status: "Open", dateResponse: "2024-01-25", comment: "Under review" }
+        { code: "RFA-001", description: "Request for field change", status: "Submit", dateResponse: "2024-01-25", comment: "Under review" }
       ],
       fcr: [
-        { code: "FCR-001", description: "Field change approved", status: "Closed", dateResponse: "2024-01-07", comment: "Change implemented" }
+        { code: "FCR-001", description: "Field change approved", status: "Approved", dateResponse: "2024-01-07", comment: "Change implemented" }
       ],
       vo: [
-        { code: "VO-001", description: "Additional scope request", status: "Open", dateResponse: "2024-01-28", comment: "Cost estimate pending" }
+        { code: "VO-001", description: "Additional scope request", status: "Pending", dateResponse: "2024-01-28", comment: "Cost estimate pending" }
       ],
       tr: [
-        { code: "TR-001", description: "Technical specification review", status: "Closed", dateResponse: "2024-01-11", comment: "Approved with comments" }
+        { code: "TR-001", description: "Technical specification review", status: "Approved", dateResponse: "2024-01-11", comment: "Approved with comments" }
       ],
       mir: [
-        { code: "MIR-001", description: "Steel material inspection and approval", status: "Open", dateResponse: "2024-01-30", comment: "Pending laboratory results" },
+        { code: "MIR-001", description: "Steel material inspection and approval", status: "Pending", dateResponse: "2024-01-30", comment: "Pending laboratory results" },
         { code: "MIR-002", description: "Cement quality inspection", status: "Approved", dateResponse: "2024-01-25", comment: "All tests passed - material approved for use" },
-        { code: "MIR-003", description: "Reinforcement bar inspection", status: "In Review", dateResponse: "2024-01-28", comment: "Awaiting final approval from quality team" }
+        { code: "MIR-003", description: "Reinforcement bar inspection", status: "Respond", dateResponse: "2024-01-28", comment: "Awaiting final approval from quality team" }
       ]
     };
     
@@ -443,15 +443,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
               setQaqcData(backendData);
             }
           }}
-          search={qaqcTableHook.search}
-          setSearch={qaqcTableHook.setSearch}
-          handleAddRow={qaqcTableHook.handleAddRow}
-          handleDeleteRow={qaqcTableHook.handleDeleteRow}
-          handleCellChange={qaqcTableHook.handleCellChange}
-          totalRows={qaqcTableHook.totalRows}
-          openRows={qaqcTableHook.openRows}
-          filteredSections={qaqcTableHook.filteredSections}
-          weeklyReportId={undefined} // No API integration - use local state only
         />
       </div>
     );
