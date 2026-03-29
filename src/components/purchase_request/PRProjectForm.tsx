@@ -191,7 +191,6 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
         ...data,
         subProjects: data.subProjects.map(({ _id, ...rest }) => rest),
         purposes: data.purposes.map(({ _id, ...rest }) => rest),
-        members: data.members.map(({ _id, ...rest }) => rest)
       };
     }
   };
@@ -284,6 +283,14 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
         purposes: [],
         members: [],
         visibility: 'public'
+      });
+    } else if (mode === 'edit') {
+      setFormData({
+        ...initialData,
+        requestDate: 
+            initialData.requestDate 
+              ? new Date(initialData.requestDate).toISOString().split('T')[0] 
+              : new Date().toISOString().split('T')[0],
       });
     }
   };
@@ -494,8 +501,6 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
             {getHeaderTitle(mode)}
           </DialogTitle>
 
-
-
           {/* <Button 
             type="button"
             variant="default"
@@ -533,39 +538,48 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                     </Label>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="active"
-                          checked={formData.status === 'active'}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            status: 'active'
-                          })}
-                        />
+                        {mode === 'view' && (<span>{formData.status === 'active' ? '☑' : '☐'}</span>)}
+                        {mode !== 'view' && (
+                          <input
+                            type="checkbox"
+                            id="active"
+                            checked={formData.status === 'active'}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              status: 'active'
+                            })}
+                          />
+                        )}
                         <label htmlFor="active" className="text-sm">Active</label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="on_hold"
-                          checked={formData.status === 'on_hold'}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            status: 'on_hold'
-                          })}
-                        />
+                        {mode === 'view' && (<span>{formData.status === 'on_hold' ? '☑' : '☐'}</span>)}
+                        {mode !== 'view' && (
+                          <input
+                            type="checkbox"
+                            id="on_hold"
+                            checked={formData.status === 'on_hold'}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              status: 'on_hold'
+                            })}
+                          />
+                        )}
                         <label htmlFor="on_hold" className="text-sm">On Hold</label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="completed"
-                          checked={formData.status === 'completed'}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            status: 'completed'
-                          })}
-                        />
+                        {mode === 'view' && (<span>{formData.status === 'completed' ? '☑' : '☐'}</span>)}
+                        {mode !== 'view' && (
+                          <input
+                            type="checkbox"
+                            id="completed"
+                            checked={formData.status === 'completed'}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              status: 'completed'
+                            })}
+                          />
+                        )}
                         <label htmlFor="completed" className="text-sm">Completed</label>
                       </div>
                     </div>
@@ -642,7 +656,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
 
                   <div className="space-y-2 mt-4">
                     <p className="text-sm text-muted-foreground">
-                      {"(Users will select these 'Sub-Project Name' when creating Purchase Requests)"}
+                      {"(Users will select these 'Sub-Project' when creating Purchase Requests)"}
                     </p>
                     {formData.subProjects.length <= 0 && (
                       <div className="gap-2">

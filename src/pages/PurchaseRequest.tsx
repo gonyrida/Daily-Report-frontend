@@ -26,6 +26,7 @@ import PendingApprovalsTab from '@/components/purchase_request/PendingApprovalsT
 import PurchaseRequestDetail from '@/components/purchase_request/PurchaseRequestDetail';
 import PurchaseRequestForm from '@/components/purchase_request/PurchaseRequestForm';
 import ProjectManagement from '@/components/purchase_request/ProjectManagement';
+import MasterMaterials from '@/components/purchase_request/MasterMaterials';
 
 interface PurchaseRequest {
   groupId?: string;
@@ -484,6 +485,8 @@ const PurchaseRequest = ({onRefresh}) => {
       requesterName: request.requesterName || '',
       requesterDepartment: request.requesterDepartment || '',
       projectName: request.projectName || '',
+      projectFrom: request.projectFrom || {},
+      label: request.label || '',
       purpose: request.purpose || '',
       requestDate: request.requestDate ? new Date(request.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       deliveryPlace: request.deliveryPlace || '',
@@ -494,6 +497,7 @@ const PurchaseRequest = ({onRefresh}) => {
         services: false
       },
       items: request.items || [],
+      formattedGrandTotal: request.formattedGrandTotal || 0,
       approvers: approversFromWorkflow,
       status: request.status || 'draft'
     };
@@ -726,6 +730,9 @@ const PurchaseRequest = ({onRefresh}) => {
                     {profile?.role === 'approver' || profile?.role === 'admin' ? (
                       <TabsTrigger value="project-management">Project Management</TabsTrigger>
                     ) : null}
+                    {profile?.role === 'approver' || profile?.role === 'admin' ? (
+                      <TabsTrigger value="material-master">Material Master</TabsTrigger>
+                    ) : null}
                   </TabsList>
 
                   <TabsContent value="my-requests" className="space-y-6">
@@ -737,6 +744,7 @@ const PurchaseRequest = ({onRefresh}) => {
                         isOpen={showNewRequest}
                         setIsOpen={setShowNewRequest}
                         onRefresh={refreshRequests}
+                        projectData={PRProjects}
                       />
 
                       {/* Edit Request Form */}
@@ -748,6 +756,7 @@ const PurchaseRequest = ({onRefresh}) => {
                         onRefresh={refreshRequests}
                         initialData={editFormData}
                         requestId={editFormData?._id}
+                        projectData={PRProjects}
                       />
 
                       {/* Revise Request Form */}
@@ -759,6 +768,7 @@ const PurchaseRequest = ({onRefresh}) => {
                         onRefresh={refreshRequests}
                         initialData={reviseFormData}
                         requestId={reviseFormData?._id}
+                        projectData={PRProjects}
                       />
 
                       <Button 
@@ -780,7 +790,7 @@ const PurchaseRequest = ({onRefresh}) => {
                         Edit Request
                       </Button>
                       <Button 
-                        variant="outline" 
+                        variant="default" 
                         onClick={() => {
                           if (selectedRequests.length === 1) {
                             const request = requests.find(r => r.id === selectedRequests[0] || r._id === selectedRequests[0]);
@@ -875,7 +885,7 @@ const PurchaseRequest = ({onRefresh}) => {
                                             }}
                                           />
                                         </td>
-                                        <td className="p-3 font-medium">{request.id}</td>
+                                        <td className="p-3 font-medium">{request.label}</td>
                                         <td className="p-3">{request.projectName}</td>
                                         <td className="p-3">
                                           <div className="flex gap-1 flex-wrap">
@@ -981,7 +991,7 @@ const PurchaseRequest = ({onRefresh}) => {
                                       className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
                                       onClick={() => handleViewDetails(request)}
                                     >
-                                      <td className="p-3 font-medium">{request.id}</td>
+                                      <td className="p-3 font-medium">{request.label}</td>
                                       <td className="p-3">{request.projectName}</td>
                                       <td className="p-3">{request.requesterName}</td>
                                       <td className="p-3">
@@ -1045,6 +1055,15 @@ const PurchaseRequest = ({onRefresh}) => {
                         projects={PRProjects}
                         loadingProjects={loadingPRProjects}
                         onRefresh={fetchPRProjects}
+                      />
+                    </TabsContent>
+                  ) : null}
+                  {profile?.role === 'approver' || profile?.role === 'admin' ? (
+                    <TabsContent value="material-master" className="space-y-6">
+                      <MasterMaterials 
+                        // projects={PRProjects}
+                        // loadingProjects={loadingPRProjects}
+                        // onRefresh={fetchPRProjects}
                       />
                     </TabsContent>
                   ) : null}

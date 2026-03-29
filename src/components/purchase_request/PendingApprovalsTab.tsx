@@ -400,7 +400,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
 														}}
 													/>
 												</td>
-												<td className="p-3 font-medium">{request.id}</td>
+												<td className="p-3 font-medium">{request.label}</td>
 												<td className="p-3">{request.projectName}</td>
 												<td className="p-3">{request.requesterName}</td>
                         <td className="p-3">

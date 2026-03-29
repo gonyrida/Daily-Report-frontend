@@ -104,7 +104,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
             <div className="bg-muted/30 p-4 rounded-lg border-l-4 border-blue-500">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-bold text-lg">MR-{selectedRequest.id}</h3>
+                  <h3 className="font-bold text-lg">{selectedRequest.label}</h3>
                   <p className="text-sm text-muted-foreground">
                     Created: {new Date(selectedRequest.createdAt || selectedRequest.date).toLocaleString()}
                   </p>
@@ -135,7 +135,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                 </div>
                 <div>
                   <label className="text-sm font-medium text-blue-700">Internal Project Code</label>
-                  <p className="text-sm">{selectedRequest.id}</p>
+                  <p className="text-sm">{selectedRequest.projectFrom.mainProject}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-blue-700">Category</label>

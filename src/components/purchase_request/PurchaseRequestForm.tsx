@@ -22,14 +22,17 @@ import {
 	apiPut
 } from '@/lib/apiFetch';
 import { useToast } from '@/hooks/use-toast';
+import CustomCombobox from './CustomCombobox';
+import MaterialActualCost from './MaterialActualCost';
 
 interface PurchaseRequestFormProps {
   mode: 'create' | 'edit' | 'revise';
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   onRefresh: () => void;
-  initialData?: any; // For edit mode
-  requestId?: string; // For edit mode
+  projectData: any;
+  initialData?: any; // For edit/revise mode
+  requestId?: string; // For edit/revise mode
 }
 
 const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
@@ -37,6 +40,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
   isOpen,
   setIsOpen,
   onRefresh,
+  projectData,
   initialData,
   requestId
 }) => {
@@ -108,6 +112,13 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			requesterName: data.requesterName || '',
 			requesterDepartment: data.requesterDepartment || '',
 			projectName: data.projectName || '',
+			label: data.label || '',
+			projectFrom: {
+				mainProject: data.projectFrom?.mainProject || '',
+				mainId: data.projectFrom?.mainId || '',
+				subProject: data.projectFrom?.subProject || '',
+				subId: data.projectFrom?.subId || ''
+			},
 			purpose: data.purpose || '',
 			requestDate: data.requestDate || new Date().toISOString().split('T')[0],
 			deliveryPlace: data.deliveryPlace || '',
@@ -118,6 +129,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				services: false
 			},
 			items: data.items || [],
+			formattedGrandTotal: data.formattedGrandTotal || '',
 			approvers: {
 				preparedBy: data.approvers?.preparedBy || '',
 				checkedBy: data.approvers?.checkedBy || '',
@@ -140,6 +152,12 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
         requesterName: profile?.fullName || '',
         requesterDepartment: profile?.department || '',
         projectName: '',
+				projectFrom: {
+					mainProject: '',
+					mainId: '',
+					subProject: '',
+					subId: ''
+				},
         purpose: '',
         requestDate: new Date().toISOString().split('T')[0],
         deliveryPlace: '',
@@ -190,6 +208,12 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			requesterName: profile?.fullName || '',
 			requesterDepartment: profile?.department || '',
 			projectName: '',
+			projectFrom: {
+				mainProject: '',
+				mainId: '',
+				subProject: '',
+				subId: ''
+			},
 			purpose: '',
 			requestDate: new Date().toISOString().split('T')[0],
 			deliveryPlace: '',
@@ -259,6 +283,12 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
             requesterName: profile?.fullName || '',
             requesterDepartment: profile?.department || '',
             projectName: '',
+						projectFrom: {
+							mainProject: '',
+							mainId: '',
+							subProject: '',
+							subId: ''
+						},
             purpose: '',
             requestDate: new Date().toISOString().split('T')[0],
             deliveryPlace: '',
@@ -336,14 +366,15 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
   const handleAddItem = () => {
     if (newItem.description && newItem.quantity > 0 && newItem.unitPrice > 0) {
       let updatedItems;
-      
-      updatedItems = formData.items.map((item, index) => 
-        index === editingIndex ? newItem : item
-      );
-
-      updatedItems = [...formData.items, newItem];
-      
-      setFormData({...formData, items: updatedItems});
+      formData.items.map((item, index) => {
+	      if (index === editingIndex) {
+	      	formData.items[editingIndex] = newItem
+	      	console.log("This is formData.items[editingIndex]", formData.items[editingIndex])
+	      } else if (!editingIndex) {
+		      updatedItems = [...formData.items, newItem];
+		      setFormData({...formData, items: updatedItems});
+	      }
+      });
       
       // Reset form
       setNewItem({
@@ -448,8 +479,6 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			return 'Revise Purchase Request';
 		}
 	}
-	
-	// console.log('This is the formData ', formData)
 
   return (
 		<>
@@ -464,6 +493,12 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 									requesterName: profile?.fullName || '',
 									requesterDepartment: profile?.department || '',
 									projectName: '',
+									projectFrom: {
+										mainProject: '',
+										mainId: '',
+										subProject: '',
+										subId: ''
+									},
 									purpose: '',
 									requestDate: new Date().toISOString().split('T')[0],
 									deliveryPlace: '',
@@ -503,7 +538,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					<Tabs defaultValue="purchase-request" className="w-full">
 						<TabsList className="grid w-full grid-cols-3">
 							<TabsTrigger value="purchase-request">Purchase Request</TabsTrigger>
-							<TabsTrigger value="placeholder1">Placeholder 1</TabsTrigger>
+							<TabsTrigger value="placeholder1">Material - Actual Cost</TabsTrigger>
 							<TabsTrigger value="placeholder2">Placeholder 2</TabsTrigger>
 						</TabsList>
 
@@ -523,22 +558,67 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 										{/* Project Name */}
 										<div className="space-y-2">
 											<label className="text-sm font-medium">Project Name *</label>
-											<Input
-												value={formData.projectName}
-												onChange={(e) => setFormData({...formData, projectName: e.target.value})}
-												placeholder="Enter project name"
-												required
-											/>
+											<div>
+												<CustomCombobox 
+													initialValue={formData.projectName || ''}
+													options={projectData}
+													optionsFrom='subProjects'
+													onChange={(value) => {
+														const project = projectData.find((project) => project.subProjects?.some((subProject) => subProject._id === value));
+														const subProject = project.subProjects.find((subProject) => subProject._id === value);
+														setFormData({
+															...formData,
+															projectName: subProject?.name || '',
+															projectFrom: {
+																mainProject: project?.parentProjectCode || '',
+																mainId: project?._id || '',
+																subProject: subProject?.name || '',
+																subId: subProject?._id || ''
+															}
+														})
+													}}
+													onCreate={(label) => {
+														setFormData({
+															...formData,
+															projectName: label || '',
+															projectFrom: {
+																mainProject: '',
+																mainId: '',
+																subProject: '',
+																subId: ''
+															}
+														})
+													}}
+													placeholder="Pick a project..."
+												/>
+											</div>
 										</div>
 										
 										{/* Purpose */}
 										<div className="space-y-2">
 											<label className="text-sm font-medium">Purpose *</label>
-											<Input
-												value={formData.purpose}
-												onChange={(e) => setFormData({...formData, purpose: e.target.value})}
-												placeholder="Enter Purpose of Request"
-											/>
+											<div>
+												<CustomCombobox 
+													initialValue={formData.purpose || ''}
+													options={projectData}
+													optionsFrom='purposes'
+													onChange={(value) => {
+														const project = projectData.find((project) => project.purposes?.some((subProject) => subProject._id === value));
+														const subProject = project.purposes.find((subProject) => subProject._id === value);
+														setFormData({
+															...formData,
+															purpose: subProject?.name || ''
+														})
+													}}
+													onCreate={(label) => {
+														setFormData({
+															...formData,
+															purpose: label || ''
+														})
+													}}
+													placeholder="Pick a purpose..."
+												/>
+											</div>
 										</div>
 										
 										{/* Request Date */}
@@ -576,8 +656,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 													...formData,
 													categories: {...formData.categories, construction: e.target.checked}
 												})}
+												className="cursor-pointer"
 											/>
-											<label htmlFor="construction" className="text-sm">Construction</label>
+											<label htmlFor="construction" className="text-sm cursor-pointer">Construction</label>
 										</div>
 										<div className="flex items-center space-x-2">
 											<input
@@ -588,8 +669,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 													...formData,
 													categories: {...formData.categories, admin: e.target.checked}
 												})}
+												className="cursor-pointer"
 											/>
-											<label htmlFor="admin" className="text-sm">Admin</label>
+											<label htmlFor="admin" className="text-sm cursor-pointer">Admin</label>
 										</div>
 										<div className="flex items-center space-x-2">
 											<input
@@ -600,8 +682,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 													...formData,
 													categories: {...formData.categories, material: e.target.checked}
 												})}
+												className="cursor-pointer"
 											/>
-											<label htmlFor="material" className="text-sm">Material</label>
+											<label htmlFor="material" className="text-sm cursor-pointer">Material</label>
 										</div>
 										<div className="flex items-center space-x-2">
 											<input
@@ -612,8 +695,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 													...formData,
 													categories: {...formData.categories, services: e.target.checked}
 												})}
+												className="cursor-pointer"
 											/>
-											<label htmlFor="services" className="text-sm">Services</label>
+											<label htmlFor="services" className="text-sm cursor-pointer">Services</label>
 										</div>
 									</div>
 								</div>
@@ -894,7 +978,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 											variant="outline"
 											onClick={() => {
 												// Export logic here
-												console.log("Export clicked");
+												console.log("This is final formData: ", formData);
 											}}
 										>
 											Export
@@ -987,6 +1071,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 							<div className="text-center py-8 text-muted-foreground">
 								<p>Placeholder 1 content will appear here.</p>
 							</div>
+							<MaterialActualCost
+								request={formData}
+							/>
 						</TabsContent>
 
 						<TabsContent value="placeholder2" className="mt-6">
