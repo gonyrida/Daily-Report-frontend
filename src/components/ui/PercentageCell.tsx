@@ -28,8 +28,10 @@ export default function PercentageCell({
 
   // Sync external value without forcing formatting
   useEffect(() => {
-    if (value !== undefined && value !== null && value !== "") {
-      setInputValue(String(value));
+    if (value !== undefined && value !== null) {
+      // Handle 0 as a valid value, not empty
+      const displayValue = value === 0 ? "0.0" : String(value);
+      setInputValue(displayValue);
     } else {
       setInputValue(""); // keep empty so placeholder shows
     }

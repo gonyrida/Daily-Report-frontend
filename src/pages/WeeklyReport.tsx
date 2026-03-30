@@ -297,6 +297,19 @@ const WeeklyReport = () => {
     }
   }, [selectedProject]);
 
+  // Sync project name from construction progress to cover page
+  useEffect(() => {
+    if (constructionProgressHook.constructionData?.projectInfo?.project) {
+      const constructionProgressProjectName = constructionProgressHook.constructionData.projectInfo.project;
+      if (sharedData.projectName !== constructionProgressProjectName) {
+        setSharedData(prev => ({
+          ...prev,
+          projectName: constructionProgressProjectName
+        }));
+      }
+    }
+  }, [constructionProgressHook.constructionData?.projectInfo?.project, sharedData.projectName]);
+
   // Load master schedule data when reportId changes or component mounts
   useEffect(() => {
     const loadMasterSchedule = async () => {
@@ -2308,6 +2321,7 @@ const WeeklyReport = () => {
                       setHsesData={setHsesData}
                       onClearQaqcData={handleClearQaqcData}
                       onClearHsesData={handleClearHsesData}
+                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     />
                   </div>
                 </>
@@ -2349,6 +2363,7 @@ const WeeklyReport = () => {
                       setSharedData={setSharedData}
                       overallProgressData={overallProgressHook}
                       setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
+                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                       weeklyActivities={weeklyActivities}
                       setWeeklyActivities={setWeeklyActivities}
                       nextWeekPlan={nextWeekPlan}
@@ -2377,6 +2392,7 @@ const WeeklyReport = () => {
                       setNextWeekPlan={setNextWeekPlan}
                       qaqcData={qaqcData}
                       setQaqcData={setQaqcData}
+                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                       onClearQaqcData={(fn) => { clearQaqcDataRef.current = fn; }}
                     />
                   </div>
@@ -2402,6 +2418,7 @@ const WeeklyReport = () => {
                       setNextWeekPlan={setNextWeekPlan}
                       hsesData={hsesData}
                       setHsesData={setHsesData}
+                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                       onClearHsesData={(fn) => { clearHsesDataRef.current = fn; }}
                     />
                   </div>

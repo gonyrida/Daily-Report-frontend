@@ -1,4 +1,5 @@
 import { ActivityRow } from "./activity.types";
+import { ConstructionProgressItem } from "./constructionProgress";
 
 export interface Section {
   id: string;
@@ -30,4 +31,5 @@ export interface WeeklyReportContentProps {
   onQaqcDataChange?: (qaqcData: any) => void;
   onClearQaqcData?: (clearFn: () => void) => void;
   onClearHsesData?: (clearFn: () => void) => void;
+  constructionProgressItems?: ConstructionProgressItem[];
 }

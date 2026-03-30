@@ -16,7 +16,9 @@ import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { useQaqcApi } from "@/hooks/useQaqcApi";
 import { useResourceTable } from "@/hooks/useResourceTable";
 import { ActivityRow } from "@/types/activity.types";
+import { ProgressRow } from "@/types/progress.types";
 import { createHSESections } from "@/utils/hseSectionUtils";
+import { mergeConstructionIntoOverallRows } from "@/utils/constructionProgressToOverall";
 
 const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   showIntroduction: externalShowIntroduction,
@@ -40,7 +42,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   setHsesData,
   onQaqcDataChange,
   onClearQaqcData,
-  onClearHsesData
+  onClearHsesData,
+  constructionProgressItems
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -48,6 +51,27 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // Initialize activities state at parent level
   const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
   const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
+  const [overallRows, setOverallRows] = useState<ProgressRow[]>([]);
+
+  // Re-merge whenever construction progress changes, preserving user edits
+  useEffect(() => {
+    console.log('[WeeklyReportContent] constructionProgressItems changed:', constructionProgressItems?.length, 'items');
+    console.log('[WeeklyReportContent] constructionProgressItems:', constructionProgressItems);
+    if (!constructionProgressItems?.length) return;
+    setOverallRows(prev => {
+      const merged = mergeConstructionIntoOverallRows(constructionProgressItems, prev);
+      console.log('[WeeklyReportContent] merged rows:', merged.length);
+      return merged;
+    });
+  }, [constructionProgressItems]);
+
+  // Sync overallRows to overallProgressData when provided (stable reference)
+  const setRowsRef = overallProgressData?.setRows;
+  useEffect(() => {
+    if (setRowsRef && overallRows.length > 0) {
+      setRowsRef(overallRows);
+    }
+  }, [overallRows, setRowsRef]);
 
   // Use external props if provided, otherwise use internal state
   const currentWeeklyActivities = externalWeeklyActivities || weeklyActivities;
@@ -66,9 +90,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   const resourceTableHook = useResourceTable(sharedData, true);
 
   // Use passed overallProgress data or create a simple fallback
-  const overallProgressHook = overallProgressData || { 
-    rows: [], 
-    setRows: () => {} 
+  const overallProgressHook = overallProgressData || {
+    rows: overallRows,
+    setRows: setOverallRows,
+    updateRows: setOverallRows,
+    addTitleRow: () => {},   // disabled — rows come from construction progress
+    addDetailRow: () => {},
   };
 
   const showIntroduction = externalShowIntroduction ?? internalShowIntroduction;
@@ -314,10 +341,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Ensure hook data is always available for the Hses component
   const currentHsesData = (hsesData?.hsePhotoReferences && hsesData.hsePhotoReferences.length > 0) ? hsesData : hsesDataHook.hsesData;
-  console.log('WeeklyReportContent - hsesData:', hsesData);
-  console.log('WeeklyReportContent - hsesDataHook.hsesData:', hsesDataHook.hsesData);
-  console.log('WeeklyReportContent - currentHsesData:', currentHsesData);
-
+  
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
     if (onClearQaqcData && qaqcTableHook.clearQaqcData) {
@@ -502,17 +526,32 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Handle overall-progress tab
   if (activeTab === "overall-progress") {
+    // Don't render if we have no overall rows yet
+    if (!overallRows || overallRows.length === 0) {
+      return (
+        <div className="bg-card p-3">
+          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+            2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
+          </h2>
+          <div className="text-center py-8 text-muted-foreground">
+            Loading construction progress data...
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
         <OverallProgress 
-          rows={overallProgressHook.rows}
-          setRows={overallProgressHook.setRows}
-          updateRows={overallProgressHook.updateRows}
-          addTitleRow={overallProgressHook.addTitleRow}
-          addDetailRow={overallProgressHook.addDetailRow}
+          rows={overallRows}
+          setRows={setOverallRows}
+          updateRows={setOverallRows}
+          addTitleRow={() => {}}
+          addDetailRow={() => {}}
+          descriptionsReadOnly={true}
         />
       </div>
     );

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { ConstructionProgressItem, EditableCell } from '../../types/constructionProgress';
 import { isAutoCalculated } from '../../utils/calculationEngine';
-import { detectIdType, isRomanId } from '../../utils/idEngine';
+import { detectIdType } from '../../utils/idEngine';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -248,11 +248,11 @@ export const ConstructionProgressTable: React.FC<ConstructionProgressTableProps>
 
     let display: any = value;
     if (field.includes('materialRate') || field.includes('laborRate') || field.includes('qty') || field.includes('unitRate')) {
-      display = (typeof value === 'number' && value > 0) ? formatNum(value) : '-';
+      display = (typeof value === 'number' && value > 0) ? formatNum(value) : '0';
     } else if (field.includes('amount')) {
-      display = (typeof value === 'number' && value > 0) ? formatCurrency(value) : '-';
+      display = (typeof value === 'number' && value > 0) ? formatCurrency(value) : '0';
     } else if (field.includes('percentage')) {
-      display = (typeof value === 'number' && value > 0) ? `${value}%` : '-';
+      display = (typeof value === 'number' && value > 0) ? `${value}%` : '0.0%';
 
       // For percentage fields, add background color based on value
       const percentageValue = typeof value === 'number' ? value : 0;

@@ -1,4 +1,4 @@
-import { ConstructionProgressItem, IdType } from '../types/constructionProgress';
+import { ConstructionProgressItem, IdType, AmbiguousIdType } from '../types/constructionProgress';
 
 const ROMAN_VALUES: [string, number][] = [
   ['M', 1000], ['CM', 900], ['D', 500], ['CD', 400],
@@ -26,20 +26,56 @@ export function fromRoman(str: string): number {
   return total;
 }
 
-export function detectIdType(id: string): IdType {
+// Pure string classifier. Returns 'ambiguous' for single letters that could
+// be either roman (I, V, X...) or alpha (A, B, C...).
+// Never call this directly in computation — use resolveIdType() instead.
+export const detectIdType = (id: string): AmbiguousIdType => {
   if (!id || id.trim() === '') return 'empty';
-  const t = id.trim();
-  if (/^\d+\.\d+\.\d+$/.test(t)) return 'level3';
-  if (/^\d+\.\d+$/.test(t)) return 'level2';
-  if (/^\d+$/.test(t)) return 'level1';
-  // Single uppercase letter (A-Z) = alpha  e.g. A, B, C
-  if (/^[A-Z]$/.test(t)) return 'alpha';
-  // Two or more roman numeral chars = roman  e.g. II, III, IV, XIV
-  // (single-char roman like I, V, X treated as alpha above — we disambiguate
-  //  by reserving single caps for alpha and requiring 2+ chars for roman)
-  if (/^[IVXLCDM]{2,}$/.test(t) && fromRoman(t) > 0) return 'roman';
+  if (/^\d+$/.test(id)) return 'level1';
+  if (/^\d+\.\d+$/.test(id)) return 'level2';
+  if (/^\d+\.\d+\.\d+$/.test(id)) return 'level3';
+
+  // 2+ roman chars → unambiguously roman (II, IV, XII, etc.)
+  if (/^[IVXLCDM]{2,}$/.test(id)) return 'roman';
+
+  if (/^[A-Z]$/.test(id)) {
+    // Single letter: roman-numeral chars are ambiguous, others are always alpha
+    return /^[IVXLCDM]$/.test(id) ? 'ambiguous' : 'alpha';
+  }
+
   return 'empty';
-}
+};
+
+// Context-aware resolver — use this everywhere in computation & rendering.
+// Scans backward from `index` to find the nearest structural ancestor.
+export const resolveIdType = (
+  id: string,
+  items: { id: string }[],
+  index: number
+): IdType => {
+  const raw = detectIdType(id);
+  if (raw !== 'ambiguous') return raw as IdType;
+
+  for (let i = index - 1; i >= 0; i--) {
+    if (!items[i]) break;
+    const t = detectIdType(items[i].id);
+
+    // Unambiguous structural types — these settle it immediately
+    if (t === 'level1' || t === 'level2' || t === 'level3') return 'alpha';
+    if (t === 'roman') return 'roman';
+
+    // Another ambiguous row — recurse to resolve IT first, then use that result
+    if (t === 'ambiguous') {
+      const resolved = resolveIdType(items[i].id, items, i);
+      if (resolved === 'level1' || resolved === 'level2' || resolved === 'level3' || resolved === 'alpha') return 'alpha';
+      if (resolved === 'roman') return 'roman';
+    }
+
+    // 'empty' and 'alpha' (non-ambiguous) — keep scanning upward
+  }
+
+  return 'roman'; // nothing structural above → first section
+};
 
 /** Classify a user-intent "section header" ID — single I means roman section 1 */
 export function isRomanOne(id: string): boolean {
@@ -75,33 +111,26 @@ export function findNearestParent(items: ConstructionProgressItem[], insertAfter
   if (!parentType) return undefined;
 
   for (let i = insertAfterIndex; i >= 0; i--) {
-    if (detectIdType(items[i].id) === parentType) return items[i].id;
+    if (!items[i]) break; // Bounds check
+    const detectedType = resolveIdType(items[i].id, items, i);
+    if (detectedType === parentType) return items[i].id;
     // Don't cross a higher-level boundary going up
     // e.g. for level2, stop scanning if we hit a roman (section boundary)
-    if (type === 'level2' && detectIdType(items[i].id) === 'roman') break;
-    if (type === 'level3' && detectIdType(items[i].id) === 'level1') break;
-    if (type === 'alpha' && detectIdType(items[i].id) === 'level2') break;
+    if (type === 'level2' && detectedType === 'roman') break;
+    if (type === 'level3' && detectedType === 'level1') break;
+    if (type === 'alpha' && detectedType === 'level2') break;
   }
 
   // Fallback: scan without boundary restriction
   for (let i = insertAfterIndex; i >= 0; i--) {
-    if (detectIdType(items[i].id) === parentType) return items[i].id;
+    if (!items[i]) continue; // Bounds check
+    const detectedType = resolveIdType(items[i].id, items, i);
+    if (detectedType === parentType) return items[i].id;
   }
   return undefined;
 }
 
-/** Check if an ID is a roman numeral (including the ambiguous single-char "I") */
-export function isRomanId(id: string): boolean {
-  const t = id?.trim() ?? '';
-  // Multi-char roman
-  if (/^[IVXLCDM]{2,}$/.test(t) && fromRoman(t) > 0) return true;
-  // Single "I" — the only single-char that unambiguously means roman section 1
-  if (t === 'I') return true;
-  return false;
-}
-
-/**
- * Find the last same-type SIBLING above insertAfterIndex.
+/** Find the last same-type SIBLING above insertAfterIndex.
  * "Sibling" means: shares the same parent prefix.
  *   - roman/level1: any roman/level1 (global siblings)
  *   - level2: same level1 prefix  e.g. "1.x" only matches other "1.x"
@@ -115,7 +144,9 @@ export function findLastSibling(
 ): string | null {
   if (type === 'roman') {
     for (let i = insertAfterIndex; i >= 0; i--) {
-      if (isRomanId(items[i].id)) return items[i].id;
+      if (!items[i]) break; // Bounds check
+      const detectedType = resolveIdType(items[i].id, items, i);
+      if (detectedType === 'roman') return items[i].id;
     }
     return null;
   }
@@ -123,8 +154,10 @@ export function findLastSibling(
     // Level1 is scoped under its nearest roman parent.
     // Scan backwards: return last level1 found, but STOP if we cross a roman boundary.
     for (let i = insertAfterIndex; i >= 0; i--) {
-      if (isRomanId(items[i].id)) break; // crossed into previous roman section — stop
-      if (detectIdType(items[i].id) === 'level1') return items[i].id;
+      if (!items[i]) break; // Bounds check
+      const detectedType = resolveIdType(items[i].id, items, i);
+      if (detectedType === 'roman') break; // crossed into previous roman section — stop
+      if (detectedType === 'level1') return items[i].id;
     }
     return null; // no sibling in this roman section → start from 1
   }
@@ -134,13 +167,14 @@ export function findLastSibling(
     const parent = findNearestParent(items, insertAfterIndex, 'level2');
     const prefix = parent ?? null; // e.g. "1"
     for (let i = insertAfterIndex; i >= 0; i--) {
-      const t = detectIdType(items[i].id);
+      if (!items[i]) break; // Bounds check
+      const t = resolveIdType(items[i].id, items, i);
       if (t === 'level2') {
         const p = items[i].id.split('.')[0];
         if (!prefix || p === prefix) return items[i].id;
       }
       // Stop if we cross into a different level1 or roman section
-      if (t === 'level1' || isRomanId(items[i].id)) break;
+      if (t === 'level1' || t === 'roman') break;
     }
     return null;
   }
@@ -150,7 +184,8 @@ export function findLastSibling(
     const parent = findNearestParent(items, insertAfterIndex, 'level3');
     const prefix = parent ?? null; // e.g. "1.1"
     for (let i = insertAfterIndex; i >= 0; i--) {
-      const t = detectIdType(items[i].id);
+      if (!items[i]) break; // Bounds check
+      const t = resolveIdType(items[i].id, items, i);
       if (t === 'level3') {
         const parts = items[i].id.split('.');
         const p = `${parts[0]}.${parts[1]}`;
@@ -167,7 +202,8 @@ export function findLastSibling(
     // Find the nearest level3 or level2 scope boundary above
     let scopeBoundaryIndex = -1;
     for (let i = insertAfterIndex; i >= 0; i--) {
-      const t = detectIdType(items[i].id);
+      if (!items[i]) break; // Bounds check
+      const t = resolveIdType(items[i].id, items, i);
       if (t === 'level3' || t === 'level2' || t === 'level1' || t === 'roman') {
         scopeBoundaryIndex = i;
         break;
@@ -175,7 +211,9 @@ export function findLastSibling(
     }
     // Scan backwards from insertAfterIndex down to scopeBoundaryIndex for last alpha
     for (let i = insertAfterIndex; i > scopeBoundaryIndex; i--) {
-      if (detectIdType(items[i].id) === 'alpha') return items[i].id;
+      if (!items[i]) continue; // Bounds check
+      const detectedType = resolveIdType(items[i].id, items, i);
+      if (detectedType === 'alpha') return items[i].id;
     }
     return null;
   }
@@ -232,10 +270,11 @@ export function renumberBelow(
   // Pass 1: renumber same-type siblings below insertion point
   for (let i = insertedAt + count; i < result.length; i++) {
     const item = result[i];
-    const itemMatchesType = type === 'roman' ? isRomanId(item.id) : detectIdType(item.id) === type;
+    const detectedType = resolveIdType(item.id, result, i);
+    const itemMatchesType = detectedType === type;
 
     // For level1: stop renumbering when we enter a new roman section
-    if (type === 'level1' && isRomanId(item.id)) break;
+    if (type === 'level1' && detectedType === 'roman') break;
 
     if (!itemMatchesType) continue;
 
@@ -299,15 +338,16 @@ export function renumberFromIndex(
 
   for (let i = startIndex; i < result.length; i++) {
     const item = result[i];
-    const itemType = isRomanId(item.id) ? 'roman' : detectIdType(item.id);
+    const detectedType = resolveIdType(item.id, result, i);
+    const itemType = detectedType;
 
     // Stop at a higher-level boundary (same logic as findLastSibling)
-    if (type === 'level1' && isRomanId(item.id)) break;
-    if (type === 'level2' && (itemType === 'level1' || isRomanId(item.id))) break;
-    if (type === 'level3' && (itemType === 'level2' || itemType === 'level1' || isRomanId(item.id))) break;
-    if (type === 'alpha' && (itemType === 'level3' || itemType === 'level2' || itemType === 'level1' || isRomanId(item.id))) break;
+    if (type === 'level1' && detectedType === 'roman') break;
+    if (type === 'level2' && (itemType === 'level1' || detectedType === 'roman')) break;
+    if (type === 'level3' && (itemType === 'level2' || itemType === 'level1' || detectedType === 'roman')) break;
+    if (type === 'alpha' && (itemType === 'level3' || itemType === 'level2' || itemType === 'level1' || detectedType === 'roman')) break;
 
-    const currentType = type === 'roman' ? (isRomanId(item.id) ? 'roman' : null) : itemType;
+    const currentType = itemType;
     if (currentType !== type) continue;
 
     // Find the previous sibling of the same type to increment from

@@ -1,11 +1,11 @@
 import { ConstructionProgressItem } from '../types/constructionProgress';
-import { detectIdType, isRomanId } from './idEngine';
+import { detectIdType, resolveIdType } from './idEngine';
 
 /** Level order for hierarchy comparisons (higher = more senior) */
 const LEVEL_ORDER: Record<string, number> = { roman: 5, level1: 4, level2: 3, level3: 2, alpha: 1, empty: 0 };
 
-export function getRowLevel(id: string): number {
-  return LEVEL_ORDER[isRomanId(id) ? 'roman' : detectIdType(id)] ?? 0;
+export function getRowLevel(id: string, items: { id: string }[], index: number): number {
+  return LEVEL_ORDER[resolveIdType(id, items, index)] ?? 0;
 }
 
 /**
@@ -21,15 +21,30 @@ export function getRowLevel(id: string): number {
  */
 export function getDirectChildren(items: ConstructionProgressItem[], parentIndex: number): number[] {
   if (!items || parentIndex < 0 || parentIndex >= items.length) return [];
-  const parentId = items[parentIndex]?.id ?? '';
-  const parentLevel = getRowLevel(parentId);
+  
+  const item = items[parentIndex];
+  const parentId = item?.id ?? '';
+  const parentLevel = getRowLevel(parentId, items, parentIndex);
+  const isBoldEmpty = item?.isBold && (parentLevel === 0);
+
+  // Bold-empty: collect everything below until the next same-or-higher structural row
+  if (isBoldEmpty) {
+    const children: number[] = [];
+    for (let i = parentIndex + 1; i < items.length; i++) {
+      const rowLevel = getRowLevel(items[i].id, items, i);
+      const isNextBoldEmpty = items[i].isBold && rowLevel === 0;
+      if (rowLevel > 0 || isNextBoldEmpty) break; // hit a structural row or another bold-empty
+      children.push(i);
+    }
+    return children;
+  }
+
   if (parentLevel <= 1) return []; // alpha/empty have no children
 
   const expectedChildLevel = parentLevel - 1;
   const children: number[] = [];
-
   for (let i = parentIndex + 1; i < items.length; i++) {
-    const rowLevel = getRowLevel(items[i].id);
+    const rowLevel = getRowLevel(items[i].id, items, i);
     if (rowLevel >= parentLevel) break; // same or higher = end of this parent's scope
     if (rowLevel === expectedChildLevel) children.push(i);
   }
@@ -51,10 +66,14 @@ export function hasChildren(items: ConstructionProgressItem[], parentIndex: numb
 /** Check if a specific item's boQ.amount is auto-calculated (read-only). */
 export function isAutoCalculated(allItems: ConstructionProgressItem[], item: ConstructionProgressItem): boolean {
   const boQ = item.boQ;
-  const type = isRomanId(item.id) ? 'roman' : detectIdType(item.id);
+  const index = allItems.findIndex(i => i === item);
+  const type = resolveIdType(item.id, allItems, index);
 
   // Bold-empty row: aggregates rows below it
   if (item.isBold && type === 'empty') return true;
+
+  // Empty type: no children, no aggregation
+  if (type === 'empty') return false;
 
   // Has rates → amount = qty×unitRate
   const hasRates = (boQ.materialRate || 0) > 0 ||
@@ -63,8 +82,7 @@ export function isAutoCalculated(allItems: ConstructionProgressItem[], item: Con
   if (hasRates) return true;
 
   // Has children → aggregation
-  if (type === 'alpha' || type === 'empty') return false;
-  const index = allItems.findIndex(i => i === item);
+  if (type === 'alpha') return false;
   if (index === -1) return false;
   return hasChildren(allItems, index);
 }
@@ -126,7 +144,7 @@ export function computeAllAmounts(items: ConstructionProgressItem[]): Constructi
   for (let i = result.length - 1; i >= 0; i--) {
     const boQ = result[i].boQ;
     const id = result[i].id;
-    const type = isRomanId(id) ? 'roman' : detectIdType(id);
+    const type = resolveIdType(id, result, i);
     const isBoldEmpty = result[i].isBold && type === 'empty';
 
     // Get children for aggregation
@@ -139,43 +157,56 @@ export function computeAllAmounts(items: ConstructionProgressItem[]): Constructi
     const childrenNextWeekPlanAmounts = children.map(ci => result[ci].nextWeekPlan.amount || 0);
     const childrenUpToNextWeekPlanAmounts = children.map(ci => result[ci].upToNextWeekPlan.amount || 0);
 
-    // Rule 0.1: Alpha row → sum ALL rows below until next Alpha
+    // Rule 0.1: Alpha row → sum bold-empty below; fallback to plain empty if none
     if (type === 'alpha') {
       let boQSum = 0, previousWeekSum = 0, thisWeekSum = 0, upToThisWeekSum = 0;
       let remainingSum = 0, nextWeekPlanSum = 0, upToNextWeekPlanSum = 0;
 
+      // First pass: check if any bold-empty rows exist below (before next alpha)
+      let hasBoldEmpty = false;
       for (let j = i + 1; j < result.length; j++) {
-        const jId = result[j].id;
-        const jType = isRomanId(jId) ? 'roman' : detectIdType(jId);
-        if (jType === 'alpha') break; // stop at next Alpha
+        const jType = resolveIdType(result[j].id, result, j);
+        if (jType === 'alpha') break;
+        const jIsBoldEmpty = result[j].isBold && (jType === 'empty');
+        if (jIsBoldEmpty) { hasBoldEmpty = true; break; }
+      }
 
-        boQSum += result[j].boQ.amount || 0;
-        previousWeekSum += result[j].previousWeek.amount || 0;
-        thisWeekSum += result[j].thisWeek.amount || 0;
-        upToThisWeekSum += result[j].upToThisWeek.amount || 0;
-        remainingSum += result[j].remaining.amount || 0;
-        nextWeekPlanSum += result[j].nextWeekPlan.amount || 0;
+      // Second pass: sum the right target rows
+      for (let j = i + 1; j < result.length; j++) {
+        const jType = resolveIdType(result[j].id, result, j);
+        if (jType === 'alpha') break;
+
+        const jIsBoldEmpty = result[j].isBold && (jType === 'empty');
+        const jIsPlainEmpty = !result[j].isBold && (jType === 'empty');
+
+        const shouldSum = hasBoldEmpty ? jIsBoldEmpty : jIsPlainEmpty;
+        if (!shouldSum) continue;
+
+        boQSum            += result[j].boQ.amount || 0;
+        previousWeekSum   += result[j].previousWeek.amount || 0;
+        thisWeekSum       += result[j].thisWeek.amount || 0;
+        upToThisWeekSum   += result[j].upToThisWeek.amount || 0;
+        remainingSum      += result[j].remaining.amount || 0;
+        nextWeekPlanSum   += result[j].nextWeekPlan.amount || 0;
         upToNextWeekPlanSum += result[j].upToNextWeekPlan.amount || 0;
       }
 
-      result[i].boQ.amount = Math.round(boQSum * 100) / 100;
-      result[i].previousWeek.amount = Math.round(previousWeekSum * 100) / 100;
-      result[i].thisWeek.amount = Math.round(thisWeekSum * 100) / 100;
-      result[i].upToThisWeek.amount = Math.round(upToThisWeekSum * 100) / 100;
-      result[i].remaining.amount = Math.round(remainingSum * 100) / 100;
-      result[i].nextWeekPlan.amount = Math.round(nextWeekPlanSum * 100) / 100;
+      result[i].boQ.amount            = Math.round(boQSum * 100) / 100;
+      result[i].previousWeek.amount   = Math.round(previousWeekSum * 100) / 100;
+      result[i].thisWeek.amount       = Math.round(thisWeekSum * 100) / 100;
+      result[i].upToThisWeek.amount   = Math.round(upToThisWeekSum * 100) / 100;
+      result[i].remaining.amount      = Math.round(remainingSum * 100) / 100;
+      result[i].nextWeekPlan.amount   = Math.round(nextWeekPlanSum * 100) / 100;
       result[i].upToNextWeekPlan.amount = Math.round(upToNextWeekPlanSum * 100) / 100;
 
-      // Calculate percentages for Alpha rows
       const boQAmount = result[i].boQ.amount || 0;
-      result[i].previousWeek.percentage = boQAmount > 0 ? Math.round((result[i].previousWeek.amount / boQAmount) * 100 * 10) / 10 : 0;
-      result[i].thisWeek.percentage = boQAmount > 0 ? Math.round((result[i].thisWeek.amount / boQAmount) * 100 * 10) / 10 : 0;
-      result[i].upToThisWeek.percentage = boQAmount > 0 ? Math.round((result[i].upToThisWeek.amount / boQAmount) * 100 * 10) / 10 : 0;
-      result[i].remaining.percentage = boQAmount > 0 ? Math.round((result[i].remaining.amount / boQAmount) * 100 * 10) / 10 : 0;
-      result[i].nextWeekPlan.percentage = boQAmount > 0 ? Math.round((result[i].nextWeekPlan.amount / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].previousWeek.percentage     = boQAmount > 0 ? Math.round((result[i].previousWeek.amount   / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].thisWeek.percentage         = boQAmount > 0 ? Math.round((result[i].thisWeek.amount       / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].upToThisWeek.percentage     = boQAmount > 0 ? Math.round((result[i].upToThisWeek.amount   / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].remaining.percentage        = boQAmount > 0 ? Math.round((result[i].remaining.amount      / boQAmount) * 100 * 10) / 10 : 0;
+      result[i].nextWeekPlan.percentage     = boQAmount > 0 ? Math.round((result[i].nextWeekPlan.amount   / boQAmount) * 100 * 10) / 10 : 0;
       result[i].upToNextWeekPlan.percentage = boQAmount > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmount) * 100 * 10) / 10 : 0;
 
-      // Alpha rows should preserve their unitRate - don't recalculate from material/labor rates
       continue;
     }
 
@@ -238,10 +269,32 @@ export function computeAllAmounts(items: ConstructionProgressItem[]): Constructi
       continue;
     }
 
-    // Rule 2: sum children (skip empty — they have no children, but not alpha since alpha now has its own aggregation)
+    // Rule 2: bold-empty → aggregate ALL rows below until next structural boundary
+    if (isBoldEmpty) {
+      if (children.length === 0) continue; // no children → keep manual
+
+      result[i].boQ.amount = childrenBoQAmounts.reduce((a, b) => a + b, 0);
+      result[i].previousWeek.amount = childrenPreviousWeekAmounts.reduce((a, b) => a + b, 0);
+      result[i].thisWeek.amount = childrenThisWeekAmounts.reduce((a, b) => a + b, 0);
+      result[i].upToThisWeek.amount = childrenUpToThisWeekAmounts.reduce((a, b) => a + b, 0);
+      result[i].remaining.amount = childrenRemainingAmounts.reduce((a, b) => a + b, 0);
+      result[i].nextWeekPlan.amount = childrenNextWeekPlanAmounts.reduce((a, b) => a + b, 0);
+      result[i].upToNextWeekPlan.amount = childrenUpToNextWeekPlanAmounts.reduce((a, b) => a + b, 0);
+
+      const boQAmt = result[i].boQ.amount || 0;
+      result[i].previousWeek.percentage   = boQAmt > 0 ? Math.round((result[i].previousWeek.amount   / boQAmt) * 100 * 10) / 10 : 0;
+      result[i].thisWeek.percentage       = boQAmt > 0 ? Math.round((result[i].thisWeek.amount       / boQAmt) * 100 * 10) / 10 : 0;
+      result[i].upToThisWeek.percentage   = boQAmt > 0 ? Math.round((result[i].upToThisWeek.amount   / boQAmt) * 100 * 10) / 10 : 0;
+      result[i].remaining.percentage      = boQAmt > 0 ? Math.round((result[i].remaining.amount      / boQAmt) * 100 * 10) / 10 : 0;
+      result[i].nextWeekPlan.percentage   = boQAmt > 0 ? Math.round((result[i].nextWeekPlan.amount   / boQAmt) * 100 * 10) / 10 : 0;
+      result[i].upToNextWeekPlan.percentage = boQAmt > 0 ? Math.round((result[i].upToNextWeekPlan.amount / boQAmt) * 100 * 10) / 10 : 0;
+      continue;
+    }
+
+    // Rule 3: plain empty → no aggregation, keep manual
     if (type === 'empty') continue;
 
-    if (children.length === 0) continue; // Rule 3: keep manual
+    if (children.length === 0) continue; // Rule 4: keep manual
 
     // Aggregate children amounts for all periods
     result[i].boQ.amount = childrenBoQAmounts.reduce((acc, amount) => acc + amount, 0);

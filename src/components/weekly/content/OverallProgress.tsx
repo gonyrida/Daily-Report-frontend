@@ -7,22 +7,12 @@ interface OverallProgressProps {
   updateRows?: (newRows: ProgressRow[]) => void;
   addTitleRow?: () => void;
   addDetailRow?: () => void;
+  descriptionsReadOnly?: boolean;
 }
 
-export default function OverallProgress({
-  rows = [],
-  setRows = () => {},
-  updateRows = () => {},
-  addTitleRow = () => {},
-  addDetailRow = () => {}
-}: OverallProgressProps) {
-  return (
-    <OverallProgressTable
-      rows={rows}
-      setRows={setRows}
-      updateRows={updateRows}
-      addTitleRow={addTitleRow}
-      addDetailRow={addDetailRow}
-    />
-  );
+export default function OverallProgress({ descriptionsReadOnly = false, ...props }: OverallProgressProps) {
+  console.log('[OverallProgress] rows received:', props.rows);
+  console.log('[OverallProgress] rows length:', props.rows?.length);
+  console.log('[OverallProgress] first row:', props.rows?.[0]);
+  return <OverallProgressTable {...props} descriptionsReadOnly={descriptionsReadOnly} />;
 }
