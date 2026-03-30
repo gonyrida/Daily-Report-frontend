@@ -58,10 +58,17 @@ export default function OverallProgressTable({
     let titleCount = 0;
 
     // Filter out alpha level rows (single letters like A, B, C)
+    // but keep single-character Roman numerals (I, V)
     const filteredRows = localRows.filter(row => {
       if (!row.sourceId) return true;
-      // Skip single alphabetic characters (but keep roman numerals with 2+ chars)
-      return !/^[a-zA-Z]$/i.test(row.sourceId.trim());
+      const trimmed = row.sourceId.trim();
+      // Skip single alphabetic characters that are NOT Roman numerals I or V
+      const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
+      const isRomanNumeralIorV = /^(I|V)$/i.test(trimmed);
+      const shouldKeep = !(isSingleAlpha && !isRomanNumeralIorV);
+      if (!shouldKeep) {
+      }
+      return shouldKeep;
     });
 
     const result = filteredRows.map((row, index) => {
@@ -340,9 +347,6 @@ export default function OverallProgressTable({
                 </th>
                 <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                   % Up Next Week Plan
-                </th>
-                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[5%]">
-                  Actions
                 </th>
               </tr>
             </thead>

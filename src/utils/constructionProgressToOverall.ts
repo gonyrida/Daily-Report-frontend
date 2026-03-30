@@ -16,8 +16,13 @@ function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' {
 
   const trimmed = id.trim();
 
+  // Common single-char Roman numerals
+  if (/^(I|V)$/i.test(trimmed)) {
+    return 'title';
+  }
+
   // Roman numerals (I – XXXIX is enough for any real project)
-  if (/^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/i.test(trimmed) && trimmed.length > 0) {
+  if (/^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/i.test(trimmed) && trimmed.length > 1) {
     return 'title';
   }
 
@@ -56,14 +61,26 @@ export function mergeConstructionIntoOverallRows(
   items.forEach((item) => {
     // Skip items with empty IDs or multi-level dotted IDs (1.1, 1.1.1, etc.)
     // Only allow: roman numerals (I, II) and plain numbers (1, 2, 3)
-    if (!item.scopeOfWorks && !item.id) return;
-    if (!item.id || item.id.trim() === '') return;
+    console.log('[mergeConstruction] Processing item:', { id: item.id, scopeOfWorks: item.scopeOfWorks });
+    
+    if (!item.scopeOfWorks && !item.id) {
+      console.log('[mergeConstruction] Skipping - no scopeOfWorks and no id');
+      return;
+    }
+    if (!item.id || item.id.trim() === '') {
+      console.log('[mergeConstruction] Skipping - empty id');
+      return;
+    }
     
     const trimmed = item.id.trim();
     // Skip dotted IDs like "1.1", "2.1", "1.1.1", "1.1.2"
-    if (/^\d+\.\d+/.test(trimmed)) return;
+    if (/^\d+\.\d+/.test(trimmed)) {
+      console.log('[mergeConstruction] Skipping - dotted ID:', trimmed);
+      return;
+    }
 
     const rowType = resolveRowType(item.id);
+    console.log('[mergeConstruction] Adding row:', { id: item.id, rowType });
     const existing = existingBySourceId.get(item.id);
 
     // Safely read percentage values, defaulting to 0
