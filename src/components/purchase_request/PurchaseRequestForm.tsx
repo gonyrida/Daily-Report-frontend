@@ -24,6 +24,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import CustomCombobox from './CustomCombobox';
 import MaterialActualCost from './MaterialActualCost';
+import AttachmentsTab, { Attachment } from './AttachmentsTab';
 
 interface PurchaseRequestFormProps {
   mode: 'create' | 'edit' | 'revise';
@@ -47,6 +48,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	// console.log('This is the request you got ', initialData)
 
   const { profile } = useProfileContext();
+  const [activeTab, setActiveTab] = useState('purchase-request');
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [selectedItems, setSelectedItems] = useState([]);
 	const [editingIndex, setEditingIndex] = useState(null);
@@ -58,6 +60,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const { toast } = useToast();
 	const [requests, setRequests] = useState([]);
+	const [prSummaryData, setPrSummaryData] = useState(null);
 
 	useEffect(() => {
 		if (profile) {
@@ -180,6 +183,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
     }
   });
 
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+
 	useEffect(() => {
 		if ((mode === 'edit' || mode === 'revise') && initialData) {
 			setFormData({
@@ -223,6 +228,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			status: '',
 			priority: ''
 		});
+		setAttachments([]);
  }
 
 	const handleSubmit = async (action) => {
@@ -298,6 +304,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 						status: '',
 						priority: ''
           });
+          setAttachments([]);
         }
         
         setIsOpen(false);
@@ -366,15 +373,21 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
   const handleAddItem = () => {
     if (newItem.description && newItem.quantity > 0 && newItem.unitPrice > 0) {
       let updatedItems;
-      formData.items.map((item, index) => {
-	      if (index === editingIndex) {
-	      	formData.items[editingIndex] = newItem
-	      	console.log("This is formData.items[editingIndex]", formData.items[editingIndex])
-	      } else if (!editingIndex) {
-		      updatedItems = [...formData.items, newItem];
-		      setFormData({...formData, items: updatedItems});
-	      }
-      });
+      
+      if (editingIndex !== null && editingIndex >= 0) {
+        // Edit existing item
+        updatedItems = formData.items.map((item, index) => 
+          index === editingIndex ? newItem : item
+        );
+        console.log("Editing item at index", editingIndex, "with:", newItem);
+      } else {
+        // Add new item
+        updatedItems = [...formData.items, newItem];
+        console.log("Adding new item:", newItem);
+      }
+      
+      // Update form data with the new items array
+      setFormData({...formData, items: updatedItems});
       
       // Reset form
       setNewItem({
@@ -480,6 +493,19 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		}
 	}
 
+	const getPRSummaryData = async (projectId: string) => {
+		try {
+			setPrSummaryData('loading'); // Set loading state
+			const response = await apiGet(`/purchase-requests/pr-summary/${projectId}`);
+			const result = await response.json();
+			setPrSummaryData(result.data);
+		} catch (error) {
+			console.error('Error fetching PR summary data:', error);
+			setPrSummaryData(null); // Reset to null on error
+			return null;
+		}
+	}
+
   return (
 		<>
 			<Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -519,6 +545,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 									priority: ''
 								});
 								setSelectedItems([]); // Clear any selected items
+								setPrSummaryData(null); // Reset PR summary data
+								setActiveTab('purchase-request'); // Reset to first tab
 							}}
 						>
 							New Request
@@ -535,11 +563,11 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					</DialogHeader>
 					
 					{/* Modal Tabs */}
-					<Tabs defaultValue="purchase-request" className="w-full">
+					<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 						<TabsList className="grid w-full grid-cols-3">
 							<TabsTrigger value="purchase-request">Purchase Request</TabsTrigger>
 							<TabsTrigger value="placeholder1">Material - Actual Cost</TabsTrigger>
-							<TabsTrigger value="placeholder2">Placeholder 2</TabsTrigger>
+							<TabsTrigger value="attachments">Attachments</TabsTrigger>
 						</TabsList>
 
 						<TabsContent value="purchase-request" className="space-y-4 mt-6">
@@ -576,6 +604,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 																subId: subProject?._id || ''
 															}
 														})
+														getPRSummaryData(project?._id || '')
 													}}
 													onCreate={(label) => {
 														setFormData({
@@ -995,7 +1024,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 										</Button>
 									</div>
 									
-									{/* Right side - Cancel and Post */}
+									{/* Right side - Cancel and Next */}
 									<div className="flex space-x-2">
 										<Button 
 											type="button" 
@@ -1008,78 +1037,41 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 											Cancel
 										</Button>
 
-										{mode === 'create' ? (
-											<DropdownMenu>
-												<DropdownMenuTrigger asChild>
-													<Button 
-														type="button" 
-														disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-													>
-														{isSubmitting ? "Processing..." : "Options ▼"}
-													</Button>
-												</DropdownMenuTrigger>
-												<DropdownMenuContent>
-													<DropdownMenuItem onClick={() => handleSubmit('post')}>
-														{isSubmitting ? "Posting..." : "Post"}
-													</DropdownMenuItem>
-													<DropdownMenuItem onClick={() => handleSubmit('draft')}>
-														{isSubmitting ? "Saving..." : "Save as Draft"}
-													</DropdownMenuItem>
-												</DropdownMenuContent>
-											</DropdownMenu>
-										) : mode === 'edit' ? (
-											<DropdownMenu>
-												<DropdownMenuTrigger asChild>
-													<Button 
-														type="button" 
-														disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-													>
-														{isSubmitting ? "Processing..." : "Options ▼"}
-													</Button>
-												</DropdownMenuTrigger>
-												<DropdownMenuContent>
-													<DropdownMenuItem 
-														onClick={() => handleSubmit('post')}
-														disabled={formData?.status !== 'draft'}
-														className={formData?.status !== 'draft' ? 'opacity-50 cursor-not-allowed' : ''}
-													>
-														{isSubmitting ? "Posting..." : "Post"}
-														{formData?.status !== 'draft' && (
-															<span className="ml-2 text-xs text-gray-500">(Only for drafts)</span>
-														)}
-													</DropdownMenuItem>
-													<DropdownMenuItem onClick={() => handleSubmit('update')}>
-														{isSubmitting ? "Updating..." : "Update"}
-													</DropdownMenuItem>
-												</DropdownMenuContent>
-											</DropdownMenu>
-										) : (
-											<Button 
-												type="button" 
-												disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-												onClick={() => handleSubmit('revise')}
-											>
-												{isSubmitting ? "Revising..." : "Revise"}
-											</Button>
-										)}
+										<Button 
+											type="button" 
+											onClick={() => {
+												// Switch to Material Actual Cost tab
+												setActiveTab('placeholder1');
+											}}
+										>
+											Next →
+										</Button>
 									</div>
 								</div>
 							</form>
 						</TabsContent>
 
 						<TabsContent value="placeholder1" className="mt-6">
-							<div className="text-center py-8 text-muted-foreground">
-								<p>Placeholder 1 content will appear here.</p>
-							</div>
 							<MaterialActualCost
-								request={formData}
+								requests={prSummaryData}
+								setActiveTab={setActiveTab}
+								currentFormData={formData}
 							/>
 						</TabsContent>
 
-						<TabsContent value="placeholder2" className="mt-6">
-							<div className="text-center py-8 text-muted-foreground">
-								<p>Placeholder 2 content will appear here.</p>
-							</div>
+						<TabsContent value="attachments" className="mt-6">
+							<AttachmentsTab
+								attachments={attachments}
+								onAttachmentsChange={setAttachments}
+								mode={mode}
+								isSubmitting={isSubmitting}
+								formData={formData}
+								handleSubmit={handleSubmit}
+								setActiveTab={setActiveTab}
+								maxFiles={10}
+								maxFileSize={10}
+								allowedFileTypes={['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']}
+							/>
 						</TabsContent>
 					</Tabs>
 				</DialogContent>
