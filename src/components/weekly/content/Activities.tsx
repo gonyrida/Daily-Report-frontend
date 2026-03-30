@@ -1,68 +1,97 @@
 import { ClipboardList, CalendarCheck, Plus, Trash2, Upload } from "lucide-react";
 import { ActivityRow, ActivitiesProps } from "@/types/activity.types";
 import { adjustHeight } from "@/utils/autoResizeTextarea";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import BulkActivitiesModal from "./BulkActivitiesModal";
 import { bulkImportActivities } from "@/integrations/reportsApi";
+import { mergeConstructionIntoActivityRows } from "@/utils/constructionProgressToActivities";
 
 const Activities = (props: ActivitiesProps) => {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [importContext, setImportContext] = useState<"weekly" | "next">("weekly");
   
+  // Local state for construction progress integration
+  const [weeklyRows, setWeeklyRows] = useState<ActivityRow[]>(props.weeklyActivities || []);
+  const [nextRows, setNextRows] = useState<ActivityRow[]>(props.nextWeekPlan || []);
   
-  // Helper function to detect indentation level
-  const getIndentationLevel = (description: string): number => {
-    const trimmed = description.trim();
-    if (!trimmed) return 0;
-    
-    const firstWord = trimmed.split(/\s+/)[0];
-    
-    // Roman numerals (level 0)
-    if (/^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?$/i.test(firstWord)) {
-      return 0;
+  // Sync with parent state
+  useEffect(() => {
+    if (props.weeklyActivities && props.weeklyActivities.length > 0) {
+      setWeeklyRows(props.weeklyActivities);
     }
-    
-    // Numbers with dots (level 1 or 2)
-    if (/^\d+(?:\.\d+)*\.?$/.test(firstWord)) {
-      const dotCount = (firstWord.match(/\./g) || []).length;
-      return dotCount; // 1. = level 1, 1.1 = level 2, 1.1.1 = level 3
+  }, [props.weeklyActivities]);
+  
+  useEffect(() => {
+    if (props.nextWeekPlan && props.nextWeekPlan.length > 0) {
+      setNextRows(props.nextWeekPlan);
     }
-    
-    // Bullets (level 3)
-    if (/^[-•]$/i.test(firstWord)) {
-      return 3;
+  }, [props.nextWeekPlan]);
+  
+  // Merge construction progress data when available
+  useEffect(() => {
+    console.log('[Activities] constructionProgressItems received:', props.constructionProgressItems?.length || 0);
+    if (props.constructionProgressItems && props.constructionProgressItems.length > 0) {
+      console.log('[Activities] first item:', props.constructionProgressItems[0]);
+      
+      // Merge for weekly activities (work done) - using % up to this week
+      const mergedWeekly = mergeConstructionIntoActivityRows(
+        props.constructionProgressItems,
+        weeklyRows,
+        'weekly'
+      );
+      console.log('[Activities] mergedWeekly rows:', mergedWeekly.length);
+      
+      if (mergedWeekly.length !== weeklyRows.length || 
+          JSON.stringify(mergedWeekly) !== JSON.stringify(weeklyRows)) {
+        setWeeklyRows(mergedWeekly);
+        props.setWeeklyActivities?.(mergedWeekly);
+      }
+      
+      // Merge for next week plan - using % next week plan
+      const mergedNext = mergeConstructionIntoActivityRows(
+        props.constructionProgressItems,
+        nextRows,
+        'next'
+      );
+      console.log('[Activities] mergedNext rows:', mergedNext.length);
+      
+      if (mergedNext.length !== nextRows.length ||
+          JSON.stringify(mergedNext) !== JSON.stringify(nextRows)) {
+        setNextRows(mergedNext);
+        props.setNextWeekPlan?.(mergedNext);
+      }
     }
-    
-    return 0;
-  };
-
-  // Helper function to get indentation style
-  const getIndentationStyle = (description: string) => {
-    const level = getIndentationLevel(description);
-    const indentPixels = level * 20; // 20px per level
+  }, [props.constructionProgressItems]);
+  
+  // Helper function to get indentation style based on level
+  const getIndentStyle = (level: number = 0) => {
+    const indentPixels = level * 24; // 24px per level
     return { paddingLeft: `${indentPixels}px` };
   };
   
-  // Use props directly or fallback to local state
-  const weeklyActivities = props.weeklyActivities || [];
-  const nextWeekPlan = props.nextWeekPlan || [];
+  // Use local or props
+  const weeklyActivities = weeklyRows;
+  const nextWeekPlan = nextRows;
 
   // Helper functions using props
   const addRow = useCallback((type: "weekly" | "next") => {
     const newRow: ActivityRow = { 
       description: "", 
       percent: 0,
-      percentage: "0", // Legacy field - matches backend
+      percentage: "0",
       source: "manual",
       bulkImportId: undefined,
-      addedAt: new Date()
+      addedAt: new Date(),
+      indentLevel: 0,
     };
     
     if (type === "weekly") {
       const newWeeklyActivities = [...weeklyActivities, newRow];
+      setWeeklyRows(newWeeklyActivities);
       props.setWeeklyActivities?.(newWeeklyActivities);
     } else {
       const newNextWeekPlan = [...nextWeekPlan, newRow];
+      setNextRows(newNextWeekPlan);
       props.setNextWeekPlan?.(newNextWeekPlan);
     }
   }, [weeklyActivities, nextWeekPlan, props.setWeeklyActivities, props.setNextWeekPlan]);
@@ -70,9 +99,11 @@ const Activities = (props: ActivitiesProps) => {
   const deleteRow = useCallback((type: "weekly" | "next", index: number) => {
     if (type === "weekly") {
       const newActivities = weeklyActivities.filter((_, idx) => idx !== index);
+      setWeeklyRows(newActivities);
       props.setWeeklyActivities?.(newActivities);
     } else {
       const newPlan = nextWeekPlan.filter((_, idx) => idx !== index);
+      setNextRows(newPlan);
       props.setNextWeekPlan?.(newPlan);
     }
   }, [weeklyActivities, nextWeekPlan, props.setWeeklyActivities, props.setNextWeekPlan]);
@@ -88,18 +119,22 @@ const Activities = (props: ActivitiesProps) => {
       if (field === "percent") {
         const numValue = typeof value === 'string' ? Number(value) : value;
         newActivities[index][field] = isNaN(numValue) ? 0 : numValue;
+        newActivities[index].percentage = isNaN(numValue) ? "0" : numValue.toString();
       } else {
         newActivities[index][field] = value as string;
       }
+      setWeeklyRows(newActivities);
       props.setWeeklyActivities?.(newActivities);
     } else {
       const newPlan = [...nextWeekPlan];
       if (field === "percent") {
         const numValue = typeof value === 'string' ? Number(value) : value;
         newPlan[index][field] = isNaN(numValue) ? 0 : numValue;
+        newPlan[index].percentage = isNaN(numValue) ? "0" : numValue.toString();
       } else {
         newPlan[index][field] = value as string;
       }
+      setNextRows(newPlan);
       props.setNextWeekPlan?.(newPlan);
     }
   }, [weeklyActivities, nextWeekPlan, props.setWeeklyActivities, props.setNextWeekPlan]);
@@ -168,7 +203,7 @@ const Activities = (props: ActivitiesProps) => {
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-semibold text-foreground">Activities Of Work Done</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground">Describe this week's completed work</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Describe this week&apos;s completed work (% up to this week)</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -193,15 +228,19 @@ const Activities = (props: ActivitiesProps) => {
 
         <table className="w-full text-sm">
           <thead>
-            <tr>
-              <th className="text-left py-2 px-2">Description</th>
-              <th className="text-left py-2 px-2 w-20">%</th>
-              <th className="text-left py-2 px-2 w-12"></th>
+            <tr className="bg-muted">
+              <th className="text-left py-2 px-2 w-16">ID</th>
+              <th className="text-left py-2 px-2">Scope of Works</th>
+              <th className="text-center py-2 px-2 w-20">%</th>
+              <th className="text-center py-2 px-2 w-12"></th>
             </tr>
           </thead>
           <tbody>
             {(weeklyActivities || []).map((row, idx) => (
-              <tr key={idx}>
+              <tr key={row.id || idx} className="border-b hover:bg-muted/30">
+                <td className="py-2 px-2 text-muted-foreground font-medium">
+                  {row.sourceId || ""}
+                </td>
                 <td className="py-2 px-1 sm:px-2 align-top">
                   <div className="relative">
                     <textarea
@@ -211,7 +250,7 @@ const Activities = (props: ActivitiesProps) => {
                         adjustHeightWrapper(e);
                       }}
                       className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground text-xs sm:text-sm ${
-                        /^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$/i.test(row.description.trim().split(/\s+/)[0])
+                        row.sourceId && /^[IVX]|^(I{1,3}|IV|V|VI|VII|VIII|IX|X)$/i.test(row.sourceId.trim())
                           ? 'font-bold'
                           : 'font-normal'
                       }`}
@@ -221,7 +260,7 @@ const Activities = (props: ActivitiesProps) => {
                         border: 'none', 
                         outline: 'none', 
                         padding: '1px sm:2px',
-                        ...getIndentationStyle(row.description)
+                        ...getIndentStyle(row.indentLevel)
                       }}
                     />
                   </div>
@@ -280,7 +319,7 @@ const Activities = (props: ActivitiesProps) => {
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-semibold text-foreground">Next Week Plan</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground">Plan next week's activities</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Plan next week&apos;s activities (% next week plan)</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -305,15 +344,19 @@ const Activities = (props: ActivitiesProps) => {
 
         <table className="w-full text-sm">
           <thead>
-            <tr>
-              <th className="text-left py-2 px-2">Description</th>
-              <th className="text-left py-2 px-2 w-20">%</th>
-              <th className="text-left py-2 px-2 w-12"></th>
+            <tr className="bg-muted">
+              <th className="text-left py-2 px-2 w-16">ID</th>
+              <th className="text-left py-2 px-2">Scope of Works</th>
+              <th className="text-center py-2 px-2 w-20">%</th>
+              <th className="text-center py-2 px-2 w-12"></th>
             </tr>
           </thead>
           <tbody>
             {(nextWeekPlan || []).map((row, idx) => (
-              <tr key={idx}>
+              <tr key={row.id || idx} className="border-b hover:bg-muted/30">
+                <td className="py-2 px-2 text-muted-foreground font-medium">
+                  {row.sourceId || ""}
+                </td>
                 <td className="py-2 px-1 sm:px-2 align-top">
                   <textarea
                     value={row.description}
@@ -322,7 +365,7 @@ const Activities = (props: ActivitiesProps) => {
                       adjustHeightWrapper(e);
                     }}
                     className={`w-full resize-none overflow-hidden dark:bg-transparent dark:text-foreground text-xs sm:text-sm ${
-                      /^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$/i.test(row.description.trim().split(/\s+/)[0])
+                      row.sourceId && /^[IVX]|^(I{1,3}|IV|V|VI|VII|VIII|IX|X)$/i.test(row.sourceId.trim())
                         ? 'font-bold'
                         : 'font-normal'
                     }`}
@@ -332,7 +375,7 @@ const Activities = (props: ActivitiesProps) => {
                       border: 'none', 
                       outline: 'none', 
                       padding: '1px sm:2px',
-                      ...getIndentationStyle(row.description)
+                      ...getIndentStyle(row.indentLevel)
                     }}
                   />
                 </td>

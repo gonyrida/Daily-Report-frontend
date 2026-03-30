@@ -66,7 +66,6 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       const alphaIndices: number[] = [];
       computed.forEach((item, index) => {
         const detectedType = resolveIdType(item.id, computed, index);
-        console.log('DEBUG ID:', item.id, '->', detectedType); // Temporary debug
         if (detectedType === 'alpha') {
           alphaIndices.push(index);
         }

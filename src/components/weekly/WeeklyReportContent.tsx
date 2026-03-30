@@ -55,8 +55,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Re-merge whenever construction progress changes, preserving user edits
   useEffect(() => {
-    console.log('[WeeklyReportContent] constructionProgressItems changed:', constructionProgressItems?.length, 'items');
-    console.log('[WeeklyReportContent] constructionProgressItems:', constructionProgressItems);
     if (!constructionProgressItems?.length) return;
     setOverallRows(prev => {
       const merged = mergeConstructionIntoOverallRows(constructionProgressItems, prev);
@@ -418,7 +416,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           setWeeklyActivities={currentSetWeeklyActivities}
           nextWeekPlan={currentNextWeekPlan}
           setNextWeekPlan={currentSetNextWeekPlan}
-          reportId={reportId} // NEW: Pass reportId to Activities component
+          reportId={reportId}
+          constructionProgressItems={constructionProgressItems}
         />
       </div>
     );

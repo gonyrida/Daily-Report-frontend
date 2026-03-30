@@ -534,11 +534,9 @@ const WeeklyReport = () => {
 
             // If we're in createNew mode, prepare the data but don't create report yet
             if (isCreateNewMode) {
-              console.log('🔧 CREATE NEW MODE: Preparing new report with loaded data');
               
               // Check if the loaded report is a submitted report - use its data for rolling total
               if (report.status === 'submitted' && report.sections?.constructionProgress?.items) {
-                console.log('🔄 Applying rolling total from loaded submitted report');
                 
                 const data = report.sections.constructionProgress;
                 
@@ -570,7 +568,6 @@ const WeeklyReport = () => {
                   items: finalItems
                 };
                 constructionProgressHook.updateConstructionData(updatedData);
-                console.log('✅ Rolling total applied from loaded submitted report');
               } else {
                 // For non-submitted reports or no construction progress, check for any submitted reports in project
                 if (constructionProgressHook.constructionData?.items) {
@@ -626,7 +623,6 @@ const WeeklyReport = () => {
               // Reset reportId to indicate this is a new report (not saved yet)
               setCurrentReportId(null);
               setReportStatus('draft');
-              console.log('🔧 CREATE NEW MODE: Report prepared, ready for user to save');
             }
           }
         } catch (error) {
@@ -2344,6 +2340,7 @@ const WeeklyReport = () => {
                       setWeeklyActivities={setWeeklyActivities}
                       nextWeekPlan={nextWeekPlan}
                       setNextWeekPlan={setNextWeekPlan}
+                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     />
                   </div>
                 </>

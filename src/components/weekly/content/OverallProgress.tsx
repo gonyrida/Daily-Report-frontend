@@ -11,8 +11,5 @@ interface OverallProgressProps {
 }
 
 export default function OverallProgress({ descriptionsReadOnly = false, ...props }: OverallProgressProps) {
-  console.log('[OverallProgress] rows received:', props.rows);
-  console.log('[OverallProgress] rows length:', props.rows?.length);
-  console.log('[OverallProgress] first row:', props.rows?.[0]);
   return <OverallProgressTable {...props} descriptionsReadOnly={descriptionsReadOnly} />;
 }
