@@ -61,26 +61,21 @@ export function mergeConstructionIntoOverallRows(
   items.forEach((item) => {
     // Skip items with empty IDs or multi-level dotted IDs (1.1, 1.1.1, etc.)
     // Only allow: roman numerals (I, II) and plain numbers (1, 2, 3)
-    console.log('[mergeConstruction] Processing item:', { id: item.id, scopeOfWorks: item.scopeOfWorks });
     
     if (!item.scopeOfWorks && !item.id) {
-      console.log('[mergeConstruction] Skipping - no scopeOfWorks and no id');
       return;
     }
     if (!item.id || item.id.trim() === '') {
-      console.log('[mergeConstruction] Skipping - empty id');
       return;
     }
     
     const trimmed = item.id.trim();
     // Skip dotted IDs like "1.1", "2.1", "1.1.1", "1.1.2"
     if (/^\d+\.\d+/.test(trimmed)) {
-      console.log('[mergeConstruction] Skipping - dotted ID:', trimmed);
       return;
     }
 
     const rowType = resolveRowType(item.id);
-    console.log('[mergeConstruction] Adding row:', { id: item.id, rowType });
     const existing = existingBySourceId.get(item.id);
 
     // Safely read percentage values, defaulting to 0
