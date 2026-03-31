@@ -29,9 +29,7 @@ const Activities = (props: ActivitiesProps) => {
   
   // Merge construction progress data when available
   useEffect(() => {
-    console.log('[Activities] constructionProgressItems received:', props.constructionProgressItems?.length || 0);
     if (props.constructionProgressItems && props.constructionProgressItems.length > 0) {
-      console.log('[Activities] first item:', props.constructionProgressItems[0]);
       
       // Merge for weekly activities (work done) - using % up to this week
       const mergedWeekly = mergeConstructionIntoActivityRows(
@@ -39,7 +37,6 @@ const Activities = (props: ActivitiesProps) => {
         weeklyRows,
         'weekly'
       );
-      console.log('[Activities] mergedWeekly rows:', mergedWeekly.length);
       
       if (mergedWeekly.length !== weeklyRows.length || 
           JSON.stringify(mergedWeekly) !== JSON.stringify(weeklyRows)) {
@@ -53,7 +50,6 @@ const Activities = (props: ActivitiesProps) => {
         nextRows,
         'next'
       );
-      console.log('[Activities] mergedNext rows:', mergedNext.length);
       
       if (mergedNext.length !== nextRows.length ||
           JSON.stringify(mergedNext) !== JSON.stringify(nextRows)) {
@@ -237,7 +233,7 @@ const Activities = (props: ActivitiesProps) => {
           </thead>
           <tbody>
             {(weeklyActivities || []).map((row, idx) => (
-              <tr key={row.id || idx} className="border-b hover:bg-muted/30">
+              <tr key={`weekly-${row.id || idx}`} className="border-b hover:bg-muted/30">
                 <td className="py-2 px-2 text-muted-foreground font-medium">
                   {row.sourceId || ""}
                 </td>
@@ -353,7 +349,7 @@ const Activities = (props: ActivitiesProps) => {
           </thead>
           <tbody>
             {(nextWeekPlan || []).map((row, idx) => (
-              <tr key={row.id || idx} className="border-b hover:bg-muted/30">
+              <tr key={`next-${row.id || idx}`} className="border-b hover:bg-muted/30">
                 <td className="py-2 px-2 text-muted-foreground font-medium">
                   {row.sourceId || ""}
                 </td>

@@ -30,7 +30,15 @@ export function mergeConstructionIntoActivityRows(
 
   const rows: ActivityRow[] = [];
 
-  items.forEach((item) => {
+  // Deduplicate items by id to prevent duplicate React keys
+  const seenIds = new Set<string>();
+  const uniqueItems = items.filter((item) => {
+    if (!item.id || seenIds.has(item.id)) return false;
+    seenIds.add(item.id);
+    return true;
+  });
+
+  uniqueItems.forEach((item) => {
     // Skip items with no ID and no description
     if (!item.scopeOfWorks && !item.id) return;
     if (!item.id || item.id.trim() === '') return;
@@ -98,7 +106,6 @@ function calculateIndentLevel(id: string): { level: number; displayId: string } 
   const isCommonSingleCharRoman = /^(I|V)$/i.test(trimmed); // I and V are commonly used as single-char
     
   if (/^[a-zA-Z]$/i.test(trimmed) && !isRomanNumeral && !isCommonSingleCharRoman) {
-    console.log('[calculateIndentLevel] Alpha detected, returning "-"');
     return { level: 3, displayId: "-" }; // Alpha becomes "-" with level 3 indent
   }
   

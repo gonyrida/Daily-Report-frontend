@@ -6,7 +6,7 @@ export interface Section {
   title: string;
 }
 
-export type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource";
+export type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
 
 export interface WeeklyReportContentProps {
   showIntroduction?: boolean;
