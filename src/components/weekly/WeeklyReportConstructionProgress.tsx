@@ -12,7 +12,7 @@ import {
 } from '../../types/constructionProgress';
 import {
   detectIdType,
-  isRomanId,
+  resolveIdType,
   computeNextId,
   renumberBelow,
   renumberFromIndex
@@ -65,7 +65,8 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       // Auto-clear backgrounds for Alpha rows to ensure they always have white background
       const alphaIndices: number[] = [];
       computed.forEach((item, index) => {
-        if (detectIdType(item.id) === 'alpha') {
+        const detectedType = resolveIdType(item.id, computed, index);
+        if (detectedType === 'alpha') {
           alphaIndices.push(index);
         }
       });
@@ -130,17 +131,10 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   };
   const formatCurrency = formatNum;
 
-  const getDefaultRowBg = (id: string) => {
-    if (!id || id.trim() === '') return 'bg-white';
-    if (/^[IVXLCDM]+$/.test(id)) return 'bg-[#D0CECE]';
-    if (/^\d+$/.test(id)) return 'bg-[#ACB9CA]';
-    if (/^\d+\.\d+\.\d+$/.test(id)) return 'bg-[#E7E6E6]';
-    if (/^\d+\.\d+$/.test(id)) return 'bg-[#DDEBF7]';
-    return 'bg-white';
-  };
-
   const getRowBg = (item: ConstructionProgressItem, rowIndex: number) => {
-    // Check if any percentage exceeds 100%
+    const type = resolveIdType(item.id, items, rowIndex);
+
+    // Over 100% always red
     const hasOver100Percentage =
       item.previousWeek.percentage > 100 ||
       item.thisWeek.percentage > 100 ||
@@ -149,12 +143,20 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       item.nextWeekPlan.percentage > 100 ||
       item.upToNextWeekPlan.percentage > 100;
 
-    // If any percentage is over 100%, return red background
-    if (hasOver100Percentage) {
-      return 'bg-red-100';
-    }
+    if (hasOver100Percentage) return 'bg-red-100';
 
-    return rowBackgrounds[rowIndex] ?? getDefaultRowBg(item.id);
+    // Custom override
+    if (rowBackgrounds[rowIndex]) return rowBackgrounds[rowIndex];
+
+    // Default by type
+    switch (type) {
+      case 'roman': return 'bg-[#D0CECE]';
+      case 'level1': return 'bg-[#ACB9CA]';
+      case 'level2': return 'bg-[#DDEBF7]';
+      case 'level3': return 'bg-[#E7E6E6]';
+      case 'alpha': return 'bg-white';
+      default: return 'bg-white';
+    }
   };
 
   // Memoize getRowBg to prevent unnecessary re-renders
@@ -233,7 +235,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     // Handle nested updates
     const keys = field.split('.');
     let updated;
-    
+
     if (keys.length === 2) {
       const [parent, child] = keys;
       const parentValue = filteredItem[parent as keyof ConstructionProgressItem];
@@ -330,12 +332,12 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const toggleBold = (rowIndex: number) => {
     if (rowIndex < 0 || rowIndex >= filteredItems.length) return;
     const item = filteredItems[rowIndex];
-    
+
     // Enable calculations when user starts editing an existing report
     if (!isCreateNewMode && !allowCalculations) {
       setAllowCalculations(true);
     }
-    
+
     const newItems = [...items];
     const idx = items.findIndex(i => i === item);
     if (idx === -1) return;
@@ -371,7 +373,10 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       boQ: { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 }, remark: '',
       previousWeek: { ...ep }, thisWeek: { ...ep }, upToThisWeek: { ...ep },
       remaining: { ...ep }, nextWeekPlan: { ...ep }, upToNextWeekPlan: { ...ep },
-      isBold: detectIdType(id) === 'alpha' || detectIdType(id) === 'level1' || detectIdType(id) === 'level2' || detectIdType(id) === 'level3' || isRomanId(id)
+      isBold: (() => {
+        const type = detectIdType(id);
+        return type === 'alpha' || type === 'level1' || type === 'level2' || type === 'level3' || type === 'roman' || type === 'ambiguous';
+      })()
     });
     const ids: string[] = [];
     const tempItems = [...items];
@@ -393,8 +398,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     // Auto-detect type from the clicked row to pre-select the likely type
     const clickedItem = items[rowIndex];
     if (clickedItem) {
-      const t = detectIdType(clickedItem.id);
-      const resolvedType: IdType = isRomanId(clickedItem.id) ? 'roman' : (t === 'empty' ? 'level1' : t);
+      const resolvedType: IdType = resolveIdType(clickedItem.id, items, rowIndex);
       setAddRowsType(resolvedType);
     }
     setDropdownPosition(null);
@@ -428,7 +432,10 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       remaining: { ...emptyProgress },
       nextWeekPlan: { ...emptyProgress },
       upToNextWeekPlan: { ...emptyProgress },
-      isBold: detectIdType(id) === 'alpha' || detectIdType(id) === 'level1' || detectIdType(id) === 'level2' || detectIdType(id) === 'level3' || isRomanId(id)
+      isBold: (() => {
+        const type = detectIdType(id);
+        return type === 'alpha' || type === 'level1' || type === 'level2' || type === 'level3' || type === 'roman' || type === 'ambiguous';
+      })()
     }));
 
     let newItems = [...items];
@@ -447,7 +454,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     // Clear backgrounds for any new Alpha rows
     const newAlphaIndices: number[] = [];
     for (let i = insertAfterIndex + 1; i <= insertAfterIndex + addRowsCount; i++) {
-      const itemType = detectIdType(computedItems[i].id);
+      const itemType = resolveIdType(computedItems[i].id, computedItems, i);
       if (itemType === 'alpha') {
         newAlphaIndices.push(i);
       }
@@ -484,9 +491,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
     // Detect the type of the row being deleted so we can renumber its siblings
     const deletedItem = items[rowIndex];
-    const deletedType: IdType = isRomanId(deletedItem.id)
-      ? 'roman'
-      : detectIdType(deletedItem.id);
+    const deletedType: IdType = resolveIdType(deletedItem.id, items, rowIndex);
 
     // Remove the row first
     const filtered = items.filter((_, i) => i !== rowIndex);

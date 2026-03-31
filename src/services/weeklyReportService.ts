@@ -40,6 +40,20 @@ const handleApiResponse = async <T>(response: Response): Promise<ApiResponse<T>>
     if (!response.ok) {
       const errorMessage = data?.message || data?.error || `HTTP ${response.status}: ${response.statusText}`;
       console.error('API Error:', { status: response.status, message: errorMessage, data });
+      // Log detailed validation errors - check multiple possible locations
+      console.error('🔍 Full response data:', JSON.stringify(data, null, 2));
+      if (data?.data && typeof data.data === 'object') {
+        console.error('🔍 Detailed validation errors (data.data):', JSON.stringify(data.data, null, 2));
+      }
+      if (data?.errors && Array.isArray(data.errors)) {
+        console.error('🔍 Validation errors (data.errors):', JSON.stringify(data.errors, null, 2));
+      }
+      if (data?.validationErrors) {
+        console.error('🔍 Validation errors (data.validationErrors):', JSON.stringify(data.validationErrors, null, 2));
+      }
+      if (data?.details) {
+        console.error('🔍 Error details (data.details):', JSON.stringify(data.details, null, 2));
+      }
       return {
         success: false,
         error: errorMessage

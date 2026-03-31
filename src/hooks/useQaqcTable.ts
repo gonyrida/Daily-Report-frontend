@@ -1,15 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { QaqcRow, Section, TableData } from "@/types/qaqc.types";
 import { makeRow } from "@/utils/rowFactory";
 import { handleCommentChange } from "@/lib/tableUtils";
 
 export const useQaqcTable = (sections: Section[]) => {
-  const initialData: TableData = Object.fromEntries(
-    sections.map((s) => [s.id, Array(5).fill(null).map(() => makeRow())])
+  const initialData = useMemo<TableData>(
+    () => Object.fromEntries(
+      sections.map((s) => [s.id, Array(5).fill(null).map(() => makeRow())])
+    ),
+    []
   );
 
-  // Use state only - no localStorage persistence
-  const [tableData, setTableData] = useState<TableData>(initialData);
+  const [tableData, setTableData] = useState<TableData>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("qaqc_table_data");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Validate that all sections exist
+          const hasAllSections = sections.every(s => parsed[s.id] !== undefined);
+          if (hasAllSections) {
+            return parsed;
+          }
+        } catch (e) {
+          // Failed to parse saved QAQC data, will use initial data
+        }
+      }
+    }
+    return initialData;
+  });
+
+  // Persist to localStorage whenever data changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("qaqc_table_data", JSON.stringify(tableData));
+    }
+  }, [tableData]);
 
   const [search, setSearch] = useState<string>("");
 
@@ -45,8 +71,14 @@ export const useQaqcTable = (sections: Section[]) => {
     setTableData(initialData);
   };
 
+  const clearQaqcStorage = (): void => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("qaqc_table_data");
+    }
+  };
+
   const totalRows = Object.values(tableData).reduce((a, r) => a + r.length, 0);
-  const openRows = Object.values(tableData).flat().filter((r) => r.status === "Open").length;
+  const openRows = Object.values(tableData).flat().filter((r) => r.status === "Pending").length;
 
   const filteredSections = sections.filter(
     (s) =>
@@ -63,6 +95,7 @@ export const useQaqcTable = (sections: Section[]) => {
     handleDeleteRow,
     handleCellChange,
     clearQaqcData,
+    clearQaqcStorage,
     totalRows,
     openRows,
     filteredSections,

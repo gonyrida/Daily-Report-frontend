@@ -65,5 +65,6 @@ interface EditableCell {
 }
 
 export type IdType = 'roman' | 'level1' | 'level2' | 'level3' | 'alpha' | 'empty';
+export type AmbiguousIdType = IdType | 'ambiguous';
 
 export type { WeeklyReportConstructionProgressProps, EditableCell };

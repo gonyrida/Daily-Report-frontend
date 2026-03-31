@@ -249,3 +249,94 @@ export const getWeeklyReportFiles = async (
     };
   }
 };
+
+/**
+ * Upload HSE photo reference images to Supabase Storage
+ * @param photoReferences - Array of photo reference sections with entries and slots
+ * @param reportId - Weekly report ID for folder organization
+ * @returns Converted photo references with Supabase URLs
+ */
+export const uploadHSEPhotoReferencesToSupabase = async (
+  photoReferences: any[],
+  reportId: string
+): Promise<any[]> => {
+  if (!photoReferences || !Array.isArray(photoReferences) || photoReferences.length === 0) {
+    return [];
+  }
+
+  // Handle temporary report IDs for new reports
+  const folderId = reportId?.startsWith('temp-') || !reportId ? 'temp-uploads' : reportId;
+
+  const convertedSections = await Promise.all(
+    photoReferences.map(async (section, sectionIndex) => {
+      const convertedEntries = await Promise.all(
+        (section.entries || []).map(async (entry, entryIndex) => {
+          const convertedSlots = await Promise.all(
+            (entry.slots || []).map(async (slot, slotIndex) => {
+              // If slot has a File object, upload to Supabase
+              if (slot.image instanceof File) {
+                try {
+                  const folderPath = `weekly-reports/${folderId}/hse-photos/${sectionIndex}`;
+                  const timestamp = Date.now();
+                  const fileExt = slot.image.name.split('.').pop();
+                  const fileName = `hse-${sectionIndex}-${entryIndex}-${slotIndex}-${timestamp}.${fileExt}`;
+                  const filePath = `${folderPath}/${fileName}`;
+
+                  // Upload to Supabase Storage
+                  const { data, error } = await supabase.storage
+                    .from('weekly-reports')
+                    .upload(filePath, slot.image, {
+                      cacheControl: '3600',
+                      upsert: false,
+                      contentType: slot.image.type
+                    });
+
+                  if (error) {
+                    console.error('Supabase upload error for HSE photo:', error);
+                    // Fallback: convert to base64 if upload fails
+                    const base64 = await new Promise((resolve) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result as string);
+                      reader.readAsDataURL(slot.image);
+                    });
+                    return { ...slot, image: base64 };
+                  }
+
+                  // Get public URL
+                  const { data: { publicUrl } } = supabase.storage
+                    .from('weekly-reports')
+                    .getPublicUrl(data.path);
+
+                  return { ...slot, image: publicUrl };
+                } catch (uploadError) {
+                  console.error('Error uploading HSE photo to Supabase:', uploadError);
+                  // Fallback: convert to base64
+                  const base64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.readAsDataURL(slot.image);
+                  });
+                  return { ...slot, image: base64 };
+                }
+              }
+
+              // If it's already a URL (Supabase or otherwise), keep it as-is
+              if (typeof slot.image === 'string' && slot.image.startsWith('http')) {
+                return slot;
+              }
+
+              // For base64 strings or null, return as-is
+              return slot;
+            })
+          );
+
+          return { ...entry, slots: convertedSlots };
+        })
+      );
+
+      return { ...section, entries: convertedEntries };
+    })
+  );
+
+  return convertedSections;
+};

@@ -4,33 +4,12 @@ import ReferenceSection from "../../ReferenceSection";
 import { createReferenceSection } from "@/utils/referenceHelpers";
 import { HsesData, HsesProps } from "@/types/hses.types";
 import { createHSESections } from "@/utils/hseSectionUtils";
+import { defaultHsesData } from "@/hooks/useHsesData";
 
 const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
-  console.log('Hses component - data:', data);
-  console.log('Hses component - data.hsePhotoReferences:', data?.hsePhotoReferences);
   
-  const hsesData = data || {
-    training: [
-      { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-      { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-      { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
-    ],
-    inspection: [
-      { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-      { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-      { typeOfInspection: "", date: "", inspector: "", remarks: "" }
-    ],
-    permit: [
-      { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-      { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-      { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
-    ],
-    firstAidAccident: "",
-    otherActivities: "",
-    hsePhotoReferences: createHSESections(),
-  };
+  const hsesData = data || defaultHsesData;
 
-  console.log('Hses component - hsePhotoReferences after initialization:', hsesData.hsePhotoReferences);
 
   const updateData = (section: keyof HsesData, value: any) => {
     const newData = { ...hsesData, [section]: value };

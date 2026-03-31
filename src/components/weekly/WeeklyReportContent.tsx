@@ -16,7 +16,9 @@ import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { useQaqcApi } from "@/hooks/useQaqcApi";
 import { useResourceTable } from "@/hooks/useResourceTable";
 import { ActivityRow } from "@/types/activity.types";
+import { ProgressRow } from "@/types/progress.types";
 import { createHSESections } from "@/utils/hseSectionUtils";
+import { mergeConstructionIntoOverallRows } from "@/utils/constructionProgressToOverall";
 
 const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   showIntroduction: externalShowIntroduction,
@@ -40,7 +42,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   setHsesData,
   onQaqcDataChange,
   onClearQaqcData,
-  onClearHsesData
+  onClearHsesData,
+  constructionProgressItems
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -48,6 +51,24 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // Initialize activities state at parent level
   const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
   const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
+  const [overallRows, setOverallRows] = useState<ProgressRow[]>([]);
+
+  // Re-merge whenever construction progress changes, preserving user edits
+  useEffect(() => {
+    if (!constructionProgressItems?.length) return;
+    setOverallRows(prev => {
+      const merged = mergeConstructionIntoOverallRows(constructionProgressItems, prev);
+      return merged;
+    });
+  }, [constructionProgressItems]);
+
+  // Sync overallRows to overallProgressData when provided (stable reference)
+  const setRowsRef = overallProgressData?.setRows;
+  useEffect(() => {
+    if (setRowsRef && overallRows.length > 0) {
+      setRowsRef(overallRows);
+    }
+  }, [overallRows, setRowsRef]);
 
   // Use external props if provided, otherwise use internal state
   const currentWeeklyActivities = externalWeeklyActivities || weeklyActivities;
@@ -66,9 +87,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   const resourceTableHook = useResourceTable(sharedData, true);
 
   // Use passed overallProgress data or create a simple fallback
-  const overallProgressHook = overallProgressData || { 
-    rows: [], 
-    setRows: () => {} 
+  const overallProgressHook = overallProgressData || {
+    rows: overallRows,
+    setRows: setOverallRows,
+    updateRows: setOverallRows,
+    addTitleRow: () => {},   // disabled — rows come from construction progress
+    addDetailRow: () => {},
   };
 
   const showIntroduction = externalShowIntroduction ?? internalShowIntroduction;
@@ -314,16 +338,13 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
   // Ensure hook data is always available for the Hses component
   const currentHsesData = (hsesData?.hsePhotoReferences && hsesData.hsePhotoReferences.length > 0) ? hsesData : hsesDataHook.hsesData;
-  console.log('WeeklyReportContent - hsesData:', hsesData);
-  console.log('WeeklyReportContent - hsesDataHook.hsesData:', hsesDataHook.hsesData);
-  console.log('WeeklyReportContent - currentHsesData:', currentHsesData);
-
+  
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
-    if (onClearQaqcData && qaqcTableHook.clearQaqcData) {
-      onClearQaqcData(qaqcTableHook.clearQaqcData);
+    if (onClearQaqcData && qaqcTableHook.clearQaqcStorage) {
+      onClearQaqcData(qaqcTableHook.clearQaqcStorage);
     }
-  }, [onClearQaqcData, qaqcTableHook.clearQaqcData]);
+  }, [onClearQaqcData, qaqcTableHook.clearQaqcStorage]);
 
   // Expose clearHsesData function to parent for successful submit cleanup
   useEffect(() => {
@@ -382,10 +403,11 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
     );
   }
 
-  // Handle activities tab
-  if (activeTab === "activities") {
-    return (
-      <div className="bg-card p-3">
+  // Render all tabs but hide inactive ones with display:none to prevent remounting
+  return (
+    <div className="space-y-0">
+      {/* Activities Tab */}
+      <div style={{ display: activeTab === "activities" ? "block" : "none" }} className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           3. ACTIVITIES OF WORK DONE / NEXT WEEK PLAN
         </h2>
@@ -394,27 +416,24 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           setWeeklyActivities={currentSetWeeklyActivities}
           nextWeekPlan={currentNextWeekPlan}
           setNextWeekPlan={currentSetNextWeekPlan}
-          reportId={reportId} // NEW: Pass reportId to Activities component
+          reportId={reportId}
+          constructionProgressItems={constructionProgressItems}
         />
       </div>
-    );
-  }
 
-  // Handle qaqc-status tab
-  if (activeTab === "qaqc-status") {
-    return (
-      <div className="bg-card p-3">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-0 text-foreground">
+      {/* QAQC Tab */}
+      <div style={{ display: activeTab === "qaqc-status" ? "block" : "none" }} className="bg-card p-3">
+        {/* <div className="flex items-center justify-between mb-3"> */}
+          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
             4. QA/QC STATUS
           </h2>
-          <button
+          {/* <button
             onClick={loadQaqcExampleData}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium mr-6"
           >
             📝 Load Example Data
-          </button>
-        </div>
+          </button> */}
+        {/* </div> */}
         <QaqcStatusNew 
           sections={qaqcTableHook.filteredSections}
           tableData={qaqcTableHook.tableData}
@@ -439,8 +458,11 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                   
                   backendData[backendKey] = {
                     items: nonEmptyRows.map(row => ({
-                      code: row.code, description: row.description, status: row.status,
+                      code: row.code, 
+                      description: row.description, 
+                      status: row.status,
                       dateResponded: row.dateResponse
+                      // Note: We don't send _id field as backend doesn't expect it
                     })),
                     comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
                   };
@@ -450,39 +472,32 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
               setQaqcData(backendData);
             }
           }}
+          weeklyReportId={reportId}
         />
       </div>
-    );
-  }
 
-  // Handle hses tab
-  if (activeTab === "hses") {
-    return (
-      <div className="bg-card p-3">
-        <div className="flex items-center justify-between mb-3">
+      {/* HSES Tab */}
+      <div style={{ display: activeTab === "hses" ? "block" : "none" }} className="bg-card p-3">
+        {/* <div className="flex  mb-3"> */}
           <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-0 text-foreground">
             5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
           </h2>
-          <button
+          {/* <button
             onClick={loadHsesExampleData}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium mr-6"
           >
             📝 Load Example Data
-          </button>
-        </div>
+          </button> */}
+        {/* </div> */}
         <Hses 
           isEditing={true}
           data={currentHsesData}
           onChange={setHsesData}
         />
       </div>
-    );
-  }
 
-  // Handle resource tab
-  if (activeTab === "resource") {
-    return (
-      <div className="bg-card p-3">
+      {/* Resource Tab */}
+      <div style={{ display: activeTab === "resource" ? "block" : "none" }} className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           6. RESOURCES STATUS
         </h2>
@@ -494,528 +509,158 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           removeSubRow={resourceTableHook.removeSubRow}
           monthYearDisplay={resourceTableHook.monthYearDisplay}
           dates={resourceTableHook.dates}
-          reportId={reportId} // Pass reportId to Resource component
+          reportId={reportId}
         />
       </div>
-    );
-  }
 
-  // Handle overall-progress tab
-  if (activeTab === "overall-progress") {
-    return (
-      <div className="bg-card p-3">
+      {/* Photos Tab */}
+      <div style={{ display: activeTab === "photos" ? "block" : "none" }} className="bg-card p-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+          7. SITE ACTIVITY PHOTOS
+        </h2>
+        <div className="text-center py-12 text-muted-foreground">
+          Site activity photos content will be displayed here.
+        </div>
+      </div>
+
+      {/* Issues Tab */}
+      <div style={{ display: activeTab === "issues" ? "block" : "none" }} className="bg-card p-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+          8. CONSTRUCTION ISSUE
+        </h2>
+        <div className="text-center py-12 text-muted-foreground">
+          Construction issues will be displayed here.
+        </div>
+      </div>
+
+      {/* Schedule Tab */}
+      <div style={{ display: activeTab === "schedule" ? "block" : "none" }} className="bg-card p-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+          9. MASTER SCHEDULE
+        </h2>
+        <div className="text-center py-12 text-muted-foreground">
+          Master schedule content will be displayed here.
+        </div>
+      </div>
+
+      {/* Overall Progress Tab */}
+      <div style={{ display: activeTab === "overall-progress" ? "block" : "none" }} className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
-        <OverallProgress 
-          rows={overallProgressHook.rows}
-          setRows={overallProgressHook.setRows}
-          updateRows={overallProgressHook.updateRows}
-          addTitleRow={overallProgressHook.addTitleRow}
-          addDetailRow={overallProgressHook.addDetailRow}
-        />
+        {(!overallRows || overallRows.length === 0) ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Loading construction progress data...
+          </div>
+        ) : (
+          <OverallProgress 
+            rows={overallRows}
+            setRows={setOverallRows}
+            updateRows={setOverallRows}
+            addTitleRow={() => {}}
+            addDetailRow={() => {}}
+            descriptionsReadOnly={true}
+          />
+        )}
       </div>
-    );
-  }
 
-  // Only show table of content if activeTab is table-of-content and not showing introduction
-  if (activeTab !== "table-of-content") {
-    return null;
-  }
-
-  return (
-    <div className="max-w-none space-y-4">
-      <style>{`
-  ol.hierarchical {
-    counter-reset: section;
-    list-style: none;
-    padding-left: 0;
-  }
-
-  ol.hierarchical > li {
-    counter-increment: section;
-    margin: 6px 0;
-  }
-
-  ol.hierarchical > li::before {
-    content: counter(section) ". ";
-    font-weight: 600;
-    margin-right: 4px;
-  }
-
-  ol.hierarchical ol {
-    counter-reset: subsection;
-    list-style: none;
-    margin-top: 6px;
-    padding-left: 24px;
-  }
-
-  ol.hierarchical ol > li {
-    counter-increment: subsection;
-  }
-
-  ol.hierarchical ol > li::before {
-    content: counter(section) "." counter(subsection) " ";
-    font-weight: 500;
-    margin-right: 4px;
-  }
-`}</style>
-
-      <ol className="hierarchical list-none ml-6 space-y-2">
-        <li className="text-blue-600 dark:text-blue-400">
-          <a
-            href="#introduction"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={handleIntroductionClick}
-          >
-            INTRODUCTION
-          </a>
-        </li>
-        <li className="text-blue-600 dark:text-blue-400">
-          <a
-            href="#overall-progress-of-this-week-and-next-week"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              e.preventDefault();
-              if (setActiveTab) setActiveTab("overall-progress");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
-          </a>
-        </li>
-        <li className="text-blue-600 dark:text-blue-400">
-          <a
-            href="#activities-of-work-done--next-week-plan"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              e.preventDefault();
-              if (setActiveTab) setActiveTab("activities");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            ACTIVITIES OF WORK DONE / NEXT WEEK PLAN
-          </a>
-        </li>
-        <li className="text-primary dark:text-primary">
-          <a
-            href="#qaqc-status"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              e.preventDefault();
-              if (setActiveTab) setActiveTab("qaqc-status");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            QA/QC STATUS
-          </a>
-          <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#non-conformity-report-ncr"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  // Scroll to section after a short delay to allow component to render
-                  setTimeout(() => {
-                    document.getElementById("section-4.1")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Non-Conformity Report (NCR)
+      {/* Table of Content Tab */}
+      {activeTab === "table-of-content" && (
+        <div className="max-w-none space-y-4">
+          <style>{`
+            ol.hierarchical {
+              counter-reset: section;
+              list-style: none;
+              padding-left: 0;
+            }
+            ol.hierarchical > li {
+              counter-increment: section;
+              margin: 6px 0;
+            }
+            ol.hierarchical > li::before {
+              content: counter(section) ". ";
+              font-weight: 600;
+              margin-right: 4px;
+            }
+            ol.hierarchical ol {
+              counter-reset: subsection;
+              list-style: none;
+              margin-top: 6px;
+              padding-left: 24px;
+            }
+            ol.hierarchical ol > li {
+              counter-increment: subsection;
+            }
+            ol.hierarchical ol > li::before {
+              content: counter(section) "." counter(subsection) " ";
+              font-weight: 500;
+              margin-right: 4px;
+            }
+          `}</style>
+          <ol className="hierarchical list-none ml-6 space-y-2">
+            <li className="text-blue-600 dark:text-blue-400">
+              <a href="#introduction" className="text-primary dark:text-primary hover:underline" onClick={handleIntroductionClick}>
+                INTRODUCTION
+              </a>
+            </li>
+            <li className="text-blue-600 dark:text-blue-400">
+              <a href="#overall-progress" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("overall-progress"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
+              </a>
+            </li>
+            <li className="text-blue-600 dark:text-blue-400">
+              <a href="#activities" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("activities"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                ACTIVITIES OF WORK DONE / NEXT WEEK PLAN
               </a>
             </li>
             <li className="text-primary dark:text-primary">
-              <a
-                href="#corrective-action-request-car"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.2")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Corrective Action Request (CAR)
+              <a href="#qaqc-status" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                QA/QC STATUS
+              </a>
+              <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
+                <li className="text-primary dark:text-primary"><a href="#ncr" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.1")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Non-Conformity Report (NCR)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#car" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.2")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Corrective Action Request (CAR)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#scar" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.3")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Safety Corrective Action Request (SCAR)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#pmsi" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.4")?.scrollIntoView({ behavior: "smooth" }), 100); }}>PM Site Instruction (SI)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#csi" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.5")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Client Site Instruction (SI)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#ir" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.6")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Inspection Request (IR)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#mfa" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.7")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Material for Approval (MFA)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#rfi" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.8")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Request for Information (RFI)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#rfa" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.9")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Request for Approval (RFA)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#fcr" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.10")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Field Change Request (FCR)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#vo" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.11")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Variation Order (VO)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#tr" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.12")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Transmittal (TR)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#mir" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("qaqc-status"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-4.13")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Material Inspection Approval (MIR)</a></li>
+              </ol>
+            </li>
+            <li className="text-primary dark:text-primary">
+              <a href="#hses" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
               </a>
             </li>
             <li className="text-primary dark:text-primary">
-              <a
-                href="#safety-corrective-action-request-scar"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.3")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Safety Corrective Action Request (SCAR)
+              <a href="#resource" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("resource"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                RESOURCES STATUS
               </a>
             </li>
             <li className="text-primary dark:text-primary">
-              <a
-                href="#pm-site-instruction-si"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.4")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                PM Site Instruction (SI)
+              <a href="#photos" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("photos"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                SITE ACTIVITY PHOTOS
               </a>
             </li>
             <li className="text-primary dark:text-primary">
-              <a
-                href="#client-site-instruction-si"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.5")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Client Site Instruction (SI)
+              <a href="#issues" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("issues"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                CONSTRUCTION ISSUE
               </a>
             </li>
             <li className="text-primary dark:text-primary">
-              <a
-                href="#inspection-request-ir"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.6")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Inspection Request (IR)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#material-for-approval-mfa"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.7")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Material for Approval (MFA)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#request-for-information-rfi"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.8")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Request for Information (RFI)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#request-for-approval-rfa"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.9")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Request for Approval (RFA)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#field-change-request-fcr"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.10")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Field Change Request (FCR)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#variation-order-vo"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.11")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Variation Order (VO)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#transmittal-tr"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.12")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Transmittal (TR)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#material-inspection-approval-mir"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("qaqc-status");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-4.13")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Material Inspection Approval (MIR)
+              <a href="#schedule" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("schedule"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                MASTER SCHEDULE
               </a>
             </li>
           </ol>
-        </li>
-        <li className="text-primary dark:text-primary">
-          <a
-            href="#health-safety-environmental--security-hses"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              e.preventDefault();
-              if (setActiveTab) setActiveTab("hses");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
-          </a>
-          <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#hses-training--introduction--toolbox-meeting"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("hses");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                }}
-              >
-                HSES Training / Introduction / Toolbox Meeting
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#hses-inspection--audit--heavy-equipment--handpower-tool-checklist"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("hses");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                }}
-              >
-                HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool
-                Checklist
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#permit-to-work"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("hses");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                }}
-              >
-                Permit to Work
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#first-aid--accident--incident--near-miss--fatalities-if-any"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("hses");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                }}
-              >
-                First Aid / Accident / Incident / Near Miss / Fatalities (if
-                Any)
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#other-hses-actities-concerns"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("hses");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                }}
-              >
-                Other HSES Actities Concerns
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#hses-photo-reference"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("hses");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                }}
-              >
-                HSES Photo Reference
-              </a>
-            </li>
-          </ol>
-        </li>
-        <li className="text-primary dark:text-primary">
-          <a
-            href="#resources-status"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              e.preventDefault();
-              if (setActiveTab) setActiveTab("resource");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            RESOURCES STATUS
-          </a>
-          <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#manpower-status"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("resource");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-6.1")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Manpower Status
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#material-delivery-status"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("resource");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-6.2")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Material Delivery Status
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a
-                href="#machinery--equipment-status"
-                className="text-primary dark:text-primary hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (setActiveTab) setActiveTab("resource");
-                  if (setShowSecondNav) setShowSecondNav(true);
-                  setTimeout(() => {
-                    document.getElementById("section-6.3")?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }}
-              >
-                Machinery / Equipment Status
-              </a>
-            </li>
-          </ol>
-        </li>
-        <li className="text-primary dark:text-primary">
-          <a
-            href="#site-activity-photos"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              if (setActiveTab) setActiveTab("table-of-content");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            SITE ACTIVITY PHOTOS
-          </a>
-        </li>
-        <li className="text-primary dark:text-primary">
-          <a
-            href="#construction-issue"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              if (setActiveTab) setActiveTab("table-of-content");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            CONSTRUCTION ISSUE
-          </a>
-        </li>
-        <li className="text-primary dark:text-primary">
-          <a
-            href="#master-schedule"
-            className="text-primary dark:text-primary hover:underline"
-            onClick={(e) => {
-              if (setActiveTab) setActiveTab("table-of-content");
-              if (setShowSecondNav) setShowSecondNav(true);
-            }}
-          >
-            MASTER SCHEDULE
-          </a>
-        </li>
-      </ol>
+        </div>
+      )}
     </div>
   );
 };

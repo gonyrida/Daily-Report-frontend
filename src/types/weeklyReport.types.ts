@@ -83,7 +83,21 @@ export interface WeeklyReportSections {
   introduction: WeeklyReportIntroduction;
   overallProgress: OverallProgressSection;
   activities: WeeklyReportActivities;
-  qaqcStatus: QaqcEntry[];
+  qaqcStatus: {
+    ncr?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    car?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    scar?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    pmsi?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    csi?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    ir?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    mfa?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    rfi?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    rfa?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    fcr?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    vo?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    tr?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+    mir?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  };
   hses: HsesData;
   resources: Resources;
   photos: any;
@@ -357,7 +371,19 @@ export interface UpdateConstructionIssuesRequest {
 }
 
 export interface UpdateQaqcRequest {
-  entries: QaqcEntry[];
+  ncr?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  car?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  scar?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  pmsi?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  csi?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  ir?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  mfa?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  rfi?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  rfa?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  fcr?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  vo?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  tr?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
+  mir?: { items: Array<{ code: string; description: string; status: string; dateResponded: string }>; comments: string };
 }
 
 export interface UpdateOverallProgressRequest {

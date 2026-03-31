@@ -1,11 +1,12 @@
 import { ActivityRow } from "./activity.types";
+import { ConstructionProgressItem } from "./constructionProgress";
 
 export interface Section {
   id: string;
   title: string;
 }
 
-export type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource";
+export type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
 
 export interface WeeklyReportContentProps {
   showIntroduction?: boolean;
@@ -30,4 +31,5 @@ export interface WeeklyReportContentProps {
   onQaqcDataChange?: (qaqcData: any) => void;
   onClearQaqcData?: (clearFn: () => void) => void;
   onClearHsesData?: (clearFn: () => void) => void;
+  constructionProgressItems?: ConstructionProgressItem[];
 }

@@ -20,6 +20,7 @@ interface OverallProgressTableProps {
   updateRows?: (newRows: ProgressRow[]) => void;
   addTitleRow?: () => void;
   addDetailRow?: () => void;
+  descriptionsReadOnly?: boolean;
 }
 
 export default function OverallProgressTable({
@@ -27,7 +28,8 @@ export default function OverallProgressTable({
   setRows = () => { },
   updateRows = () => { },
   addTitleRow = () => { },
-  addDetailRow = () => { }
+  addDetailRow = () => { },
+  descriptionsReadOnly = false
 }: OverallProgressTableProps) {
   const [localRows, setLocalRows] = useState<ProgressRow[]>(rows || []);
 
@@ -55,7 +57,21 @@ export default function OverallProgressTable({
   const formattedRows = useMemo(() => {
     let titleCount = 0;
 
-    const result = localRows.map((row, index) => {
+    // Filter out alpha level rows (single letters like A, B, C)
+    // but keep single-character Roman numerals (I, V)
+    const filteredRows = localRows.filter(row => {
+      if (!row.sourceId) return true;
+      const trimmed = row.sourceId.trim();
+      // Skip single alphabetic characters that are NOT Roman numerals I or V
+      const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
+      const isRomanNumeralIorV = /^(I|V)$/i.test(trimmed);
+      const shouldKeep = !(isSingleAlpha && !isRomanNumeralIorV);
+      if (!shouldKeep) {
+      }
+      return shouldKeep;
+    });
+
+    const result = filteredRows.map((row, index) => {
       // Debug: log each row to see what's happening
 
       if (row.rowType === "title") {
@@ -324,7 +340,7 @@ export default function OverallProgressTable({
                   % Up to This Week
                 </th>
                 <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
-                  Remaining
+                 % Remaining
                 </th>
                 <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                   % Next Week Plan
@@ -332,147 +348,129 @@ export default function OverallProgressTable({
                 <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                   % Up Next Week Plan
                 </th>
-                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[5%]">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody>
               {formattedRows.map((row) => (
                 <tr key={row.id} className={`border-b ${row.rowType === "title" ? "bg-slate-200 dark:bg-slate-800/50" : row.rowType === "subDetail" ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-muted/30"}`}>
                   <td className={`px-4 py-2 text-sm ${row.rowType === "title" ? "font-semibold text-muted-foreground" : "text-muted-foreground"}`}>
-                    {row.displayIndex || ""}
+                    {row.sourceId || row.displayIndex || ""}
                   </td>
 
                   {/* Description */}
                   <td className="px-3 py-2">
-                    {row.isCustomInput ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          value={row.description}
-                          onChange={(e) =>
-                            customUpdateRow(row.id, "description", e.target.value)
-                          }
-                          placeholder="Enter custom..."
-                          className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
-                          showIndicator={false}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            customUpdateRow(row.id, "isCustomInput", false)
-                          }
-                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    {descriptionsReadOnly ? (
+                      <span className={`text-sm px-2 ${row.rowType === 'title' ? 'font-semibold' : ''}`}>
+                        {row.description || <span className="text-muted-foreground italic">—</span>}
+                      </span>
                     ) : (
-                      <Select
-                        value={row.description}
-                        onValueChange={(value) =>
-                          customUpdateRow(row.id, "description", value)
-                        }
-                      >
-                        <SelectTrigger className={`border-0 bg-transparent focus:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}>
-                          <SelectValue placeholder="Select province..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <div className="max-h-60 overflow-y-auto">
+                      <>
+                        {row.isCustomInput ? (
+                          <div className="flex items-center gap-1">
                             <Input
-                              placeholder="Search..."
-                              value={row.searchTerm || ""}
+                              value={row.description}
                               onChange={(e) =>
-                                customUpdateRow(
-                                  row.id,
-                                  "searchTerm",
-                                  e.target.value,
-                                )
+                                customUpdateRow(row.id, "description", e.target.value)
                               }
-                              className="border-b mb-2"
-                              showIndicator={false}
+                              placeholder="Enter custom..."
+                              className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
                             />
-                            {CAMBODIA_PROVINCES.filter((province) =>
-                              province
-                                .toLowerCase()
-                                .includes((row.searchTerm || "").toLowerCase())
-                            ).map((province) => (
-                              <SelectItem key={province} value={province}>
-                                {province}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="__custom__">+ Add Custom</SelectItem>
+                            <Button
+                              onClick={() => customUpdateRow(row.id, "description", "")}
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              variant="ghost"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
                           </div>
-                        </SelectContent>
-                      </Select>
+                        ) : (
+                          <Select
+                            value={row.description}
+                            onValueChange={(value) =>
+                              customUpdateRow(row.id, "description", value)
+                            }
+                          >
+                            <SelectTrigger className={`border-0 bg-transparent focus:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}>
+                              <SelectValue placeholder="Select description" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CAMBODIA_PROVINCES.map((province) => (
+                                <SelectItem key={province} value={province}>
+                                  {province}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="__custom__">+ Custom Input</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </>
                     )}
                   </td>
 
                   {/* % Up to Previous Week */}
-                  <PercentageCell
-                    value={0}
-                    onChange={(value) => customUpdateRow(row.id, "unit", value)}
-                    placeholder="0"
-                    showIndicator={false}
-                    backgroundType="none"
-                  />
+                  <td className="px-3 py-2 text-center">
+                    <PercentageCell
+                      value={row.unit}
+                      onChange={(value) => customUpdateRow(row.id, "unit", value)}
+                      readOnly={descriptionsReadOnly}
+                    />
+                  </td>
 
                   {/* % This Week */}
-                  <PercentageCell
-                    value={row.prev}
-                    onChange={(value) => customUpdateRow(row.id, "prev", value)}
-                    placeholder="0"
-                    showIndicator={false}
-                    backgroundType="none"
-                  />
+                  <td className="px-3 py-2 text-center">
+                    <PercentageCell
+                      value={row.prev}
+                      onChange={(value) => customUpdateRow(row.id, "prev", value)}
+                      readOnly={descriptionsReadOnly}
+                    />
+                  </td>
 
                   {/* % Up to This Week */}
-                  <PercentageCell
-                    value={row.today}
-                    placeholder="0"
-                    readOnly
-                    showIndicator={false}
-                    backgroundType="blue"
-                  />
+                  <td className="px-3 py-2 text-center">
+                    <PercentageCell
+                      value={row.today}
+                      onChange={(value) => customUpdateRow(row.id, "today", value)}
+                      readOnly={descriptionsReadOnly}
+                    />
+                  </td>
 
                   {/* Remaining */}
-                  <PercentageCell
-                    value={row.accumulated}
-                    placeholder="0"
-                    readOnly
-                    showIndicator={false}
-                    backgroundType="orange"
-                  />
+                  <td className="px-3 py-2 text-center">
+                    <PercentageCell
+                      value={row.accumulated}
+                      onChange={(value) => customUpdateRow(row.id, "accumulated", value)}
+                      readOnly={descriptionsReadOnly}
+                    />
+                  </td>
 
                   {/* % Next Week Plan */}
-                  <PercentageCell
-                    value={row.nextWeekPlan}
-                    onChange={(value) => customUpdateRow(row.id, "nextWeekPlan", value)}
-                    placeholder="0"
-                    showIndicator={false}
-                    backgroundType="none"
-                  />
+                  <td className="px-3 py-2 text-center">
+                    <PercentageCell
+                      value={row.nextWeekPlan}
+                      onChange={(value) => customUpdateRow(row.id, "nextWeekPlan", value)}
+                      readOnly={descriptionsReadOnly}
+                    />
+                  </td>
 
                   {/* % Up Next Week Plan */}
-                  <PercentageCell
-                    value={row.upNextWeekPlan}
-                    placeholder="0"
-                    readOnly
-                    showIndicator={false}
-                    backgroundType="green"
-                  />
+                  <td className="px-3 py-2 text-center">
+                    <PercentageCell
+                      value={row.upNextWeekPlan}
+                      onChange={(value) => customUpdateRow(row.id, "upNextWeekPlan", value)}
+                      readOnly={descriptionsReadOnly}
+                    />
+                  </td>
 
                   {/* Actions */}
                   <td className="px-2 py-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeRow(row.id)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {!descriptionsReadOnly && (
+                      <Button
+                        onClick={() => removeRow(row.id)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -483,33 +481,37 @@ export default function OverallProgressTable({
 
       {/* Add Buttons */}
       <div className="flex gap-2">
-        <Button
-          onClick={localAddTitleRow}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Title Row
-        </Button>
-        <Button
-          onClick={localAddDetailRow}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Detail Row
-        </Button>
-        <Button
-          onClick={localAddSubDetailRow}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Sub Detail
-        </Button>
+        {!descriptionsReadOnly && (
+          <div className="flex gap-2">
+            <Button
+              onClick={localAddTitleRow}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Title Row
+            </Button>
+            <Button
+              onClick={localAddDetailRow}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Detail Row
+            </Button>
+            <Button
+              onClick={localAddSubDetailRow}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Sub Detail
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
