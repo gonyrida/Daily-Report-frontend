@@ -1,5 +1,5 @@
 // PurchaseRequestForm.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,35 @@ import CustomCombobox from './CustomCombobox';
 import MaterialActualCost from './MaterialActualCost';
 import AttachmentsTab, { Attachment } from './AttachmentsTab';
 
+const parseFileSize = (fileSize) => {
+  if (fileSize === undefined || fileSize === null) return 0;
+  if (typeof fileSize === 'number') return fileSize;
+  if (typeof fileSize !== 'string') return 0;
+  let normalized = fileSize.trim().toUpperCase();
+
+  const parts = normalized.split(' ');
+  if (parts.length === 0) return 0;
+
+  let value = parseFloat(parts[0].replace(/,/g, ''));
+  if (Number.isNaN(value)) return 0;
+
+  const suffix = parts[1] || 'B';
+  switch (true) {
+    case suffix.startsWith('KB'):
+      return Math.round(value * 1024);
+    case suffix.startsWith('MB'):
+      return Math.round(value * 1024 * 1024);
+    case suffix.startsWith('GB'):
+      return Math.round(value * 1024 * 1024 * 1024);
+    case suffix.startsWith('TB'):
+      return Math.round(value * 1024 * 1024 * 1024 * 1024);
+    default:
+      return Math.round(value);
+  }
+};
+
 interface PurchaseRequestFormProps {
-  mode: 'create' | 'edit' | 'revise';
+  mode: string;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   onRefresh: () => void;
@@ -133,6 +160,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			},
 			items: data.items || [],
 			formattedGrandTotal: data.formattedGrandTotal || '',
+			requestDescription: data.requestDescription || '',
+			requestRemarks: data.requestRemarks || '',
+			attachments: data.attachments || [],
 			approvers: {
 				preparedBy: data.approvers?.preparedBy || '',
 				checkedBy: data.approvers?.checkedBy || '',
@@ -143,6 +173,25 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			priority: data.priority
     };
 	};
+
+	const getPRSummaryData = async (projectId: string) => {
+		try {
+			setPrSummaryData('loading'); // Set loading state
+			const response = await apiGet(`/purchase-requests/pr-summary/${projectId}`);
+			const result = await response.json();
+			setPrSummaryData(result.data);
+		} catch (error) {
+			console.error('Error fetching PR summary data:', error);
+			setPrSummaryData(null); // Reset to null on error
+			return null;
+		}
+	}
+
+	useEffect(() => {
+		if (initialData?.projectFrom?.mainId) {
+			getPRSummaryData(initialData.projectFrom.mainId)
+		}
+	}, [initialData])
 
   const [formData, setFormData] = useState(() => {
     if (mode === 'edit' && initialData) {
@@ -171,6 +220,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
           services: false
         },
         items: [],
+        requestDescription: '',
+        requestRemarks: '',
+        attachments: [],
         approvers: {
 					preparedBy: '',
           checkedBy: '',
@@ -186,10 +238,22 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
 	useEffect(() => {
+		// Sync attachments to formData
+		setFormData(prev => ({
+			...prev,
+			attachments: attachments
+		}));
+	}, [attachments]);
+
+	useEffect(() => {
 		if ((mode === 'edit' || mode === 'revise') && initialData) {
 			setFormData({
 				...initialData,
 			});
+			// Also set attachments from initialData
+			if (initialData.attachments) {
+				setAttachments(initialData.attachments);
+			}
 		}
 	}, [initialData, mode]);
 
@@ -224,12 +288,18 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			deliveryPlace: '',
 			categories: { construction: false, admin: false, material: false, services: false },
 			items: [],
+			requestDescription: '',
+			requestRemarks: '',
+			attachments: [],
 			approvers: { preparedBy: '', checkedBy: '', verifiedBy: '', approvedBy: '' },
 			status: '',
 			priority: ''
 		});
+		setSelectedItems([]); // Clear any selected items
+		setPrSummaryData(null); // Reset PR summary data
+		setActiveTab('purchase-request'); // Reset to first tab
 		setAttachments([]);
- }
+ 	}
 
 	const handleSubmit = async (action) => {
 		setIsSubmitting(true);
@@ -254,7 +324,14 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				return;
 			}
 
-			const submissionData = { ...formData };
+			const submissionData = {
+				...formData,
+				attachments: formData.attachments.map(attachment => ({
+					...attachment,
+					fileSize: parseFileSize(attachment.fileSize),
+					base64: attachment.imageData || attachment.base64 // Use imageData as base64
+				}))
+			};
 
 			let result = null;
 
@@ -300,6 +377,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
             deliveryPlace: '',
             categories: { construction: false, admin: false, material: false, services: false },
             items: [],
+            requestDescription: '',
+            requestRemarks: '',
+            attachments: [],
             approvers: { preparedBy: '', checkedBy: '', verifiedBy: '', approvedBy: '' },
 						status: '',
 						priority: ''
@@ -488,29 +568,30 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			return 'New Purchase Request';
 		} else if (mode === 'edit') {
 			return 'Edit Purchase Request';
-		} else {
+		} else if (mode === 'revise') {
 			return 'Revise Purchase Request';
 		}
 	}
 
-	const getPRSummaryData = async (projectId: string) => {
-		try {
-			setPrSummaryData('loading'); // Set loading state
-			const response = await apiGet(`/purchase-requests/pr-summary/${projectId}`);
-			const result = await response.json();
-			setPrSummaryData(result.data);
-		} catch (error) {
-			console.error('Error fetching PR summary data:', error);
-			setPrSummaryData(null); // Reset to null on error
-			return null;
-		}
-	}
+	const handleFormDataChange = useCallback((updates) => {
+		setFormData(prev => ({ ...prev, ...updates }));
+	}, []);
 
   return (
 		<>
-			<Dialog open={isOpen} onOpenChange={setIsOpen}>
+			<Dialog 
+				open={isOpen} 
+				onOpenChange={(isOpen) => {
+					// When dialog tries to close (X button, outside click, Escape)
+					if (!isOpen) { // Dialog is closing
+						setIsOpen(false);
+						resetForm();
+					} else {
+						setIsOpen(true);
+					}
+				}}>
 				<DialogTrigger asChild>
-					{mode === 'create' && (
+					{/* {mode === 'create' && (
 						<Button 
 							variant="default"
 							onClick={() => {
@@ -535,6 +616,9 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 										services: false
 									},
 									items: [],
+									requestDescription: '',
+									requestRemarks: '',
+									attachments: [],
 									approvers: {
 										preparedBy: '',
 										checkedBy: '',
@@ -551,7 +635,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 						>
 							New Request
 						</Button>
-					)}
+					)} */}
 				</DialogTrigger>
 				<DialogContent 
 					className="max-w-6xl max-h-[95vh] overflow-y-auto"
@@ -1053,9 +1137,11 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 
 						<TabsContent value="placeholder1" className="mt-6">
 							<MaterialActualCost
+								mode={mode}
 								requests={prSummaryData}
 								setActiveTab={setActiveTab}
 								currentFormData={formData}
+								onFormDataChange={handleFormDataChange}
 							/>
 						</TabsContent>
 

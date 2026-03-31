@@ -21,7 +21,7 @@ export interface Attachment {
 interface AttachmentsTabProps {
   attachments: Attachment[];
   onAttachmentsChange: (attachments: Attachment[]) => void;
-  mode: 'create' | 'edit' | 'revise';
+  mode: string;
   isSubmitting: boolean;
   formData: any;
   handleSubmit: (action: string) => void;

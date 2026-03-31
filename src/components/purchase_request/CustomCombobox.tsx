@@ -49,13 +49,12 @@ const CustomCombobox: React.FC<CreatableComboboxProps> = ({
   const [localOptions, setLocalOptions] = useState<Option[]>(initialOptions)
   const [displayLabel, setDisplayLabel] = useState<string>(initialValue)
 
-  // 2. You "Flatten" it for the Sub-Project dropdown
-  // const flattenedOptions = localOptions.flatMap(project => 
-  //   project[optionsFrom].map(sub => ({
-  //     [defaultValue]: sub._id,
-  //     [defaultLabel]: sub.name
-  //   }))
-  // );
+  useEffect(() => {
+    if (initialValue) {
+      // Update internal state when initialValue changes
+      setDisplayLabel(initialValue);
+    }
+  }, [initialValue]);
 
   const duplicatedOptions = [];
   const flattenedOptions = localOptions

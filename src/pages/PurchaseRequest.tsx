@@ -40,6 +40,7 @@ const PurchaseRequest = ({onRefresh}) => {
   const [PRProjects, setPRProjects] = useState([]);
   const [loadingPRProjects, setLoadingPRProjects] = useState(false);
   const [formData, setFormData] = useState({
+    _id: '',
     requesterName: profile?.fullName || '',
     requesterDepartment: profile?.department || '',
     projectName: '',
@@ -61,63 +62,11 @@ const PurchaseRequest = ({onRefresh}) => {
     }
   });
 
-  const [editFormData, setEditFormData] = useState({
-    _id:'',
-    requesterName: '',
-    requesterDepartment: '',
-    projectName: '',
-    purpose: '',
-    requestDate: new Date().toISOString().split('T')[0],
-    deliveryPlace: '',
-    categories: {
-      construction: false,
-      admin: false,
-      material: false,
-      services: false
-    },
-    items: [],
-    approvers: {
-      preparedBy: '',
-      checkedBy: '',
-      verifiedBy: '',
-      approvedBy: ''
-    },
-    status: ''
-  });
-
-  const [reviseFormData, setReviseFormData] = useState({
-    _id:'',
-    requesterName: '',
-    requesterDepartment: '',
-    projectName: '',
-    purpose: '',
-    requestDate: new Date().toISOString().split('T')[0],
-    deliveryPlace: '',
-    categories: {
-      construction: false,
-      admin: false,
-      material: false,
-      services: false
-    },
-    items: [],
-    approvers: {
-      preparedBy: '',
-      checkedBy: '',
-      verifiedBy: '',
-      approvedBy: ''
-    },
-    status: ''
-  });
-
   const [selectedItems, setSelectedItems] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('my-requests');
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [loadingPendingApprovals, setLoadingPendingApprovals] = useState(false);
-  const [showNewRequest, setShowNewRequest] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [editingIndex, setEditingIndex] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedRequests, setSelectedRequests] = useState([]);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -125,17 +74,13 @@ const PurchaseRequest = ({onRefresh}) => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
-  const [editingRequest, setEditingRequest] = useState(null); // NEW: For editing
-  const [showEditModal, setShowEditModal] = useState(false); // NEW: Edit modal visibility
   const [displayValues, setDisplayValues] = useState({
     quantity: '0',
     unitPrice: '0'
   });
   const [isEditMode, setIsEditMode] = useState(false);
-  const [showReviseModal, setShowReviseModal] = useState(false);
-  const [revisingRequest, setRevisingRequest] = useState(null);
-  const [reviseNotes, setReviseNotes] = useState('');
-  const [isRevising, setIsRevising] = useState(false);
+  const [mode, setMode] = useState('create');
+  const [showModal, setShowModal] = useState(false);
 
   // Fetch pending approvals function
   const fetchPendingApprovals = () => {
@@ -192,152 +137,7 @@ const PurchaseRequest = ({onRefresh}) => {
     }
   }, [showAddItemModal, isEditMode]);
 
-  const [newItem, setNewItem] = useState({
-    description: '',
-    unit: '',
-    quantity: 0,
-    unitPrice: 0,
-    brand: '',
-    reference: '',
-    note: ''
-  });
-
   const { toast } = useToast();
-
-  // Mock projects data
-  const mockProjects = [
-    {
-      _id: '1',
-      projectCode: 'PRJ-001',
-      name: 'Website Redesign',
-      createdBy: {
-        firstName: 'John',
-        lastName: 'Doe'
-      },
-      status: 'ACTIVE',
-      createdAt: '2026-01-15T10:30:00Z'
-    },
-    {
-      _id: '2',
-      projectCode: 'PRJ-002',
-      name: 'Mobile App Development',
-      createdBy: {
-        firstName: 'Jane',
-        lastName: 'Smith'
-      },
-      status: 'COMPLETED',
-      createdAt: '2026-02-20T14:15:00Z'
-    },
-    {
-      _id: '3',
-      projectCode: 'PRJ-003',
-      name: 'Database Migration',
-      createdBy: {
-        firstName: 'Mike',
-        lastName: 'Johnson'
-      },
-      status: 'ON_HOLD',
-      createdAt: '2026-03-05T09:45:00Z'
-    },
-    {
-      _id: '4',
-      projectCode: 'PRJ-004',
-      name: 'API Integration',
-      createdBy: {
-        firstName: 'Sarah',
-        lastName: 'Williams'
-      },
-      status: 'ACTIVE',
-      createdAt: '2026-03-10T16:20:00Z'
-    }
-  ];
-
-  const handleEditSelected = () => {
-    if (selectedItems.length === 1) {
-      const itemIndex = selectedItems[0];
-      
-      // Smart context detection
-      const isEditMode = showEditModal;
-      const currentItems = isEditMode ? editFormData.items : formData.items;
-      const item = currentItems[itemIndex];
-      
-      setNewItem({
-        description: item.description,
-        unit: item.unit,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        brand: item.brand,
-        reference: item.reference,
-        note: item.note
-      });
-      
-      setEditingIndex(itemIndex);
-
-      // Set display values for editing
-      setDisplayValues({
-        quantity: item.quantity.toString(),
-        unitPrice: item.unitPrice.toString()
-      });
-      setIsEditMode(true); // Set to edit mode
-      setShowAddItemModal(true);
-    }
-  };
-
-  const handleRemoveSelected = () => {
-    if (selectedItems.length > 0) {
-      // Smart context detection
-      const isEditMode = showEditModal;
-      
-      if (isEditMode) {
-        const updatedItems = editFormData.items.filter((_, index) => !selectedItems.includes(index));
-        setEditFormData({...editFormData, items: updatedItems});
-      } else {
-        const updatedItems = formData.items.filter((_, index) => !selectedItems.includes(index));
-        setFormData({...formData, items: updatedItems});
-      }
-      setSelectedItems([]);
-    }
-  };
-
-  // Helper functions for number to words (from improv.md)
-  const numberToWords = (num) => {
-    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-    const scales = ['', 'Thousand', 'Million', 'Billion'];
-
-    const convertChunk = (n) => {
-      let chunkStr = "";
-      if (n >= 100) {
-        chunkStr += ones[Math.floor(n / 100)] + " Hundred ";
-        n %= 100;
-      }
-      if (n >= 20) {
-        chunkStr += tens[Math.floor(n / 10)] + " ";
-        n %= 10;
-      }
-      if (n > 0) {
-        chunkStr += ones[n] + " ";
-      }
-      return chunkStr.trim();
-    }
-
-    if (num === 0) return "Zero";
-
-    let words = "";
-    let scaleIdx = 0;
-
-    while (num > 0) {
-      let chunk = num % 1000;
-      if (chunk !== 0) {
-        let chunkText = convertChunk(chunk);
-        words = chunkText + (scales[scaleIdx] ? " " + scales[scaleIdx] : "") + " " + words;
-      }
-      num = Math.floor(num / 1000);
-      scaleIdx++;
-    }
-
-    return words.trim();
-  }
 
   const handleViewDetails = (request) => {
     const approversFromWorkflow = {
@@ -469,7 +269,6 @@ const PurchaseRequest = ({onRefresh}) => {
 
   const handleEditRequest = (request) => {
     // console.log('Edit request:', request);
-    setEditingRequest(request);
     // console.log('Setting editingRequest to:', request);
     // console.log('Setting editFormData to:', editFormData);
 
@@ -480,91 +279,19 @@ const PurchaseRequest = ({onRefresh}) => {
       approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
     };
 
-    const data = {
-      _id: request._id || '',
-      requesterName: request.requesterName || '',
-      requesterDepartment: request.requesterDepartment || '',
-      projectName: request.projectName || '',
-      projectFrom: request.projectFrom || {},
-      label: request.label || '',
-      purpose: request.purpose || '',
+    setFormData({
+      ...request,
       requestDate: request.requestDate ? new Date(request.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      deliveryPlace: request.deliveryPlace || '',
-      categories: request.categories || {
-        construction: false,
-        admin: false,
-        material: false,
-        services: false
-      },
-      items: request.items || [],
-      formattedGrandTotal: request.formattedGrandTotal || 0,
       approvers: approversFromWorkflow,
-      status: request.status || 'draft'
-    };
+    });
     
-    // Populate formData with request data
-    setEditFormData(data);
-
+    // // Populate formData with request data
+    setMode('edit')
     setSelectedRequests([]); // Clear selection after edit opens
     setSelectedItems([]); // CLEAR selection from New Request modal
-    setShowEditModal(true);
+    setShowModal(true);
     // console.log('editingRequest after set:', editingRequest);
     // console.log('editFormData after set:', editFormData);
-  };
-
-  const handlePlaceholder1 = (request) => {
-    console.log('Placeholder 1 for:', request);
-    // TODO: Implement placeholder 1 functionality
-    toast({
-      title: "Placeholder 1",
-      description: `Action for request: ${request.id}`
-    });
-  };
-
-  const handleUpdateRequest = async (action = 'update') => {
-    setIsUpdating(true);
-    try {
-      const updateData = {
-        ...editFormData,
-        ...(action === 'post' && { status: 'pending' })
-      };
-
-      const response = await apiPut(`/purchase-requests/${editingRequest._id}`, updateData);
-      const result = await response.json();
-      
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: "Request updated successfully"
-        });
-        setShowEditModal(false);
-        setEditingRequest(null);
-        // Refresh requests
-        const fetchRequests = async () => {
-          const endpoint = activeTab === 'my-requests' 
-            ? '/purchase-requests/my-requests' 
-            : '/purchase-requests';
-          const response = await apiGet(endpoint);
-          const result = await response.json();
-          if (result.success) {
-            setRequests(result.data);
-          }
-        };
-        fetchRequests();
-      } else {
-        toast({
-          title: "Error",
-          description: result.message || "Failed to update request"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update request"
-      });
-    } finally {
-      setIsUpdating(false);
-    }
   };
 
   const getPendingStatusText = (request) => {
@@ -662,14 +389,16 @@ const PurchaseRequest = ({onRefresh}) => {
       approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
     };
 
-    setReviseFormData({
+    setFormData({
       ...request,
       requestDate: request.requestDate ? new Date(request.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       approvers: approversFromWorkflow
     });
+
+    setMode('revise')
     setSelectedRequests([]);
     setSelectedItems([]);
-    setShowReviseModal(true);
+    setShowModal(true);
   };
 
   const refreshRequests = async () => {
@@ -680,6 +409,29 @@ const PurchaseRequest = ({onRefresh}) => {
       if (result.success) {
         setRequests(result.data);
       }
+      setMode('create')
+      setFormData({
+        _id: '',
+        requesterName: profile?.fullName || '',
+        requesterDepartment: profile?.department || '',
+        projectName: '',
+        purpose: '',
+        requestDate: new Date().toISOString().split('T')[0],
+        deliveryPlace: '',
+        categories: {
+          construction: false,
+          admin: false,
+          material: false,
+          services: false
+        },
+        items: [],
+        // NEW: Add approvers selection
+        approvers: {
+          checkedBy: '',
+          verifiedBy: '',
+          approvedBy: ''
+        }
+      })
     } catch (error) {
       console.error('Failed to refresh requests:', error);
     }
@@ -738,39 +490,27 @@ const PurchaseRequest = ({onRefresh}) => {
                   <TabsContent value="my-requests" className="space-y-6">
                     {/* Button Row */}
                     <div className="flex gap-2 mb-6 sticky top-0 bg-background z-10 py-4 border-b">
-                      {/* New Request From */}
+                      {/* Request Form */}
                       <PurchaseRequestForm
-                        mode="create"
-                        isOpen={showNewRequest}
-                        setIsOpen={setShowNewRequest}
+                        key={formData?._id || 'request'} //Unique key to force reset
+                        mode={mode}
+                        isOpen={showModal}
+                        setIsOpen={setShowModal}
                         onRefresh={refreshRequests}
+                        initialData={formData}
+                        requestId={formData?._id}
                         projectData={PRProjects}
                       />
 
-                      {/* Edit Request Form */}
-                      <PurchaseRequestForm
-                        key={editFormData?._id || 'edit-request'} // This forces the reset
-                        mode="edit"
-                        isOpen={showEditModal}
-                        setIsOpen={setShowEditModal}
-                        onRefresh={refreshRequests}
-                        initialData={editFormData}
-                        requestId={editFormData?._id}
-                        projectData={PRProjects}
-                      />
-
-                      {/* Revise Request Form */}
-                      <PurchaseRequestForm
-                        key={reviseFormData?._id || 'revise-request'} // This forces the reset
-                        mode="revise"
-                        isOpen={showReviseModal}
-                        setIsOpen={setShowReviseModal}
-                        onRefresh={refreshRequests}
-                        initialData={reviseFormData}
-                        requestId={reviseFormData?._id}
-                        projectData={PRProjects}
-                      />
-
+                      <Button 
+                        variant="default"
+                        onClick={() => {
+                          setMode('create');
+                          setShowModal(true);
+                        }}
+                      >
+                        New Request
+                      </Button>
                       <Button 
                         variant="default" 
                         onClick={() => {

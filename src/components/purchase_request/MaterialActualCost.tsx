@@ -26,9 +26,11 @@ const EmptyState = ({ onCreateNew, onSelectProject }) => (
 );
 
 const MaterialActualCost = ({
+	mode = 'create',
 	requests,
 	setActiveTab,
-	currentFormData = null
+	currentFormData = null,
+	onFormDataChange
 }) => {
 
 	console.log("This is the MA requet got ", requests)
@@ -60,9 +62,31 @@ const MaterialActualCost = ({
 	const reports = requests?.reports || [];
 	const summary = requests?.summary || { totalSpend: 0, reportCount: 0 };
 
-	// State for current request inputs
-	const [currentDescription, setCurrentDescription] = useState(currentFormData?.requestDescription || '');
-	const [currentRemarks, setCurrentRemarks] = useState(currentFormData?.requestRemarks || '');
+	// Track editable values for the current request row
+	const [editableRowData, setEditableRowData] = useState({
+		description: currentFormData?.requestDescription || '',
+		remarks: currentFormData?.requestRemarks || ''
+	});
+
+	// Update when currentFormData changes (mode switch or new request)
+	useEffect(() => {
+		if (currentFormData) {
+			setEditableRowData({
+				description: currentFormData.requestDescription || '',
+				remarks: currentFormData.requestRemarks || ''
+			});
+		}
+	}, [currentFormData?._id, mode]);
+
+	// Sync changes back to parent formData
+	useEffect(() => {
+		if (onFormDataChange) {
+			onFormDataChange({
+				requestDescription: editableRowData.description,
+				requestRemarks: editableRowData.remarks
+			});
+		}
+	}, [editableRowData.description, editableRowData.remarks]);
 
 	// Calculate current request total from form data
 	const getCurrentRequestTotal = () => {
@@ -70,27 +94,44 @@ const MaterialActualCost = ({
 		return currentFormData.items.reduce((total, item) => total + (item.quantity * item.unitPrice || 0), 0);
 	};
 
+	// Build unified reports array including current request, sorted by 'no' field
+	const buildUnifiedReports = () => {
+		const baseReports = [...reports];
+		
+		if (currentFormData) {
+			// Check if currentFormData already exists in reports (by _id)
+			const existingIndex = baseReports.findIndex(r => r._id === currentFormData._id);
+			
+			if (existingIndex >= 0 && (mode === 'edit' || mode === 'revise')) {
+				// Replace existing report with editable version
+				baseReports[existingIndex] = {
+					...currentFormData,
+					isEditable: true
+				};
+			} else if (mode === 'create') {
+				// Add new request at end for create mode
+				baseReports.push({
+					...currentFormData,
+					label: `MR #${summary.reportCount + 1}`,
+					version: 0,
+					status: 'draft',
+					no: summary.reportCount + 1,
+					isEditable: true,
+					isNew: true
+				});
+			}
+		}
+		
+		// Sort by 'no' field
+		return baseReports.sort((a, b) => (a.no || 0) - (b.no || 0));
+	};
+
+	const unifiedReports = buildUnifiedReports();
+
 	return (
 		<>
 			<div className="bg-muted/30 p-4 rounded-lg">
 				<h3 className="text-lg font-semibold mb-4">Material - Actual Cost</h3>
-
-        {/* Summary Section */}
-        {summary && (
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <h4 className="text-md font-semibold mb-2">Project Summary</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total Reports</p>
-                <p className="text-2xl font-bold text-blue-600">{summary.reportCount}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total Spend</p>
-                <p className="text-2xl font-bold text-green-600">${summary.totalSpend.toLocaleString()}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Empty State when no reports */}
         {reports.length === 0 && !currentFormData && (
@@ -102,6 +143,7 @@ const MaterialActualCost = ({
           </div>
         )}
 
+        {/* Summary Section */}
         <div className="border rounded-lg overflow-hidden">
           <table className="w-full">
             <thead className="bg-muted/50">
@@ -116,76 +158,65 @@ const MaterialActualCost = ({
               </tr>
             </thead>
             <tbody>
-              {/* Existing Reports */}
-              {reports.map((report) => (
-                <tr key={report._id} className="border-t hover:bg-muted/30">
-                  <td className="text-center p-2 text-sm font-medium">{report.label}</td>
-                  <td className="text-center p-2 text-sm font-medium">R-{report.version || 0}</td>
-                  <td className="text-center p-2 text-sm font-medium">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      report.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      report.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {report.status}
-                    </span>
-                  </td>
-                  <td className="text-center p-2 text-sm font-medium">{report.purpose}</td>
-                  <td className="text-center p-2 text-sm font-medium">
-                    {report.requestDescription 
-                      ? report.requestDescription.trim() 
-                      : 'No description available'
-                    }
-                  </td>
-                  <td className="text-center p-2 text-sm font-medium">${report.grandTotal?.toLocaleString() || '0'}</td>
-                  <td className="text-center p-2 text-sm font-medium">
-                    {report.requestRemarks 
-                      ? report.requestRemarks.trim() 
-                      : report.remark 
-                        ? report.remark.trim() 
-                        : '-'
-                    }
-                  </td>
-                </tr>
-              ))}
-              
-              {/* Current Request Row */}
-              {currentFormData && (
-                <tr className="border-t bg-blue-50 dark:bg-blue-900/20 font-semibold">
-                  <td className="text-center p-2 text-sm font-medium text-blue-700">
-                    MR #{summary.reportCount + 1}
-                  </td>
-                  <td className="text-center p-2 text-sm font-medium text-blue-700">R-0</td>
-                  <td className="text-center p-2 text-sm font-medium">
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                      Unknown
-                    </span>
-                  </td>
-                  <td className="text-center p-2 text-sm font-medium text-blue-700">
-                    {currentFormData.purpose || 'No category selected'}
-                  </td>
-                  <td className="text-center p-2 text-sm font-medium">
-                    <Input
-                      value={currentDescription}
-                      onChange={(e) => setCurrentDescription(e.target.value)}
-                      placeholder="Enter description..."
-                      className="text-xs h-8 text-center border-blue-200 focus:border-blue-400"
-                    />
-                  </td>
-                  <td className="text-center p-2 text-sm font-medium text-blue-700">
-                    ${getCurrentRequestTotal().toLocaleString()}
-                  </td>
-                  <td className="text-center p-2 text-sm font-medium">
-                    <Input
-                      value={currentRemarks}
-                      onChange={(e) => setCurrentRemarks(e.target.value)}
-                      placeholder="Enter remarks..."
-                      className="text-xs h-8 text-center border-blue-200 focus:border-blue-400"
-                    />
-                  </td>
-                </tr>
-              )}
+              {unifiedReports.map((report) => {
+                const isCurrentRequest = report._id === currentFormData?._id || report.isNew;
+                const isEditable = isCurrentRequest && (mode === 'create' || mode === 'edit' || mode === 'revise');
+                
+                return (
+                  <tr 
+                    key={report._id || 'new-request'} 
+                    className={`border-t ${isEditable ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : 'hover:bg-muted/30'}`}
+                  >
+                    <td className="text-center p-2 text-sm font-medium">
+                      {`MR #${report.no}`}
+                    </td>
+                    <td className="text-center p-2 text-sm font-medium">
+                      R-{report.version ?? 0}
+                    </td>
+                    <td className="text-center p-2 text-sm font-medium">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        report.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        report.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        report.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {report.status || 'Unknown'}
+                      </span>
+                    </td>
+                    <td className="text-center p-2 text-sm font-medium">
+                      {report.purpose || currentFormData?.purpose || 'No category'}
+                    </td>
+                    <td className="text-center p-2 text-sm font-medium">
+                      {isEditable ? (
+                        <Input
+                          value={editableRowData.description}
+                          onChange={(e) => setEditableRowData(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Enter description..."
+                          className="text-xs h-8 text-center border-blue-200 focus:border-blue-400"
+                        />
+                      ) : (
+                        report.requestDescription || 'No description available'
+                      )}
+                    </td>
+                    <td className="text-center p-2 text-sm font-medium">
+                      ${isEditable ? getCurrentRequestTotal().toLocaleString() : (report.grandTotal?.toLocaleString() || '0')}
+                    </td>
+                    <td className="text-center p-2 text-sm font-medium">
+                      {isEditable ? (
+                        <Input
+                          value={editableRowData.remarks}
+                          onChange={(e) => setEditableRowData(prev => ({ ...prev, remarks: e.target.value }))}
+                          placeholder="Enter remarks..."
+                          className="text-xs h-8 text-center border-blue-200 focus:border-blue-400"
+                        />
+                      ) : (
+                        report.requestRemarks || report.remark || '-'
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -196,11 +227,14 @@ const MaterialActualCost = ({
             <h4 className="text-lg font-bold text-green-800 dark:text-green-200">TOTAL</h4>
             <div className="text-right">
               <p className="text-sm text-green-600 dark:text-green-300 mb-1">
-                Including {summary.reportCount} existing report{summary.reportCount !== 1 ? 's' : ''}
-                {currentFormData ? ' + 1 current request' : ''}
+                Including {unifiedReports.length} request{unifiedReports.length !== 1 ? 's' : ''}
               </p>
               <p className="text-2xl font-bold text-green-800 dark:text-green-200">
-                ${(summary.totalSpend + getCurrentRequestTotal()).toLocaleString()}
+                ${unifiedReports.reduce((sum, report) => {
+                  const isCurrent = report._id === currentFormData?._id || report.isNew;
+                  const reportTotal = isCurrent ? getCurrentRequestTotal() : (report.grandTotal || 0);
+                  return sum + reportTotal;
+                }, 0).toLocaleString()}
               </p>
             </div>
           </div>
@@ -227,7 +261,10 @@ const MaterialActualCost = ({
                     const materialActual = summary.materialsActual?.find(
                       item => item.purpose === purpose.name
                     );
-                    const actualTotal = materialActual?.actualTotal || 0;
+                    // For each purpose row, calculate:
+                    const actualTotal = (materialActual?.actualTotal || 0) + 
+                      (currentFormData?.purpose === purpose.name ? getCurrentRequestTotal() : 0);
+
                     const remainingBudget = (purpose.DMBOQBudget || 0) - actualTotal;
                     
                     return (
@@ -265,7 +302,8 @@ const MaterialActualCost = ({
                       ${summary.project.purposes.reduce((sum, p) => sum + (p.DMBOQBudget || 0), 0).toLocaleString()}
                     </td>
                     <td className="text-center p-3 text-sm font-bold text-blue-600">
-                      ${(summary.materialsActual?.reduce((sum, item) => sum + (item.actualTotal || 0), 0) || 0).toLocaleString()}
+                      ${((summary.materialsActual?.reduce((sum, item) => sum + (item.actualTotal || 0), 0) || 0) + 
+                        getCurrentRequestTotal()).toLocaleString()}
                     </td>
                     <td className={`text-center p-3 text-sm font-bold ${
                       (summary.project.purposes.reduce((sum, p) => sum + (p.DMBOQBudget || 0), 0) - 
