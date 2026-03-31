@@ -1,5 +1,6 @@
 export interface HsesData {
   training: Array<{
+    id: string;
     typeOfTraining: string;
     date: string;
     venue: string;
@@ -8,12 +9,14 @@ export interface HsesData {
     remarks: string;
   }>;
   inspection: Array<{
+    id: string;
     typeOfInspection: string;
     date: string;
     inspector: string;
     remarks: string;
   }>;
   permit: Array<{
+    id: string;
     typeOfPermit: string;
     startDate: string;
     endDate: string;

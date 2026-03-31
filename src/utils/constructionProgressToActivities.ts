@@ -71,7 +71,7 @@ export function mergeConstructionIntoActivityRows(
       percentage: existing ? existing.percentage : percent.toString(),
 
       // Source tracking
-      source: 'construction-progress',
+      source: 'manual',
 
       // Indentation level for display hierarchy
       indentLevel: level,

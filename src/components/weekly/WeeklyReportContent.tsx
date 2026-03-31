@@ -341,10 +341,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
-    if (onClearQaqcData && qaqcTableHook.clearQaqcData) {
-      onClearQaqcData(qaqcTableHook.clearQaqcData);
+    if (onClearQaqcData && qaqcTableHook.clearQaqcStorage) {
+      onClearQaqcData(qaqcTableHook.clearQaqcStorage);
     }
-  }, [onClearQaqcData, qaqcTableHook.clearQaqcData]);
+  }, [onClearQaqcData, qaqcTableHook.clearQaqcStorage]);
 
   // Expose clearHsesData function to parent for successful submit cleanup
   useEffect(() => {
@@ -423,17 +423,17 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
       {/* QAQC Tab */}
       <div style={{ display: activeTab === "qaqc-status" ? "block" : "none" }} className="bg-card p-3">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-0 text-foreground">
+        {/* <div className="flex items-center justify-between mb-3"> */}
+          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
             4. QA/QC STATUS
           </h2>
-          <button
+          {/* <button
             onClick={loadQaqcExampleData}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium mr-6"
           >
             📝 Load Example Data
-          </button>
-        </div>
+          </button> */}
+        {/* </div> */}
         <QaqcStatusNew 
           sections={qaqcTableHook.filteredSections}
           tableData={qaqcTableHook.tableData}
@@ -458,8 +458,11 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
                   
                   backendData[backendKey] = {
                     items: nonEmptyRows.map(row => ({
-                      code: row.code, description: row.description, status: row.status,
+                      code: row.code, 
+                      description: row.description, 
+                      status: row.status,
                       dateResponded: row.dateResponse
+                      // Note: We don't send _id field as backend doesn't expect it
                     })),
                     comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
                   };
@@ -475,17 +478,17 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
       {/* HSES Tab */}
       <div style={{ display: activeTab === "hses" ? "block" : "none" }} className="bg-card p-3">
-        <div className="flex items-center justify-between mb-3">
+        {/* <div className="flex  mb-3"> */}
           <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-0 text-foreground">
             5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
           </h2>
-          <button
+          {/* <button
             onClick={loadHsesExampleData}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium mr-6"
           >
             📝 Load Example Data
-          </button>
-        </div>
+          </button> */}
+        {/* </div> */}
         <Hses 
           isEditing={true}
           data={currentHsesData}

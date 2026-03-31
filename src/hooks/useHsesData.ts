@@ -2,31 +2,30 @@ import { useState, useEffect } from "react";
 import { HsesData } from "@/types/hses.types";
 import { createHSESections } from "@/utils/hseSectionUtils";
 
-export const useHsesData = (initialData?: HsesData, isEditing: boolean = false) => {
-  const defaultData: HsesData = {
-    training: [
-      { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-      { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-      { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
-    ],
-    inspection: [
-      { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-      { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-      { typeOfInspection: "", date: "", inspector: "", remarks: "" }
-    ],
-    permit: [
-      { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-      { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-      { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
-    ],
-    firstAidAccident: "",
-    otherActivities: "",
-    hsePhotoReferences: createHSESections(),
-  };
+export const defaultHsesData: HsesData = {
+  training: [
+    { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+    { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+    { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
+  ],
+  inspection: [
+    { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
+    { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
+    { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" }
+  ],
+  permit: [
+    { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+    { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+    { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
+  ],
+  firstAidAccident: "",
+  otherActivities: "",
+  hsePhotoReferences: createHSESections(),
+};
 
-  // Use state only - no localStorage persistence
+export const useHsesData = (initialData?: HsesData, isEditing: boolean = false) => {
   const [hsesData, setHsesData] = useState<HsesData>(() => {
-    return initialData || defaultData;
+    return initialData || defaultHsesData;
   });
 
   // Sync with external data when it changes (e.g., after loading from database)
@@ -42,7 +41,7 @@ export const useHsesData = (initialData?: HsesData, isEditing: boolean = false) 
   };
 
   const clearHsesData = () => {
-    setHsesData(defaultData);
+    setHsesData(defaultHsesData);
   };
 
   return {

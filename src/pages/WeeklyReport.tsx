@@ -268,6 +268,7 @@ const WeeklyReport = () => {
 
   // Callback functions for clearing data
   const handleClearQaqcData = (clearFn: () => void) => {
+    console.log('🔍 DEBUG: QAQC clear function registered');
     clearQaqcDataRef.current = clearFn;
   };
 
@@ -719,7 +720,21 @@ const WeeklyReport = () => {
             weeklyActivities: [],
             nextWeekPlan: []
           },
-          qaqcStatus: [],
+          qaqcStatus: {
+            ncr: { items: [], comments: "" },
+            car: { items: [], comments: "" },
+            scar: { items: [], comments: "" },
+            pmsi: { items: [], comments: "" },
+            csi: { items: [], comments: "" },
+            ir: { items: [], comments: "" },
+            mfa: { items: [], comments: "" },
+            rfi: { items: [], comments: "" },
+            rfa: { items: [], comments: "" },
+            fcr: { items: [], comments: "" },
+            vo: { items: [], comments: "" },
+            tr: { items: [], comments: "" },
+            mir: { items: [], comments: "" }
+          },
           hses: {
             training: [
               { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' },
@@ -901,7 +916,21 @@ const WeeklyReport = () => {
             weeklyActivities: [],
             nextWeekPlan: []
           },
-          qaqcStatus: [],
+          qaqcStatus: {
+            ncr: { items: [], comments: "" },
+            car: { items: [], comments: "" },
+            scar: { items: [], comments: "" },
+            pmsi: { items: [], comments: "" },
+            csi: { items: [], comments: "" },
+            ir: { items: [], comments: "" },
+            mfa: { items: [], comments: "" },
+            rfi: { items: [], comments: "" },
+            rfa: { items: [], comments: "" },
+            fcr: { items: [], comments: "" },
+            vo: { items: [], comments: "" },
+            tr: { items: [], comments: "" },
+            mir: { items: [], comments: "" }
+          },
           hses: {
             training: [
               { typeOfTraining: '', date: '', venue: '', trainer: '', attendee: '', remarks: '' },
@@ -1090,7 +1119,21 @@ const WeeklyReport = () => {
       };
 
       // Use QAQC data from state (like other sections)
-      const qaqcDataForSave = qaqcData || [];
+      const qaqcDataForSave = qaqcData || {
+        ncr: { items: [], comments: "" },
+        car: { items: [], comments: "" },
+        scar: { items: [], comments: "" },
+        pmsi: { items: [], comments: "" },
+        csi: { items: [], comments: "" },
+        ir: { items: [], comments: "" },
+        mfa: { items: [], comments: "" },
+        rfi: { items: [], comments: "" },
+        rfa: { items: [], comments: "" },
+        fcr: { items: [], comments: "" },
+        vo: { items: [], comments: "" },
+        tr: { items: [], comments: "" },
+        mir: { items: [], comments: "" }
+      };
 
       // Helper function to convert File objects to base64 strings
       const convertImagesToBase64 = async (photoReferences: any[]) => {
@@ -1123,19 +1166,19 @@ const WeeklyReport = () => {
       // Use HSES data from state (like other sections)
       const hsesDataForSave = hsesData || {
         training: [
-          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
+          { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
         ],
         inspection: [
-          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-          { typeOfInspection: "", date: "", inspector: "", remarks: "" }
+          { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" }
         ],
         permit: [
-          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
+          { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
         ],
         firstAidAccident: "",
         otherActivities: "",
@@ -1473,7 +1516,21 @@ const WeeklyReport = () => {
       };
 
       // Use QAQC data from state (like other sections)
-      const qaqcDataForSave = qaqcData || [];
+      const qaqcDataForSave = qaqcData || {
+        ncr: { items: [], comments: "" },
+        car: { items: [], comments: "" },
+        scar: { items: [], comments: "" },
+        pmsi: { items: [], comments: "" },
+        csi: { items: [], comments: "" },
+        ir: { items: [], comments: "" },
+        mfa: { items: [], comments: "" },
+        rfi: { items: [], comments: "" },
+        rfa: { items: [], comments: "" },
+        fcr: { items: [], comments: "" },
+        vo: { items: [], comments: "" },
+        tr: { items: [], comments: "" },
+        mir: { items: [], comments: "" }
+      };
 
       // Helper function to convert File objects to base64 strings
       const convertImagesToBase64 = async (photoReferences: any[]) => {
@@ -1506,19 +1563,19 @@ const WeeklyReport = () => {
       // Use HSES data from state (like other sections)
       const hsesDataForSave = hsesData || {
         training: [
-          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-          { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
+          { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
         ],
         inspection: [
-          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-          { typeOfInspection: "", date: "", inspector: "", remarks: "" },
-          { typeOfInspection: "", date: "", inspector: "", remarks: "" }
+          { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" }
         ],
         permit: [
-          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-          { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
+          { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+          { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
         ],
         firstAidAccident: "",
         otherActivities: "",
@@ -1728,9 +1785,7 @@ const WeeklyReport = () => {
           sections: reportData.sections,
           status: 'draft' as const
         };
-        // DEBUG: Log HSE data being sent
-        if (updateData.sections?.hses) {
-        }
+        
         response = await updateWeeklyReport(currentReportId, updateData);
         // Ensure currentReportId is set after successful update
         if (response.success) {
@@ -1740,6 +1795,7 @@ const WeeklyReport = () => {
           const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
           window.history.replaceState({}, '', newUrl);
           
+                    
           // Update local construction progress state - for drafts, keep as-is without rolling total
           const currentData = constructionProgressHook.constructionData;
           if (currentData && currentData.items) {
@@ -1759,6 +1815,14 @@ const WeeklyReport = () => {
             // Update URL to include new report ID
             const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
             window.history.replaceState({}, '', newUrl);
+            
+            // Clear QAQC and HSES localStorage data on successful creation
+            if (clearQaqcDataRef.current) {
+              clearQaqcDataRef.current();
+            }
+            if (clearHsesDataRef.current) {
+              clearHsesDataRef.current();
+            }
           }
         }
       }

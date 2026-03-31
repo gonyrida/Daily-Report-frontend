@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { ColumnConfig, HsesTableComponentProps } from "@/types/hsesTable.types";
 
@@ -10,42 +10,25 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
   emptyMessage,
   addButtonText = "Add Row"
 }) => {
-  // Ensure all rows have unique IDs
-  const dataWithIds = data.map((row, index) => ({
-    ...row,
-    id: row.id || `existing-row-${index}-${Date.now()}`
-  }));
-  
-  const [tableData, setTableData] = useState<any[]>(dataWithIds);
-
-  // Sync with prop data
-  React.useEffect(() => {
-    setTableData(dataWithIds);
-  }, [data]);
+  // IDs must already exist on rows - assigned at data source, not here
+  const tableData = data;
 
   const addRow = () => {
-    const newRow: any = {};
+    const newRow: any = { id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` };
     columns.forEach(column => {
       newRow[column.key] = "";
     });
-    newRow.id = `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newData = [...tableData, newRow];
-    setTableData(newData);
-    onChange?.(newData);
+    onChange?.([...tableData, newRow]);
   };
 
   const removeRow = (rowId: string) => {
-    const newData = tableData.filter((row) => row.id !== rowId);
-    setTableData(newData);
-    onChange?.(newData);
+    onChange?.(tableData.filter((row) => row.id !== rowId));
   };
 
   const updateRow = (index: number, field: string, value: string) => {
-    const newData = tableData.map((row, i) =>
+    onChange?.(tableData.map((row, i) =>
       i === index ? { ...row, [field]: value } : row,
-    );
-    setTableData(newData);
-    onChange?.(newData);
+    ));
   };
 
   if (!isEditing) {
