@@ -237,6 +237,44 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
+  // Helper function to process existing attachments from backend
+  const processExistingAttachments = (backendAttachments: any[]): Attachment[] => {
+    if (!backendAttachments || !Array.isArray(backendAttachments)) return [];
+    
+    return backendAttachments.map(att => {
+      const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].some(ext => 
+        att.filename?.toLowerCase().endsWith(ext)
+      );
+      const isPDF = att.filename?.toLowerCase().endsWith('.pdf');
+      
+      // Generate unique ID if not present
+      const id = att._id || att.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Convert fileSize from number to formatted string
+      let fileSizeStr = att.fileSize;
+      if (typeof att.fileSize === 'number') {
+        const bytes = att.fileSize;
+        if (bytes === 0) fileSizeStr = '0 Bytes';
+        else if (bytes < 1024) fileSizeStr = `${bytes} Bytes`;
+        else if (bytes < 1024 * 1024) fileSizeStr = `${(bytes / 1024).toFixed(2)} KB`;
+        else fileSizeStr = `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      }
+      
+      return {
+        id,
+        filename: att.filename,
+        fileType: att.fileType,
+        fileSize: fileSizeStr,
+        uploadedAt: att.uploadedAt || new Date().toISOString(),
+        status: 'completed' as const,
+        // For images: use base64 as imageData for thumbnail display
+        imageData: isImage ? (att.base64 || null) : null,
+        // Keep base64 for all files (needed for submission and PDF preview)
+        base64: att.base64 || null
+      };
+    });
+  };
+
 	useEffect(() => {
 		// Sync attachments to formData
 		setFormData(prev => ({
@@ -250,9 +288,10 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			setFormData({
 				...initialData,
 			});
-			// Also set attachments from initialData
+			// Also set attachments from initialData - process them first
 			if (initialData.attachments) {
-				setAttachments(initialData.attachments);
+				const processedAttachments = processExistingAttachments(initialData.attachments);
+				setAttachments(processedAttachments);
 			}
 		}
 	}, [initialData, mode]);
@@ -324,14 +363,26 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				return;
 			}
 
-			const submissionData = {
-				...formData,
-				attachments: formData.attachments.map(attachment => ({
-					...attachment,
-					fileSize: parseFileSize(attachment.fileSize),
-					base64: attachment.imageData || attachment.base64 // Use imageData as base64
-				}))
-			};
+			// Prepare attachments with base64 data for all file types
+		let preparedAttachments = formData.attachments;
+		console.log('[PDF Debug] handleSubmit - initial attachments:', formData.attachments);
+		if (typeof window !== 'undefined' && (window as any).prepareAttachmentsForSubmission) {
+			console.log('[PDF Debug] handleSubmit - calling prepareAttachmentsForSubmission');
+			preparedAttachments = await (window as any).prepareAttachmentsForSubmission();
+			console.log('[PDF Debug] handleSubmit - prepared attachments:', preparedAttachments);
+		} else {
+			console.warn('[PDF Debug] handleSubmit - prepareAttachmentsForSubmission not available');
+		}
+
+		const submissionData = {
+			...formData,
+			attachments: preparedAttachments.map(attachment => ({
+				...attachment,
+				fileSize: parseFileSize(attachment.fileSize),
+				base64: attachment.base64 || attachment.imageData || null
+			}))
+		};
+		console.log('[PDF Debug] handleSubmit - final submissionData.attachments:', submissionData.attachments);
 
 			let result = null;
 

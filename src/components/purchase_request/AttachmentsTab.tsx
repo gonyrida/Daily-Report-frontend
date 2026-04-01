@@ -7,6 +7,8 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import PDFPreviewModal from '@/components/PDFPreviewModal';
+import ImageViewModal from './ImageViewModal';
 
 export interface Attachment {
   id: string;
@@ -16,6 +18,7 @@ export interface Attachment {
   uploadedAt: string;
   status: 'uploading' | 'completed' | 'error';
   imageData?: string; // Base64 data for image thumbnails
+  base64?: string; // Base64 data for PDFs and submission
 }
 
 interface AttachmentsTabProps {
@@ -46,6 +49,14 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentsRef = useRef(attachments);
+
+  // Store original File objects for PDF preview and submission
+  const fileStorageRef = useRef<Map<string, File>>(new Map());
+
+  // Modal states for file viewing
+  const [showPDFPreview, setShowPDFPreview] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -98,7 +109,7 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
     const newAttachments: Attachment[] = [];
     const errors: string[] = [];
 
-    console.log(`Starting upload of ${filesArray.length} files`);
+    // console.log(`Starting upload of ${filesArray.length} files`);
 
     // Process files sequentially to avoid race conditions
     const processFile = async (file: File, fileIndex: number): Promise<void> => {
@@ -126,22 +137,31 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
           status: 'uploading'
         };
 
-        console.log(`Processing file ${fileIndex + 1}/${filesArray.length}: ${file.name}, ID: ${attachment.id}`);
+        // Store the original File object for PDF preview and submission
+        fileStorageRef.current.set(attachment.id, file);
+        console.log(`[PDF Debug] Stored file in fileStorageRef:`, {
+          id: attachment.id,
+          filename: file.name,
+          size: file.size,
+          refSize: fileStorageRef.current.size
+        });
+
+        // console.log(`Processing file ${fileIndex + 1}/${filesArray.length}: ${file.name}, ID: ${attachment.id}`);
         newAttachments.push(attachment);
 
         // If it's an image, read the file data for thumbnail
         if (isImageFile(file.name)) {
-          console.log(`Reading image data for ${file.name}, ID: ${attachment.id}`);
+          // console.log(`Reading image data for ${file.name}, ID: ${attachment.id}`);
           const reader = new FileReader();
           
           reader.onload = (e) => {
             const imageData = e.target?.result as string;
-            console.log(`Image data loaded for ${file.name}, ID: ${attachment.id}, Data length: ${imageData?.length || 0}`);
-            console.log(`Base64 preview for ${file.name}:`, imageData?.substring(0, 100) + '...');
+            // console.log(`Image data loaded for ${file.name}, ID: ${attachment.id}, Data length: ${imageData?.length || 0}`);
+            // console.log(`Base64 preview for ${file.name}:`, imageData?.substring(0, 100) + '...');
             
             // Log to network tab by creating a custom event
             if (typeof window !== 'undefined') {
-              console.log(`NETWORK_DATA_${attachment.id}:`, imageData);
+              // console.log(`NETWORK_DATA_${attachment.id}:`, imageData);
               // Also store in window for network inspection
               (window as any)[`attachment_${attachment.id}`] = imageData;
             }
@@ -150,7 +170,7 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
             const attachmentIndex = newAttachments.findIndex(a => a.id === attachment.id);
             if (attachmentIndex !== -1) {
               newAttachments[attachmentIndex] = { ...newAttachments[attachmentIndex], imageData };
-              console.log(`Updated attachment ${attachment.id} in newAttachments array:`, newAttachments[attachmentIndex]);
+              // console.log(`Updated attachment ${attachment.id} in newAttachments array:`, newAttachments[attachmentIndex]);
             }
             resolve();
           };
@@ -184,24 +204,24 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
         if (newAttachments.length > 0) {
           const updatedAttachments = [...attachments, ...newAttachments];
           console.log(`Adding ${newAttachments.length} new attachments to list`);
-          console.log('Final attachments list:', updatedAttachments);
+          // console.log('Final attachments list:', updatedAttachments);
           
           // Store all attachments globally for network inspection
           if (typeof window !== 'undefined') {
             (window as any).allAttachments = updatedAttachments;
-            console.log('All attachments stored in window.allAttachments for inspection');
+            // console.log('All attachments stored in window.allAttachments for inspection');
             
             // Log each attachment's image data to network tab
             updatedAttachments.forEach((att, index) => {
               if (att.imageData) {
-                console.log(`ATTACHMENT_${index + 1}_${att.filename}:`, {
-                  id: att.id,
-                  filename: att.filename,
-                  hasImageData: !!att.imageData,
-                  imageDataLength: att.imageData.length,
-                  imageDataPreview: att.imageData.substring(0, 100) + '...',
-                  fullImageData: att.imageData
-                });
+                // console.log(`ATTACHMENT_${index + 1}_${att.filename}:`, {
+                //   id: att.id,
+                //   filename: att.filename,
+                //   hasImageData: !!att.imageData,
+                //   imageDataLength: att.imageData.length,
+                //   imageDataPreview: att.imageData.substring(0, 100) + '...',
+                //   fullImageData: att.imageData
+                // });
               }
             });
           }
@@ -303,6 +323,8 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
   }, [handleFileUpload]);
 
   const handleDeleteAttachment = useCallback((id: string) => {
+    // Remove file from storage
+    fileStorageRef.current.delete(id);
     const updatedAttachments = attachments.filter(a => a.id !== id);
     onAttachmentsChange(updatedAttachments);
   }, [attachments, onAttachmentsChange]);
@@ -362,52 +384,166 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
     console.log('Previewing image:', attachment.filename);
   };
 
+  const isPDF = (filename: string): boolean => {
+    return filename.toLowerCase().endsWith('.pdf');
+  };
+
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        resolve(result);
+      };
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleViewFile = (attachment: Attachment) => {
+    if (isPDF(attachment.filename)) {
+      // For PDFs: try to get File from storage (new uploads)
+      const file = fileStorageRef.current.get(attachment.id);
+      
+      if (file) {
+        // New upload: use blob URL from File object
+        const blobUrl = URL.createObjectURL(file);
+        setPreviewUrl(blobUrl);
+      } else if (attachment.base64) {
+        // Existing attachment from backend: use base64 data directly
+        setPreviewUrl(attachment.base64);
+      } else {
+        console.warn('No preview data available for PDF:', attachment.filename);
+        return;
+      }
+      setShowPDFPreview(true);
+      
+    } else if (isImageFile(attachment.filename)) {
+      // For images: use existing imageData or base64
+      setPreviewUrl(attachment.imageData || attachment.base64 || null);
+      setShowImagePreview(true);
+    }
+  };
+
+  const handleClosePDFPreview = () => {
+    // Revoke blob URL to prevent memory leak
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setShowPDFPreview(false);
+  };
+
+  const handleCloseImagePreview = () => {
+    setPreviewUrl(null);
+    setShowImagePreview(false);
+  };
+
+  // Prepare attachments for submission - returns attachments with base64 data for all files
+  const prepareAttachmentsForSubmission = async (): Promise<Attachment[]> => {
+    console.log('[PDF Debug] prepareAttachmentsForSubmission called');
+    console.log('[PDF Debug] fileStorageRef size:', fileStorageRef.current.size);
+    console.log('[PDF Debug] attachments count:', attachments.length);
+    
+    return Promise.all(
+      attachments.map(async (att, index) => {
+        console.log(`[PDF Debug] Processing attachment ${index}:`, {
+          id: att.id,
+          filename: att.filename,
+          hasBase64: !!att.base64,
+          hasImageData: !!att.imageData
+        });
+        
+        // If already has base64 (from backend or previous processing), use it
+        if (att.base64) {
+          console.log(`[PDF Debug] Attachment ${att.id} already has base64, using existing`);
+          return att;
+        }
+        
+        // For images with imageData: use that as base64
+        if (isImageFile(att.filename) && att.imageData) {
+          console.log(`[PDF Debug] Attachment ${att.id} is image with imageData`);
+          return { ...att, base64: att.imageData };
+        }
+        
+        // For PDFs: try to read from stored File object (new uploads)
+        if (isPDF(att.filename)) {
+          console.log(`[PDF Debug] Attachment ${att.id} is PDF, checking fileStorageRef`);
+          const file = fileStorageRef.current.get(att.id);
+          if (file) {
+            console.log(`[PDF Debug] Found File for ${att.id}, reading as base64...`);
+            try {
+              const base64 = await readFileAsBase64(file);
+              console.log(`[PDF Debug] Successfully read base64 for ${att.id}, length:`, base64.length);
+              return { ...att, base64 };
+            } catch (err) {
+              console.error(`[PDF Debug] Error reading file for ${att.id}:`, err);
+            }
+          } else {
+            console.warn(`[PDF Debug] No File found in storage for PDF ${att.id}`);
+          }
+        }
+        
+        console.log(`[PDF Debug] Returning attachment ${att.id} without base64`);
+        return att;
+      })
+    );
+  };
+
+  // Expose prepareAttachmentsForSubmission via ref if needed by parent
+  useEffect(() => {
+    // Make function available on the component for parent to call
+    (window as any).prepareAttachmentsForSubmission = prepareAttachmentsForSubmission;
+  }, [attachments]);
+
   return (
     <div 
       className="p-6 bg-white dark:bg-gray-900 min-h-[calc(95vh-200px)] transition-colors duration-200 flex flex-col"
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Drop Zone */}
-      <div
-        data-drop-zone="true"
-        className={`
-          border-2 border-dashed rounded-lg p-8 text-center mb-6 transition-all duration-200 cursor-pointer
-          ${isDragOver 
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' 
-            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
-          }
-        `}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={handleDropZoneClick}
-        onDoubleClick={handleDoubleClick}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
-      >
-        <Upload className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
-        <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Drag and drop files here
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-          Double-click to select files
-        </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-          Press Ctrl+V (Cmd+V on Mac) to paste files
-        </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-          Max {maxFiles} files • Max {maxFileSize}MB each • {allowedFileTypes.join(', ')}
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={allowedFileTypes.join(',')}
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-      </div>
+      {/* Drop Zone - Hidden in view mode */}
+      {mode !== 'view' && (
+        <div
+          data-drop-zone="true"
+          className={`
+            border-2 border-dashed rounded-lg p-8 text-center mb-6 transition-all duration-200 cursor-pointer
+            ${isDragOver 
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' 
+              : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
+            }
+          `}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={handleDropZoneClick}
+          onDoubleClick={handleDoubleClick}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+        >
+          <Upload className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
+          <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Drag and drop files here
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+            Double-click to select files
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+            Press Ctrl+V (Cmd+V on Mac) to paste files
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+            Max {maxFiles} files • Max {maxFileSize}MB each • {allowedFileTypes.join(', ')}
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={allowedFileTypes.join(',')}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </div>
+      )}
 
       {/* Empty State - More Prominent */}
       {attachments.length === 0 && (
@@ -415,10 +551,12 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
           <div className="text-center py-16">
             <FileText className="mx-auto text-gray-300 dark:text-gray-600 mb-6" size={80} />
             <p className="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">
-              No files uploaded yet
+              {mode === 'view' ? 'No attachments' : 'No files uploaded yet'}
             </p>
             <p className="text-gray-400 dark:text-gray-500 text-sm">
-              Upload supporting documents to complete your purchase request
+              {mode === 'view' 
+                ? 'This purchase request has no attached files' 
+                : 'Upload supporting documents to complete your purchase request'}
             </p>
           </div>
         </div>
@@ -468,6 +606,7 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
                       size="sm"
                       variant="secondary"
                       className="transform scale-90 group-hover:scale-100 transition-transform"
+                      onClick={() => handleViewFile(attachment)}
                     >
                       View
                     </Button>
@@ -510,13 +649,15 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
                         </Button>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleDeleteAttachment(attachment.id)}
-                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 rounded transition-colors duration-150"
-                      title="Delete file"
-                    >
-                      <X size={14} />
-                    </button>
+                    {mode !== 'view' && (
+                      <button
+                        onClick={() => handleDeleteAttachment(attachment.id)}
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 rounded transition-colors duration-150"
+                        title="Delete file"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -525,115 +666,131 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
         </div>
       )}
 
-      {/* Action Buttons - Fixed at Bottom */}
-      <div className="mt-auto pt-6 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center">
-          {/* Left side - Previous button */}
-          <div className="flex space-x-2">
-            <Button 
-              type="button" 
-              variant="outline"
-              onClick={() => {
-                // Navigate back to Material Actual Cost tab
-                if (setActiveTab) {
-                  setActiveTab('placeholder1');
-                }
-              }}
-            >
-              ← Previous
-            </Button>
-          </div>
-          
-          {/* Right side - Export, Preview and Cancel */}
-          <div className="flex space-x-2">
-            <Button 
-              type="button" 
-              variant="outline"
-              onClick={() => {
-                // Export logic here
-                console.log("This is final formData: ", formData);
-              }}
-            >
-              Export
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline"
-              onClick={() => {
-                // Preview logic here
-                console.log("Preview clicked");
-              }}
-            >
-              Preview
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline"
-              onClick={() => {
-                // This would need to be passed as a prop or handled differently
-                console.log("Cancel clicked");
-              }}
-            >
-              Cancel
-            </Button>
+      {/* PDF Preview Modal */}
+      <PDFPreviewModal
+        open={showPDFPreview}
+        onClose={handleClosePDFPreview}
+        pdfUrl={previewUrl}
+      />
 
-            {mode === 'create' ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    type="button" 
-                    disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-                  >
-                    {isSubmitting ? "Processing..." : "Options ▼"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleSubmit('post')}>
-                    {isSubmitting ? "Posting..." : "Post"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleSubmit('draft')}>
-                    {isSubmitting ? "Saving..." : "Save as Draft"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : mode === 'edit' ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    type="button" 
-                    disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-                  >
-                    {isSubmitting ? "Processing..." : "Options ▼"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem 
-                    onClick={() => handleSubmit('post')}
-                    disabled={formData?.status !== 'draft'}
-                    className={formData?.status !== 'draft' ? 'opacity-50 cursor-not-allowed' : ''}
-                  >
-                    {isSubmitting ? "Posting..." : "Post"}
-                    {formData?.status !== 'draft' && (
-                      <span className="ml-2 text-xs text-gray-500">(Only for drafts)</span>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleSubmit('update')}>
-                    {isSubmitting ? "Updating..." : "Update"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
+      {/* Image Preview Modal */}
+      <ImageViewModal
+        open={showImagePreview}
+        onClose={handleCloseImagePreview}
+        imageUrl={previewUrl}
+      />
+
+      {/* Action Buttons - Fixed at Bottom - Hidden in view mode */}
+      {mode !== 'view' && (
+        <div className="mt-auto pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center">
+            {/* Left side - Previous button */}
+            <div className="flex space-x-2">
               <Button 
                 type="button" 
-                disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-                onClick={() => handleSubmit('revise')}
+                variant="outline"
+                onClick={() => {
+                  // Navigate back to Material Actual Cost tab
+                  if (setActiveTab) {
+                    setActiveTab('placeholder1');
+                  }
+                }}
               >
-                {isSubmitting ? "Revising..." : "Revise"}
+                ← Previous
               </Button>
-            )}
+            </div>
+            
+            {/* Right side - Export, Preview and Cancel */}
+            <div className="flex space-x-2">
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => {
+                  // Export logic here
+                  console.log("This is final formData: ", formData);
+                }}
+              >
+                Export
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => {
+                  // Preview logic here
+                  console.log("Preview clicked");
+                }}
+              >
+                Preview
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => {
+                  // This would need to be passed as a prop or handled differently
+                  console.log("Cancel clicked");
+                }}
+              >
+                Cancel
+              </Button>
+
+              {mode === 'create' ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      type="button" 
+                      disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                    >
+                      {isSubmitting ? "Processing..." : "Options ▼"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleSubmit('post')}>
+                      {isSubmitting ? "Posting..." : "Post"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSubmit('draft')}>
+                      {isSubmitting ? "Saving..." : "Save as Draft"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : mode === 'edit' ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      type="button" 
+                      disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                    >
+                      {isSubmitting ? "Processing..." : "Options ▼"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem 
+                      onClick={() => handleSubmit('post')}
+                      disabled={formData?.status !== 'draft'}
+                      className={formData?.status !== 'draft' ? 'opacity-50 cursor-not-allowed' : ''}
+                    >
+                      {isSubmitting ? "Posting..." : "Post"}
+                      {formData?.status !== 'draft' && (
+                        <span className="ml-2 text-xs text-gray-500">(Only for drafts)</span>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSubmit('update')}>
+                      {isSubmitting ? "Updating..." : "Update"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button 
+                  type="button" 
+                  disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                  onClick={() => handleSubmit('revise')}
+                >
+                  {isSubmitting ? "Revising..." : "Revise"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
