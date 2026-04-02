@@ -27,6 +27,8 @@ import { getQaqcStatus } from "@/integrations/reportsApi";
 import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
+import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
+import { exportWeeklyReportToExcel } from "@/lib/weeklyreportexcel";
 import {
   createWeeklyReport,
   updateWeeklyReport,
@@ -1986,13 +1988,18 @@ const WeeklyReport = () => {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      // TODO: Implement Excel export functionality
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate export
+      // Generate filename with project name and week number
+      const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.xlsx`;
+      
+      // Export to Excel using ExcelJS
+      await exportWeeklyReportToExcel(excelData, filename);
+      
       toast({
         title: "Excel Exported",
-        description: "Weekly report exported as Excel successfully.",
+        description: `Weekly report exported as ${filename} successfully.`,
       });
     } catch (error) {
+      console.error('Excel export error:', error);
       toast({
         title: "Export Failed",
         description: "Could not export Excel. Please try again.",
@@ -2097,6 +2104,72 @@ const WeeklyReport = () => {
     const files = e.dataTransfer.files;
     handleScheduleUpload(files);
   };
+
+  // Build excel export data from all available hook states
+  console.log('🔍 Debug: Construction progress data:', constructionProgressHook.constructionData?.items);
+  console.log('🔍 Debug: First item remark:', constructionProgressHook.constructionData?.items?.[0]?.remark);
+  
+  const excelData = buildWeeklyReportExportData({
+    coverData: {
+      weekNumber: sharedData.weekNumber,
+      reportDateFrom: sharedData.dateRange?.split(' - ')[0],
+      reportDateTo: sharedData.dateRange?.split(' - ')[1],
+      projectTitle: sharedData.projectName,
+      employer: sharedData.employer,
+      contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+      refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+      letterDate: sharedData.reportDate,
+      toName: sharedData.recipientName,
+      ccLines: sharedData.ccList,
+      projectManager: sharedData.signatoryName,
+    },
+    constructionProgress: constructionProgressHook.constructionData?.items as any,
+    conProgressProject: sharedData.projectName,
+    conProgressSubtitle: constructionProgressHook.constructionData?.projectInfo?.subtitle || '',
+    conProgressDate: constructionProgressHook.constructionData?.projectInfo?.date || sharedData.dateRange?.split(' - ')[0],
+    conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
+    overallProgress: overallProgressHook.rows as any,
+    nwdpItems: weeklyActivities.map(a => ({
+      workDoneLabel: a.description,
+      workDonePct: a.percent,
+    })),
+    qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => ({
+      sectionTitle: key.toUpperCase(),
+      codeHeader: "Code",
+      statusHeader: "Status", 
+      dateHeader: "Date Responded",
+      items: value?.items || [],
+      comments: value?.comments || '',
+    })) : [],
+    hseTraining: hsesData?.training || [],
+    hseInspection: hsesData?.inspection || [],
+    hsePermits: hsesData?.permit || [],
+    hseFirstAid: hsesData?.firstAidAccident,
+    hseOtherConcerns: hsesData?.otherActivities,
+    weekDates: sharedData.dateRange?.split(' - ')[0] 
+      ? Array.from({ length: 7 }, (_, i) => {
+          const start = new Date(sharedData.dateRange.split(' - ')[0]);
+          start.setDate(start.getDate() + i);
+          return start.getDate().toString();
+        })
+      : ['13', '14', '15', '16', '17', '18', '19'],
+    manpowerRows: [], // Resource data managed in WeeklyReportContent
+    materialRows: [],
+    equipmentRows: [],
+    sitePhotoCaptions: siteActivitiesSections.flatMap((section: any) => 
+      section.slots?.map((slot: any, idx: number) => ({
+        siteLocation: section.title,
+        caption1: idx === 0 ? slot.caption : undefined,
+        caption2: idx === 1 ? slot.caption : undefined,
+      })) || []
+    ),
+    constructionIssues: issuesHook.issuesData.map((issue, i) => ({
+      number: i + 1,
+      siteLocation: issue.location,
+      problemDescription: issue.problem,
+      actionBy: issue.actionBy,
+    })),
+  });
 
   return (
     <SidebarProvider>

@@ -1,0 +1,369 @@
+/**
+ * weeklyReportExcelMapper.ts
+ * Place at: src/lib/weeklyReportExcelMapper.ts
+ *
+ * Maps your existing hook state → WeeklyReportExportData for the Excel export.
+ * Adjust the field names to match your actual TypeScript types.
+ */
+
+import type { WeeklyReportExportData, QAQCSection } from "./weeklyreportexcel";
+
+export interface MapperInput {
+  // from useCoverData()
+  coverData?: {
+    weekNumber?: number | string;
+    reportDateFrom?: string;
+    reportDateTo?: string;
+    projectTitle?: string;
+    projectSubtitle?: string;
+    projectSubtitle2?: string;
+    employer?: string;
+    consultant?: string;
+    contractor?: string;
+    refNo?: string;
+    letterDate?: string;
+    toName?: string;
+    attName?: string;
+    ccLines?: string[];
+    projectManager?: string;
+    [k: string]: unknown;
+  };
+
+  // Construction progress metadata
+  conProgressProject?: string;
+  conProgressSubtitle?: string;
+  conProgressDate?: string;
+  conProgressRevision?: string;
+
+  // from useConstructionProgress()
+  constructionProgress?: Array<{
+    id?: string;
+    scopeOfWorks?: string;
+    description?: string;
+    detailDescription?: string;
+    unit?: string;
+    boQ?: {
+      qty?: number | string;
+      materialRate?: number | string;
+      laborRate?: number | string;
+      unitRate?: number | string;
+      amount?: number | string;
+    };
+    reviseBoqQty?: number | string;
+    qty?: number | string;
+    materialRate?: number | string;
+    laborRate?: number | string;
+    unitRate?: number | string;
+    amount?: number | string;
+    remark?: string;
+    remarks?: string;
+    thisWeek?: {
+      qty?: number | string;
+      amount?: number | string;
+      percentage?: number | string;
+    };
+    thisWeekQty?: number | string;
+    thisWeekAmount?: number | string;
+    thisWeekPct?: number | string;
+    nextWeekPlan?: {
+      qty?: number | string;
+      amount?: number | string;
+      percentage?: number | string;
+    };
+    nextWeekQty?: number | string;
+    nextWeekAmount?: number | string;
+    nextWeekPct?: number | string;
+    upToNextWeekPlan?: {
+      qty?: number | string;
+      amount?: number | string;
+      percentage?: number | string;
+    };
+    upToNextWeekQty?: number | string;
+    upToNextWeekAmount?: number | string;
+    upToNextWeekPct?: number | string;
+    [k: string]: unknown;
+  }>;
+
+  // from useOverallProgress()
+  overallProgress?: Array<{
+    no?: string;
+    scopeOfWorks?: string;
+    description?: string;
+    pctUpToPrevWeek?: number | string;
+    prevWeek?: number | string;
+    pctThisWeek?: number | string;
+    thisWeek?: number | string;
+    pctUpToThisWeek?: number | string;
+    upToThisWeek?: number | string;
+    pctRemaining?: number | string;
+    remaining?: number | string;
+    pctNextWeekPlan?: number | string;
+    nextWeek?: number | string;
+    pctUpNextWeekPlan?: number | string;
+    upNextWeek?: number | string;
+    [k: string]: unknown;
+  }>;
+  overallProgressRemark?: string;
+
+  // from useActivities() / useWeeklyReportContent()
+  nwdpItems?: Array<{
+    workDoneLabel?: string;
+    label?: string;
+    activity?: string;
+    workDonePct?: number | string;
+    donePct?: number | string;
+    nextWeekLabel?: string;
+    nextLabel?: string;
+    nextWeekPct?: number | string;
+    planPct?: number | string;
+    [k: string]: unknown;
+  }>;
+
+  // from useQaqcApi()
+  qaqcSections?: QAQCSection[];
+
+  // from useHsesData()
+  hseTraining?: Array<{
+    typeOfTraining?: string;
+    type?: string;
+    date?: string;
+    venue?: string;
+    trainer?: string;
+    attendee?: number | string;
+    count?: number | string;
+    remarks?: string;
+    [k: string]: unknown;
+  }>;
+  hseInspection?: Array<{
+    typeOfInspection?: string;
+    type?: string;
+    date?: string;
+    inspector?: string;
+    remarks?: string;
+    [k: string]: unknown;
+  }>;
+  hsePermits?: Array<{
+    typeOfPermit?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    inspector?: string;
+    approver?: string;
+    remarks?: string;
+    [k: string]: unknown;
+  }>;
+  hseFirstAid?: string;
+  hseOtherConcerns?: string;
+
+  // from useResourceTable()
+  weekDates?: string[];
+  manpowerRows?: Array<{
+    description?: string;
+    label?: string;
+    dailyCounts?: (number | string)[];
+    counts?: (number | string)[];
+    previousWeek?: number | string;
+    prev?: number | string;
+    thisWeek?: number | string;
+    current?: number | string;
+    upToThisWeek?: number | string;
+    cumulative?: number | string;
+    [k: string]: unknown;
+  }>;
+  materialRows?: Array<{
+    description?: string;
+    name?: string;
+    unit?: string;
+    previous?: number | string;
+    prev?: number | string;
+    thisPeriod?: number | string;
+    current?: number | string;
+    accumulate?: number | string;
+    total?: number | string;
+    [k: string]: unknown;
+  }>;
+  equipmentRows?: Array<{
+    description?: string;
+    name?: string;
+    unit?: string;
+    previous?: number | string;
+    prev?: number | string;
+    thisPeriod?: number | string;
+    current?: number | string;
+    accumulate?: number | string;
+    total?: number | string;
+    [k: string]: unknown;
+  }>;
+
+  // from site photos state
+  sitePhotoCaptions?: Array<{
+    siteLocation?: string;
+    location?: string;
+    caption1?: string;
+    caption2?: string;
+    [k: string]: unknown;
+  }>;
+
+  // from useConstructionIssue()
+  constructionIssues?: Array<{
+    number?: number | string;
+    no?: number | string;
+    siteLocation?: string;
+    location?: string;
+    problemDescription?: string;
+    description?: string;
+    issue?: string;
+    actionBy?: string;
+    action?: string;
+    [k: string]: unknown;
+  }>;
+}
+
+export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
+  const c = input.coverData ?? {};
+
+  console.log('🔍 Mapper Debug: constructionProgress input:', input.constructionProgress);
+  console.log('🔍 Mapper Debug: First item remark:', input.constructionProgress?.[0]?.remark);
+
+  return {
+    // ── Cover ────────────────────────────────────────────────────────────────
+    weekNumber:      c.weekNumber,
+    reportDateFrom:  c.reportDateFrom,
+    reportDateTo:    c.reportDateTo,
+    projectTitle:    c.projectTitle,
+    projectSubtitle: c.projectSubtitle,
+    projectSubtitle2:c.projectSubtitle2,
+    employer:        c.employer,
+    consultant:      c.consultant,
+    contractor:      c.contractor,
+    refNo:           c.refNo,
+    letterDate:      c.letterDate,
+    toName:          c.toName,
+    attName:         c.attName,
+    ccLines:         c.ccLines ?? [],
+    projectManager:  c.projectManager,
+
+    // ── Con. Progress ────────────────────────────────────────────────────────
+    conProgressProject:  input.conProgressProject ?? c.projectTitle,
+    conProgressSubtitle: input.conProgressSubtitle,
+    conProgressDate:     input.conProgressDate ?? c.reportDateFrom,
+    conProgressRevision: input.conProgressRevision,
+    conProgressItems: (input.constructionProgress ?? []).map((p, index) => {
+      // Add test remark for first few items to verify Excel export
+      const testRemark = index < 3 ? `Test remark ${index + 1}` : (p.remark ?? p.remarks ?? '');
+      
+      console.log(`🔍 Mapper Debug: Item ${index} remark:`, p.remark, '-> test:', testRemark);
+      
+      return {
+      id:               p.id,
+      scopeOfWorks:     p.scopeOfWorks ?? p.description,
+      detailDescription:p.detailDescription,
+      unit:             p.unit,
+      reviseBoqQty:     p.boQ?.qty ?? p.reviseBoqQty ?? p.qty,
+      materialRate:     p.boQ?.materialRate ?? p.materialRate,
+      laborRate:        p.boQ?.laborRate ?? p.laborRate,
+      unitRate:         p.boQ?.unitRate ?? p.unitRate,
+      amount:           p.boQ?.amount ?? p.amount,
+      remark:           testRemark,
+      thisWeekQty:      p.thisWeek?.qty ?? p.thisWeekQty,
+      thisWeekAmount:   p.thisWeek?.amount ?? p.thisWeekAmount,
+      thisWeekPct:      p.thisWeek?.percentage ?? p.thisWeekPct,
+      nextWeekQty:      p.nextWeekPlan?.qty ?? p.nextWeekQty,
+      nextWeekAmount:   p.nextWeekPlan?.amount ?? p.nextWeekAmount,
+      nextWeekPct:      p.nextWeekPlan?.percentage ?? p.nextWeekPct,
+      upToNextWeekQty:  p.upToNextWeekPlan?.qty ?? p.upToNextWeekQty,
+      upToNextWeekAmount:p.upToNextWeekPlan?.amount ?? p.upToNextWeekAmount,
+      upToNextWeekPct:  p.upToNextWeekPlan?.percentage ?? p.upToNextWeekPct,
+    };
+    }),
+
+    // ── Overall Progress ─────────────────────────────────────────────────────
+    overallProgressRemark: input.overallProgressRemark,
+    overallProgressItems: (input.overallProgress ?? []).map((p, i) => ({
+      no:               p.no ?? String(i + 1),
+      scopeOfWorks:     p.scopeOfWorks ?? p.description,
+      pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
+      pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
+      pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
+      pctRemaining:     p.pctRemaining     ?? p.remaining,
+      pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
+      pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
+    })),
+
+    // ── NWDP ─────────────────────────────────────────────────────────────────
+    nwdpItems: (input.nwdpItems ?? []).map(item => ({
+      workDoneLabel: item.workDoneLabel ?? item.label ?? item.activity,
+      workDonePct:   item.workDonePct  ?? item.donePct,
+      nextWeekLabel: item.nextWeekLabel ?? item.nextLabel,
+      nextWeekPct:   item.nextWeekPct  ?? item.planPct,
+    })),
+
+    // ── QAQC ─────────────────────────────────────────────────────────────────
+    qaqcSections: input.qaqcSections ?? [],
+
+    // ── HSE ──────────────────────────────────────────────────────────────────
+    hseTraining: (input.hseTraining ?? []).map(row => ({
+      typeOfTraining: row.typeOfTraining ?? row.type,
+      date:           row.date,
+      venue:          row.venue,
+      trainer:        row.trainer,
+      attendee:       row.attendee ?? row.count,
+      remarks:        row.remarks,
+    })),
+    hseInspection: (input.hseInspection ?? []).map(row => ({
+      typeOfInspection: row.typeOfInspection ?? row.type,
+      date:             row.date,
+      inspector:        row.inspector,
+      remarks:          row.remarks,
+    })),
+    hsePermits: (input.hsePermits ?? []).map(row => ({
+      typeOfPermit: row.typeOfPermit ?? row.type,
+      startDate:    row.startDate,
+      endDate:      row.endDate,
+      inspector:    row.inspector,
+      approver:     row.approver,
+      remarks:      row.remarks,
+    })),
+    hseFirstAid:       input.hseFirstAid,
+    hseOtherConcerns:  input.hseOtherConcerns,
+
+    // ── Resources ────────────────────────────────────────────────────────────
+    weekDates: input.weekDates,
+    manpowerRows: (input.manpowerRows ?? []).map(row => ({
+      description:  row.description ?? row.label,
+      dailyCounts:  row.dailyCounts ?? row.counts ?? [0,0,0,0,0,0,0],
+      previousWeek: row.previousWeek ?? row.prev,
+      thisWeek:     row.thisWeek     ?? row.current,
+      upToThisWeek: row.upToThisWeek ?? row.cumulative,
+    })),
+    materialRows: (input.materialRows ?? []).map(row => ({
+      description: row.description ?? row.name,
+      unit:        row.unit,
+      previous:    row.previous  ?? row.prev,
+      thisPeriod:  row.thisPeriod ?? row.current,
+      accumulate:  row.accumulate ?? row.total,
+    })),
+    equipmentRows: (input.equipmentRows ?? []).map(row => ({
+      description: row.description ?? row.name,
+      unit:        row.unit,
+      previous:    row.previous  ?? row.prev,
+      thisPeriod:  row.thisPeriod ?? row.current,
+      accumulate:  row.accumulate ?? row.total,
+    })),
+
+    // ── Site Photos ───────────────────────────────────────────────────────────
+    sitePhotoCaptions: (input.sitePhotoCaptions ?? []).map(e => ({
+      siteLocation: e.siteLocation ?? e.location,
+      caption1:     e.caption1,
+      caption2:     e.caption2,
+    })),
+
+    // ── Construction Issues ───────────────────────────────────────────────────
+    constructionIssues: (input.constructionIssues ?? []).map((issue, i) => ({
+      number:              issue.number ?? issue.no ?? i + 1,
+      siteLocation:        issue.siteLocation ?? issue.location,
+      problemDescription:  issue.problemDescription ?? issue.description ?? issue.issue,
+      actionBy:            issue.actionBy ?? issue.action,
+    })),
+  };
+}
