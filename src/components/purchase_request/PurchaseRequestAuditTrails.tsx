@@ -8,6 +8,7 @@ import { MessageSquare } from 'lucide-react';
 interface AuditLog {
   _id: string;
   requestId: string;
+  requestLabel: string;
   approver: {
     _id: string;
     firstName: string;
@@ -178,7 +179,7 @@ const PurchaseRequestAuditTrails: React.FC<PurchaseRequestAuditTrailsProps> = ({
                   <span className="text-gray-500 dark:text-gray-400">({userDepartment})</span>{' '}
                   <span className="font-medium">{actionText}</span>{' '}
                   request{' '}
-                  <span className="font-medium">MR-{requestId}</span>
+                  <span className="font-medium">{log.requestLabel}</span>
                   {timestamp && (
                     <span className="text-gray-500 dark:text-gray-400"> ({timestamp})</span>
                   )}

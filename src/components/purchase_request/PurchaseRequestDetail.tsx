@@ -245,6 +245,10 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                     <label className="text-sm font-medium text-green-700">Request Date</label>
                     <p className="text-sm">{new Date(selectedRequest.createdAt || selectedRequest.date).toLocaleString()}</p>
                   </div>
+                  <div>
+                    <label className="text-sm font-medium text-green-700">Due Date</label>
+                    <p className="text-sm">{new Date(selectedRequest.dueDate).toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
 
@@ -360,14 +364,18 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                       {selectedRequest.approvalWorkflow?.map((step, index) => {
                         // Find the user details based on the approver ID
                         let userDetails = null;
+                        let backupUserDetails = null;
                         if (step.role === 'prepared') {
                           userDetails = preparers.find(user => user._id === step.approver);
                         } else if (step.role === 'checked') {
                           userDetails = checkers.find(user => user._id === step.approver);
+                          backupUserDetails = checkers.find(user => user._id === step.backupApprover);
                         } else if (step.role === 'verified') {
                           userDetails = verifiers.find(user => user._id === step.approver);
+                          backupUserDetails = verifiers.find(user => user._id === step.backupApprover);
                         } else if (step.role === 'approved') {
                           userDetails = approvers.find(user => user._id === step.approver);
+                          backupUserDetails = approvers.find(user => user._id === step.backupApprover);
                         }
 
                         return (
@@ -391,6 +399,14 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                                   <span className="ml-1">({userDetails.department})</span>
                                 )}
                               </div>
+                              {backupUserDetails && (
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  Backup Person: {backupUserDetails.firstName} {backupUserDetails.lastName}
+                                  {backupUserDetails.department && (
+                                    <span className="ml-1">({backupUserDetails.department})</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );

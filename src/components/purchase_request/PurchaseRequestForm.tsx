@@ -25,6 +25,8 @@ import { useToast } from '@/hooks/use-toast';
 import CustomCombobox from './CustomCombobox';
 import MaterialActualCost from './MaterialActualCost';
 import AttachmentsTab, { Attachment } from './AttachmentsTab';
+import ConfirmationModal from './ConfirmationModal';
+import { version } from 'os';
 
 const parseFileSize = (fileSize) => {
   if (fileSize === undefined || fileSize === null) return 0;
@@ -88,6 +90,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	const { toast } = useToast();
 	const [requests, setRequests] = useState([]);
 	const [prSummaryData, setPrSummaryData] = useState(null);
+	const [showConfirmModal, setShowConfirmModal] = useState(false);
 
 	useEffect(() => {
 		if (profile) {
@@ -138,9 +141,26 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
   const approvers = getUsersForRole(['admin', 'approver']);
 
 	const formDataFilled = (data) => {
+		// Extract approvers from approvalWorkflow array if it exists
+		const getApproverFromWorkflow = (role) => {
+			if (!data.approvalWorkflow || !Array.isArray(data.approvalWorkflow)) return '';
+			const step = data.approvalWorkflow.find(step => step.role === role);
+			return step?.approver?._id || step?.approver || '';
+		};
+
+		// Extract backup approvers from approvalWorkflow array if it exists
+		const getBackupApproverFromWorkflow = (role) => {
+			if (!data.approvalWorkflow || !Array.isArray(data.approvalWorkflow)) return '';
+			const step = data.approvalWorkflow.find(step => step.role === role);
+			return step?.backupApprover?._id || step?.backupApprover || '';
+		};
+
 		return {
+			_id: data._id || '',
 			requesterName: data.requesterName || '',
 			requesterDepartment: data.requesterDepartment || '',
+			version: data.version || 0,
+			no: data.no || '',
 			projectName: data.projectName || '',
 			label: data.label || '',
 			projectFrom: {
@@ -151,6 +171,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			},
 			purpose: data.purpose || '',
 			requestDate: data.requestDate || new Date().toISOString().split('T')[0],
+			dueDate: data.dueDate || new Date().toISOString().split('T')[0],
 			deliveryPlace: data.deliveryPlace || '',
 			categories: data.categories || {
 				construction: false,
@@ -164,10 +185,13 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			requestRemarks: data.requestRemarks || '',
 			attachments: data.attachments || [],
 			approvers: {
-				preparedBy: data.approvers?.preparedBy || '',
-				checkedBy: data.approvers?.checkedBy || '',
-				verifiedBy: data.approvers?.verifiedBy || '',
-				approvedBy: data.approvers?.approvedBy || ''
+				preparedBy: data.approvers?.preparedBy || getApproverFromWorkflow('prepared') || '',
+				checkedBy: data.approvers?.checkedBy || getApproverFromWorkflow('checked') || '',
+				verifiedBy: data.approvers?.verifiedBy || getApproverFromWorkflow('verified') || '',
+				approvedBy: data.approvers?.approvedBy || getApproverFromWorkflow('approved') || '',
+				backupCheckedBy: data.approvers?.backupCheckedBy || getBackupApproverFromWorkflow('checked') || '',
+				backupVerifiedBy: data.approvers?.backupVerifiedBy || getBackupApproverFromWorkflow('verified') || '',
+				backupApprovedBy: data.approvers?.backupApprovedBy || getBackupApproverFromWorkflow('approved') || ''
 			},
 			status: data.status,
 			priority: data.priority
@@ -212,6 +236,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				},
         purpose: '',
         requestDate: new Date().toISOString().split('T')[0],
+        dueDate: new Date().toISOString().split('T')[0],
         deliveryPlace: '',
         categories: {
           construction: false,
@@ -227,7 +252,10 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					preparedBy: '',
           checkedBy: '',
           verifiedBy: '',
-          approvedBy: ''
+          approvedBy: '',
+					backupCheckedBy: '',
+					backupVerifiedBy: '',
+					backupApprovedBy: ''
         },
 				status: '',
 				priority: ''
@@ -285,9 +313,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 
 	useEffect(() => {
 		if ((mode === 'edit' || mode === 'revise') && initialData) {
-			setFormData({
-				...initialData,
-			});
+			setFormData(formDataFilled(initialData));
 			// Also set attachments from initialData - process them first
 			if (initialData.attachments) {
 				const processedAttachments = processExistingAttachments(initialData.attachments);
@@ -324,13 +350,14 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			},
 			purpose: '',
 			requestDate: new Date().toISOString().split('T')[0],
+			dueDate: new Date().toISOString().split('T')[0],
 			deliveryPlace: '',
 			categories: { construction: false, admin: false, material: false, services: false },
 			items: [],
 			requestDescription: '',
 			requestRemarks: '',
 			attachments: [],
-			approvers: { preparedBy: '', checkedBy: '', verifiedBy: '', approvedBy: '' },
+			approvers: { preparedBy: '', checkedBy: '', verifiedBy: '', approvedBy: '', backupCheckedBy: '', backupVerifiedBy: '', backupApprovedBy: '' },
 			status: '',
 			priority: ''
 		});
@@ -340,7 +367,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		setAttachments([]);
  	}
 
-	const handleSubmit = async (action) => {
+	const handleSubmit = async (action, notes = '') => {
 		setIsSubmitting(true);
 		
 		try {
@@ -395,7 +422,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
         const response = await apiPut(`/purchase-requests/${requestId}`, submissionData);
 				result = await response.json();
 			} else if (action === 'revise') {
-				const response = await apiPost(`/purchase-requests/${requestId}/revise`, submissionData);
+				const response = await apiPost(`/purchase-requests/${requestId}/revise?comment=${encodeURIComponent(notes)}`, submissionData);
 				result = await response.json();
       } else {
         // Create new request
@@ -425,15 +452,24 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 						},
             purpose: '',
             requestDate: new Date().toISOString().split('T')[0],
+            dueDate: new Date().toISOString().split('T')[0],
             deliveryPlace: '',
             categories: { construction: false, admin: false, material: false, services: false },
             items: [],
             requestDescription: '',
             requestRemarks: '',
             attachments: [],
-            approvers: { preparedBy: '', checkedBy: '', verifiedBy: '', approvedBy: '' },
-						status: '',
-						priority: ''
+            approvers: {
+					preparedBy: '',
+          checkedBy: '',
+          verifiedBy: '',
+          approvedBy: '',
+					backupCheckedBy: '',
+					backupVerifiedBy: '',
+					backupApprovedBy: ''
+        },
+				status: '',
+				priority: ''
           });
           setAttachments([]);
         }
@@ -674,7 +710,10 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 										preparedBy: '',
 										checkedBy: '',
 										verifiedBy: '',
-										approvedBy: ''
+										approvedBy: '',
+										backupCheckedBy: '',
+										backupVerifiedBy: '',
+										backupApprovedBy: ''
 									},
 									status: '',
 									priority: ''
@@ -792,6 +831,16 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 												type="date"
 												value={formData.requestDate || new Date().toISOString().split('T')[0]}
 												onChange={(e) => setFormData({...formData, requestDate: e.target.value})}
+											/>
+										</div>
+										
+										{/* Due Date */}
+										<div className="space-y-2">
+											<label className="text-sm font-medium">Due Date</label>
+											<Input
+												type="date"
+												value={formData.dueDate || new Date().toISOString().split('T')[0]}
+												onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
 											/>
 										</div>
 										
@@ -1019,117 +1068,218 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 								<div className="border-t pt-4 mt-4"></div>
 								
 								{/* Signature Section */}
-								<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-									<div>
-										<Label className="text-sm font-medium">Prepared By</Label>
-										<Select
-											value={formData.approvers.preparedBy} 
-											onValueChange={(value) => 
-												setFormData(prev => ({
-													...prev,
-													approvers: { ...prev.approvers, preparedBy: value }
-												}))
-											}
-										>
-											<SelectTrigger className="w-full">
-												<SelectValue placeholder="Select preparer" />
-											</SelectTrigger>
-											<SelectContent>
-												{loadingUsers ? (
-													<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-												) : (
-													preparers.map((user) => (
-														<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-															{user.firstName + ' ' + user.lastName} ({user.role})
-														</SelectItem>
-													))
-												)}
-											</SelectContent>
-										</Select>
+								<div className="space-y-4">
+									<h3 className="text-sm font-semibold text-gray-700">Approval Workflow</h3>
+									
+									{/* Primary Approvers Row */}
+									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+										<div>
+											<Label className="text-sm font-medium">Prepared By</Label>
+											<Select
+												value={formData.approvers.preparedBy} 
+												onValueChange={(value) => 
+													setFormData(prev => ({
+														...prev,
+														approvers: { ...prev.approvers, preparedBy: value }
+													}))
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue placeholder="Select preparer" />
+												</SelectTrigger>
+												<SelectContent>
+													{loadingUsers ? (
+														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
+													) : (
+														preparers.map((user) => (
+															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
+																{user.firstName + ' ' + user.lastName} ({user.role})
+															</SelectItem>
+														))
+													)
+												}</SelectContent>
+											</Select>
+										</div>
+									
+										<div>
+											<Label className="text-sm font-medium">Checked By</Label>
+											<Select 
+												value={formData.approvers.checkedBy} 
+												onValueChange={(value) => 
+													setFormData(prev => ({
+														...prev,
+														approvers: { ...prev.approvers, checkedBy: value }
+													}))
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue placeholder="Select checker" />
+												</SelectTrigger>
+												<SelectContent>
+													{loadingUsers ? (
+														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
+													) : (
+														checkers.map((user) => (
+															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
+																{user.firstName + ' ' + user.lastName} ({user.role})
+															</SelectItem>
+														))
+													)
+												}</SelectContent>
+											</Select>
+										</div>
+									
+										<div>
+											<Label className="text-sm font-medium">Verified By</Label>
+											<Select 
+												value={formData.approvers.verifiedBy} 
+												onValueChange={(value) => 
+													setFormData(prev => ({
+														...prev,
+														approvers: { ...prev.approvers, verifiedBy: value }
+													}))
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue placeholder="Select verifier" />
+												</SelectTrigger>
+												<SelectContent>
+													{loadingUsers ? (
+														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
+													) : (
+														verifiers.map((user) => (
+															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
+																{user.firstName + ' ' + user.lastName} ({user.role})
+															</SelectItem>
+														))
+													)
+												}</SelectContent>
+											</Select>
+										</div>
+									
+										<div>
+											<Label className="text-sm font-medium">Approved By</Label>
+											<Select 
+												value={formData.approvers.approvedBy} 
+												onValueChange={(value) => 
+													setFormData(prev => ({
+														...prev,
+														approvers: { ...prev.approvers, approvedBy: value }
+													}))
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue placeholder="Select approver" />
+												</SelectTrigger>
+												<SelectContent>
+													{loadingUsers ? (
+														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
+													) : (
+														approvers.map((user) => (
+															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
+																{user.firstName + ' ' + user.lastName} ({user.role})
+															</SelectItem>
+														))
+													)
+												}</SelectContent>
+											</Select>
+										</div>
 									</div>
-								
-									<div>
-										<Label className="text-sm font-medium">Checked By</Label>
-										<Select 
-											value={formData.approvers.checkedBy} 
-											onValueChange={(value) => 
-												setFormData(prev => ({
-													...prev,
-													approvers: { ...prev.approvers, checkedBy: value }
-												}))
-											}
-										>
-											<SelectTrigger className="w-full">
-												<SelectValue placeholder="Select checker" />
-											</SelectTrigger>
-											<SelectContent>
-												{loadingUsers ? (
-													<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-												) : (
-													checkers.map((user) => (
-														<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-															{user.firstName + ' ' + user.lastName} ({user.role})
-														</SelectItem>
-													))
-												)}
-											</SelectContent>
-										</Select>
-									</div>
-								
-									<div>
-										<Label className="text-sm font-medium">Verified By</Label>
-										<Select 
-											value={formData.approvers.verifiedBy} 
-											onValueChange={(value) => 
-												setFormData(prev => ({
-													...prev,
-													approvers: { ...prev.approvers, verifiedBy: value }
-												}))
-											}
-										>
-											<SelectTrigger className="w-full">
-												<SelectValue placeholder="Select verifier" />
-											</SelectTrigger>
-											<SelectContent>
-												{loadingUsers ? (
-													<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-												) : (
-													verifiers.map((user) => (
-														<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-															{user.firstName + ' ' + user.lastName} ({user.role})
-														</SelectItem>
-													))
-												)}
-											</SelectContent>
-										</Select>
-									</div>
-								
-									<div>
-										<Label className="text-sm font-medium">Approved By</Label>
-										<Select 
-											value={formData.approvers.approvedBy} 
-											onValueChange={(value) => 
-												setFormData(prev => ({
-													...prev,
-													approvers: { ...prev.approvers, approvedBy: value }
-												}))
-											}
-										>
-											<SelectTrigger className="w-full">
-												<SelectValue placeholder="Select approver" />
-											</SelectTrigger>
-											<SelectContent>
-												{loadingUsers ? (
-													<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-												) : (
-													approvers.map((user) => (
-														<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-															{user.firstName + ' ' + user.lastName} ({user.role})
-														</SelectItem>
-													))
-												)}
-											</SelectContent>
-										</Select>
+
+									{/* Backup Approvers Row */}
+									<div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+										<div>
+											<Label className="text-sm font-medium text-muted-foreground">Backup Checked By</Label>
+											<Select 
+												value={formData.approvers.backupCheckedBy} 
+												onValueChange={(value) => 
+													setFormData(prev => ({
+														...prev,
+														approvers: { ...prev.approvers, backupCheckedBy: value === '__none__' ? '' : value }
+													}))
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue placeholder="Select backup checker (optional)" />
+												</SelectTrigger>
+												<SelectContent>
+													{loadingUsers ? (
+														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
+													) : (
+														<>
+															<SelectItem value="__none__">None</SelectItem>
+															{checkers.map((user) => (
+																<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
+																	{user.firstName + ' ' + user.lastName} ({user.role})
+																</SelectItem>
+															))}
+														</>
+													)
+												}</SelectContent>
+											</Select>
+										</div>
+									
+										<div>
+											<Label className="text-sm font-medium text-muted-foreground">Backup Verified By</Label>
+											<Select 
+												value={formData.approvers.backupVerifiedBy} 
+												onValueChange={(value) => 
+													setFormData(prev => ({
+														...prev,
+														approvers: { ...prev.approvers, backupVerifiedBy: value === '__none__' ? '' : value }
+													}))
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue placeholder="Select backup verifier (optional)" />
+												</SelectTrigger>
+												<SelectContent>
+													{loadingUsers ? (
+														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
+													) : (
+														<>
+															<SelectItem value="__none__">None</SelectItem>
+															{verifiers.map((user) => (
+																<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
+																	{user.firstName + ' ' + user.lastName} ({user.role})
+																</SelectItem>
+															))}
+														</>
+													)
+												}</SelectContent>
+											</Select>
+										</div>
+									
+										<div>
+											<Label className="text-sm font-medium text-muted-foreground">Backup Approved By</Label>
+											<Select 
+												value={formData.approvers.backupApprovedBy} 
+												onValueChange={(value) => 
+													setFormData(prev => ({
+														...prev,
+														approvers: { ...prev.approvers, backupApprovedBy: value === '__none__' ? '' : value }
+													}))
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue placeholder="Select backup approver (optional)" />
+												</SelectTrigger>
+												<SelectContent>
+													{loadingUsers ? (
+														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
+													) : (
+														<>
+															<SelectItem value="__none__">None</SelectItem>
+															{approvers.map((user) => (
+																<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
+																	{user.firstName + ' ' + user.lastName} ({user.role})
+																</SelectItem>
+															))}
+														</>
+													)
+												}</SelectContent>
+											</Select>
+										</div>
 									</div>
 								</div>
 
@@ -1181,6 +1331,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 										>
 											Next →
 										</Button>
+
 									</div>
 								</div>
 							</form>
@@ -1208,11 +1359,26 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 								maxFiles={10}
 								maxFileSize={10}
 								allowedFileTypes={['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']}
+								onReviseClick={() => setShowConfirmModal(true)}
 							/>
 						</TabsContent>
 					</Tabs>
 				</DialogContent>
 			</Dialog>
+
+			<ConfirmationModal
+				isOpen={showConfirmModal}
+				onClose={() => setShowConfirmModal(false)}
+				onConfirm={(notes) => {
+					setShowConfirmModal(false);
+					handleSubmit('revise', notes);
+				}}
+				title="Confirm Revision"
+				message="Are you sure you want to revise this purchase request? A new version will be created and the original request will be marked as revised."
+				showNotes={true}
+				confirmText="Revise Request"
+				isLoading={isSubmitting}
+			/>
 
 			{/* Add Item Modal */}
 			<Dialog open={showAddItemModal} onOpenChange={setShowAddItemModal}>

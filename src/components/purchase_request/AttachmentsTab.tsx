@@ -27,11 +27,12 @@ interface AttachmentsTabProps {
   mode: string;
   isSubmitting: boolean;
   formData: any;
-  handleSubmit: (action: string) => void;
+  handleSubmit: (action: string, notes?: string) => void;
   setActiveTab?: (tab: string) => void;
   maxFiles?: number;
   maxFileSize?: number; // in MB
   allowedFileTypes?: string[];
+  onReviseClick?: () => void;
 }
 
 const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
@@ -44,7 +45,8 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
   setActiveTab,
   maxFiles = 10,
   maxFileSize = 10,
-  allowedFileTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']
+  allowedFileTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'],
+  onReviseClick
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -782,7 +784,7 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
                 <Button 
                   type="button" 
                   disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-                  onClick={() => handleSubmit('revise')}
+                  onClick={() => onReviseClick ? onReviseClick() : handleSubmit('revise')}
                 >
                   {isSubmitting ? "Revising..." : "Revise"}
                 </Button>
