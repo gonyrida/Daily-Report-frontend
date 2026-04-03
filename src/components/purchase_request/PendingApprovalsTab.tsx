@@ -8,8 +8,37 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet } from '@/lib/apiFetch';
 import PurchaseRequestDetail from './PurchaseRequestDetail';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, onRefresh }) => {
+const PendingApprovalsTab = ({ 
+  requests, 
+  loadingRequests, 
+  onApprove, 
+  onReject, 
+  onRefresh,
+  // Pagination
+  pagination,
+  setPagination,
+  // Filters
+  statusFilter,
+  setStatusFilter,
+  projectFilter,
+  setProjectFilter,
+  purposeFilter,
+  setPurposeFilter,
+  requesterFilter,
+  setRequesterFilter,
+  // Filter options
+  PRProjects,
+  availablePurposes,
+  availableRequesters
+}) => {
   const [selectedRequests, setSelectedRequests] = useState([]);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [detailRequest, setDetailRequest] = useState(null);
@@ -19,6 +48,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
   const [isRejecting, setIsRejecting] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingRequest, setLoadingRequest] = useState(false);
   const [approveNotes, setApproveNotes] = useState('');
   const [rejectNotes, setRejectNotes] = useState('');
   const [rejectNotesError, setRejectNotesError] = useState('');
@@ -251,6 +281,44 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
     return 'Pending';
   };
 
+  const handleViewDetail = async (request) => {
+    setLoadingRequest(true);
+    setShowDetailsModal(true);
+    console.log("This is the request sent to detail from pending: ", request)
+    try {
+      const approversFromWorkflow = {
+        preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
+        checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
+        verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
+        approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
+      };
+  
+      const response = await apiGet(`/purchase-requests/${request._id}`);
+      const result = await response.json();
+      if (result.success) {
+        setDetailRequest({
+          ...result.data,
+          approvers: approversFromWorkflow,
+        });
+        
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to load request data"
+        });
+      }
+
+    } catch (error) {
+      console.error('Edit request error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load request data"
+      });
+    } finally {
+      setLoadingRequest(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Approve Confirmation Dialog */}
@@ -334,7 +402,85 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
 			{/* Request List */}
 			<Card>
 				<CardHeader>
-					<CardTitle>Pending Approvals</CardTitle>
+					<div className="flex flex-col gap-4">
+						<CardTitle>Pending Approvals</CardTitle>
+						<div className="flex flex-wrap gap-4">
+							{/* Status Filter */}
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-muted-foreground">Status:</span>
+								<Select value={statusFilter || "__all__"} onValueChange={setStatusFilter}>
+									<SelectTrigger className="w-[140px]">
+										<SelectValue placeholder="All Status" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__all__">All Status</SelectItem>
+										<SelectItem value="pending">Pending</SelectItem>
+										<SelectItem value="approved">Approved</SelectItem>
+										<SelectItem value="rejected">Rejected</SelectItem>
+										<SelectItem value="checked">Checked</SelectItem>
+										<SelectItem value="verified">Verified</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+
+							{/* Sub-Project Filter */}
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-muted-foreground">Sub-Project:</span>
+								<Select value={projectFilter || "__all__"} onValueChange={setProjectFilter}>
+									<SelectTrigger className="w-[160px]">
+										<SelectValue placeholder="All Sub Projects" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__all__">All Sub Projects</SelectItem>
+										{PRProjects?.flatMap((project) => 
+											project.subProjects?.map((subProject) => (
+												<SelectItem key={subProject._id} value={subProject.name}>
+													{subProject.name}
+												</SelectItem>
+											)) || []
+										)
+										}
+									</SelectContent>
+								</Select>
+							</div>
+
+							{/* Purpose Filter */}
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-muted-foreground">Purpose:</span>
+								<Select value={purposeFilter || "__all__"} onValueChange={setPurposeFilter}>
+									<SelectTrigger className="w-[160px]">
+										<SelectValue placeholder="All Purposes" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__all__">All Purposes</SelectItem>
+										{availablePurposes?.map((purpose) => (
+											<SelectItem key={purpose} value={purpose}>
+												{purpose}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+
+							{/* Requester Filter */}
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-muted-foreground">Requester:</span>
+								<Select value={requesterFilter || "__all__"} onValueChange={setRequesterFilter}>
+									<SelectTrigger className="w-[160px]">
+										<SelectValue placeholder="All Requesters" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__all__">All Requesters</SelectItem>
+										{availableRequesters?.map((requester) => (
+											<SelectItem key={requester} value={requester}>
+												{requester}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+						</div>
+					</div>
 				</CardHeader>
 				<CardContent>
 					<div className="overflow-x-auto">
@@ -381,8 +527,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
 												onClick={e => {
 													// If clicking checkbox, don't open modal
 													if (e.target instanceof HTMLInputElement) return;
-													setDetailRequest(request);
-													setShowDetailsModal(true);
+													handleViewDetail(request);
 												}}
 											>
 												<td className="p-3">
@@ -439,6 +584,77 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
 							</tbody>
 						</table>
 
+						{/* Pagination Controls */}
+						{pagination?.pages > 0 && (
+							<div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+								<div className="flex items-center gap-2 text-sm text-muted-foreground">
+									<span>Showing {(pagination.page - 1) * pagination.limit + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results</span>
+									<Select
+										value={pagination.limit.toString()}
+										onValueChange={(value) => {
+											setPagination(prev => ({ ...prev, limit: parseInt(value), page: 1 }));
+										}}
+									>
+										<SelectTrigger className="w-20 h-8">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="10">10</SelectItem>
+											<SelectItem value="25">25</SelectItem>
+											<SelectItem value="50">50</SelectItem>
+										</SelectContent>
+									</Select>
+									<span>per page</span>
+								</div>
+								
+								<div className="flex items-center gap-1">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+										disabled={pagination.page === 1 || loadingRequests}
+									>
+										←
+									</Button>
+									
+									{Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+										let pageNum;
+										if (pagination.pages <= 5) {
+											pageNum = i + 1;
+										} else if (pagination.page <= 3) {
+											pageNum = i + 1;
+										} else if (pagination.page >= pagination.pages - 2) {
+											pageNum = pagination.pages - 4 + i;
+										} else {
+											pageNum = pagination.page - 2 + i;
+										}
+										
+										return (
+											<Button
+												key={pageNum}
+												variant={pagination.page === pageNum ? "default" : "outline"}
+												size="sm"
+												onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+												disabled={loadingRequests}
+												className="min-w-[32px]"
+											>
+												{pageNum}
+											</Button>
+										);
+									})}
+									
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+										disabled={pagination.page === pagination.pages || loadingRequests}
+									>
+										→
+									</Button>
+								</div>
+							</div>
+						)}
+
             {/* Request Detail Dialog */}
             <PurchaseRequestDetail
               selectedRequest={detailRequest}
@@ -450,6 +666,7 @@ const PendingApprovalsTab = ({ requests, loadingRequests, onApprove, onReject, o
               checkers={checkers}
               verifiers={verifiers}
               approvers={approvers}
+              isLoading={loadingRequest}
             />
 
 					</div>

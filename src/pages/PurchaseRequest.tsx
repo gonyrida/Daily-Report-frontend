@@ -27,6 +27,13 @@ import PurchaseRequestDetail from '@/components/purchase_request/PurchaseRequest
 import PurchaseRequestForm from '@/components/purchase_request/PurchaseRequestForm';
 import ProjectManagement from '@/components/purchase_request/ProjectManagement';
 import MasterMaterials from '@/components/purchase_request/MasterMaterials';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface PurchaseRequest {
   groupId?: string;
@@ -36,7 +43,6 @@ interface PurchaseRequest {
 
 const PurchaseRequest = ({onRefresh}) => {
   const { profile } = useProfileContext();
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [PRProjects, setPRProjects] = useState([]);
   const [loadingPRProjects, setLoadingPRProjects] = useState(false);
   const [formData, setFormData] = useState({
@@ -74,6 +80,39 @@ const PurchaseRequest = ({onRefresh}) => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  });
+  const [allRequestsPagination, setAllRequestsPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  });
+  const [projectFilter, setProjectFilter] = useState('');
+  const [purposeFilter, setPurposeFilter] = useState('');
+  const [availablePurposes, setAvailablePurposes] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [allProjectFilter, setAllProjectFilter] = useState('');
+  const [allPurposeFilter, setAllPurposeFilter] = useState('');
+  const [allStatusFilter, setAllStatusFilter] = useState('');
+  const [allRequesterFilter, setAllRequesterFilter] = useState('');
+  const [allAvailableRequesters, setAllAvailableRequesters] = useState([]);
+  // Pending Approvals filter and pagination states
+  const [pendingApprovalsPagination, setPendingApprovalsPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  });
+  const [pendingStatusFilter, setPendingStatusFilter] = useState('');
+  const [pendingProjectFilter, setPendingProjectFilter] = useState('');
+  const [pendingPurposeFilter, setPendingPurposeFilter] = useState('');
+  const [pendingRequesterFilter, setPendingRequesterFilter] = useState('');
+  const [pendingAvailableRequesters, setPendingAvailableRequesters] = useState([]);
   const [displayValues, setDisplayValues] = useState({
     quantity: '0',
     unitPrice: '0'
@@ -83,16 +122,35 @@ const PurchaseRequest = ({onRefresh}) => {
   const [showModal, setShowModal] = useState(false);
 
   // Fetch pending approvals function
-  const fetchPendingApprovals = () => {
+  const fetchPendingApprovals = async () => {
     if (profile?.role === 'approver' || profile?.role === 'admin') {
       setLoadingPendingApprovals(true);
-      apiGet('/purchase-requests/pending-approvals')
-        .then(res => res.json())
-        .then(result => {
-          if (result.success) setPendingApprovals(result.data);
-        })
-        .catch(() => setPendingApprovals([]))
-        .finally(() => setLoadingPendingApprovals(false));
+      try {
+        // Build query params
+        const params = new URLSearchParams();
+        params.set('page', pendingApprovalsPagination.page.toString());
+        params.set('limit', pendingApprovalsPagination.limit.toString());
+        if (pendingStatusFilter) params.set('status', pendingStatusFilter);
+        if (pendingProjectFilter) params.set('subProject', pendingProjectFilter);
+        if (pendingPurposeFilter) params.set('purpose', pendingPurposeFilter);
+        if (pendingRequesterFilter) params.set('requester', pendingRequesterFilter);
+        
+        const endpoint = `/purchase-requests/pending-approvals${params.toString() ? `?${params.toString()}` : ''}`;
+        const response = await apiGet(endpoint);
+        const result = await response.json();
+        
+        if (result.success) {
+          setPendingApprovals(result.data);
+          if (result.pagination) {
+            setPendingApprovalsPagination(result.pagination);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch pending approvals:', error);
+        setPendingApprovals([]);
+      } finally {
+        setLoadingPendingApprovals(false);
+      }
     }
   };
 
@@ -139,21 +197,41 @@ const PurchaseRequest = ({onRefresh}) => {
 
   const { toast } = useToast();
 
-  const handleViewDetails = (request) => {
-    const approversFromWorkflow = {
-      preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
-      checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
-      verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
-      approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
-    };
-
-    // Populate selectedRequest with request data
-    setSelectedRequest({
-      ...request,
-      approvers: approversFromWorkflow
-    });
-
+  const handleViewDetails =  async (request) => {
+    setLoadingRequest(true);
     setShowDetailsModal(true);
+    try {
+      const approversFromWorkflow = {
+        preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
+        checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
+        verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
+        approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
+      };
+  
+      const response = await apiGet(`/purchase-requests/${request._id}`);
+      const result = await response.json();
+      if (result.success) {
+        setSelectedRequest({
+          ...result.data,
+          approvers: approversFromWorkflow,
+        });
+        
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to load request data"
+        });
+      }
+
+    } catch (error) {
+      console.error('Edit request error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load request data"
+      });
+    } finally {
+      setLoadingRequest(false);
+    }
   };
 
   // Approval role order for stage display
@@ -225,16 +303,40 @@ const PurchaseRequest = ({onRefresh}) => {
     const fetchRequests = async () => {
       setLoadingRequests(true);
       try {
+        // Build query params
+        const params = new URLSearchParams();
+        if (activeTab === 'my-requests') {
+          params.set('page', pagination.page.toString());
+          params.set('limit', pagination.limit.toString());
+          if (statusFilter) params.set('status', statusFilter);
+          if (projectFilter) params.set('subProject', projectFilter);
+          if (purposeFilter) params.set('purpose', purposeFilter);
+        } else if (activeTab === 'all-mrs') {
+          params.set('page', allRequestsPagination.page.toString());
+          params.set('limit', allRequestsPagination.limit.toString());
+          if (allStatusFilter) params.set('status', allStatusFilter);
+          if (allProjectFilter) params.set('subProject', allProjectFilter);
+          if (allPurposeFilter) params.set('purpose', allPurposeFilter);
+          if (allRequesterFilter) params.set('requester', allRequesterFilter);
+        }
+        
         // Use different endpoints based on active tab
-        const endpoint = activeTab === 'my-requests' 
+        const baseEndpoint = activeTab === 'my-requests' 
           ? '/purchase-requests/my-requests' 
-            : '/purchase-requests';
+          : '/purchase-requests';
+        const endpoint = `${baseEndpoint}${params.toString() ? `?${params.toString()}` : ''}`;
         
         const response = await apiGet(endpoint);
         const result = await response.json();
         if (result.success) {
           setRequests(result.data);
-          // console.log('✅ Requests loaded:', result.data);
+          if (result.pagination) {
+            if (activeTab === 'my-requests') {
+              setPagination(result.pagination);
+            } else if (activeTab === 'all-mrs') {
+              setAllRequestsPagination(result.pagination);
+            }
+          }
         }
       } catch (error) {
         toast({
@@ -247,51 +349,90 @@ const PurchaseRequest = ({onRefresh}) => {
     };
     
     fetchRequests();
-  }, [activeTab]); // Re-fetch when tab changes
+  }, [activeTab, pagination.page, pagination.limit, statusFilter, projectFilter, purposeFilter, allRequestsPagination.page, allRequestsPagination.limit, allStatusFilter, allProjectFilter, allPurposeFilter, allRequesterFilter]); // Re-fetch when these change
 
+  // Fetch pending approvals when filters or pagination changes
   useEffect(() => {
-    if (profile) {
-      setFormData(prev => ({
-        ...prev,
-        requesterName: profile.fullName || prev.requesterName,
-        requesterDepartment: profile.department || prev.requesterDepartment
-      }));
-      setIsProfileLoading(false);
+    if (activeTab === 'pending-approvals') {
+      fetchPendingApprovals();
     }
-  }, [profile]);
+  }, [activeTab, pendingApprovalsPagination.page, pendingApprovalsPagination.limit, pendingStatusFilter, pendingProjectFilter, pendingPurposeFilter, pendingRequesterFilter]);
 
-  // Role-based filtering functions
+  // Extract unique purposes from projects and requests for the filter dropdown
+  useEffect(() => {
+    if (activeTab === 'my-requests') {
+      const purposesFromProjects = PRProjects.flatMap(p => p.purposes?.map(purp => purp.name) || []);
+      const purposesFromRequests = requests.map(r => r.purpose).filter(Boolean);
+      const allPurposes = [...purposesFromProjects, ...purposesFromRequests];
+      const uniquePurposes = [...new Set(allPurposes)];
+      setAvailablePurposes(uniquePurposes);
+    } else if (activeTab === 'all-mrs') {
+      // Extract unique requester names for All Related Requests tab
+      const requestersFromRequests = requests.map(r => r.requesterName).filter(Boolean);
+      const uniqueRequesters = [...new Set(requestersFromRequests)];
+      setAllAvailableRequesters(uniqueRequesters);
+    } else if (activeTab === 'pending-approvals') {
+      // Extract unique purposes and requesters for Pending Approvals tab
+      const purposesFromProjects = PRProjects.flatMap(p => p.purposes?.map(purp => purp.name) || []);
+      const purposesFromRequests = pendingApprovals.map(r => r.purpose).filter(Boolean);
+      const allPurposes = [...purposesFromProjects, ...purposesFromRequests];
+      const uniquePurposes = [...new Set(allPurposes)];
+      setAvailablePurposes(uniquePurposes);
+      
+      const requestersFromRequests = pendingApprovals.map(r => r.requesterName).filter(Boolean);
+      const uniqueRequesters = [...new Set(requestersFromRequests)];
+      setPendingAvailableRequesters(uniqueRequesters);
+    }
+  }, [PRProjects, requests, pendingApprovals, activeTab]);
+
   const getUsersForRole = (allowedRoles) => {
     return allUsers.filter(user => 
       allowedRoles.includes(user.role?.toLowerCase())
     );
   };
 
-  const handleEditRequest = (request) => {
-    // console.log('Edit request:', request);
-    // console.log('Setting editingRequest to:', request);
-    // console.log('Setting editFormData to:', editFormData);
+  const [loadingRequest, setLoadingRequest] = useState(false);
 
-    const approversFromWorkflow = {
-      preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
-      checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
-      verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
-      approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
-    };
-
-    setFormData({
-      ...request,
-      requestDate: request.requestDate ? new Date(request.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      approvers: approversFromWorkflow,
-    });
-    
-    // // Populate formData with request data
+  const handleEditRequest = async (request) => {
     setMode('edit')
-    setSelectedRequests([]); // Clear selection after edit opens
-    setSelectedItems([]); // CLEAR selection from New Request modal
+    setLoadingRequest(true);
     setShowModal(true);
-    // console.log('editingRequest after set:', editingRequest);
-    // console.log('editFormData after set:', editFormData);
+    try {
+      const approversFromWorkflow = {
+        preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
+        checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
+        verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
+        approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
+      };
+
+      const response = await apiGet(`/purchase-requests/${request._id}`);
+      const result = await response.json();
+      if (result.success) {
+        setFormData({
+          ...result.data,
+          requestDate: result.data.requestDate ? new Date(result.data.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          dueDate: result.data.dueDate ? new Date(result.data.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          approvers: approversFromWorkflow,
+        });
+        
+        setSelectedRequests([]);
+        setSelectedItems([]);
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to load request data"
+        });
+      }
+
+    } catch (error) {
+      console.error('Edit request error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load request data"
+      });
+    } finally {
+      setLoadingRequest(false);
+    }
   };
 
   const getPendingStatusText = (request) => {
@@ -382,56 +523,66 @@ const PurchaseRequest = ({onRefresh}) => {
 
   // Add this function to handle revision
   const handleReviseRequest = async (request) => {
-    const approversFromWorkflow = {
-      preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
-      checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
-      verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
-      approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
-    };
-
-    setFormData({
-      ...request,
-      requestDate: request.requestDate ? new Date(request.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      approvers: approversFromWorkflow
-    });
-
     setMode('revise')
-    setSelectedRequests([]);
-    setSelectedItems([]);
+    setLoadingRequest(true);
     setShowModal(true);
+    try {
+      const approversFromWorkflow = {
+        preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',
+        checkedBy: request.approvalWorkflow.find(w => w.role === 'checked')?.approver || '',
+        verifiedBy: request.approvalWorkflow.find(w => w.role === 'verified')?.approver || '',
+        approvedBy: request.approvalWorkflow.find(w => w.role === 'approved')?.approver || ''
+      };
+      
+      const response = await apiGet(`/purchase-requests/${request._id}`);
+      const result = await response.json();
+      if (result.success) {
+        setFormData({
+          ...result.data,
+          requestDate: result.data.requestDate ? new Date(result.data.requestDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          dueDate: result.data.dueDate ? new Date(result.data.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          approvers: approversFromWorkflow,
+        });
+        
+
+        setSelectedRequests([]);
+        setSelectedItems([]);
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to load request data"
+        });
+      }
+
+    } catch (error) {
+      console.error('Revise request error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load request data"
+      });
+    } finally {
+      setLoadingRequest(false);
+    }
   };
 
   const refreshRequests = async () => {
     try {
-      const endpoint = '/purchase-requests/my-requests';
+      const params = new URLSearchParams();
+      params.set('page', '1');
+      params.set('limit', pagination.limit.toString());
+      if (statusFilter) params.set('status', statusFilter);
+      if (projectFilter) params.set('subProject', projectFilter);
+      if (purposeFilter) params.set('purpose', purposeFilter);
+      
+      const endpoint = `/purchase-requests/my-requests?${params.toString()}`;
       const response = await apiGet(endpoint);
       const result = await response.json();
       if (result.success) {
         setRequests(result.data);
-      }
-      setMode('create')
-      setFormData({
-        _id: '',
-        requesterName: profile?.fullName || '',
-        requesterDepartment: profile?.department || '',
-        projectName: '',
-        purpose: '',
-        requestDate: new Date().toISOString().split('T')[0],
-        deliveryPlace: '',
-        categories: {
-          construction: false,
-          admin: false,
-          material: false,
-          services: false
-        },
-        items: [],
-        // NEW: Add approvers selection
-        approvers: {
-          checkedBy: '',
-          verifiedBy: '',
-          approvedBy: ''
+        if (result.pagination) {
+          setPagination(result.pagination);
         }
-      })
+      }
     } catch (error) {
       console.error('Failed to refresh requests:', error);
     }
@@ -486,7 +637,6 @@ const PurchaseRequest = ({onRefresh}) => {
                       <TabsTrigger value="material-master">Material Master</TabsTrigger>
                     ) : null}
                   </TabsList>
-
                   <TabsContent value="my-requests" className="space-y-6">
                     {/* Button Row */}
                     <div className="flex gap-2 mb-6 sticky top-0 bg-background z-10 py-4 border-b">
@@ -500,6 +650,7 @@ const PurchaseRequest = ({onRefresh}) => {
                         initialData={formData}
                         requestId={formData?._id}
                         projectData={PRProjects}
+                        isLoading={loadingRequest}
                       />
 
                       <Button 
@@ -547,7 +698,77 @@ const PurchaseRequest = ({onRefresh}) => {
                     {/* Request List */}
                     <Card>
                       <CardHeader>
-                        <CardTitle>My Purchase Requests</CardTitle>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <CardTitle>My Purchase Requests</CardTitle>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            {/* Project Filter (SubProjects) */}
+                            <Select
+                              value={projectFilter || "__all__"}
+                              onValueChange={(value) => {
+                                setProjectFilter(value === "__all__" ? "" : value);
+                                setPagination(prev => ({ ...prev, page: 1 }));
+                              }}
+                            >
+                              <SelectTrigger className="w-full sm:w-44">
+                                <SelectValue placeholder="All Sub-Projects" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__all__">All Sub-Projects</SelectItem>
+                                {PRProjects.flatMap((project) => 
+                                  project.subProjects?.map((subProject) => (
+                                    <SelectItem key={subProject._id} value={subProject.name}>
+                                      {subProject.name}
+                                    </SelectItem>
+                                  )) || []
+                                )}
+                              </SelectContent>
+                            </Select>
+
+                            {/* Purpose Filter */}
+                            <Select
+                              value={purposeFilter || "__all__"}
+                              onValueChange={(value) => {
+                                setPurposeFilter(value === "__all__" ? "" : value);
+                                setPagination(prev => ({ ...prev, page: 1 }));
+                              }}
+                            >
+                              <SelectTrigger className="w-full sm:w-44">
+                                <SelectValue placeholder="All Purposes" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__all__">All Purposes</SelectItem>
+                                {availablePurposes.map((purpose) => (
+                                  <SelectItem key={purpose} value={purpose}>
+                                    {purpose}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            {/* Status Filter */}
+                            <Select
+                              value={statusFilter || "__all__"}
+                              onValueChange={(value) => {
+                                setStatusFilter(value === "__all__" ? "" : value);
+                                setPagination(prev => ({ ...prev, page: 1 }));
+                              }}
+                            >
+                              <SelectTrigger className="w-full sm:w-36">
+                                <SelectValue placeholder="All Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__all__">All Status</SelectItem>
+                                <SelectItem value="draft">Draft</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="checked">Checked</SelectItem>
+                                <SelectItem value="verified">Verified</SelectItem>
+                                <SelectItem value="approved">Approved</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                                <SelectItem value="revised">Revised</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent>
                         <div className="overflow-x-auto">
@@ -672,6 +893,76 @@ const PurchaseRequest = ({onRefresh}) => {
                             </tbody>
                           </table>
                         </div>
+                        {/* Pagination Controls */}
+                        {pagination.pages > 0 && (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span>Showing {(pagination.page - 1) * pagination.limit + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results</span>
+                              <Select
+                                value={pagination.limit.toString()}
+                                onValueChange={(value) => {
+                                  setPagination(prev => ({ ...prev, limit: parseInt(value), page: 1 }));
+                                }}
+                              >
+                                <SelectTrigger className="w-20 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="10">10</SelectItem>
+                                  <SelectItem value="25">25</SelectItem>
+                                  <SelectItem value="50">50</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <span>per page</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                disabled={pagination.page === 1 || loadingRequests}
+                              >
+                                ←
+                              </Button>
+                              
+                              {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                                let pageNum;
+                                if (pagination.pages <= 5) {
+                                  pageNum = i + 1;
+                                } else if (pagination.page <= 3) {
+                                  pageNum = i + 1;
+                                } else if (pagination.page >= pagination.pages - 2) {
+                                  pageNum = pagination.pages - 4 + i;
+                                } else {
+                                  pageNum = pagination.page - 2 + i;
+                                }
+                                
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    variant={pagination.page === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+                                    disabled={loadingRequests}
+                                    className="min-w-[32px]"
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                );
+                              })}
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                disabled={pagination.page === pagination.pages || loadingRequests}
+                              >
+                                →
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -687,6 +978,7 @@ const PurchaseRequest = ({onRefresh}) => {
                     checkers={checkers}
                     verifiers={verifiers}
                     approvers={approvers}
+                    isLoading={loadingRequest}
                   />
 
                   {/* All Related MRs */}
@@ -694,7 +986,83 @@ const PurchaseRequest = ({onRefresh}) => {
                     {/* All Request List */}
                     <Card>
                       <CardHeader>
-                        <CardTitle>All Requests</CardTitle>
+                        <div className="flex flex-col gap-4">
+                          <CardTitle>All Related Requests</CardTitle>
+                          <div className="flex flex-wrap gap-4">
+                            {/* Status Filter */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Status:</span>
+                              <Select value={allStatusFilter} onValueChange={setAllStatusFilter}>
+                                <SelectTrigger className="w-[140px]">
+                                  <SelectValue placeholder="All Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__all__">All Status</SelectItem>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="approved">Approved</SelectItem>
+                                  <SelectItem value="rejected">Rejected</SelectItem>
+                                  <SelectItem value="draft">Draft</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Sub-Project Filter */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Sub-Project:</span>
+                              <Select value={allProjectFilter} onValueChange={setAllProjectFilter}>
+                                <SelectTrigger className="w-[160px]">
+                                  <SelectValue placeholder="All Sub Projects" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__all__">All Sub Projects</SelectItem>
+                                  {PRProjects.flatMap((project) => 
+                                    project.subProjects?.map((subProject) => (
+                                      <SelectItem key={subProject._id} value={subProject.name}>
+                                        {subProject.name}
+                                      </SelectItem>
+                                    )) || []
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Purpose Filter */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Purpose:</span>
+                              <Select value={allPurposeFilter} onValueChange={setAllPurposeFilter}>
+                                <SelectTrigger className="w-[160px]">
+                                  <SelectValue placeholder="All Purposes" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__all__">All Purposes</SelectItem>
+                                  {availablePurposes.map((purpose) => (
+                                    <SelectItem key={purpose} value={purpose}>
+                                      {purpose}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Requester Filter */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Requester:</span>
+                              <Select value={allRequesterFilter} onValueChange={setAllRequesterFilter}>
+                                <SelectTrigger className="w-[160px]">
+                                  <SelectValue placeholder="All Requesters" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__all__">All Requesters</SelectItem>
+                                  {allAvailableRequesters.map((requester) => (
+                                    <SelectItem key={requester} value={requester}>
+                                      {requester}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent>
                         <div className="overflow-x-auto">
@@ -775,6 +1143,76 @@ const PurchaseRequest = ({onRefresh}) => {
                             </tbody>
                           </table>
                         </div>
+                        {/* Pagination Controls */}
+                        {allRequestsPagination.pages > 0 && (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span>Showing {(allRequestsPagination.page - 1) * allRequestsPagination.limit + 1} to {Math.min(allRequestsPagination.page * allRequestsPagination.limit, allRequestsPagination.total)} of {allRequestsPagination.total} results</span>
+                              <Select
+                                value={allRequestsPagination.limit.toString()}
+                                onValueChange={(value) => {
+                                  setAllRequestsPagination(prev => ({ ...prev, limit: parseInt(value), page: 1 }));
+                                }}
+                              >
+                                <SelectTrigger className="w-20 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="10">10</SelectItem>
+                                  <SelectItem value="25">25</SelectItem>
+                                  <SelectItem value="50">50</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <span>per page</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAllRequestsPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                disabled={allRequestsPagination.page === 1 || loadingRequests}
+                              >
+                                ←
+                              </Button>
+                              
+                              {Array.from({ length: Math.min(5, allRequestsPagination.pages) }, (_, i) => {
+                                let pageNum;
+                                if (allRequestsPagination.pages <= 5) {
+                                  pageNum = i + 1;
+                                } else if (allRequestsPagination.page <= 3) {
+                                  pageNum = i + 1;
+                                } else if (allRequestsPagination.page >= allRequestsPagination.pages - 2) {
+                                  pageNum = allRequestsPagination.pages - 4 + i;
+                                } else {
+                                  pageNum = allRequestsPagination.page - 2 + i;
+                                }
+                                
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    variant={allRequestsPagination.page === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setAllRequestsPagination(prev => ({ ...prev, page: pageNum }))}
+                                    disabled={loadingRequests}
+                                    className="min-w-[32px]"
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                );
+                              })}
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAllRequestsPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                disabled={allRequestsPagination.page === allRequestsPagination.pages || loadingRequests}
+                              >
+                                →
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -786,6 +1224,19 @@ const PurchaseRequest = ({onRefresh}) => {
                         onApprove={(id) => console.log('Approve', id)}
                         onReject={(id) => console.log('Reject', id)}
                         onRefresh={fetchPendingApprovals}
+                        pagination={pendingApprovalsPagination}
+                        setPagination={setPendingApprovalsPagination}
+                        statusFilter={pendingStatusFilter}
+                        setStatusFilter={setPendingStatusFilter}
+                        projectFilter={pendingProjectFilter}
+                        setProjectFilter={setPendingProjectFilter}
+                        purposeFilter={pendingPurposeFilter}
+                        setPurposeFilter={setPendingPurposeFilter}
+                        requesterFilter={pendingRequesterFilter}
+                        setRequesterFilter={setPendingRequesterFilter}
+                        PRProjects={PRProjects}
+                        availablePurposes={availablePurposes}
+                        availableRequesters={pendingAvailableRequesters}
                       />
                     </TabsContent>
                   ) : null}

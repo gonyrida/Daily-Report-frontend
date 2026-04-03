@@ -63,6 +63,7 @@ interface PurchaseRequestFormProps {
   projectData: any;
   initialData?: any; // For edit/revise mode
   requestId?: string; // For edit/revise mode
+  isLoading?: boolean; // Loading state from parent
 }
 
 const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
@@ -72,7 +73,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
   onRefresh,
   projectData,
   initialData,
-  requestId
+  requestId,
+  isLoading = false
 }) => {
 	// console.log('This is the request you got ', initialData)
 
@@ -732,6 +734,12 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					onPointerDownOutside={(e) => e.preventDefault()}
 					onEscapeKeyDown={(e) => e.preventDefault()}
 				>
+					{isLoading && (
+						<div className="absolute inset-0 bg-background/80 z-50 flex flex-col items-center justify-center">
+							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+							<p className="mt-2 text-gray-600">Loading request...</p>
+						</div>
+					)}
 					<DialogHeader>
 						<DialogTitle>{getTitle(mode)}</DialogTitle>
 					</DialogHeader>

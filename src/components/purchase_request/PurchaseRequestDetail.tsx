@@ -19,6 +19,7 @@ interface PurchaseRequestDetailProps {
   checkers: any[];
   verifiers: any[];
   approvers: any[];
+  isLoading?: boolean; // Loading state from parent
 }
 
 const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
@@ -30,7 +31,8 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
   preparers,
   checkers,
   verifiers,
-  approvers
+  approvers,
+  isLoading
 }) => {
   const { profile } = useProfileContext();
   const [activeTab, setActiveTab] = useState('details');
@@ -138,6 +140,12 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
   return (
     <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        {isLoading && (
+          <div className="absolute inset-0 bg-background/80 z-50 flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-600">Loading request...</p>
+          </div>
+        )}
         <DialogHeader>
           <DialogTitle>Purchase Request Details</DialogTitle>
         </DialogHeader>
