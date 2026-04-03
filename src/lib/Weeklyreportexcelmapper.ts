@@ -20,6 +20,8 @@ export interface MapperInput {
     employer?: string;
     consultant?: string;
     contractor?: string;
+    coverImage?: string;         // Cover image URL or base64 data
+    clientLogo?: string;         // Client logo URL or base64 data
     refNo?: string;
     letterDate?: string;
     toName?: string;
@@ -57,6 +59,14 @@ export interface MapperInput {
     amount?: number | string;
     remark?: string;
     remarks?: string;
+    previousWeek?: {
+      qty?: number | string;
+      amount?: number | string;
+      percentage?: number | string;
+    };
+    previousWeekQty?: number | string;
+    previousWeekAmount?: number | string;
+    previousWeekPct?: number | string;
     thisWeek?: {
       qty?: number | string;
       amount?: number | string;
@@ -65,6 +75,22 @@ export interface MapperInput {
     thisWeekQty?: number | string;
     thisWeekAmount?: number | string;
     thisWeekPct?: number | string;
+    upToThisWeek?: {
+      qty?: number | string;
+      amount?: number | string;
+      percentage?: number | string;
+    };
+    upToThisWeekQty?: number | string;
+    upToThisWeekAmount?: number | string;
+    upToThisWeekPct?: number | string;
+    remaining?: {
+      qty?: number | string;
+      amount?: number | string;
+      percentage?: number | string;
+    };
+    remainingQty?: number | string;
+    remainingAmount?: number | string;
+    remainingPct?: number | string;
     nextWeekPlan?: {
       qty?: number | string;
       amount?: number | string;
@@ -81,6 +107,7 @@ export interface MapperInput {
     upToNextWeekQty?: number | string;
     upToNextWeekAmount?: number | string;
     upToNextWeekPct?: number | string;
+    isBold?: boolean;
     [k: string]: unknown;
   }>;
 
@@ -222,9 +249,6 @@ export interface MapperInput {
 export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
   const c = input.coverData ?? {};
 
-  console.log('🔍 Mapper Debug: constructionProgress input:', input.constructionProgress);
-  console.log('🔍 Mapper Debug: First item remark:', input.constructionProgress?.[0]?.remark);
-
   return {
     // ── Cover ────────────────────────────────────────────────────────────────
     weekNumber:      c.weekNumber,
@@ -236,6 +260,8 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     employer:        c.employer,
     consultant:      c.consultant,
     contractor:      c.contractor,
+    coverImage:      c.coverImage,        // Map cover image
+    clientLogo:      c.clientLogo,        // Map client logo
     refNo:           c.refNo,
     letterDate:      c.letterDate,
     toName:          c.toName,
@@ -248,13 +274,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     conProgressSubtitle: input.conProgressSubtitle,
     conProgressDate:     input.conProgressDate ?? c.reportDateFrom,
     conProgressRevision: input.conProgressRevision,
-    conProgressItems: (input.constructionProgress ?? []).map((p, index) => {
-      // Add test remark for first few items to verify Excel export
-      const testRemark = index < 3 ? `Test remark ${index + 1}` : (p.remark ?? p.remarks ?? '');
-      
-      console.log(`🔍 Mapper Debug: Item ${index} remark:`, p.remark, '-> test:', testRemark);
-      
-      return {
+    conProgressItems: (input.constructionProgress ?? []).map(p => ({
       id:               p.id,
       scopeOfWorks:     p.scopeOfWorks ?? p.description,
       detailDescription:p.detailDescription,
@@ -264,18 +284,27 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       laborRate:        p.boQ?.laborRate ?? p.laborRate,
       unitRate:         p.boQ?.unitRate ?? p.unitRate,
       amount:           p.boQ?.amount ?? p.amount,
-      remark:           testRemark,
+      remark:           p.remark ?? p.remarks,
+      previousWeekQty:  p.previousWeek?.qty ?? p.previousWeekQty,
+      previousWeekAmount: p.previousWeek?.amount ?? p.previousWeekAmount,
+      previousWeekPct: p.previousWeek?.percentage ?? p.previousWeekPct,
       thisWeekQty:      p.thisWeek?.qty ?? p.thisWeekQty,
       thisWeekAmount:   p.thisWeek?.amount ?? p.thisWeekAmount,
       thisWeekPct:      p.thisWeek?.percentage ?? p.thisWeekPct,
+      upToThisWeekQty: p.upToThisWeek?.qty ?? p.upToThisWeekQty,
+      upToThisWeekAmount: p.upToThisWeek?.amount ?? p.upToThisWeekAmount,
+      upToThisWeekPct: p.upToThisWeek?.percentage ?? p.upToThisWeekPct,
+      remainingQty: p.remaining?.qty ?? p.remainingQty,
+      remainingAmount: p.remaining?.amount ?? p.remainingAmount,
+      remainingPct: p.remaining?.percentage ?? p.remainingPct,
       nextWeekQty:      p.nextWeekPlan?.qty ?? p.nextWeekQty,
       nextWeekAmount:   p.nextWeekPlan?.amount ?? p.nextWeekAmount,
       nextWeekPct:      p.nextWeekPlan?.percentage ?? p.nextWeekPct,
       upToNextWeekQty:  p.upToNextWeekPlan?.qty ?? p.upToNextWeekQty,
       upToNextWeekAmount:p.upToNextWeekPlan?.amount ?? p.upToNextWeekAmount,
       upToNextWeekPct:  p.upToNextWeekPlan?.percentage ?? p.upToNextWeekPct,
-    };
-    }),
+      isBold:           p.isBold,
+    })),
 
     // ── Overall Progress ─────────────────────────────────────────────────────
     overallProgressRemark: input.overallProgressRemark,

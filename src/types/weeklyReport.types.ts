@@ -122,6 +122,7 @@ export interface WeeklyReportCover {
   clientName: string;
   contractNumber: string;
   coverImage?: string;
+  clientLogo?: string;
   projectTitle?: string;
   employer?: string;
 }

@@ -164,6 +164,7 @@ const WeeklyReport = () => {
     projectName: selectedProject || "Default Project Name",
     employer: "Client Name",
     coverImage: "",
+    clientLogo: "",
     // Introduction fields
     projectOverview: "",
     designNConstruction: "",
@@ -362,6 +363,7 @@ const WeeklyReport = () => {
               projectName: report.projectName || selectedProject || 'Default Project Name',
               employer: report.sections?.cover?.employer || 'Client Name',
               coverImage: report.sections?.cover?.coverImage || '',
+              clientLogo: report.sections?.cover?.clientLogo || '',
               dateRange: isCreateNewMode ? '' : (report.sections?.cover?.dateRange || ''), // Reset date range for new report
               // Load introduction data
               projectOverview: report.sections?.introduction?.projectOverview || '',
@@ -688,6 +690,7 @@ const WeeklyReport = () => {
             clientName: 'Client Name',
             contractNumber: '',
             coverImage: '',
+            clientLogo: '',
             projectTitle: selectedProject || 'Default Project',
             employer: 'Client Name'
           },
@@ -884,6 +887,7 @@ const WeeklyReport = () => {
             clientName: 'Client Name',
             contractNumber: '',
             coverImage: '',
+            clientLogo: '',
             projectTitle: selectedProject || 'Default Project',
             employer: 'Client Name'
           },
@@ -1296,6 +1300,7 @@ const WeeklyReport = () => {
             clientName: sharedData.employer || 'Client Name',
             contractNumber: '', // Add contract number field if needed
             coverImage: sharedData.coverImage || '',
+            clientLogo: sharedData.clientLogo || '',
             projectTitle: sharedData.projectName || 'Default Project',
             employer: sharedData.employer || 'Client Name'
           },
@@ -1318,6 +1323,7 @@ const WeeklyReport = () => {
             clientName: sharedData.employer || 'Client Name',
             contractNumber: '', // Add contract number field if needed
             coverImage: sharedData.coverImage || '',
+            clientLogo: sharedData.clientLogo || '',
             projectTitle: sharedData.projectName || 'Default Project',
             employer: sharedData.employer || 'Client Name'
           },
@@ -1693,6 +1699,7 @@ const WeeklyReport = () => {
             clientName: sharedData.employer || 'Client Name',
             contractNumber: '', // Add contract number field if needed
             coverImage: sharedData.coverImage || '',
+            clientLogo: sharedData.clientLogo || '',
             projectTitle: sharedData.projectName || 'Default Project',
             employer: sharedData.employer || 'Client Name'
           },
@@ -2106,9 +2113,6 @@ const WeeklyReport = () => {
   };
 
   // Build excel export data from all available hook states
-  console.log('🔍 Debug: Construction progress data:', constructionProgressHook.constructionData?.items);
-  console.log('🔍 Debug: First item remark:', constructionProgressHook.constructionData?.items?.[0]?.remark);
-  
   const excelData = buildWeeklyReportExportData({
     coverData: {
       weekNumber: sharedData.weekNumber,
@@ -2117,6 +2121,8 @@ const WeeklyReport = () => {
       projectTitle: sharedData.projectName,
       employer: sharedData.employer,
       contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+      coverImage: sharedData.coverImage,  // Add cover image
+      clientLogo: sharedData.clientLogo,  // Add client logo
       refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
       letterDate: sharedData.reportDate,
       toName: sharedData.recipientName,
@@ -2180,8 +2186,8 @@ const WeeklyReport = () => {
           <div className="flex flex-col bg-background">
             {/* Report Header with Company and Client Logos */}
             <ReportHeader
-              projectLogo={projectLogo}
-              setProjectLogo={setProjectLogo}
+              projectLogo={sharedData.clientLogo}
+              setProjectLogo={(logo) => setSharedData(prev => ({ ...prev, clientLogo: logo }))}
               title={`WEEKLY REPORT - ${selectedProject || 'No Project Selected'}`}
             />
 
