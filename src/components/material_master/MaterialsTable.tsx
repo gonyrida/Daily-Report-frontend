@@ -55,7 +55,7 @@ export default function MaterialsTable({
 						<th className="px-4 py-3 text-left font-medium">Code</th>
 						<th className="px-4 py-3 text-left font-medium">Description</th>
 						<th className="px-4 py-3 text-left font-medium">Unit</th>
-						<th className="px-4 py-3 text-right font-medium">Unit Price</th>
+						<th className="px-4 py-3 text-left font-medium">Unit Price</th>
 						<th className="px-4 py-3 text-left font-medium">Brand</th>
 						<th className="px-4 py-3 text-left font-medium">Last Modified</th>
 					</tr>
@@ -66,16 +66,16 @@ export default function MaterialsTable({
 							key={material._id}
 							className="border-t cursor-pointer"
 						>
-							<td className="px-4 py-3">
+							<td className="px-4">
 								<Checkbox
 									checked={selectedMaterials.includes(material._id)}
 									onCheckedChange={() => toggleSelect(material._id)}
 								/>
 							</td>
-							<td className="px-4 py-3">
+							<td className="px-4 py-1">
 								<div className="flex items-center gap-2">
 									<span className="text-xs truncate max-w-[100px]">
-										<img src={material.reference} className="w-30 h-16 object-fit" />
+										<img src={material.reference} className="w-30 h-10 object-fit" />
 									</span>
 								</div>
 							</td>
@@ -94,7 +94,7 @@ export default function MaterialsTable({
 									{getUnitLabel(material.unit)}
 								</span>
 							</td>
-							<td className="px-4 py-3 text-right font-semibold">
+							<td className="px-4 py-3 font-semibold">
 								{formatPrice(material.unitPrice)}
 							</td>
 							<td className="px-4 py-3">

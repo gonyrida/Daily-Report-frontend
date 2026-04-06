@@ -26,6 +26,7 @@ import CustomCombobox from './CustomCombobox';
 import MaterialActualCost from './MaterialActualCost';
 import AttachmentsTab, { Attachment } from './AttachmentsTab';
 import ConfirmationModal from './ConfirmationModal';
+import MaterialSelectionDialog from '@/components/material_master/MaterialSelectionDialog';
 import { version } from 'os';
 
 const parseFileSize = (fileSize) => {
@@ -93,6 +94,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	const [requests, setRequests] = useState([]);
 	const [prSummaryData, setPrSummaryData] = useState(null);
 	const [showConfirmModal, setShowConfirmModal] = useState(false);
+	const [showMaterialDialog, setShowMaterialDialog] = useState(false);
 
 	useEffect(() => {
 		if (profile) {
@@ -529,6 +531,23 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
     }
   };
 
+  const handleMaterialsSelected = (items: any[]) => {
+    const newItems = items.map(item => ({
+      description: item.description,
+      unit: item.unit,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      brand: item.brand,
+      reference: item.reference,
+      note: item.note
+    }));
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, ...newItems]
+    }));
+    setShowMaterialDialog(false);
+  };
+
   const handleRemoveSelected = () => {
     if (selectedItems.length > 0) {
       // Smart context detection
@@ -880,6 +899,14 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 									<div className="flex justify-between items-center">
 										<label className="text-sm font-medium">Item Management</label>
 										<div className="flex gap-2">
+											<Button
+												type='button'
+												variant="outline"
+												size="sm"
+												onClick={() => setShowMaterialDialog(true)}
+											>
+												Load Material(s)
+											</Button>
 											<Button 
 												type="button" 
 												variant="outline" 
@@ -1338,6 +1365,12 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				showNotes={true}
 				confirmText="Revise Request"
 				isLoading={isSubmitting}
+			/>
+
+			<MaterialSelectionDialog
+				isOpen={showMaterialDialog}
+				onOpenChange={setShowMaterialDialog}
+				onMaterialsSelected={handleMaterialsSelected}
 			/>
 
 			{/* Add Item Modal */}

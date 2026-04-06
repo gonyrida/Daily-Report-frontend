@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MaterialItem, CreateMaterialDTO, UnitType } from '@/components/material_master/types/material';
+import CreatableCombobox from '@/components/ui/creatable-combobox';
 
 interface MaterialDialogProps {
 	open: boolean;
@@ -258,22 +259,15 @@ export default function MaterialDialog({
 								<label htmlFor="unit" className="block text-sm font-medium mb-1">
 									Unit <span className="text-red-500">*</span>
 								</label>
-								<select
-									id="unit"
+								<CreatableCombobox
+									options={UNIT_OPTIONS}
 									value={formData.unit}
-									onChange={(e) => handleChange('unit', e.target.value)}
-									className={`bg-background w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 ${
-										errors.unit
-											? 'border-red-300 focus:ring-red-500'
-											: 'border-gray-300 focus:ring-blue-500'
-									}`}
-								>
-									{UNIT_OPTIONS.map(option => (
-										<option key={option.value} value={option.value}>
-											{option.label}
-										</option>
-									))}
-								</select>
+									onChange={(value) =>
+										handleChange('unit', value)
+									}
+									placeholder="Select unit..."
+									width="w-full"
+								/>
 								{errors.unit && <p className="mt-1 text-xs text-red-500">{errors.unit}</p>}
 							</div>
 
