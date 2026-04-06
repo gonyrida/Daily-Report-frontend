@@ -55,8 +55,8 @@ export const useOverallProgress = () => {
           if (field === "description" && value === "__custom__") {
             return { ...row, description: "", isCustomInput: true };
           }
-          if (field === "unit" && value === "__custom_unit__") {
-            return { ...row, unit: "__custom_unit_input__" };
+          if (field === "scopeOfWorks" && value === "__custom_unit__") {
+            return { ...row, scopeOfWorks: "__custom_unit_input__" };
           }
           if (field === "isCustomInput" && value === false) {
             return {
@@ -77,13 +77,14 @@ export const useOverallProgress = () => {
     const newRow: ProgressRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: 0,
-      prev: 0,
-      today: 0,
-      accumulated: 0,
+      scopeOfWorks: "",
+      pctUpToPrevWeek: 0,
+      pctThisWeek: 0,
+      pctUpToThisWeek: 0,
+      pctRemaining: 0,
+      pctNextWeekPlan: 0,
+      pctUpNextWeekPlan: 0,
       rowType: "title",
-      nextWeekPlan: 0,
-      upNextWeekPlan: 0,
       searchTerm: "",
       isCustomInput: false,
     };
@@ -95,13 +96,14 @@ export const useOverallProgress = () => {
     const newRow: ProgressRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: 0,
-      prev: 0,
-      today: 0,
-      accumulated: 0,
+      scopeOfWorks: "",
+      pctUpToPrevWeek: 0,
+      pctThisWeek: 0,
+      pctUpToThisWeek: 0,
+      pctRemaining: 0,
+      pctNextWeekPlan: 0,
+      pctUpNextWeekPlan: 0,
       rowType: "detail",
-      nextWeekPlan: 0,
-      upNextWeekPlan: 0,
       searchTerm: "",
       isCustomInput: false,
     };

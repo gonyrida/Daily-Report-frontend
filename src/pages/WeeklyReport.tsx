@@ -18,6 +18,7 @@ import { useHsesData } from "@/hooks/useHsesData";
 import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
 import { useQaqcTable } from "@/hooks/useQaqcTable";
+import { toRoman } from "@/lib/numberUtils";
 import { useIssues } from "@/hooks/useIssues";
 import { useConstructionProgress } from "@/hooks/useConstructionProgress";
 import { ConstructionProgressData } from "@/types/constructionProgress";
@@ -271,7 +272,6 @@ const WeeklyReport = () => {
 
   // Callback functions for clearing data
   const handleClearQaqcData = (clearFn: () => void) => {
-    console.log('🔍 DEBUG: QAQC clear function registered');
     clearQaqcDataRef.current = clearFn;
   };
 
@@ -2128,13 +2128,105 @@ const WeeklyReport = () => {
       toName: sharedData.recipientName,
       ccLines: sharedData.ccList,
       projectManager: sharedData.signatoryName,
+      signatureImage: sharedData.signatureImage,  // Add signature image
+      constructorName: sharedData.constructorName,
+      companyLocation: sharedData.companyLocation,
+      companyPhone1: sharedData.companyPhone1,
+      companyPhone2: sharedData.companyPhone2,
+      companyEmail1: sharedData.companyEmail1,
+      companyEmail2: sharedData.companyEmail2,
     },
     constructionProgress: constructionProgressHook.constructionData?.items as any,
     conProgressProject: sharedData.projectName,
     conProgressSubtitle: constructionProgressHook.constructionData?.projectInfo?.subtitle || '',
     conProgressDate: constructionProgressHook.constructionData?.projectInfo?.date || sharedData.dateRange?.split(' - ')[0],
     conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
-    overallProgress: overallProgressHook.rows as any,
+    overallProgress: (() => {
+      // Helper function to format rows with displayIndex (same logic as UI)
+      const formatRowsWithDisplayIndex = (rows: any[]) => {
+        let titleCount = 0;
+        return rows.map((row, index) => {
+          if (row.rowType === "title") {
+            titleCount++;
+            return {
+              ...row,
+              displayIndex: `${toRoman(titleCount)}.`,
+            };
+          }
+          if (row.rowType === "detail") {
+            let detailCount = 0;
+            for (let i = 0; i <= index; i++) {
+              if (rows[i].rowType === "title") {
+                detailCount = 0;
+              } else if (rows[i].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            return {
+              ...row,
+              displayIndex: `${detailCount}.`,
+            };
+          }
+          if (row.rowType === "subDetail") {
+            // Find parent detail number for this sub-detail
+            let parentDetailNumber = 0;
+            for (let i = index; i >= 0; i--) {
+              if (rows[i].rowType === "detail") {
+                let detailCount = 0;
+                for (let j = 0; j <= i; j++) {
+                  if (rows[j].rowType === "detail") {
+                    detailCount++;
+                  }
+                }
+                parentDetailNumber = detailCount;
+                break;
+              }
+            }
+            
+            // Count sub-details under the same parent
+            let subDetailCount = 0;
+            for (let i = 0; i <= index; i++) {
+              if (rows[i].rowType === "detail") {
+                let detailCount = 0;
+                for (let j = 0; j <= i; j++) {
+                  if (rows[j].rowType === "detail") {
+                    detailCount++;
+                  }
+                }
+                if (detailCount === parentDetailNumber) {
+                  subDetailCount = 0;
+                }
+              } else if (rows[i].rowType === "subDetail") {
+                let currentParentDetail = 0;
+                for (let k = i; k >= 0; k--) {
+                  if (rows[k].rowType === "detail") {
+                    let detailCount = 0;
+                    for (let j = 0; j <= k; j++) {
+                      if (rows[j].rowType === "detail") {
+                        detailCount++;
+                      }
+                    }
+                    currentParentDetail = detailCount;
+                    break;
+                  }
+                }
+                if (currentParentDetail === parentDetailNumber) {
+                  subDetailCount++;
+                }
+              }
+            }
+            
+            return {
+              ...row,
+              displayIndex: `${parentDetailNumber}.${subDetailCount}`,
+            };
+          }
+          return row;
+        });
+      };
+      
+      return formatRowsWithDisplayIndex(overallProgressHook.rows);
+    })(),
     nwdpItems: weeklyActivities.map(a => ({
       workDoneLabel: a.description,
       workDonePct: a.percent,
@@ -2175,6 +2267,10 @@ const WeeklyReport = () => {
       problemDescription: issue.problem,
       actionBy: issue.actionBy,
     })),
+    // Introduction fields
+    projectOverview: sharedData.projectOverview,
+    designConstruction: sharedData.designNConstruction,
+    designList: [], // Design list not available in current data structure
   });
 
   return (

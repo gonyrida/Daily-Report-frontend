@@ -40,9 +40,18 @@ export interface WeeklyReportExportData {
   letterDate?: string;
   toName?: string;
   toAddress?: string;
-  attName?: string;
+  recipientCompany?: string;
+  recipientLocation?: string;
+  recipientName?: string;
   ccLines?: string[];
   projectManager?: string;
+  signatureImage?: string;
+  constructorName?: string;
+  companyLocation?: string;
+  companyPhone1?: string;
+  companyPhone2?: string;
+  companyEmail1?: string;
+  companyEmail2?: string;
 
   // ── Con. Progress ────────────────────────────────────────────────────────────
   conProgressProject?: string;
@@ -79,6 +88,11 @@ export interface WeeklyReportExportData {
 
   // ── 8. Construction Issues ────────────────────────────────────────────────────
   constructionIssues?: ConstructionIssue[];
+
+  // ── 9. Introduction (1.Intro) ───────────────────────────────────────────────────
+  projectOverview?: string;
+  designConstruction?: string;
+  designList?: string[];
 }
 
 export interface ConProgressItem {
@@ -222,7 +236,7 @@ async function addImageToWorksheet(workbook: ExcelJS.Workbook, worksheet: ExcelJ
     // Check if it's a base64 data URL
     if (imagePath.startsWith('data:')) {
       // Extract the base64 part and extension from data URL
-      const matches = imagePath.match(/^data:(image\/\w+);base64,(.+)$/);
+      const matches = imagePath.match(/^data:(image\/[\w+]+);base64,(.+)$/);
       if (!matches) {
         console.warn(`⚠️ Invalid data URL format for image`);
         return;
@@ -232,7 +246,11 @@ async function addImageToWorksheet(workbook: ExcelJS.Workbook, worksheet: ExcelJ
       const base64Data = matches[2];
 
       // Determine extension from MIME type
-      extension = mimeType.split('/')[1] || 'png';
+      if (mimeType === 'image/svg+xml') {
+        extension = 'svg';
+      } else {
+        extension = mimeType.split('/')[1] || 'png';
+      }
 
       // Convert base64 to ArrayBuffer
       const binaryString = atob(base64Data);
@@ -322,6 +340,12 @@ async function safeBuild(name: string, fn: () => Promise<void>) {
 // EXCEL EXPORT FUNCTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Helper function to add padding to text (top and bottom) - accessible to all functions
+const padText = (text: string | number | undefined) => {
+  if (!text || text === '') return '';
+  return `\n${text}\n`;
+};
+
 export async function exportWeeklyReportToExcel(data: WeeklyReportExportData, filename?: string) {
   const workbook = new ExcelJS.Workbook();
 
@@ -330,7 +354,7 @@ export async function exportWeeklyReportToExcel(data: WeeklyReportExportData, fi
   await safeBuild('Cover', () => buildCover(workbook, data));
   await safeBuild('Letter', () => buildLetter(workbook, data));
   await safeBuild('Content', () => buildContent(workbook));
-  await safeBuild('Intro', () => buildIntro(workbook));
+  await safeBuild('Intro', () => buildIntro(workbook, data));
   await safeBuild('OP', () => buildOP(workbook, data));
   await safeBuild('NWDP', () => buildNWDP(workbook, data));
   await safeBuild('QAQC', () => buildQAQC(workbook, data));
@@ -406,6 +430,11 @@ function createStyles(workbook: ExcelJS.Workbook): { [key: string]: Partial<Exce
       font: { size: 10, name: 'Arial' },
       alignment: { horizontal: 'center' as const, vertical: 'middle' as const },
       numFmt: '[=1]0%;0.0%'
+    },
+    introHeader: {
+      font: { bold: true, size: 12, name: 'Arial' },
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } },
+      alignment: { horizontal: 'left' as const, vertical: 'middle' as const }
     }
   };
 }
@@ -573,12 +602,6 @@ async function buildConProgress(workbook: ExcelJS.Workbook, d: WeeklyReportExpor
     const maxHeight = Math.max(...heights);
     ws.getRow(r).height = maxHeight;
 
-    // Helper function to add padding to text (top and bottom)
-    const padText = (text: string | number | undefined) => {
-      if (!text || text === '') return '';
-      return `\n${text}\n`;
-    };
-
     ws.getCell(r, 1).value = padText(item.id);
     ws.getCell(r, 1).style = numberStyle;
 
@@ -712,10 +735,10 @@ async function buildConProgress(workbook: ExcelJS.Workbook, d: WeeklyReportExpor
 
       // Add borders to all cells
       currentStyle.border = {
-        top: { style: 'hair' },
-        bottom: { style: 'hair' },
-        left: { style: 'thin' },
-        right: { style: 'thin' }
+        top: { style: 'hair' as const },
+        bottom: { style: 'hair' as const },
+        left: { style: 'thin' as const },
+        right: { style: 'thin' as const }
       };
 
       cell.style = currentStyle;
@@ -937,7 +960,21 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
   ws.getRow(13).height = 30;
   ws.getRow(15).height = 35;
 }
+/**
+ * Estimates row height based on text length, column width, and font size.
+ * ExcelJS does NOT auto-size merged cell rows — this does it manually.
+ */
+function estimateRowHeight(text: string, colWidthChars: number, fontSize: number = 12): number {
+  const lineHeightPx = fontSize * 1.5;         // Approximate line height
+  const charsPerLine = colWidthChars * 1.1;    // ~1.1 chars per column width unit
 
+  const lines = text.split('\n').reduce((total, line) => {
+    const wrappedLines = Math.ceil(line.length / charsPerLine) || 1;
+    return total + wrappedLines;
+  }, 0);
+
+  return Math.max(15, lines * lineHeightPx);
+}
 // SHEET 3: Letter
 async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('Letter');
@@ -957,7 +994,11 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   // Row 2: height = 20, merge col B-J
   ws.getRow(2).height = 20;
   ws.getCell(2, 2).value = `LETTER FOR WEEKLY PROGRESS REPORT No.${d.weekNumber ?? ''}`;
-  ws.getCell(2, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+  ws.getCell(2, 2).style = { 
+    font: { bold: true, size: 14, name: 'Arial', color: { argb: 'FFFFFFFF' } }, 
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2F75B5' } },
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const } 
+  };
   ws.mergeCells(2, 2, 2, 10);
 
   // Skip row 3 (leave empty)
@@ -967,18 +1008,18 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
 
   // Ref No and Date - no bg color, all values bold
   const letterInfo = [
-    ['Ref. No.', d.refNo ?? `ICT-CPM-LETTER-${d.weekNumber ?? ''}`],
+    ['Ref. No.', d.refNo ?? ''],
     ['Date', d.letterDate ?? '']
   ];
 
   let r = 4;
   letterInfo.forEach(([label, value]) => {
     ws.getCell(r, 2).value = label;
-    ws.getCell(r, 2).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+    ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
     ws.getCell(r, 3).value = ':';
-    ws.getCell(r, 3).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+    ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
     ws.getCell(r, 4).value = value;
-    ws.getCell(r, 4).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+    ws.getCell(r, 4).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
     ws.mergeCells(r, 4, r, 10);
     r++;
   });
@@ -991,54 +1032,109 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
 
   // To, Att, CC with Employee location using "\n"
   ws.getCell(r, 2).value = 'To';
-  ws.getCell(r, 2).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+  ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
   ws.getCell(r, 3).value = ':';
-  ws.getCell(r, 3).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
-  ws.getCell(r, 4).value = d.toName ?? '';
-  ws.getCell(r, 4).style = { font: { size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
+  ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+  ws.getCell(r, 4).value = `${d.recipientCompany ?? ''}\n${d.recipientLocation ?? ''}`;
+  ws.getCell(r, 4).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true } };
   ws.mergeCells(r, 4, r, 10);
   r++;
 
   ws.getCell(r, 2).value = 'Att.';
-  ws.getCell(r, 2).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+  ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
   ws.getCell(r, 3).value = ':';
-  ws.getCell(r, 3).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
-  ws.getCell(r, 4).value = d.attName ?? '';
-  ws.getCell(r, 4).style = { font: { size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
+  ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+  ws.getCell(r, 4).value = d.recipientName ?? d.consultant ?? 'Attention';
+  ws.getCell(r, 4).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
   ws.mergeCells(r, 4, r, 10);
   r++;
 
   (d.ccLines ?? []).forEach((cc, i) => {
     if (i === 0) {
       ws.getCell(r, 2).value = 'CC';
-      ws.getCell(r, 2).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+      ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
     }
     ws.getCell(r, 3).value = ':';
-    ws.getCell(r, 3).style = { font: { bold: true, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+    ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
     ws.getCell(r, 4).value = cc;
-    ws.getCell(r, 4).style = { font: { size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
+    ws.getCell(r, 4).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
     ws.mergeCells(r, 4, r, 10);
     r++;
   });
   r++;
 
   // Letter body
+  // "Dear Sir," row
   ws.getCell(r, 2).value = 'Dear Sir,';
-  ws.getCell(r, 2).style = { font: { size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+  ws.getCell(r, 2).style = { 
+    font: { bold: true, size: 11, name: 'Arial' }, 
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const } 
+  };
+  ws.mergeCells(r, 2, r, 10);
+  ws.getRow(r).height = 20; // Single line, fixed is fine
   r++;
 
-  ws.getCell(r, 2).value = `We are pleased to submit Weekly Progress Report No-${d.weekNumber ?? ''} from ${d.reportDateFrom ?? ''} to ${d.reportDateTo ?? ''}.`;
-  ws.getCell(r, 2).style = { font: { size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
+  // Letter body row — calculate merged width (cols B-J = widths[1..9])
+  const mergedWidthChars = widths.slice(1, 10).reduce((a, b) => a + b, 0); // sum cols B-J
+  const bodyText = `We are pleased to submit Weekly Progress Report No-${d.weekNumber ?? ''} from ${d.reportDateFrom ?? ''} to ${d.reportDateTo ?? ''} for ${d.projectTitle ?? ''}.\n\n\nSincerely Yours,`;
+
+  ws.getCell(r, 2).value = bodyText;
+  ws.getCell(r, 2).style = { 
+    font: { size: 12, name: 'Arial' }, 
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } 
+  };
   ws.mergeCells(r, 2, r, 10);
+  ws.getRow(r).height = estimateRowHeight(bodyText, mergedWidthChars, 12); // ✅ Manual height
   r += 2;
 
-  ws.getCell(r, 2).value = '_________________________________';
-  ws.getCell(r, 2).style = { font: { size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
-  r++;
+   // Row 16: height = 80, merge B-D for signature image
+  ws.getRow(16).height = 60;
+  ws.mergeCells(16, 2, 16, 4); // Merge B16:D16
 
-  ws.getCell(r, 2).value = `${d.projectManager ?? ''} | Project Manager\n${d.contractor ?? ''}`;
-  ws.getCell(r, 2).style = { font: { size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
+  // E-Sign signature image in row 16
+  
+  if (d.signatureImage && d.signatureImage.trim() !== '') {
+    
+    try {
+      // Add signature image to the merged cells
+      const imageRange = 'B16:D16';
+      console.log(`🔍 Attempting to add signature image to range: ${imageRange}`);
+      
+      await addImageToWorksheet(workbook, ws, d.signatureImage, imageRange);
+      
+    } catch (error) {
+      
+      // Add fallback text when image fails
+      ws.getCell(16, 2).value = '[Signature Image - Failed to Load]';
+      ws.getCell(16, 2).style = {
+        font: { size: 10, name: 'Arial', color: { argb: 'FFFF0000' } },
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } },
+        border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+      };
+    }
+  } else {
+    console.log('ℹ️ No signature image provided or empty value');
+    
+    // Add placeholder text when no image is provided
+    ws.getCell(16, 2).value = '[No Signature Image]';
+    ws.getCell(16, 2).style = {
+      font: { size: 10, name: 'Arial', color: { argb: 'FF888888' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } },
+      border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+    };
+  }
+  
+  // Signature block (bold formatting)
+  const sigText = `${d.projectManager ?? ''} | Project Manager\n${d.contractor ?? ''}\n\n${d.companyLocation ?? ''}\n\n${d.companyPhone1 ?? ''}${d.companyPhone2 ? ' | ' + d.companyPhone2 : ' | M +885 (0)'}\n${d.companyEmail1 ?? ''}\n${d.companyEmail2 ?? ''}`;
+  ws.getCell(r, 2).value = sigText;
+  ws.getCell(r, 2).style = { 
+    font: { size: 10, name: 'Arial', bold: true }, 
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } 
+  };
   ws.mergeCells(r, 2, r, 10);
+  ws.getRow(r).height = estimateRowHeight(sigText, mergedWidthChars, 10); // ✅ Manual height
 }
 
 // SHEET 4: CONTENT (Table of Contents)
@@ -1051,7 +1147,7 @@ async function buildContent(workbook: ExcelJS.Workbook) {
   let r = 3;
 
   ws.getCell(r, 2).value = 'TABLE OF CONTENTS*';
-  ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const } };
+  ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const }, fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } } };
   r += 2;
 
   const tocItems = [
@@ -1059,33 +1155,60 @@ async function buildContent(workbook: ExcelJS.Workbook) {
     "2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK",
     "3. ACTIVITIES OF WORK DONE / NEXT WEEK PLAN",
     "4. QA/QC STATUS",
-    "4.1 Non-Conformity Report (NCR)", "4.2 Corrective Action Request (CAR)",
-    "4.3 Safety Corrective Action Request (SCAR)", "4.4 PM Site Instruction (SI)",
-    "4.5 Client Site Instruction (SI)", "4.6 Inspection Request (IR)",
-    "4.7 Material for Approval (MFA)", "4.8 Request for Information (RFI)",
-    "4.9 Request for Approval (RFA)", "4.10 Field Change Request (FCR)",
-    "4.11 Variation Order (VO)", "4.12 Transmittal (TR)", "4.13 Material Inspection Approval (MIR)",
+    "4.1 Non-Conformity Report (NCR)",
+    "4.2 Corrective Action Request (CAR)",
+    "4.3 Safety Corrective Action Request (SCAR)", 
+    "4.4 PM Site Instruction (SI)",
+    "4.5 Client Site Instruction (SI)", 
+    "4.6 Inspection Request (IR)",
+    "4.7 Material for Approval (MFA)", 
+    "4.8 Request for Information (RFI)",
+    "4.9 Request for Approval (RFA)", 
+    "4.10 Field Change Request (FCR)",
+    "4.11 Variation Order (VO)", 
+    "4.12 Transmittal (TR)", 
+    "4.13 Material Inspection Approval (MIR)",
     "5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)",
     "5.1 HSES Training / Introduction / Toolbox Meeting",
-    "5.2 HSES Inspection / Audit / Heavy Equipment / Hand&Power Tools",
-    "5.3 Permit to Work", "5.4 First Aid / Accident / Incident / Near Miss / Fatalities",
-    "5.5 Other HSES Activities Concerns", "5.6 HSES Photo Reference",
-    "6. RESOURCES STATUS", "6.1 Manpower Status", "6.2 Material Delivery Status", "6.3 Machinery / Equipment Status",
-    "7. SITE ACTIVITY PHOTOS", "8. CONSTRUCTION ISSUE", "9. MASTER SCHEDULE"
+    "5.2 HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist",
+    "5.3 Permit to Work",
+    "5.4 First Aid / Accident / Incident / Near Miss / Fatalities (if Any)",
+    "5.5 Other HSES Actities Concerns",
+    "5.6 HSES Photo Reference",
+    "6. RESOURCES STATUS", 
+    "6.1 Manpower Status", 
+    "6.2 Material Delivery Status", 
+    "6.3 Machinery / Equipment Status",
+    "7. SITE ACTIVITY PHOTOS", 
+    "8. CONSTRUCTION ISSUE", 
+    "9. MASTER SCHEDULE"
   ];
 
   tocItems.forEach(line => {
-    const isMajor = /^\d+\.\s[A-Z]/.test(line);
+    const isMajor = /^\d+\.\s[A-Z]/.test(line);     // 1. TITLE
+    const isSub = /^\d+\.\d+/.test(line);           // 4.1, 5.2, etc.
+
     ws.getCell(r, 2).value = line;
-    ws.getCell(r, 2).style = { font: { bold: isMajor, size: 10, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+    ws.getRow(r).height = 25;  // Set row height to 25
+
+    ws.getCell(r, 2).style = {
+      font: { bold: false, size: 11, name: 'Arial' },
+      alignment: {
+        horizontal: 'left' as const,
+        vertical: 'middle' as const,
+        indent: isSub ? 2 : 0   // 👈 THIS IS THE KEY
+      }
+    };
+
     r++;
   });
 
   ws.getColumn(2).width = 98;
+  ws.getColumn(1).width = 5;
 }
 
 // SHEET 5: 1.Intro
-async function buildIntro(workbook: ExcelJS.Workbook) {
+async function buildIntro(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('1.Intro');
   const styles = createStyles(workbook);
 
@@ -1094,14 +1217,78 @@ async function buildIntro(workbook: ExcelJS.Workbook) {
   let r = 3;
 
   ws.getCell(r, 2).value = '1. INTRODUCTION';
-  ws.getCell(r, 2).style = styles.sectionHdr;
-  ws.mergeCells(r, 2, r, 8);
+  ws.getCell(r, 2).style = styles.introHeader;
   r += 2;
 
-  // Add introduction content here as needed
-  ws.getCell(r, 2).value = 'Introduction content would go here...';
+  // Project Overview 
+  ws.getCell(r, 2).value = 'Project Overview';
+  ws.getCell(r, 2).style = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
+  };
+  ws.getRow(r).height = 22;
+  r++;
+
+  // Project Overview Content
+  ws.getCell(r, 2).value = '\n' + (d.projectOverview || '');
   ws.getCell(r, 2).style = styles.dataWhite;
-  ws.mergeCells(r, 2, r, 8);
+  r++;
+
+  // Design & Construction
+  if (d.designConstruction) {
+    ws.getCell(r, 2).value = 'Design & Construction';
+    ws.getCell(r, 2).style = {
+      font: { bold: true, size: 12, name: 'Arial' },
+      alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
+    };
+    ws.getRow(r).height = 22;
+    r++;
+
+    ws.getCell(r, 2).value ='\n'+ d.designConstruction + '\n';
+    ws.getCell(r, 2).style = styles.dataWhite;
+    r++;
+  }
+
+  // Design List
+  if (d.designList && d.designList.length > 0) {
+    d.designList.forEach((item) => {
+      if (item && item.trim() !== '') {
+        ws.getCell(r, 2).value = item;
+        ws.getCell(r, 2).style = styles.dataWhite;
+        r += 1;
+      }
+    });
+  }
+
+  // Cover Image
+  if (d.coverImage) {
+    r = 10; // Set to row 10
+    try {
+      // For browser compatibility, we'll use the base64 string directly
+      // ExcelJS should handle base64 images properly in the browser environment
+      const imageId = workbook.addImage({
+        base64: d.coverImage,
+        extension: d.coverImage.includes('png') ? 'png' : 'jpeg'
+      });
+      
+      ws.addImage(imageId, {
+        tl: { col: 1, row: 9 }, // Position at B10 (col 1 = Column B, row 9 = row 10)
+        ext: { width: 700, height: 400 } // Width for Col B only, full height
+      });
+      
+      ws.getRow(r).height = 400;
+    } catch (error) {
+      console.error('Error adding cover image:', error);
+      // Add a placeholder text if image fails
+      ws.getCell(r, 2).value = '[Cover Image]';
+      ws.getCell(r, 2).style = styles.dataWhite;
+    }
+  }
+
+  // Set column widths
+  ws.getColumn(1).width = 5;   // Col A
+  ws.getColumn(2).width = 100; // Col B
+  ws.getColumn(3).width = 4;   // Col C
 }
 
 // SHEET 6: 2.OP (Overall Progress)
@@ -1111,15 +1298,163 @@ async function buildOP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
 
   ws.properties.tabColor = { argb: 'FF0070C0' };
 
+  // Ensure all columns exist before merging
+  for (let i = 1; i <= 9; i++) {
+    ws.getColumn(i);
+  }
+
   let r = 2;
 
+  // Title
+  ws.getRow(r).height = 25;
   ws.getCell(r, 2).value = '2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK';
-  ws.getCell(r, 2).style = styles.sectionHdr;
+  ws.getCell(r, 2).style = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } },
+    alignment: { horizontal: 'left', vertical: 'middle' }
+  };
   ws.mergeCells(r, 2, r, 9);
   r += 2;
 
-  // Add overall progress content here
-  // Implementation similar to Con. Progress but for overall progress data
+  // Headers
+  const headers = [
+    'No',
+    'Scope of Works',
+    '% Up to Previous Week',
+    '% This Week',
+    '% Up to This Week',
+    '% Remaining',
+    '% Next Week Plan',
+    '% Up Next Week Plan'
+  ];
+
+  headers.forEach((header, index) => {
+    ws.getCell(r, index + 2).value = header;
+    ws.getCell(r, index + 2).style = {
+      font: { bold: true, size: 10, name: 'Arial' },
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } },
+      alignment: { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true },
+      border: {
+        top: { style: 'thin' as const },
+        bottom: { style: 'thin' as const },
+        left: { style: 'thin' as const },
+        right: { style: 'thin' as const }
+      }
+    };
+  });
+  ws.getRow(r).height = 30;
+  r++;
+
+  // Data rows
+  (d.overallProgressItems ?? []).forEach((item, i) => {
+    const isAlt = i % 2 === 1;
+    const dataStyle = isAlt ? styles.dataAlt : styles.dataWhite;
+    const numberStyle = isAlt ? styles.numberAlt : styles.numberWhite;
+    const percentStyle = isAlt ? styles.percentAlt : styles.percentWhite;
+
+    // Check if the ID is a Roman numeral for special background color
+    const displayValue = String(item.no || '');
+    const isRomanId = /^[IVXLCDM]+\./.test(displayValue.trim());
+    const romanStyle = {
+      font: { bold: true, size: 10, name: 'Arial' },
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFE7E6E6' } },
+      alignment: { horizontal: 'left' as const, vertical: 'middle' as const },
+      border: {
+        top: { style: 'hair' as const },
+        bottom: { style: 'hair' as const },
+        left: { style: 'thin' as const },
+        right: { style: 'thin' as const }
+      }
+    };
+
+    // Calculate row height based on content
+    const calculateHeight = (text: string | number | undefined) => {
+      if (!text || text === '') return 15;
+      const str = String(text);
+      const charsPerLine = 50; // Approximate
+      const totalChars = str.length;
+      const estimatedLines = Math.ceil(totalChars / charsPerLine);
+      return Math.max(15, estimatedLines * 15);
+    };
+
+    // Format percentage display like UI
+    const formatPercentageDisplay = (value: number | string | undefined): string => {
+      if (value === undefined || value === null || value === "") return "";
+      const numValue = typeof value === "string" ? parseFloat(value.replace("%", "")) : value;
+      if (isNaN(numValue)) return "";
+      return `${numValue.toFixed(1)}%`;
+    };
+
+    const heights = [
+      calculateHeight(item.no),
+      calculateHeight(item.scopeOfWorks)
+    ];
+    // Set fixed row height to 26
+    ws.getRow(r).height = 26;
+
+    // Apply styles based on whether it's a Roman ID row
+    const rowStyle = isRomanId ? romanStyle : dataStyle;
+    const rowNumberStyle = isRomanId ? romanStyle : numberStyle;
+    const rowPercentStyle = isRomanId ? romanStyle : percentStyle;
+
+    ws.getCell(r, 2).value = padText(displayValue);
+    ws.getCell(r, 2).style = rowNumberStyle;
+
+    ws.getCell(r, 3).value = padText(item.scopeOfWorks);
+    ws.getCell(r, 3).style = rowStyle;
+
+    ws.getCell(r, 4).value = formatPercentageDisplay(item.pctUpToPrevWeek);
+    ws.getCell(r, 4).style = rowPercentStyle;
+
+    ws.getCell(r, 5).value = formatPercentageDisplay(item.pctThisWeek);
+    ws.getCell(r, 5).style = rowPercentStyle;
+
+    ws.getCell(r, 6).value = formatPercentageDisplay(item.pctUpToThisWeek);
+    ws.getCell(r, 6).style = rowPercentStyle;
+
+    ws.getCell(r, 7).value = formatPercentageDisplay(item.pctRemaining);
+    ws.getCell(r, 7).style = rowPercentStyle;
+
+    ws.getCell(r, 8).value = formatPercentageDisplay(item.pctNextWeekPlan);
+    ws.getCell(r, 8).style = rowPercentStyle;
+
+    ws.getCell(r, 9).value = formatPercentageDisplay(item.pctUpNextWeekPlan);
+    ws.getCell(r, 9).style = rowPercentStyle;
+
+    // Add borders to all cells (already included in romanStyle)
+    if (!isRomanId) {
+      for (let col = 2; col <= 9; col++) {
+        const cell = ws.getCell(r, col);
+        const currentStyle = { ...cell.style };
+        currentStyle.border = {
+          top: { style: 'hair' },
+          bottom: { style: 'hair' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+        cell.style = currentStyle;
+      }
+    }
+
+    r++;
+  });
+
+  // Set column widths
+  const widths = [5, 6.57, 35, 14, 14, 14, 14, 14, 14, 4]; // Columns A-J
+  widths.forEach((width, index) => {
+    ws.getColumn(index + 1).width = width;
+  });
+
+  // Add remark if provided
+  if (d.overallProgressRemark) {
+    r += 2;
+    ws.getCell(r, 1).value = 'Remarks:';
+    ws.getCell(r, 1).style = styles.label;
+    r++;
+    ws.getCell(r, 1).value = d.overallProgressRemark;
+    ws.getCell(r, 1).style = styles.dataWhite;
+    ws.mergeCells(r, 1, r, 8);
+  }
 }
 
 // SHEET 7: 3.NWDP

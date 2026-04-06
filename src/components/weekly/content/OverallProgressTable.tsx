@@ -185,8 +185,8 @@ export default function OverallProgressTable({
         if (field === "description" && value === "__custom__") {
           return { ...row, description: "", isCustomInput: true };
         }
-        if (field === "unit" && value === "__custom_unit__") {
-          return { ...row, unit: "__custom_unit_input__" };
+        if (field === "scopeOfWorks" && value === "__custom_unit__") {
+          return { ...row, scopeOfWorks: "__custom_unit_input__" };
         }
         if (field === "isCustomInput" && value === false) {
           return {
@@ -197,20 +197,15 @@ export default function OverallProgressTable({
         }
 
         // Handle percentage formatting for percentage columns
-        const percentageFields = ["unit", "prev", "today", "nextWeekPlan", "upNextWeekPlan"];
+        const percentageFields = ["pctUpToPrevWeek", "pctThisWeek", "pctNextWeekPlan", "pctUpNextWeekPlan"];
         let processedValue = value;
 
         if (percentageFields.includes(field) && typeof value === "string") {
-          // Convert string input to number, but handle special cases
-          if (value === "__custom_unit_input__") {
-            processedValue = value; // Keep the special string value
+          const numericValue = parseFloat(value);
+          if (!isNaN(numericValue)) {
+            processedValue = numericValue;
           } else {
-            const numericValue = parseFloat(value);
-            if (!isNaN(numericValue)) {
-              processedValue = numericValue;
-            } else {
-              processedValue = 0; // Default to 0 for invalid numbers
-            }
+            processedValue = 0; // Default to 0 for invalid numbers
           }
         }
 
@@ -218,26 +213,26 @@ export default function OverallProgressTable({
         updatedRow = { ...updatedRow, [field]: processedValue };
 
         // Calculate % Up to This Week when % Up to Previous Week or % This Week changes
-        if (field === "unit" || field === "prev") {
-          const upToPrevWeek = typeof updatedRow.unit === "number" ? updatedRow.unit : (typeof updatedRow.unit === "string" && updatedRow.unit !== "__custom_unit_input__" ? Number(updatedRow.unit) || 0 : 0);
-          const thisWeek = typeof updatedRow.prev === "number" ? updatedRow.prev : Number(updatedRow.prev) || 0;
-          updatedRow.today = upToPrevWeek + thisWeek;
+        if (field === "pctUpToPrevWeek" || field === "pctThisWeek") {
+          const upToPrevWeek = typeof updatedRow.pctUpToPrevWeek === "number" ? updatedRow.pctUpToPrevWeek : Number(updatedRow.pctUpToPrevWeek) || 0;
+          const thisWeek = typeof updatedRow.pctThisWeek === "number" ? updatedRow.pctThisWeek : Number(updatedRow.pctThisWeek) || 0;
+          updatedRow.pctUpToThisWeek = upToPrevWeek + thisWeek;
           // Calculate Remaining as 100% - up to this week %
-          const upToThisWeek = updatedRow.today;
-          updatedRow.accumulated = Math.max(0, 100 - upToThisWeek);
+          const upToThisWeek = updatedRow.pctUpToThisWeek;
+          updatedRow.pctRemaining = Math.max(0, 100 - upToThisWeek);
         }
 
-        // Recalculate Remaining when today field changes directly
-        if (field === "today") {
-          const upToThisWeek = typeof updatedRow.today === "number" ? updatedRow.today : Number(updatedRow.today) || 0;
-          updatedRow.accumulated = Math.max(0, 100 - upToThisWeek);
+        // Recalculate Remaining when pctUpToThisWeek field changes directly
+        if (field === "pctUpToThisWeek") {
+          const upToThisWeek = typeof updatedRow.pctUpToThisWeek === "number" ? updatedRow.pctUpToThisWeek : Number(updatedRow.pctUpToThisWeek) || 0;
+          updatedRow.pctRemaining = Math.max(0, 100 - upToThisWeek);
         }
 
         // Calculate % Up to next week plan when % up to this week or % next week plan changes
-        if (field === "today" || field === "nextWeekPlan") {
-          const upToThisWeek = typeof updatedRow.today === "number" ? updatedRow.today : Number(updatedRow.today) || 0;
-          const nextWeekPlan = typeof updatedRow.nextWeekPlan === "number" ? updatedRow.nextWeekPlan : Number(updatedRow.nextWeekPlan) || 0;
-          updatedRow.upNextWeekPlan = upToThisWeek + nextWeekPlan;
+        if (field === "pctUpToThisWeek" || field === "pctNextWeekPlan") {
+          const upToThisWeek = typeof updatedRow.pctUpToThisWeek === "number" ? updatedRow.pctUpToThisWeek : Number(updatedRow.pctUpToThisWeek) || 0;
+          const nextWeekPlan = typeof updatedRow.pctNextWeekPlan === "number" ? updatedRow.pctNextWeekPlan : Number(updatedRow.pctNextWeekPlan) || 0;
+          updatedRow.pctUpNextWeekPlan = upToThisWeek + nextWeekPlan;
         }
 
         return updatedRow;
@@ -253,13 +248,14 @@ export default function OverallProgressTable({
     const newRow: ProgressRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: 0,
-      prev: 0,
-      today: 0,
-      accumulated: 0,
+      scopeOfWorks: "",
+      pctUpToPrevWeek: 0,
+      pctThisWeek: 0,
+      pctUpToThisWeek: 0,
+      pctRemaining: 0,
+      pctNextWeekPlan: 0,
+      pctUpNextWeekPlan: 0,
       rowType: "title",
-      nextWeekPlan: 0,
-      upNextWeekPlan: 0,
       searchTerm: "",
       isCustomInput: false,
     };
@@ -272,13 +268,14 @@ export default function OverallProgressTable({
     const newRow: ProgressRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: 0,
-      prev: 0,
-      today: 0,
-      accumulated: 0,
+      scopeOfWorks: "",
+      pctUpToPrevWeek: 0,
+      pctThisWeek: 0,
+      pctUpToThisWeek: 0,
+      pctRemaining: 0,
+      pctNextWeekPlan: 0,
+      pctUpNextWeekPlan: 0,
       rowType: "detail",
-      nextWeekPlan: 0,
-      upNextWeekPlan: 0,
       searchTerm: "",
       isCustomInput: false,
     };
@@ -291,13 +288,14 @@ export default function OverallProgressTable({
     const newRow: ProgressRow = {
       id: crypto.randomUUID(),
       description: "",
-      unit: 0,
-      prev: 0,
-      today: 0,
-      accumulated: 0,
+      scopeOfWorks: "",
+      pctUpToPrevWeek: 0,
+      pctThisWeek: 0,
+      pctUpToThisWeek: 0,
+      pctRemaining: 0,
+      pctNextWeekPlan: 0,
+      pctUpNextWeekPlan: 0,
       rowType: "subDetail",
-      nextWeekPlan: 0,
-      upNextWeekPlan: 0,
       searchTerm: "",
       isCustomInput: false,
     };
@@ -410,8 +408,8 @@ export default function OverallProgressTable({
                   {/* % Up to Previous Week */}
                   <td className="px-3 py-2 text-center">
                     <PercentageCell
-                      value={row.unit}
-                      onChange={(value) => customUpdateRow(row.id, "unit", value)}
+                      value={row.pctUpToPrevWeek}
+                      onChange={(value) => customUpdateRow(row.id, "pctUpToPrevWeek", value)}
                       readOnly={descriptionsReadOnly}
                     />
                   </td>
@@ -419,8 +417,8 @@ export default function OverallProgressTable({
                   {/* % This Week */}
                   <td className="px-3 py-2 text-center">
                     <PercentageCell
-                      value={row.prev}
-                      onChange={(value) => customUpdateRow(row.id, "prev", value)}
+                      value={row.pctThisWeek}
+                      onChange={(value) => customUpdateRow(row.id, "pctThisWeek", value)}
                       readOnly={descriptionsReadOnly}
                     />
                   </td>
@@ -428,8 +426,8 @@ export default function OverallProgressTable({
                   {/* % Up to This Week */}
                   <td className="px-3 py-2 text-center">
                     <PercentageCell
-                      value={row.today}
-                      onChange={(value) => customUpdateRow(row.id, "today", value)}
+                      value={row.pctUpToThisWeek}
+                      onChange={(value) => customUpdateRow(row.id, "pctUpToThisWeek", value)}
                       readOnly={descriptionsReadOnly}
                     />
                   </td>
@@ -437,8 +435,8 @@ export default function OverallProgressTable({
                   {/* Remaining */}
                   <td className="px-3 py-2 text-center">
                     <PercentageCell
-                      value={row.accumulated}
-                      onChange={(value) => customUpdateRow(row.id, "accumulated", value)}
+                      value={row.pctRemaining}
+                      onChange={(value) => customUpdateRow(row.id, "pctRemaining", value)}
                       readOnly={descriptionsReadOnly}
                     />
                   </td>
@@ -446,8 +444,8 @@ export default function OverallProgressTable({
                   {/* % Next Week Plan */}
                   <td className="px-3 py-2 text-center">
                     <PercentageCell
-                      value={row.nextWeekPlan}
-                      onChange={(value) => customUpdateRow(row.id, "nextWeekPlan", value)}
+                      value={row.pctNextWeekPlan}
+                      onChange={(value) => customUpdateRow(row.id, "pctNextWeekPlan", value)}
                       readOnly={descriptionsReadOnly}
                     />
                   </td>
@@ -455,8 +453,8 @@ export default function OverallProgressTable({
                   {/* % Up Next Week Plan */}
                   <td className="px-3 py-2 text-center">
                     <PercentageCell
-                      value={row.upNextWeekPlan}
-                      onChange={(value) => customUpdateRow(row.id, "upNextWeekPlan", value)}
+                      value={row.pctUpNextWeekPlan}
+                      onChange={(value) => customUpdateRow(row.id, "pctUpNextWeekPlan", value)}
                       readOnly={descriptionsReadOnly}
                     />
                   </td>

@@ -22,6 +22,13 @@ export interface MapperInput {
     contractor?: string;
     coverImage?: string;         // Cover image URL or base64 data
     clientLogo?: string;         // Client logo URL or base64 data
+    signatureImage?: string;     // Signature image URL or base64 data
+    constructorName?: string;     // Constructor name
+    companyLocation?: string;     // Company location
+    companyPhone1?: string;      // Company phone 1
+    companyPhone2?: string;      // Company phone 2
+    companyEmail1?: string;       // Company email 1
+    companyEmail2?: string;       // Company email 2
     refNo?: string;
     letterDate?: string;
     toName?: string;
@@ -128,6 +135,11 @@ export interface MapperInput {
     nextWeek?: number | string;
     pctUpNextWeekPlan?: number | string;
     upNextWeek?: number | string;
+    rowType?: "title" | "detail" | "subDetail";
+    displayIndex?: string;
+    sourceId?: string;
+    searchTerm?: string;
+    isCustomInput?: boolean;
     [k: string]: unknown;
   }>;
   overallProgressRemark?: string;
@@ -244,6 +256,11 @@ export interface MapperInput {
     action?: string;
     [k: string]: unknown;
   }>;
+
+  // from Introduction component
+  projectOverview?: string;
+  designConstruction?: string;
+  designList?: string[];
 }
 
 export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
@@ -262,12 +279,19 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     contractor:      c.contractor,
     coverImage:      c.coverImage,        // Map cover image
     clientLogo:      c.clientLogo,        // Map client logo
+    signatureImage:  c.signatureImage,    // Map signature image
     refNo:           c.refNo,
     letterDate:      c.letterDate,
     toName:          c.toName,
     attName:         c.attName,
     ccLines:         c.ccLines ?? [],
     projectManager:  c.projectManager,
+    constructorName:  c.constructorName,
+    companyLocation: c.companyLocation,
+    companyPhone1:   c.companyPhone1,
+    companyPhone2:   c.companyPhone2,
+    companyEmail1:   c.companyEmail1,
+    companyEmail2:   c.companyEmail2,
 
     // ── Con. Progress ────────────────────────────────────────────────────────
     conProgressProject:  input.conProgressProject ?? c.projectTitle,
@@ -309,7 +333,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     // ── Overall Progress ─────────────────────────────────────────────────────
     overallProgressRemark: input.overallProgressRemark,
     overallProgressItems: (input.overallProgress ?? []).map((p, i) => ({
-      no:               p.no ?? String(i + 1),
+      no:               p.no ?? p.displayIndex ?? String(i + 1),
       scopeOfWorks:     p.scopeOfWorks ?? p.description,
       pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
       pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
@@ -394,5 +418,10 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       problemDescription:  issue.problemDescription ?? issue.description ?? issue.issue,
       actionBy:            issue.actionBy ?? issue.action,
     })),
+
+    // ── Introduction (1.Intro) ───────────────────────────────────────────────
+    projectOverview: input.projectOverview,
+    designConstruction: input.designConstruction,
+    designList: input.designList,
   };
 }
