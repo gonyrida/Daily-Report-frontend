@@ -680,54 +680,6 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					}
 				}}>
 				<DialogTrigger asChild>
-					{/* {mode === 'create' && (
-						<Button 
-							variant="default"
-							onClick={() => {
-								// Reset form data when opening New Request
-								setFormData({
-									requesterName: profile?.fullName || '',
-									requesterDepartment: profile?.department || '',
-									projectName: '',
-									projectFrom: {
-										mainProject: '',
-										mainId: '',
-										subProject: '',
-										subId: ''
-									},
-									purpose: '',
-									requestDate: new Date().toISOString().split('T')[0],
-									deliveryPlace: '',
-									categories: {
-										construction: false,
-										admin: false,
-										material: false,
-										services: false
-									},
-									items: [],
-									requestDescription: '',
-									requestRemarks: '',
-									attachments: [],
-									approvers: {
-										preparedBy: '',
-										checkedBy: '',
-										verifiedBy: '',
-										approvedBy: '',
-										backupCheckedBy: '',
-										backupVerifiedBy: '',
-										backupApprovedBy: ''
-									},
-									status: '',
-									priority: ''
-								});
-								setSelectedItems([]); // Clear any selected items
-								setPrSummaryData(null); // Reset PR summary data
-								setActiveTab('purchase-request'); // Reset to first tab
-							}}
-						>
-							New Request
-						</Button>
-					)} */}
 				</DialogTrigger>
 				<DialogContent 
 					className="max-w-6xl max-h-[95vh] overflow-y-auto"
@@ -1512,6 +1464,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 												};
 												reader.readAsDataURL(file);
 											}
+											e.target.value = '';
 										}}
 									/>
 								</div>

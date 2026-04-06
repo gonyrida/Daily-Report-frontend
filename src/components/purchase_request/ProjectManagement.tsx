@@ -10,11 +10,10 @@ import PRProjectForm from './PRProjectForm';
 
 const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
   const [selectedProjects, setSelectedProjects] = useState([]);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [detailProject, setDetailProject] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false); // New state for create modal
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingProject, setEditingProject] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [project, setProject] = useState(null);
+  const [loadingProject, setLoadingProject] = useState(false);
+  const [mode, setMode] = useState<'create' | 'edit' | 'view'>('create');
   const { toast } = useToast();
   const { profile } = useProfileContext();
 
@@ -35,41 +34,86 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
     fetchUsers();
   }, []);
 
-  const handleViewDetails = (project) => {
-    setDetailProject(project);
-    setShowDetailsModal(true);
+  const handleViewDetails = async (project) => {
+    setMode('view');
+    setLoadingProject(true);
+    setShowModal(true);
+    try {
+      const response = await apiGet(`/purchase-requests/pr-projects/${project._id}`);
+      const result = await response.json();
+      if (result.success) {
+        setProject(result.data);
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to load project data"
+        });
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch project details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load project data"
+      });
+    } finally {
+      setLoadingProject(false);
+    }
   };
 
   const handleCreateProject = () => {
-    setShowCreateModal(true);
-  };
- 
-  const handleProjectCreated = (newProject) => {
-    setShowCreateModal(false);
-    if (onRefresh) {
-      onRefresh(); // Refresh parent data if using props
-    }
-    toast({
-      title: "Success",
-      description: "Project created successfully"
-    });
+    setProject(null);
+    setMode('create');
+    setShowModal(true);
   };
 
-  // Update handler for viewing/editing
-  const handleEditProject = (project) => {
-    setEditingProject(project);
-    setShowEditModal(true);
+  const handleEditProject = async (project) => {
+    setMode('edit')
+    setLoadingProject(true);
+    setShowModal(true);
+    try {
+      const response = await apiGet(`/purchase-requests/pr-projects/${project._id}`);
+      const result = await response.json();
+      if (result.success) {
+        setProject(result.data);
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to load project data"
+        });
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch project details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load project data"
+      });
+    } finally {
+      setLoadingProject(false);
+    }
   };
-  
-  const handleProjectUpdated = (updatedProject) => {
-    setShowEditModal(false);
-    setSelectedProjects([]);
-    setEditingProject(null);
-    onRefresh(); // Refresh the projects list
-    toast({
-      title: "Success",
-      description: "Project updated successfully"
-    });
+
+  const handleRefresh = () => {
+    if (mode === 'create') {
+      setShowModal(false);
+      if (onRefresh) {
+        onRefresh(); // Refresh parent data if using props
+      }
+      toast({
+        title: "Success",
+        description: "Project created successfully"
+      });
+    } else if (mode === 'edit') {
+      setShowModal(false);
+      setSelectedProjects([]);
+      setProject(null);
+      onRefresh(); // Refresh the projects list
+      toast({
+        title: "Success",
+        description: "Project updated successfully"
+      });
+    }
   };
 
   // console.log('I am rendering');
@@ -80,9 +124,7 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl font-semibold">Project(s)</CardTitle>
-          {/* You can add action buttons here later */}
           <div className="flex gap-2">
-            {/* Placeholder for future buttons like "New Project" */}
             <Button 
               variant="outline" 
               size="sm"
@@ -211,55 +253,13 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
         </CardContent>
       </Card>
 
-      {/* Details Modal */}
-      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Project Details</DialogTitle>
-          </DialogHeader>
-          {detailProject && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Project Name</label>
-                <div className="text-lg font-semibold">{detailProject.name || 'N/A'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Description</label>
-                <div className="text-sm">{detailProject.description || '-'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Status</label>
-                <div className="text-sm">{detailProject.status || 'Unknown'}</div>
-              </div>
-              {/* Add more project details here */}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Project Modal */}
       <PRProjectForm
-        isOpen={showCreateModal}
-        setIsOpen={setShowCreateModal}
-        onProjectCreated={handleProjectCreated}
-      />
-
-      {/* Edit Project Modal */}
-      <PRProjectForm
-        isOpen={showEditModal}
-        setIsOpen={setShowEditModal}
-        mode='edit'
-        onProjectCreated={handleProjectUpdated}
-        initialData={editingProject}
-      />
-
-      {/* Project Details Modal */}
-      <PRProjectForm
-        isOpen={showDetailsModal}
-        setIsOpen={setShowDetailsModal}
-        mode='view'
-        onProjectCreated={handleProjectUpdated}
-        initialData={detailProject}
+        isOpen={showModal}
+        setIsOpen={setShowModal}
+        mode={mode}
+        onProjectCreated={handleRefresh}
+        initialData={project}
+        isLoading={loadingProject}
       />
     </div>
   );

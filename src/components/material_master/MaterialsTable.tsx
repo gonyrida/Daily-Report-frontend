@@ -40,10 +40,10 @@ export default function MaterialsTable({
 	}
 
 	return (
-		<div className="w-full overflow-x-auto rounded-lg border border-gray-200">
-			<table className="w-full text-sm">
-				<thead>
-					<tr className="border-b border-gray-200 bg-gray-50">
+		<div className="w-full overflow-x-auto">
+			<table className="w-full border-collapse border">
+				<thead className="bg-muted/50">
+					<tr>
 						<th className="w-12 px-4 py-3 text-left">
 							<Checkbox
 								checked={selectedMaterials.length === materials.length && materials.length > 0}
@@ -51,22 +51,20 @@ export default function MaterialsTable({
 								onCheckedChange={toggleSelectAll}
 							/>
 						</th>
-						<th className="px-4 py-3 text-left font-medium text-gray-700">Reference</th>
-						<th className="px-4 py-3 text-left font-medium text-gray-700">Code</th>
-						<th className="px-4 py-3 text-left font-medium text-gray-700">Description</th>
-						<th className="px-4 py-3 text-left font-medium text-gray-700">Unit</th>
-						<th className="px-4 py-3 text-right font-medium text-gray-700">Unit Price</th>
-						<th className="px-4 py-3 text-left font-medium text-gray-700">Brand</th>
-						<th className="px-4 py-3 text-left font-medium text-gray-700">Last Modified</th>
+						<th className="px-4 py-3 text-left font-medium">Reference</th>
+						<th className="px-4 py-3 text-left font-medium">Code</th>
+						<th className="px-4 py-3 text-left font-medium">Description</th>
+						<th className="px-4 py-3 text-left font-medium">Unit</th>
+						<th className="px-4 py-3 text-right font-medium">Unit Price</th>
+						<th className="px-4 py-3 text-left font-medium">Brand</th>
+						<th className="px-4 py-3 text-left font-medium">Last Modified</th>
 					</tr>
 				</thead>
 				<tbody>
 					{materials.map((material, index) => (
 						<tr
 							key={material._id}
-							className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${
-								index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-							}`}
+							className="border-t cursor-pointer"
 						>
 							<td className="px-4 py-3">
 								<Checkbox
@@ -76,11 +74,8 @@ export default function MaterialsTable({
 							</td>
 							<td className="px-4 py-3">
 								<div className="flex items-center gap-2">
-									<div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-500 flex-shrink-0">
-										{material.reference === '#file:placeholder.png' ? '📄' : '📷'}
-									</div>
-									<span className="text-xs text-gray-500 truncate max-w-[100px]">
-										{material.reference}
+									<span className="text-xs truncate max-w-[100px]">
+										<img src={material.reference} className="w-30 h-16 object-fit" />
 									</span>
 								</div>
 							</td>
@@ -90,7 +85,7 @@ export default function MaterialsTable({
 								</span>
 							</td>
 							<td className="px-4 py-3 max-w-xs">
-								<span className="text-gray-700 line-clamp-2">
+								<span className="line-clamp-2">
 									{material.description}
 								</span>
 							</td>
@@ -99,13 +94,13 @@ export default function MaterialsTable({
 									{getUnitLabel(material.unit)}
 								</span>
 							</td>
-							<td className="px-4 py-3 text-right font-semibold text-gray-900">
+							<td className="px-4 py-3 text-right font-semibold">
 								{formatPrice(material.unitPrice)}
 							</td>
 							<td className="px-4 py-3">
-								<span className="text-gray-700">{material.brand}</span>
+								<span>{material.brand}</span>
 							</td>
-							<td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
+							<td className="px-4 py-3 text-sm whitespace-nowrap">
 								{formatDate(material.updatedAt)}
 							</td>
 						</tr>

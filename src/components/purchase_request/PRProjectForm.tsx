@@ -54,6 +54,7 @@ interface PRProjectFormProps {
   onProjectCreated: (project: PRProject) => void;
   mode?: 'create' | 'edit' | 'view';
   initialData?: PRProject;
+  isLoading?: boolean;
 }
 
 const PRProjectForm: React.FC<PRProjectFormProps> = ({
@@ -61,7 +62,8 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
   setIsOpen,
   onProjectCreated,
   mode = 'create', // Default to create mode
-  initialData // Optional initial data for edit/detail mode
+  initialData, // Optional initial data for edit/detail mode
+  isLoading
 }) => {
   // console.log('This is the data you got: ', initialData);
 
@@ -263,36 +265,24 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
     }
   };
 
-  const handleClose = (mode: string) => {
+  const handleClose = () => {
     setIsOpen(false);
-
-    if (mode === 'create') {
-      // Reset form on close
-      setFormData({
-        name: '',
-        projectCode: '',
-        description: '',
-        status: 'active',
-        requestDate: '',
-        subProjects: [],
-        budgetSettings: {
-          MBOQ: '',
-          DMBOQ: '',
-          percentage: ''
-        },
-        purposes: [],
-        members: [],
-        visibility: 'public'
-      });
-    } else if (mode === 'edit') {
-      setFormData({
-        ...initialData,
-        requestDate: 
-            initialData.requestDate 
-              ? new Date(initialData.requestDate).toISOString().split('T')[0] 
-              : new Date().toISOString().split('T')[0],
-      });
-    }
+    setFormData({
+      name: '',
+      projectCode: '',
+      description: '',
+      status: 'active',
+      requestDate: '',
+      subProjects: [],
+      budgetSettings: {
+        MBOQ: '',
+        DMBOQ: '',
+        percentage: ''
+      },
+      purposes: [],
+      members: [],
+      visibility: 'public'
+    });
   };
 
   const addSubProject = () => {
@@ -485,7 +475,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
       onOpenChange={(isOpen) => {
         // When dialog tries to close (X button, outside click, Escape)
         if (!isOpen) { // Dialog is closing
-          handleClose(mode);
+          handleClose();
         }
       }}
     >
@@ -496,19 +486,16 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
           onEscapeKeyDown: (e) => e.preventDefault()
         })}
       >
+        {isLoading && (
+          <div className="absolute inset-0 bg-background/80 z-50 flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-600">Loading request...</p>
+          </div>
+        )}
         <DialogHeader>
           <DialogTitle>
             {getHeaderTitle(mode)}
           </DialogTitle>
-
-          {/* <Button 
-            type="button"
-            variant="default"
-            onClick={populateFormWithMockData}
-            className="mb-4"
-          >
-            Load Mock Data
-          </Button> */}
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -945,7 +932,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                 <Button 
                   type="button" 
                   variant="outline"
-                  onClick={() => handleClose(mode)}
+                  onClick={() => handleClose()}
                 >
                   Cancel
                 </Button>
@@ -1110,7 +1097,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                     <Button 
                       type="button" 
                       variant="outline"
-                      onClick={() => handleClose(mode)}
+                      onClick={() => handleClose()}
                       disabled={isSubmitting}
                     >
                       Cancel

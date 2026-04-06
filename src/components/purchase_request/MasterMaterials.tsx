@@ -116,7 +116,7 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 								placeholder="Search by code, description, or brand..."
 								value={searchTerm}
 								onChange={(e) => setSearchTerm(e.target.value)}
-								className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+								className="bg-background px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 							/>
 						</div>
 
@@ -126,7 +126,7 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 							<select
 								value={filterBrand}
 								onChange={(e) => setFilterBrand(e.target.value)}
-								className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+								className="bg-background px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 							>
 								<option value="">All Brands</option>
 								{uniqueBrands.map(brand => (
@@ -177,7 +177,7 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 							size="sm"
 							onClick={handleRefresh}
 						>
-							Reset
+							Refresh
 						</Button>
 					</div>
 				</CardHeader>
@@ -190,7 +190,7 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 					/>
 				</CardContent>
 
-				<div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm text-gray-600">
+				<div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
 					<span>
 						Page {pagination.page} of {pagination.totalPages} — {pagination.total} item{pagination.total === 1 ? '' : 's'}
 					</span>
@@ -201,7 +201,7 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 						<Button variant="outline" size="sm" onClick={() => setPage(Math.min(pagination.totalPages, pagination.page + 1))} disabled={pagination.page === pagination.totalPages}>
 							Next
 						</Button>
-						<select value={pagination.limit} onChange={(e) => setLimit(Number(e.target.value))} className="rounded border border-gray-300 px-2 py-1 text-sm">
+						<select value={pagination.limit} onChange={(e) => setLimit(Number(e.target.value))} className="bg-background rounded border border-gray-300 px-2 py-1 text-sm">
 							<option value={5}>5</option>
 							<option value={10}>10</option>
 							<option value={20}>20</option>
