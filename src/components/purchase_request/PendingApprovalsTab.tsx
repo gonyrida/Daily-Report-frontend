@@ -101,11 +101,11 @@ const PendingApprovalsTab = ({
     try {
       for (const reqId of selectedRequests) {
         // Find the request to get the workflow step
-        const req = requests.find(r => r.id === reqId);
+        const req = requests.find(r => r._id === reqId);
         if (!req) continue;
         console.log('Approving request:', req);
         // Find the user's workflow step (role)
-        const step = req.approvalWorkflow?.find(w => w.approver?._id === profile.id || w.approver === profile.id);
+        const step = req.approvalWorkflow?.find(w => w.backupApprover === profile.id || w.approver === profile.id);
         const role = step?.role || 'approved';
         await apiPut(`/purchase-requests/${reqId}/status`, {
           status: 'approved',  // Changed from `role` to `'approved'`
@@ -232,7 +232,7 @@ const PendingApprovalsTab = ({
   const canActSingle = (req) => {
     if (!req || !profile || !req.approvalWorkflow) return false;
     const myStep = req.approvalWorkflow.find(s =>
-      String(s.approver?._id) === profile.id || String(s.approver) === profile.id
+      String(s.backupApprover) === profile.id || String(s.approver) === profile.id
     );
     if (!myStep) return false;
     const myStepIdx = ROLE_ORDER.indexOf(myStep.role);
@@ -246,7 +246,7 @@ const PendingApprovalsTab = ({
   const canActSelection = () => {
     if (!selectedRequests || selectedRequests.length === 0) return false;
     return selectedRequests.every(id => {
-      const req = requests.find(r => r.id === id);
+      const req = requests.find(r => r._id === id);
       return canActSingle(req);
     });
   };
@@ -397,7 +397,13 @@ const PendingApprovalsTab = ({
       <div className="flex gap-2 mb-6 sticky top-0 bg-background z-10 py-4 border-b">
         <Button variant="default" onClick={handleApprove} disabled={selectedRequests.length === 0 || !canActSelection()}>Approve</Button>
         <Button variant="destructive" onClick={handleReject} disabled={selectedRequests.length === 0}>Reject</Button>
-        <Button variant="outline">Placeholder1</Button>
+        <Button 
+          variant="outline" 
+          onClick={onRefresh}
+          disabled={loadingRequests}
+        >
+          {loadingRequests ? 'Refreshing...' : 'Refresh'}
+        </Button>
       </div>
 			{/* Request List */}
 			<Card>
@@ -519,10 +525,10 @@ const PendingApprovalsTab = ({
 									<tr><td colSpan={10} className="text-center py-8">No requests found</td></tr>
 								) : (
 									requests.map((request) => {
-										const isSelected = selectedRequests.includes(request.id);
+										const isSelected = selectedRequests.includes(request._id);
 										return (
 											<tr
-												key={request.id}
+												key={request._id}
 												className={`border-b cursor-pointer transition-colors ${isSelected ? 'bg-blue-100' : 'hover:bg-muted/30'}`}
 												onClick={e => {
 													// If clicking checkbox, don't open modal
@@ -538,9 +544,9 @@ const PendingApprovalsTab = ({
 														onChange={e => {
 															e.stopPropagation();
 															if (e.target.checked) {
-																setSelectedRequests([...selectedRequests, request.id]);
+																setSelectedRequests([...selectedRequests, request._id]);
 															} else {
-																setSelectedRequests(selectedRequests.filter(id => id !== request.id));
+																setSelectedRequests(selectedRequests.filter(id => id !== request._id));
 															}
 														}}
 													/>

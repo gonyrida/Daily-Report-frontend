@@ -588,6 +588,68 @@ const PurchaseRequest = ({onRefresh}) => {
     }
   };
 
+  const handleRefresh = async (tab?: string) => {
+    setLoadingRequests(true);
+    try {
+      // Determine which tab we're refreshing (default to activeTab if not specified)
+      const targetTab = tab || activeTab;
+      
+      // Build query params based on the tab
+      const params = new URLSearchParams();
+      
+      if (targetTab === 'my-requests') {
+        // Use current pagination and filters for my-requests
+        params.set('page', pagination.page.toString());
+        params.set('limit', pagination.limit.toString());
+        if (statusFilter) params.set('status', statusFilter);
+        if (projectFilter) params.set('subProject', projectFilter);
+        if (purposeFilter) params.set('purpose', purposeFilter);
+      } else {
+        // Use current pagination and filters for all-mrs
+        params.set('page', allRequestsPagination.page.toString());
+        params.set('limit', allRequestsPagination.limit.toString());
+        if (allStatusFilter && allStatusFilter !== '__all__') params.set('status', allStatusFilter);
+        if (allProjectFilter && allProjectFilter !== '__all__') params.set('subProject', allProjectFilter);
+        if (allPurposeFilter && allPurposeFilter !== '__all__') params.set('purpose', allPurposeFilter);
+        if (allRequesterFilter && allRequesterFilter !== '__all__') params.set('requester', allRequesterFilter);
+      }
+      
+      // Use different endpoints based on tab
+      const baseEndpoint = targetTab === 'my-requests' 
+        ? '/purchase-requests/my-requests' 
+        : '/purchase-requests';
+      const endpoint = `${baseEndpoint}${params.toString() ? `?${params.toString()}` : ''}`;
+      
+      const response = await apiGet(endpoint);
+      const result = await response.json();
+      
+      if (result.success) {
+        setRequests(result.data);
+        // Update the correct pagination state
+        if (result.pagination) {
+          if (targetTab === 'my-requests') {
+            setPagination(result.pagination);
+          } else {
+            setAllRequestsPagination(result.pagination);
+          }
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to load requests data"
+        });
+      }
+    } catch (error) {
+      console.error('Failed to refresh requests:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load requests data"
+      });
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
   // console.log("I am Rendering")
 
   return (
@@ -692,7 +754,13 @@ const PurchaseRequest = ({onRefresh}) => {
                       >
                         Revise Request
                       </Button>
-                      <Button variant="outline">Placeholder 2</Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => handleRefresh('my-requests')}
+                        disabled={loadingRequests}
+                      >
+                        {loadingRequests ? 'Refreshing...' : 'Refresh'}
+                      </Button>
                     </div>
 
                     {/* Request List */}
@@ -988,6 +1056,16 @@ const PurchaseRequest = ({onRefresh}) => {
                       <CardHeader>
                         <div className="flex flex-col gap-4">
                           <CardTitle>All Related Requests</CardTitle>
+                          {/* Button Row */}
+                          <div className="flex gap-2 border-b">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => handleRefresh()}
+                              disabled={loadingRequests}
+                            >
+                              {loadingRequests ? 'Refreshing...' : 'Refresh'}
+                            </Button>
+                          </div>
                           <div className="flex flex-wrap gap-4">
                             {/* Status Filter */}
                             <div className="flex items-center gap-2">
