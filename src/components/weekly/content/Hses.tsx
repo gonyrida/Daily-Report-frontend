@@ -37,12 +37,12 @@ const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
           onChange={(training) => updateData("training", training)}
           isEditing={isEditing}
           columns={[
-            { key: "typeOfTraining", label: "Type of Training", type: "text", placeholder: "Enter training type", width: "100% sm:450px" },
+            { key: "typeOfTraining", label: "Type of Training", type: "text", placeholder: "Enter training type", width: "min-w-36" },
             { key: "date", label: "Date", type: "date" },
-            { key: "venue", label: "Venue", type: "text", placeholder: "Enter venue" },
-            { key: "trainer", label: "Trainer", type: "text", placeholder: "Enter trainer name" },
-            { key: "attendee", label: "Attendee", type: "text", placeholder: "Enter attendee" },
-            { key: "remarks", label: "Remarks", type: "text", placeholder: "Enter remarks" }
+            { key: "venue", label: "Venue", type: "text", placeholder: "Enter venue", width: "min-w-36" },
+            { key: "trainer", label: "Trainer", type: "text", placeholder: "Enter trainer name", width: "min-w-36" },
+            { key: "attendee", label: "Attendee", type: "text", placeholder: "Enter attendee", width: "min-w-36" },
+            { key: "remarks", label: "Remarks", type: "text", placeholder: "Enter remarks", width: "min-w-36" }
           ]}
           emptyMessage="No training records available"
           addButtonText="Add Training"
@@ -65,10 +65,10 @@ const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
           onChange={(inspection) => updateData("inspection", inspection)}
           isEditing={isEditing}
           columns={[
-            { key: "typeOfInspection", label: "Type of Inspection", type: "text", placeholder: "Enter inspection type", width: "100% sm:450px" },
+            { key: "typeOfInspection", label: "Type of Inspection", type: "text", placeholder: "Enter inspection type", width: "min-w-36" },
             { key: "date", label: "Date", type: "date" },
-            { key: "inspector", label: "Inspector", type: "text", placeholder: "Enter inspector name" },
-            { key: "remarks", label: "Remarks", type: "text", placeholder: "Enter remarks" }
+            { key: "inspector", label: "Inspector", type: "text", placeholder: "Enter inspector name", width: "min-w-36" },
+            { key: "remarks", label: "Remarks", type: "text", placeholder: "Enter remarks", width: "min-w-36" }
           ]}
           emptyMessage="No inspection records available"
           addButtonText="Add Inspection"
@@ -87,12 +87,12 @@ const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
           onChange={(permit) => updateData("permit", permit)}
           isEditing={isEditing}
           columns={[
-            { key: "typeOfPermit", label: "Type of Permit", type: "text", placeholder: "Enter permit type", width: "100% sm:450px" },
+            { key: "typeOfPermit", label: "Type of Permit", type: "text", placeholder: "Enter permit type", width: "min-w-36" },
             { key: "startDate", label: "Start Date", type: "date" },
             { key: "endDate", label: "End Date", type: "date" },
-            { key: "inspector", label: "Inspector", type: "text", placeholder: "Enter inspector name" },
-            { key: "approver", label: "Approver", type: "text", placeholder: "Enter approver name" },
-            { key: "remarks", label: "Remarks", type: "text", placeholder: "Enter remarks" }
+            { key: "inspector", label: "Inspector", type: "text", placeholder: "Enter inspector name", width: "min-w-36" },
+            { key: "approver", label: "Approver", type: "text", placeholder: "Enter approver name", width: "min-w-36" },
+            { key: "remarks", label: "Remarks", type: "text", placeholder: "Enter remarks", width: "min-w-36" }
           ]}
           emptyMessage="No permit records available"
           addButtonText="Add Permit"

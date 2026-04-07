@@ -46,16 +46,16 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
       case '4.5': // Client Site Instruction (SI)
         return [
           { key: '#', label: '#', width: 'w-12' },
-          { key: 'code', label: 'Code', width: '' },
+          { key: 'code', label: 'Code', width: 'min-w-36' },
           { key: 'description', label: 'Description', width: 'min-w-48' },
-          { key: 'issuedBy', label: 'Issued By', width: 'w-32' },
+          { key: 'issuedBy', label: 'Issued By', width: 'min-w-36' },
           { key: 'issuedDate', label: 'Issued Date', width: 'w-32' },
           { key: 'actions', label: '', width: 'w-12' }
         ];
       case '4.6': // Inspection Request (IR)
         return [
           { key: '#', label: '#', width: 'w-12' },
-          { key: 'code', label: 'Code', width: '' },
+          { key: 'code', label: 'Code', width: 'min-w-36' },
           { key: 'description', label: 'Description', width: 'min-w-48' },
           { key: 'receivedDate', label: 'Received Date', width: 'w-32' },
           { key: 'inspectionDate', label: 'Inspection Date', width: 'w-32' },
@@ -64,9 +64,9 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
       default:
         return [
           { key: '#', label: '#', width: 'w-12' },
-          { key: 'code', label: 'Code', width: '' },
+          { key: 'code', label: 'Code', width: 'min-w-36' },
           { key: 'description', label: 'Description', width: 'min-w-48' },
-          { key: 'status', label: 'Status', width: 'w-32' },
+          { key: 'status', label: 'Status', width: 'min-w-36' },
           { key: 'dateResponse', label: 'Date Submit/Response', width: 'w-32' },
           { key: 'actions', label: '', width: 'w-12' }
         ];

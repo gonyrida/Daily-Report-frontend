@@ -57,7 +57,7 @@ const Activities = (props: ActivitiesProps) => {
         props.setNextWeekPlan?.(mergedNext);
       }
     }
-  }, [props.constructionProgressItems]);
+  }, [props.constructionProgressItems, weeklyRows, nextRows]);
   
   // Helper function to get indentation style based on level
   const getIndentStyle = (level: number = 0) => {

@@ -65,7 +65,7 @@ const WeeklyReport = () => {
   const reportId = searchParams.get('reportId');
   const createNew = searchParams.get('createNew');
   const readOnly = searchParams.get('readOnly') === 'true';
-  
+
   const [projectLogo, setProjectLogo] = useState<string>("/koica_logo.png");
   const [showIntroduction, setShowIntroduction] = useState(false);
   const [currentReportId, setCurrentReportId] = useState<string | null>(
@@ -79,14 +79,14 @@ const WeeklyReport = () => {
     const urlReportId = searchParams.get('reportId');
     const urlCreateNew = searchParams.get('createNew');
     const urlReadOnly = searchParams.get('readOnly');
-    
+
     // Handle createNew parameter
     if (urlCreateNew === 'true' && !urlReportId) {
       handleCreateNewWeeklyReport();
       setIsCreateNewMode(true);
       return;
     }
-    
+
     // Handle case where both reportId and createNew=true are provided
     // This means we should load the existing report data but create a new one
     if (urlCreateNew === 'true' && urlReportId) {
@@ -100,7 +100,7 @@ const WeeklyReport = () => {
       setIsCreateNewMode(true);
       return;
     }
-    
+
     // Convert 'undefined' string to null for proper comparison
     const normalizedUrlId = urlReportId === 'undefined' || urlReportId === 'null' || !urlReportId ? null : urlReportId;
     if (normalizedUrlId !== currentReportId) {
@@ -128,7 +128,7 @@ const WeeklyReport = () => {
     | "schedule"
   >("construction-progress");
 
-  
+
   // State for second navigation bar visibility
   const [showSecondNav, setShowSecondNav] = useState(false);
 
@@ -221,12 +221,12 @@ const WeeklyReport = () => {
   // Helper function to format date to yyyy-MM-dd
   const formatDateToYYYYMMDD = (dateStr: string): string => {
     if (!dateStr) return new Date().toISOString().split("T")[0];
-    
+
     // If already in correct format, return as is
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       return dateStr;
     }
-    
+
     // Try to parse DD-MMM-YY format
     const match = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/);
     if (match) {
@@ -239,7 +239,7 @@ const WeeklyReport = () => {
       const year = "20" + match[3];
       return `${year}-${month}-${day}`;
     }
-    
+
     // Fallback to today's date
     return new Date().toISOString().split("T")[0];
   };
@@ -345,7 +345,7 @@ const WeeklyReport = () => {
       if (currentReportId) {
         try {
           const response = await getWeeklyReportById(currentReportId);
-          
+
           if (response.success && response.data) {
             const report = response.data;
             const reportId = (report as any)._id || report.id;
@@ -539,12 +539,12 @@ const WeeklyReport = () => {
 
             // If we're in createNew mode, prepare the data but don't create report yet
             if (isCreateNewMode) {
-              
+
               // Check if the loaded report is a submitted report - use its data for rolling total
               if (report.status === 'submitted' && report.sections?.constructionProgress?.items) {
-                
+
                 const data = report.sections.constructionProgress;
-                
+
                 // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
                 const rolledItems = data.items.map(item => ({
                   ...item,
@@ -559,14 +559,14 @@ const WeeklyReport = () => {
                     percentage: 0
                   }
                 }));
-                
+
                 // Apply calculations and restore previousWeek amounts
                 const computedItems = computeAllAmounts(rolledItems);
                 const finalItems = computedItems.map((item, index) => ({
                   ...item,
                   previousWeek: rolledItems[index].previousWeek
                 }));
-                
+
                 // Update the construction progress data with rolled values
                 const updatedData = {
                   ...data,
@@ -577,18 +577,18 @@ const WeeklyReport = () => {
                 // For non-submitted reports or no construction progress, check for any submitted reports in project
                 if (constructionProgressHook.constructionData?.items) {
                   try {
-                    const reportsResponse = await getWeeklyReports({ 
-                      projectName: selectedProject || '', 
+                    const reportsResponse = await getWeeklyReports({
+                      projectName: selectedProject || '',
                       status: 'submitted',
                       limit: 1,
                       sortBy: 'createdAt',
                       sortOrder: 'desc'
                     });
-                    
+
                     if (reportsResponse.success && reportsResponse.data?.length > 0) {
                       const submittedReportData = reportsResponse.data[0];
                       console.log('✅ Found submitted report in project, applying rolling total');
-                      
+
                       if (submittedReportData?.sections?.constructionProgress?.items) {
                         const data = submittedReportData.sections.constructionProgress;
                         const rolledItems = data.items.map(item => ({
@@ -604,13 +604,13 @@ const WeeklyReport = () => {
                             percentage: 0
                           }
                         }));
-                        
+
                         const computedItems = computeAllAmounts(rolledItems);
                         const finalItems = computedItems.map((item, index) => ({
                           ...item,
                           previousWeek: rolledItems[index].previousWeek
                         }));
-                        
+
                         const updatedData = {
                           ...constructionProgressHook.constructionData,
                           items: finalItems
@@ -624,7 +624,7 @@ const WeeklyReport = () => {
                   }
                 }
               }
-              
+
               // Reset reportId to indicate this is a new report (not saved yet)
               setCurrentReportId(null);
               setReportStatus('draft');
@@ -658,14 +658,14 @@ const WeeklyReport = () => {
       // First, check if there are any submitted reports for this project
       let submittedReportData = null;
       try {
-        const reportsResponse = await getWeeklyReports({ 
-          projectName: selectedProject || '', 
+        const reportsResponse = await getWeeklyReports({
+          projectName: selectedProject || '',
           status: 'submitted',
           limit: 1,
           sortBy: 'createdAt',
           sortOrder: 'desc'
         });
-        
+
         if (reportsResponse.success && reportsResponse.data?.length > 0) {
           submittedReportData = reportsResponse.data[0];
           console.log('✅ Found submitted report, applying rolling total');
@@ -780,10 +780,10 @@ const WeeklyReport = () => {
                 items: []
               };
             }
-            
+
             console.log('🔄 Applying rolling total logic from database: upToThisWeek → previousWeek, thisWeek → 0');
             console.log('📊 Source: Submitted report from database with ID:', submittedReportData._id);
-            
+
             // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
             const rolledItems = data.items.map(item => ({
               ...item,
@@ -798,20 +798,20 @@ const WeeklyReport = () => {
                 percentage: 0
               }
             }));
-            
+
             // Apply calculations to the rolled items
             const computedItems = computeAllAmounts(rolledItems);
-            
+
             // Restore the previousWeek amounts that were overwritten by computeAllAmounts
             const finalItems = computedItems.map((item, index) => ({
               ...item,
               previousWeek: rolledItems[index].previousWeek
             }));
-            
+
             console.log('✅ Rolling total applied successfully from database data');
             console.log('📈 Previous Week now has values from submitted report upToThisWeek');
             console.log('📝 This Week reset to 0 for new data entry');
-            
+
             return {
               ...data,
               items: finalItems
@@ -836,7 +836,7 @@ const WeeklyReport = () => {
           // Update URL to include new report ID and remove createNew parameter
           const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
           window.history.replaceState({}, '', newUrl);
-          
+
           console.log('✅ New report created successfully with rolling totals');
         }
       }
@@ -856,14 +856,14 @@ const WeeklyReport = () => {
       // First, check if there are any submitted reports for this project
       let submittedReportData = null;
       try {
-        const reportsResponse = await getWeeklyReports({ 
-          projectName: selectedProject || '', 
+        const reportsResponse = await getWeeklyReports({
+          projectName: selectedProject || '',
           status: 'submitted',
           limit: 1,
           sortBy: 'createdAt',
           sortOrder: 'desc'
         });
-        
+
         if (reportsResponse.success && reportsResponse.data?.length > 0) {
           submittedReportData = reportsResponse.data[0];
         }
@@ -977,14 +977,14 @@ const WeeklyReport = () => {
                 items: []
               };
             }
-            
+
             // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
             console.log('🔍 Debug: Original submitted report data:', data.items);
-            
+
             const rolledItems = data.items.map(item => {
               console.log('🔍 Debug: Processing item:', item.id);
               console.log('🔍 Debug: upToThisWeek values:', item.upToThisWeek);
-              
+
               const rolledItem = {
                 ...item,
                 previousWeek: {
@@ -998,25 +998,25 @@ const WeeklyReport = () => {
                   percentage: 0
                 }
               };
-              
+
               console.log('🔍 Debug: Rolled item previousWeek:', rolledItem.previousWeek);
               return rolledItem;
             });
-            
+
             console.log('🔍 Debug: Rolled items before computeAllAmounts:', rolledItems);
-            
+
             // Apply calculations to the rolled items, but preserve the previousWeek amounts we just set
             const computedItems = computeAllAmounts(rolledItems);
-            
+
             // Restore the previousWeek amounts that were overwritten by computeAllAmounts
             const finalItems = computedItems.map((item, index) => ({
               ...item,
               previousWeek: rolledItems[index].previousWeek
             }));
-            
+
             console.log('🔍 Debug: Final items after restoring previousWeek:', finalItems);
             console.log('🔍 Debug: First item previousWeek final:', finalItems[0]?.previousWeek);
-            
+
             return {
               ...data,
               items: finalItems
@@ -1239,10 +1239,10 @@ const WeeklyReport = () => {
 
       if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
         // Filter out empty entries before conversion
-        const validEntries = scheduleSections[0].entries.filter(entry => 
+        const validEntries = scheduleSections[0].entries.filter(entry =>
           entry.title || entry.file || entry.fileName || entry.supabaseUrl
         );
-        
+
         if (validEntries.length > 0) {
           // Convert entries to Supabase URLs
           scheduleDataForSave = await convertScheduleEntriesToSupabase(
@@ -1359,7 +1359,7 @@ const WeeklyReport = () => {
                 items: []
               };
             }
-            
+
             // Apply rolling total logic: copy upToThisWeek to previousWeek and reset This Week
             return {
               ...data,
@@ -1380,7 +1380,7 @@ const WeeklyReport = () => {
           })()
         }
       };
-      
+
       // Convert HSES photo references to Supabase URLs before saving (submit handler)
       if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
         hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
@@ -1404,7 +1404,7 @@ const WeeklyReport = () => {
           // Update URL to include the report ID
           const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
           window.history.replaceState({}, '', newUrl);
-          
+
           // Update local construction progress state with rolling total and This Week reset for submitted reports
           const currentData = constructionProgressHook.constructionData;
           if (currentData && currentData.items) {
@@ -1638,10 +1638,10 @@ const WeeklyReport = () => {
 
       if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
         // Filter out empty entries before conversion
-        const validEntries = scheduleSections[0].entries.filter(entry => 
+        const validEntries = scheduleSections[0].entries.filter(entry =>
           entry.title || entry.file || entry.fileName || entry.supabaseUrl
         );
-        
+
         if (validEntries.length > 0) {
           // Convert entries to Supabase URLs
           scheduleDataForSave = await convertScheduleEntriesToSupabase(
@@ -1761,7 +1761,7 @@ const WeeklyReport = () => {
                 items: []
               };
             }
-            
+
             // For drafts, save data as-is without rolling total logic
             return {
               ...data,
@@ -1776,7 +1776,7 @@ const WeeklyReport = () => {
           })()
         }
       };
-      
+
       // Convert HSES photo references to Supabase URLs before saving (draft handler)
       if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
         hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
@@ -1794,7 +1794,7 @@ const WeeklyReport = () => {
           sections: reportData.sections,
           status: 'draft' as const
         };
-        
+
         response = await updateWeeklyReport(currentReportId, updateData);
         // Ensure currentReportId is set after successful update
         if (response.success) {
@@ -1803,8 +1803,8 @@ const WeeklyReport = () => {
           // Update URL to include the report ID
           const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
           window.history.replaceState({}, '', newUrl);
-          
-                    
+
+
           // Update local construction progress state - for drafts, keep as-is without rolling total
           const currentData = constructionProgressHook.constructionData;
           if (currentData && currentData.items) {
@@ -1824,7 +1824,7 @@ const WeeklyReport = () => {
             // Update URL to include new report ID
             const newUrl = `${window.location.pathname}?reportId=${newId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
             window.history.replaceState({}, '', newUrl);
-            
+
             // Clear QAQC and HSES localStorage data on successful creation
             if (clearQaqcDataRef.current) {
               clearQaqcDataRef.current();
@@ -1861,7 +1861,7 @@ const WeeklyReport = () => {
             if (!entry.fileName) console.error(`Entry ${index}: Missing fileName`);
           });
         }
-        
+
         // Check other required fields
         if (!reportData.projectName) console.error('Missing projectName');
         if (!reportData.weekNumber) console.error('Missing weekNumber');
@@ -1879,7 +1879,7 @@ const WeeklyReport = () => {
     setIsSaving(true);
     try {
       await handleSaveAsDraftInternal();
-      
+
       toast({
         title: "Saved",
         description: currentReportId
@@ -1912,10 +1912,10 @@ const WeeklyReport = () => {
     setIsSubmitting(true);
     try {
       let reportId = currentReportId;
-      
+
       // For submitted reports, save WITHOUT rolling total logic (preserve original values)
       const saveResponse = await handleSaveAsDraftInternal();
-      
+
       if (saveResponse?.success && saveResponse?.data) {
         reportId = (saveResponse.data as any)._id || saveResponse.data.id || currentReportId;
       } else {
@@ -1997,10 +1997,10 @@ const WeeklyReport = () => {
     try {
       // Generate filename with project name and week number
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.xlsx`;
-      
+
       // Export to Excel using ExcelJS
       await exportWeeklyReportToExcel(excelData, filename);
-      
+
       toast({
         title: "Excel Exported",
         description: `Weekly report exported as ${filename} successfully.`,
@@ -2182,7 +2182,7 @@ const WeeklyReport = () => {
                 break;
               }
             }
-            
+
             // Count sub-details under the same parent
             let subDetailCount = 0;
             for (let i = 0; i <= index; i++) {
@@ -2215,7 +2215,7 @@ const WeeklyReport = () => {
                 }
               }
             }
-            
+
             return {
               ...row,
               displayIndex: `${parentDetailNumber}.${subDetailCount}`,
@@ -2224,13 +2224,13 @@ const WeeklyReport = () => {
           return row;
         });
       };
-      
+
       return formatRowsWithDisplayIndex(overallProgressHook.rows);
     })(),
     nwdpItems: (() => {
       // Create array to hold all individual rows
       const allItems = [];
-      
+
       // First, add all weekly activities as individual items
       weeklyActivities.forEach(a => {
         allItems.push({
@@ -2241,12 +2241,12 @@ const WeeklyReport = () => {
           nextWeekPct: undefined
         });
       });
-      
+
       // Then, try to match next week plan items with existing weekly activities
       // or add them as new items if no match found
       nextWeekPlan.forEach(a => {
         const id = a.sourceId || '';
-        
+
         // Try to find matching weekly activity by sourceId
         let matched = false;
         if (id) {
@@ -2261,7 +2261,7 @@ const WeeklyReport = () => {
             }
           }
         }
-        
+
         // If no match found (or ID is empty), add as separate item
         if (!matched) {
           allItems.push({
@@ -2273,16 +2273,16 @@ const WeeklyReport = () => {
           });
         }
       });
-      
+
       // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
-      return allItems.filter(item => 
+      return allItems.filter(item =>
         item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
       );
     })(),
     qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => ({
       sectionTitle: key.toUpperCase(),
       codeHeader: "Code",
-      statusHeader: "Status", 
+      statusHeader: "Status",
       dateHeader: "Date Responded",
       items: value?.items || [],
       comments: value?.comments || '',
@@ -2292,17 +2292,17 @@ const WeeklyReport = () => {
     hsePermits: hsesData?.permit || [],
     hseFirstAid: hsesData?.firstAidAccident,
     hseOtherConcerns: hsesData?.otherActivities,
-    weekDates: sharedData.dateRange?.split(' - ')[0] 
+    weekDates: sharedData.dateRange?.split(' - ')[0]
       ? Array.from({ length: 7 }, (_, i) => {
-          const start = new Date(sharedData.dateRange.split(' - ')[0]);
-          start.setDate(start.getDate() + i);
-          return start.getDate().toString();
-        })
+        const start = new Date(sharedData.dateRange.split(' - ')[0]);
+        start.setDate(start.getDate() + i);
+        return start.getDate().toString();
+      })
       : ['13', '14', '15', '16', '17', '18', '19'],
     manpowerRows: [], // Resource data managed in WeeklyReportContent
     materialRows: [],
     equipmentRows: [],
-    sitePhotoCaptions: siteActivitiesSections.flatMap((section: any) => 
+    sitePhotoCaptions: siteActivitiesSections.flatMap((section: any) =>
       section.slots?.map((slot: any, idx: number) => ({
         siteLocation: section.title,
         caption1: idx === 0 ? slot.caption : undefined,
@@ -2436,106 +2436,156 @@ const WeeklyReport = () => {
               activeTab === "issues" ||
               activeTab === "schedule") &&
               showSecondNav && (
-                <div className="w-full px-4 sm:px-6 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
-                  <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                    {tableOfContentSections.map((section) => {
-                      // Determine if this section is currently active
-                      const isActiveSection =
-                        (section.id === 1 && activeTab === "table-of-content" && showIntroduction) ||
-                        (section.id === 2 && activeTab === "overall-progress") ||
-                        (section.id === 3 && activeTab === "activities") ||
-                        (section.id === 4 && activeTab === "qaqc-status") ||
-                        (section.id === 5 && activeTab === "hses") ||
-                        (section.id === 6 && activeTab === "resource") ||
-                        (section.id === 7 && activeTab === "photos") ||
-                        (section.id === 8 && activeTab === "issues") ||
-                        (section.id === 9 && activeTab === "schedule");
+                <div className="w-full px-2 sm:px-4 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
+                  <div className="relative flex items-center gap-1">
+                    {/* Left Arrow */}
+                    <button
+                      onClick={() => {
+                        const el = document.getElementById("second-nav-scroll");
+                        if (el) el.scrollBy({ left: -150, behavior: "smooth" });
+                      }}
+                      className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m15 18-6-6 6-6" />
+                      </svg>
+                    </button>
 
-                      return (
-                        <Button
-                          key={section.id}
-                          variant={isActiveSection ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            if (section.id === 1) {
-                              setShowIntroduction(true);
-                              setActiveTab("table-of-content");
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 2) {
-                              setShowIntroduction(false);
-                              setActiveTab("overall-progress");
-                              if (setShowSecondNav) setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 3) {
-                              setShowIntroduction(false);
-                              setActiveTab("activities");
-                              if (setShowSecondNav) setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 4) {
-                              setShowIntroduction(false);
-                              setActiveTab("qaqc-status");
-                              if (setShowSecondNav) setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 5) {
-                              setShowIntroduction(false);
-                              setActiveTab("hses");
-                              setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 6) {
-                              setShowIntroduction(false);
-                              setActiveTab("resource");
-                              setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 7) {
-                              setShowIntroduction(false);
-                              setActiveTab("photos");
-                              setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 8) {
-                              setShowIntroduction(false);
-                              setActiveTab("issues");
-                              setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else if (section.id === 9) {
-                              setShowIntroduction(false);
-                              setActiveTab("schedule");
-                              setShowSecondNav(true);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            } else {
-                              setShowIntroduction(false);
-                              setActiveTab("table-of-content");
-                              const element = document.querySelector(
-                                section.href,
-                              );
-                              if (element) {
-                                element.scrollIntoView({ behavior: "smooth" });
+                    {/* Scrollable Tab Row - hides scrollbar, supports mouse drag + touch */}
+                    <div
+                      id="second-nav-scroll"
+                      className="flex flex-row items-center gap-1.5 overflow-x-auto overflow-y-hidden flex-1"
+                      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                      onMouseDown={(e) => {
+                        const el = e.currentTarget;
+                        el.dataset.isDown = "true";
+                        el.dataset.startX = String(e.pageX - el.offsetLeft);
+                        el.dataset.scrollLeft = String(el.scrollLeft);
+                      }}
+                      onMouseLeave={(e) => { e.currentTarget.dataset.isDown = "false"; }}
+                      onMouseUp={(e) => { e.currentTarget.dataset.isDown = "false"; }}
+                      onMouseMove={(e) => {
+                        const el = e.currentTarget;
+                        if (el.dataset.isDown !== "true") return;
+                        e.preventDefault();
+                        const x = e.pageX - el.offsetLeft;
+                        const walk = (x - Number(el.dataset.startX)) * 1.5;
+                        el.scrollLeft = Number(el.dataset.scrollLeft) - walk;
+                      }}
+                    >
+                      <style>{`#second-nav-scroll::-webkit-scrollbar { display: none; }`}</style>
+                      {tableOfContentSections.map((section) => {
+                        // Determine if this section is currently active
+                        const isActiveSection =
+                          (section.id === 1 && activeTab === "table-of-content" && showIntroduction) ||
+                          (section.id === 2 && activeTab === "overall-progress") ||
+                          (section.id === 3 && activeTab === "activities") ||
+                          (section.id === 4 && activeTab === "qaqc-status") ||
+                          (section.id === 5 && activeTab === "hses") ||
+                          (section.id === 6 && activeTab === "resource") ||
+                          (section.id === 7 && activeTab === "photos") ||
+                          (section.id === 8 && activeTab === "issues") ||
+                          (section.id === 9 && activeTab === "schedule");
+
+                        return (
+                          <Button
+                            key={section.id}
+                            variant={isActiveSection ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              if (section.id === 1) {
+                                setShowIntroduction(true);
+                                setActiveTab("table-of-content");
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 2) {
+                                setShowIntroduction(false);
+                                setActiveTab("overall-progress");
+                                if (setShowSecondNav) setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 3) {
+                                setShowIntroduction(false);
+                                setActiveTab("activities");
+                                if (setShowSecondNav) setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 4) {
+                                setShowIntroduction(false);
+                                setActiveTab("qaqc-status");
+                                if (setShowSecondNav) setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 5) {
+                                setShowIntroduction(false);
+                                setActiveTab("hses");
+                                setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 6) {
+                                setShowIntroduction(false);
+                                setActiveTab("resource");
+                                setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 7) {
+                                setShowIntroduction(false);
+                                setActiveTab("photos");
+                                setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 8) {
+                                setShowIntroduction(false);
+                                setActiveTab("issues");
+                                setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 9) {
+                                setShowIntroduction(false);
+                                setActiveTab("schedule");
+                                setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else {
+                                setShowIntroduction(false);
+                                setActiveTab("table-of-content");
+                                const element = document.querySelector(
+                                  section.href,
+                                );
+                                if (element) {
+                                  element.scrollIntoView({ behavior: "smooth" });
+                                }
                               }
-                            }
-                          }}
-                          className="rounded-full text-sm transition-all duration-200 hover:scale-105 flex-shrink-0"
-                        >
-                          {section.id}. {section.name}
-                        </Button>
-                      );
-                    })}
+                            }}
+                            className="px-3 py-1.5 text-xs rounded-full transition-all duration-200 hover:scale-105 flex-shrink-0 h-8 min-w-fit"
+                          >
+                            {section.id}. {section.name}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Right Arrow */}
+                    <button
+                      onClick={() => {
+                        const el = document.getElementById("second-nav-scroll");
+                        if (el) el.scrollBy({ left: 150, behavior: "smooth" });
+                      }}
+                      className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               )}
 
             {/* Main Content */}
             <main className="w-full px-4 sm:px-6 pt-4 pb-6 flex flex-col">
-              {/* Implementation Notice Banner */}
-              <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold">
-                This page is still implement
-              </div>
+                    {/* Implementation Notice Banner */}
+                    <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold">
+                      This page is still implement
+                    </div>
 
-              {/* Read-Only Banner */}
+                    {/* Read-Only Banner */}
               {isReadOnly && (
                 <div className="bg-background border-l-4 border-yellow-400 p-4 m-4">
                   <div className="flex items-center bg-background">
                     <div className="ml-3">
                       <p className="text-sm text-yellow-700">
-                        <strong>🔒 View Only Mode:</strong> You are viewing
+                        <strong>View Only Mode:</strong> You are viewing
                         another user's report.
                       </p>
                     </div>
@@ -2555,196 +2605,239 @@ const WeeklyReport = () => {
                 </>
               )}
 
-              {activeTab === "letter" && (
-                <>
-                  <WeeklyReportLetter
-                    data={sharedData}
-                    onDataChange={(data) =>
-                      setSharedData((prev) => ({ ...prev, ...data }))
-                    }
+            {activeTab === "letter" && (
+              <>
+                <WeeklyReportLetter
+                  data={sharedData}
+                  onDataChange={(data) =>
+                    setSharedData((prev) => ({ ...prev, ...data }))
+                  }
+                />
+              </>
+            )}
+
+            {activeTab === "construction-progress" && (
+              <>
+                <div className="flex flex-col bg-card rounded-lg border">
+                  <WeeklyReportConstructionProgress
+                    data={constructionProgressHook.constructionData}
+                    onDataChange={handleConstructionProgressChange}
+                    reportId={currentReportId}
+                    isCreateNewMode={isCreateNewMode}
                   />
-                </>
-              )}
+                </div>
+              </>
+            )}
 
-              {activeTab === "construction-progress" && (
-                <>
-                  <div className="flex flex-col bg-card rounded-lg border">
-                    <WeeklyReportConstructionProgress
-                      data={constructionProgressHook.constructionData}
-                      onDataChange={handleConstructionProgressChange}
-                      reportId={currentReportId}
-                      isCreateNewMode={isCreateNewMode}
+            {activeTab === "table-of-content" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    overallProgressData={overallProgressHook}
+                    setOverallProgressData={overallProgressHook.setRows}
+                    reportId={currentReportId}
+                    weeklyActivities={weeklyActivities}
+                    setWeeklyActivities={setWeeklyActivities}
+                    nextWeekPlan={nextWeekPlan}
+                    setNextWeekPlan={setNextWeekPlan}
+                    qaqcData={qaqcData}
+                    setQaqcData={setQaqcData}
+                    hsesData={hsesData}
+                    setHsesData={setHsesData}
+                    onClearQaqcData={handleClearQaqcData}
+                    onClearHsesData={handleClearHsesData}
+                    constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                  />
+                </div>
+              </>
+            )}
+
+            {activeTab === "activities" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    reportId={currentReportId}
+                    weeklyActivities={weeklyActivities}
+                    setWeeklyActivities={setWeeklyActivities}
+                    nextWeekPlan={nextWeekPlan}
+                    setNextWeekPlan={setNextWeekPlan}
+                    constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                  />
+                </div>
+              </>
+            )}
+
+            {activeTab === "overall-progress" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    overallProgressData={overallProgressHook}
+                    setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
+                    constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                    weeklyActivities={weeklyActivities}
+                    setWeeklyActivities={setWeeklyActivities}
+                    nextWeekPlan={nextWeekPlan}
+                    setNextWeekPlan={setNextWeekPlan}
+                  />
+                </div>
+              </>
+            )}
+
+            {activeTab === "qaqc-status" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    reportId={currentReportId}
+                    weeklyActivities={weeklyActivities}
+                    setWeeklyActivities={setWeeklyActivities}
+                    nextWeekPlan={nextWeekPlan}
+                    setNextWeekPlan={setNextWeekPlan}
+                    qaqcData={qaqcData}
+                    setQaqcData={setQaqcData}
+                    constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                    onClearQaqcData={(fn) => { clearQaqcDataRef.current = fn; }}
+                  />
+                </div>
+              </>
+            )}
+
+            {activeTab === "hses" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    reportId={currentReportId}
+                    weeklyActivities={weeklyActivities}
+                    setWeeklyActivities={setWeeklyActivities}
+                    nextWeekPlan={nextWeekPlan}
+                    setNextWeekPlan={setNextWeekPlan}
+                    hsesData={hsesData}
+                    setHsesData={setHsesData}
+                    constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                    onClearHsesData={(fn) => { clearHsesDataRef.current = fn; }}
+                  />
+                </div>
+              </>
+            )}
+
+            {activeTab === "resource" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    reportId={currentReportId}
+                    weeklyActivities={weeklyActivities}
+                    setWeeklyActivities={setWeeklyActivities}
+                    nextWeekPlan={nextWeekPlan}
+                    setNextWeekPlan={setNextWeekPlan}
+                  />
+                </div>
+              </>
+            )}
+
+            {activeTab === "photos" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">7. {siteActivitiesTitle}</h2>
+                      <Button
+                        onClick={() => {
+                          const newSection = {
+                            id: crypto.randomUUID(),
+                            title: `Photo Section ${siteActivitiesSections.length + 1}`,
+                            entries: []
+                          };
+                          setSiteActivitiesSections([...siteActivitiesSections, newSection]);
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        Add Section
+                      </Button>
+                    </div>
+                    <ReferenceSection
+                      sections={siteActivitiesSections}
+                      setSections={setSiteActivitiesSections}
+                      onExportReference={() => { }}
+                      isExporting={isExportingSiteActivities}
+                      tableTitle={siteActivitiesTitle}
+                      setTableTitle={setSiteActivitiesTitle}
+                      hideTitle={false}
                     />
                   </div>
-                </>
-              )}
+                </div>
+              </>
+            )}
 
-              {activeTab === "table-of-content" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <WeeklyReportContent
-                      showIntroduction={showIntroduction}
-                      setShowIntroduction={setShowIntroduction}
-                      projectLogo={sharedData.coverImage}
-                      setActiveTab={setActiveTab}
-                      setShowSecondNav={setShowSecondNav}
-                      activeTab={activeTab}
-                      sharedData={sharedData}
-                      setSharedData={setSharedData}
-                      overallProgressData={overallProgressHook}
-                      setOverallProgressData={overallProgressHook.setRows}
-                      reportId={currentReportId}
-                      weeklyActivities={weeklyActivities}
-                      setWeeklyActivities={setWeeklyActivities}
-                      nextWeekPlan={nextWeekPlan}
-                      setNextWeekPlan={setNextWeekPlan}
-                      qaqcData={qaqcData}
-                      setQaqcData={setQaqcData}
-                      hsesData={hsesData}
-                      setHsesData={setHsesData}
-                      onClearQaqcData={handleClearQaqcData}
-                      onClearHsesData={handleClearHsesData}
-                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === "activities" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <WeeklyReportContent
-                      showIntroduction={showIntroduction}
-                      setShowIntroduction={setShowIntroduction}
-                      projectLogo={sharedData.coverImage}
-                      setActiveTab={setActiveTab}
-                      setShowSecondNav={setShowSecondNav}
-                      activeTab={activeTab}
-                      sharedData={sharedData}
-                      setSharedData={setSharedData}
-                      reportId={currentReportId}
-                      weeklyActivities={weeklyActivities}
-                      setWeeklyActivities={setWeeklyActivities}
-                      nextWeekPlan={nextWeekPlan}
-                      setNextWeekPlan={setNextWeekPlan}
-                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === "overall-progress" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <WeeklyReportContent
-                      showIntroduction={showIntroduction}
-                      setShowIntroduction={setShowIntroduction}
-                      projectLogo={sharedData.coverImage}
-                      setActiveTab={setActiveTab}
-                      setShowSecondNav={setShowSecondNav}
-                      activeTab={activeTab}
-                      sharedData={sharedData}
-                      setSharedData={setSharedData}
-                      overallProgressData={overallProgressHook}
-                      setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
-                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
-                      weeklyActivities={weeklyActivities}
-                      setWeeklyActivities={setWeeklyActivities}
-                      nextWeekPlan={nextWeekPlan}
-                      setNextWeekPlan={setNextWeekPlan}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === "qaqc-status" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <WeeklyReportContent
-                      showIntroduction={showIntroduction}
-                      setShowIntroduction={setShowIntroduction}
-                      projectLogo={sharedData.coverImage}
-                      setActiveTab={setActiveTab}
-                      setShowSecondNav={setShowSecondNav}
-                      activeTab={activeTab}
-                      sharedData={sharedData}
-                      setSharedData={setSharedData}
-                      reportId={currentReportId}
-                      weeklyActivities={weeklyActivities}
-                      setWeeklyActivities={setWeeklyActivities}
-                      nextWeekPlan={nextWeekPlan}
-                      setNextWeekPlan={setNextWeekPlan}
-                      qaqcData={qaqcData}
-                      setQaqcData={setQaqcData}
-                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
-                      onClearQaqcData={(fn) => { clearQaqcDataRef.current = fn; }}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === "hses" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <WeeklyReportContent
-                      showIntroduction={showIntroduction}
-                      setShowIntroduction={setShowIntroduction}
-                      projectLogo={sharedData.coverImage}
-                      setActiveTab={setActiveTab}
-                      setShowSecondNav={setShowSecondNav}
-                      activeTab={activeTab}
-                      sharedData={sharedData}
-                      setSharedData={setSharedData}
-                      reportId={currentReportId}
-                      weeklyActivities={weeklyActivities}
-                      setWeeklyActivities={setWeeklyActivities}
-                      nextWeekPlan={nextWeekPlan}
-                      setNextWeekPlan={setNextWeekPlan}
-                      hsesData={hsesData}
-                      setHsesData={setHsesData}
-                      constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
-                      onClearHsesData={(fn) => { clearHsesDataRef.current = fn; }}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === "resource" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <WeeklyReportContent
-                      showIntroduction={showIntroduction}
-                      setShowIntroduction={setShowIntroduction}
-                      projectLogo={sharedData.coverImage}
-                      setActiveTab={setActiveTab}
-                      setShowSecondNav={setShowSecondNav}
-                      activeTab={activeTab}
-                      sharedData={sharedData}
-                      setSharedData={setSharedData}
-                      reportId={currentReportId}
-                      weeklyActivities={weeklyActivities}
-                      setWeeklyActivities={setWeeklyActivities}
-                      nextWeekPlan={nextWeekPlan}
-                      setNextWeekPlan={setNextWeekPlan}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === "photos" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                      <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">7. {siteActivitiesTitle}</h2>
+            {activeTab === "issues" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="mb-6">
+                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">8. Construction Issues</h2>
+                      <div className="flex justify-end">
                         <Button
                           onClick={() => {
-                            const newSection = {
-                              id: crypto.randomUUID(),
-                              title: `Photo Section ${siteActivitiesSections.length + 1}`,
-                              entries: []
-                            };
-                            setSiteActivitiesSections([...siteActivitiesSections, newSection]);
+                            issuesHook.addIssue();
                           }}
                           className="flex items-center gap-2"
                         >
@@ -2761,211 +2854,168 @@ const WeeklyReport = () => {
                           >
                             <path d="M12 5v14M5 12h14" />
                           </svg>
-                          Add Section
+                          Add Issue
                         </Button>
                       </div>
-                      <ReferenceSection
-                        sections={siteActivitiesSections}
-                        setSections={setSiteActivitiesSections}
-                        onExportReference={() => { }}
-                        isExporting={isExportingSiteActivities}
-                        tableTitle={siteActivitiesTitle}
-                        setTableTitle={setSiteActivitiesTitle}
-                        hideTitle={false}
-                      />
                     </div>
-                  </div>
-                </>
-              )}
-
-              {activeTab === "issues" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                      <div className="mb-6">
-                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">8. Construction Issues</h2>
-                        <div className="flex justify-end">
-                          <Button
-                            onClick={() => {
-                              issuesHook.addIssue();
-                            }}
-                            className="flex items-center gap-2"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M12 5v14M5 12h14" />
-                            </svg>
-                            Add Issue
-                          </Button>
-                        </div>
-                      </div>
-                      {issuesHook.issuesData.map((issue, index) => (
-                        <ConstructionIssueComponent
-                          key={issue.id}
-                          issueNumber={index + 1}
-                          location={issue.location}
-                          problem={issue.problem}
-                          actionBy={issue.actionBy}
-                          photo={issue.photo as string | null}
-                          onRemove={() => {
-                            issuesHook.removeIssue(index);
-                          }}
-                          onDataChange={(data) => {
-                            issuesHook.updateIssue(index, data);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {activeTab === "schedule" && (
-                <>
-                  <div className="bg-card rounded-lg border p-6">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                      <div className="mb-6">
-                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
-                      </div>
-
-                      {/* New Supabase Master Schedule Component */}
-                      <MasterScheduleSupabase
-                        entries={scheduleSections[0].entries}
-                        onChange={(entries) => {
-                          const updatedSections = [...scheduleSections];
-                          updatedSections[0] = {
-                            ...updatedSections[0],
-                            entries: entries
-                          };
-                          setScheduleSections(updatedSections);
+                    {issuesHook.issuesData.map((issue, index) => (
+                      <ConstructionIssueComponent
+                        key={issue.id}
+                        issueNumber={index + 1}
+                        location={issue.location}
+                        problem={issue.problem}
+                        actionBy={issue.actionBy}
+                        photo={issue.photo as string | null}
+                        onRemove={() => {
+                          issuesHook.removeIssue(index);
                         }}
-                        reportId={currentReportId || undefined}
-                        disabled={isSaving}
+                        onDataChange={(data) => {
+                          issuesHook.updateIssue(index, data);
+                        }}
                       />
-                    </div>
+                    ))}
                   </div>
-                </>
-              )}
-            </main>
+                </div>
+              </>
+            )}
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-center py-6 border-t border-border mt-6">
-              <div className="flex items-center gap-3">
-                {/* Save As Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="min-w-[140px]"
-                      disabled={isSaving || isSubmitting || isReadOnly}
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving || isSubmitting ? "Processing..." : (isReadOnly ? "Read-Only" : "Save As...")}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-[140px]"
+            {activeTab === "schedule" && (
+              <>
+                <div className="bg-card rounded-lg border p-6">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="mb-6">
+                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
+                    </div>
+
+                    {/* New Supabase Master Schedule Component */}
+                    <MasterScheduleSupabase
+                      entries={scheduleSections[0].entries}
+                      onChange={(entries) => {
+                        const updatedSections = [...scheduleSections];
+                        updatedSections[0] = {
+                          ...updatedSections[0],
+                          entries: entries
+                        };
+                        setScheduleSections(updatedSections);
+                      }}
+                      reportId={currentReportId || undefined}
+                      disabled={isSaving}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </main>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-center py-6 border-t border-border mt-6">
+            <div className="flex items-center gap-3">
+              {/* Save As Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="min-w-[140px]"
+                    disabled={isSaving || isSubmitting || isReadOnly}
                   >
-                    <DropdownMenuItem
-                      onClick={handleSaveAsDraft}
-                      disabled={
-                        isSaving ||
-                        reportStatus === "submitted" ||
-                        isReadOnly
-                      }
-                      className={
-                        reportStatus === "submitted" || isReadOnly
-                          ? "opacity-50 cursor-not-allowed"
-                          : ""
-                      }
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? "Saving..." : "Draft"}
-                      {reportStatus === "submitted" && (
-                        <Lock className="w-3 h-3 ml-auto" />
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleSubmit}
-                      disabled={isSubmitting || isReadOnly}
-                      className={
-                        reportStatus === "submitted" || isReadOnly
-                          ? "bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer"
-                          : ""
-                      }
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      {isSubmitting ? "Submitting..." : reportStatus === "submitted" ? "Submit Again" : "Submit"}
-                      {reportStatus === "submitted" && (
-                        <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
-                      )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Preview Button */}
-                <Button
-                  variant="outline"
-                  className="min-w-[140px]"
-                  onClick={handlePreview}
-                  disabled={isPreviewing}
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving || isSubmitting ? "Processing..." : (isReadOnly ? "Read-Only" : "Save As...")}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-[140px]"
                 >
-                  <Eye className="w-4 h-4 mr-2" />
-                  {isPreviewing ? "Previewing..." : "Preview"}
-                </Button>
+                  <DropdownMenuItem
+                    onClick={handleSaveAsDraft}
+                    disabled={
+                      isSaving ||
+                      reportStatus === "submitted" ||
+                      isReadOnly
+                    }
+                    className={
+                      reportStatus === "submitted" || isReadOnly
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    }
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? "Saving..." : "Draft"}
+                    {reportStatus === "submitted" && (
+                      <Lock className="w-3 h-3 ml-auto" />
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || isReadOnly}
+                    className={
+                      reportStatus === "submitted" || isReadOnly
+                        ? "bg-green-900/20 border-green-700 dark:bg-green-900/30 dark:border-green-600 hover:bg-green-900/40 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 dark:hover:bg-green-900/50 dark:hover:border-green-400 dark:hover:shadow-green-400/30 cursor-pointer"
+                        : ""
+                    }
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {isSubmitting ? "Submitting..." : reportStatus === "submitted" ? "Submit Again" : "Submit"}
+                    {reportStatus === "submitted" && (
+                      <CheckCircle className="w-3 h-3 ml-auto text-green-600" />
+                    )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                {/* Export Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      className="min-w-[160px] bg-primary hover:bg-primary/90"
-                      disabled={isExporting}
-                    >
-                      <FileDown className="w-4 h-4 mr-2" />
-                      {isExporting ? "Exporting..." : "Export"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={handleExportPDF}
-                      disabled={isExporting}
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Export As PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleExportExcel}
-                      disabled={isExporting}
-                    >
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      Export As Excel
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleExportZIP}
-                      disabled={isExporting}
-                    >
-                      <FileDown className="w-4 h-4 mr-2" />
-                      Export As ZIP
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+              {/* Preview Button */}
+              <Button
+                variant="outline"
+                className="min-w-[140px]"
+                onClick={handlePreview}
+                disabled={isPreviewing}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                {isPreviewing ? "Previewing..." : "Preview"}
+              </Button>
+
+              {/* Export Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="min-w-[160px] bg-primary hover:bg-primary/90"
+                    disabled={isExporting}
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    {isExporting ? "Exporting..." : "Export"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleExportPDF}
+                    disabled={isExporting}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export As PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleExportExcel}
+                    disabled={isExporting}
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Export As Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleExportZIP}
+                    disabled={isExporting}
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Export As ZIP
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
-  );
+        </div>
+      </SidebarInset>
+    </div>
+  </SidebarProvider>
+);
 };
 
 export default WeeklyReport;
