@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { QaqcRow, Section, TableData } from "@/types/qaqc.types";
 import { makeRow } from "@/utils/rowFactory";
 import { handleCommentChange } from "@/lib/tableUtils";
@@ -12,6 +12,7 @@ export const useQaqcTable = (sections: Section[]) => {
   );
 
   const [tableData, setTableData] = useState<TableData>(() => {
+    // Priority 1: Use localStorage data if available
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("qaqc_table_data");
       if (saved) {
@@ -27,6 +28,8 @@ export const useQaqcTable = (sections: Section[]) => {
         }
       }
     }
+    
+    // Priority 2: Use initial data
     return initialData;
   });
 
@@ -77,6 +80,21 @@ export const useQaqcTable = (sections: Section[]) => {
     }
   };
 
+  // Load external data (call from component when needed)
+  const loadExternalData = (externalData: any): void => {
+    if (externalData && typeof externalData === 'object') {
+      const convertedData: TableData = {};
+      sections.forEach(section => {
+        if (externalData[section.id]) {
+          convertedData[section.id] = externalData[section.id];
+        } else {
+          convertedData[section.id] = Array(5).fill(null).map(() => makeRow());
+        }
+      });
+      setTableData(convertedData);
+    }
+  };
+
   const totalRows = Object.values(tableData).reduce((a, r) => a + r.length, 0);
   const openRows = Object.values(tableData).flat().filter((r) => r.status === "Pending").length;
 
@@ -96,6 +114,7 @@ export const useQaqcTable = (sections: Section[]) => {
     handleCellChange,
     clearQaqcData,
     clearQaqcStorage,
+    loadExternalData,
     totalRows,
     openRows,
     filteredSections,

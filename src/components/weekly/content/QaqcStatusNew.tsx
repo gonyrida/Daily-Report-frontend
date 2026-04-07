@@ -5,28 +5,6 @@ import { STATUS_OPTIONS } from "@/constants/qaqcStatus";
 import { handleCommentChange } from "@/lib/tableUtils";
 import { useQaqcTable } from "@/hooks/useQaqcTable";
 
-// localStorage key - exported for external clearing after save
-export const QAQC_STORAGE_KEY = 'qaqcData';
-
-// Utility to clear QAQC localStorage after successful backend save
-export const clearQaqcLocalStorage = (): void => {
-  if (typeof window !== 'undefined') {
-    
-    // Try to clear multiple possible keys
-    localStorage.removeItem(QAQC_STORAGE_KEY);
-    localStorage.removeItem('qaqc_table_data'); // Alternative key name
-    localStorage.removeItem('qaqcData'); // Alternative key name
-    
-    
-    // Check for any remaining QAQC-related data
-    const allKeys = Object.keys(localStorage);
-    const qaqcKeys = allKeys.filter(key => key.toLowerCase().includes('qaqc'));
-    if (qaqcKeys.length > 0) {
-      // Found remaining QAQC-related keys but not logging them
-    }
-  }
-};
-
 interface QaqcStatusNewProps {
   sections: Section[];
   weeklyReportId?: string;
@@ -212,14 +190,38 @@ export default function QaqcStatusNew({
     totalRows,
     openRows,
     filteredSections,
+    loadExternalData,
   } = useQaqcTable(sections);
 
-  // Sync data changes to parent component
+  // Load external data only on mount using a ref to prevent re-runs
+  const hasLoadedExternalData = React.useRef(false);
+  React.useEffect(() => {
+    if (externalTableData && typeof externalTableData === 'object' && !hasLoadedExternalData.current) {
+      loadExternalData(externalTableData);
+      hasLoadedExternalData.current = true;
+    }
+  }, []); // Empty dependency array - only run once on mount
+
+  // Sync data changes to parent component with debouncing to prevent infinite loops
+  const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   React.useEffect(() => {
     if (setTableData && tableData) {
-      // Only call setTableData when data actually changes
-      setTableData(tableData);
+      // Clear previous timeout
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      
+      // Debounce sync to prevent rapid updates
+      syncTimeoutRef.current = setTimeout(() => {
+        setTableData(tableData);
+      }, 100);
     }
+    
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
   }, [tableData, setTableData]);
 
   return (
