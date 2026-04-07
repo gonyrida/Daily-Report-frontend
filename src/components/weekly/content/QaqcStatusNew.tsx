@@ -40,6 +40,40 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
   onDeleteRow,
   onCellChange,
 }) => {
+  // Define custom headers for specific sections
+  const getSectionHeaders = () => {
+    switch (section.id) {
+      case '4.5': // Client Site Instruction (SI)
+        return [
+          { key: '#', label: '#', width: 'w-12' },
+          { key: 'code', label: 'Code', width: '' },
+          { key: 'description', label: 'Description', width: 'min-w-48' },
+          { key: 'issuedBy', label: 'Issued By', width: 'w-32' },
+          { key: 'issuedDate', label: 'Issued Date', width: 'w-32' },
+          { key: 'actions', label: '', width: 'w-12' }
+        ];
+      case '4.6': // Inspection Request (IR)
+        return [
+          { key: '#', label: '#', width: 'w-12' },
+          { key: 'code', label: 'Code', width: '' },
+          { key: 'description', label: 'Description', width: 'min-w-48' },
+          { key: 'receivedDate', label: 'Received Date', width: 'w-32' },
+          { key: 'inspectionDate', label: 'Inspection Date', width: 'w-32' },
+          { key: 'actions', label: '', width: 'w-12' }
+        ];
+      default:
+        return [
+          { key: '#', label: '#', width: 'w-12' },
+          { key: 'code', label: 'Code', width: '' },
+          { key: 'description', label: 'Description', width: 'min-w-48' },
+          { key: 'status', label: 'Status', width: 'w-32' },
+          { key: 'dateResponse', label: 'Date Submit/Response', width: 'w-32' },
+          { key: 'actions', label: '', width: 'w-12' }
+        ];
+    }
+  };
+
+  const headers = getSectionHeaders();
   return (
     <div className="section-card p-6">
       <div className="flex items-center justify-between gap-2 mb-4">
@@ -68,12 +102,11 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
         <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/30">
-                <th className="text-left py-2 px-2 w-12">#</th>
-                <th className="text-left py-2 px-2">Code</th>
-                <th className="text-left py-2 px-2 min-w-48">Description</th>
-                <th className="text-left py-2 px-2 w-32">Status</th>
-                <th className="text-left py-2 px-2 w-32">Date Submit/Response</th>
-                <th className="text-left py-2 px-2 w-12"></th>
+                {headers.map((header) => (
+                  <th key={header.key} className={`text-left py-2 px-2 ${header.width}`}>
+                    {header.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -100,37 +133,82 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                       className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
                     />
                   </td>
-                  <td className="py-2 px-2">
-                    <select
-                      value={row.status}
-                      onChange={(e) => onCellChange(section.id, row.id, "status", e.target.value as StatusKey)}
-                      className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${
-                        row.status === "Pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
-                        row.status === "Respond" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
-                        row.status === "Submit" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
-                        row.status === "Resubmit" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-700" :
-                        row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
-                        row.status === "Approved with Condition" ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700" :
-                        row.status === "Not Approved" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
-                        "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
-                      }`}
-                    >
-                      <option value="">Select</option>
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-2 px-2">
-                    <input
-                      type="date"
-                      value={row.dateResponse}
-                      onChange={(e) => onCellChange(section.id, row.id, "dateResponse", e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
-                    />
-                  </td>
+                  {section.id === '4.5' && (
+                    <>
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={row.issuedBy || ''}
+                          onChange={(e) => onCellChange(section.id, row.id, "issuedBy", e.target.value)}
+                          placeholder="Enter issued by"
+                          className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="date"
+                          value={row.issuedDate || ''}
+                          onChange={(e) => onCellChange(section.id, row.id, "issuedDate", e.target.value)}
+                          className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
+                        />
+                      </td>
+                    </>
+                  )}
+                  {section.id === '4.6' && (
+                    <>
+                      <td className="py-2 px-2">
+                        <input
+                          type="date"
+                          value={row.receivedDate || ''}
+                          onChange={(e) => onCellChange(section.id, row.id, "receivedDate", e.target.value)}
+                          className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="date"
+                          value={row.inspectionDate || ''}
+                          onChange={(e) => onCellChange(section.id, row.id, "inspectionDate", e.target.value)}
+                          className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
+                        />
+                      </td>
+                    </>
+                  )}
+                  {section.id !== '4.5' && section.id !== '4.6' && (
+                    <>
+                      <td className="py-2 px-2">
+                        <select
+                          value={row.status}
+                          onChange={(e) => onCellChange(section.id, row.id, "status", e.target.value as StatusKey)}
+                          className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${
+                            row.status === "Pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
+                            row.status === "Respond" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
+                            row.status === "Submit" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
+                            row.status === "Resubmit" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-700" :
+                            row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
+                            row.status === "Approved with Condition" ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700" :
+                            row.status === "Not Approved" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
+                            "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                          }`}
+                        >
+                          <option value="">Select</option>
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="date"
+                          value={row.dateResponse}
+                          onChange={(e) => onCellChange(section.id, row.id, "dateResponse", e.target.value)}
+                          className="w-full border rounded px-2 py-1 text-sm dark:bg-card dark:border-border"
+                        />
+                      </td>
+                    </>
+                  )}
                   <td className="py-2 px-2">
                     <button
                       onClick={() => onDeleteRow(section.id, row.id)}
@@ -193,14 +271,20 @@ export default function QaqcStatusNew({
     loadExternalData,
   } = useQaqcTable(sections);
 
-  // Load external data only on mount using a ref to prevent re-runs
-  const hasLoadedExternalData = React.useRef(false);
+  // Load external data when component mounts or when external data changes
+  const previousExternalData = React.useRef<any>(null);
   React.useEffect(() => {
-    if (externalTableData && typeof externalTableData === 'object' && !hasLoadedExternalData.current) {
-      loadExternalData(externalTableData);
-      hasLoadedExternalData.current = true;
+    if (externalTableData && typeof externalTableData === 'object') {
+      // Only load if external data has actually changed
+      const currentDataStr = JSON.stringify(externalTableData);
+      const previousDataStr = JSON.stringify(previousExternalData.current);
+      
+      if (currentDataStr !== previousDataStr) {
+        loadExternalData(externalTableData);
+        previousExternalData.current = externalTableData;
+      }
     }
-  }, []); // Empty dependency array - only run once on mount
+  }, [externalTableData, loadExternalData]); // Add dependencies to detect changes
 
   // Sync data changes to parent component with debouncing to prevent infinite loops
   const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);

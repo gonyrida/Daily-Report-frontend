@@ -77,7 +77,7 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
     companyPhone2: data.companyPhone2 || "",
     companyEmail1: data.companyEmail1 || "",
     companyEmail2: "www.cambodiacpm.com",
-    refNoPrefix: data.refNoPrefix || "ICT-CPM-LETTER",
+    refNoPrefix: data.refNoPrefix || "ICT-CPM-WRP",
   });
   useEffect(() => {
     // Parse date range to get start and end dates

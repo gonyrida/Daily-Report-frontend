@@ -160,7 +160,7 @@ const WeeklyReport = () => {
   // Shared data state between tabs
   const [sharedData, setSharedData] = useState({
     weekNumber: "",
-    refNoPrefix: "ICT-CPM-LETTER",
+    refNoPrefix: "ICT-CPM-WRP",
     dateRange: "",
     projectName: selectedProject || "Default Project Name",
     employer: "Client Name",
@@ -695,7 +695,7 @@ const WeeklyReport = () => {
             employer: 'Client Name'
           },
           letter: {
-            refNoPrefix: 'ICT-CPM-LETTER',
+            refNoPrefix: 'ICT-CPM-WRP',
             weekNumber: '1',
             reportDate: new Date().toISOString().split('T')[0],
             recipientCompany: '',
@@ -892,7 +892,7 @@ const WeeklyReport = () => {
             employer: 'Client Name'
           },
           letter: {
-            refNoPrefix: 'ICT-CPM-LETTER',
+            refNoPrefix: 'ICT-CPM-WRP',
             weekNumber: '1',
             reportDate: new Date().toISOString().split('T')[0],
             recipientCompany: '',
@@ -2227,10 +2227,58 @@ const WeeklyReport = () => {
       
       return formatRowsWithDisplayIndex(overallProgressHook.rows);
     })(),
-    nwdpItems: weeklyActivities.map(a => ({
-      workDoneLabel: a.description,
-      workDonePct: a.percent,
-    })),
+    nwdpItems: (() => {
+      // Create array to hold all individual rows
+      const allItems = [];
+      
+      // First, add all weekly activities as individual items
+      weeklyActivities.forEach(a => {
+        allItems.push({
+          sourceId: a.sourceId || '',
+          workDoneLabel: a.description,
+          workDonePct: a.percent,
+          nextWeekLabel: undefined,
+          nextWeekPct: undefined
+        });
+      });
+      
+      // Then, try to match next week plan items with existing weekly activities
+      // or add them as new items if no match found
+      nextWeekPlan.forEach(a => {
+        const id = a.sourceId || '';
+        
+        // Try to find matching weekly activity by sourceId
+        let matched = false;
+        if (id) {
+          // Only try to match if there's a non-empty ID
+          for (let i = 0; i < allItems.length; i++) {
+            if (allItems[i].sourceId === id && allItems[i].nextWeekLabel === undefined) {
+              // Found match, add next week data to this item
+              allItems[i].nextWeekLabel = a.description;
+              allItems[i].nextWeekPct = a.percent;
+              matched = true;
+              break;
+            }
+          }
+        }
+        
+        // If no match found (or ID is empty), add as separate item
+        if (!matched) {
+          allItems.push({
+            sourceId: id,
+            workDoneLabel: undefined,
+            workDonePct: undefined,
+            nextWeekLabel: a.description,
+            nextWeekPct: a.percent
+          });
+        }
+      });
+      
+      // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
+      return allItems.filter(item => 
+        item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
+      );
+    })(),
     qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => ({
       sectionTitle: key.toUpperCase(),
       codeHeader: "Code",

@@ -150,7 +150,7 @@ const ProjectInfo = ({
             className="mt-1.5"
           />
           <div>
-            <Label className="text-sm font-medium text-foreground">
+            <Label className="text-sm font-medium text-foreground block">
               Report Date *
             </Label>
             <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -158,7 +158,7 @@ const ProjectInfo = ({
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal mt-1.5",
+                    "w-full justify-start text-left font-normal mt-1.5 min-w-[200px]",
                     !reportDate && "text-muted-foreground",
                   )}
                 >
@@ -190,8 +190,10 @@ const ProjectInfo = ({
             </Label>
             <div className="space-y-3 mt-1.5">
               {/* Input Row: Period, Weather Condition, Temperature */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
+              {/* Input Row: Period, Weather Condition, Temperature */}
+              {/* Use grid-cols-2 for Period and Weather on same line, Temperature below on tablet, flex on desktop */}
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:flex lg:items-end gap-3">
+                <div className="w-full max-w-[200px] md:max-w-none md:flex-1">
                   <Label
                     htmlFor="period"
                     className="text-xs text-muted-foreground mb-1 block"
@@ -204,7 +206,7 @@ const ProjectInfo = ({
                       setCurrentPeriod(value)
                     }
                   >
-                    <SelectTrigger id="period">
+                    <SelectTrigger id="period" className="w-full min-w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -214,7 +216,7 @@ const ProjectInfo = ({
                   </Select>
                 </div>
 
-                <div className="flex-1">
+                <div className="w-full md:flex-1">
                   <Label
                     htmlFor="weather-condition"
                     className="text-xs text-muted-foreground mb-1 block"
@@ -225,7 +227,7 @@ const ProjectInfo = ({
                     value={currentWeather || ""}
                     onValueChange={handleWeatherChange}
                   >
-                    <SelectTrigger id="weather-condition">
+                    <SelectTrigger id="weather-condition" className="w-full min-w-[180px]">
                       <SelectValue placeholder="Select condition" />
                     </SelectTrigger>
                     <SelectContent>
@@ -238,12 +240,12 @@ const ProjectInfo = ({
                   </Select>
                 </div>
 
-                <div className="w-24">
+                <div className="w-full md:col-span-2 lg:w-24">
                   <Label
                     htmlFor="temperature"
                     className="text-xs text-muted-foreground mb-1 block"
                   >
-                    Temperature
+                    Temp
                   </Label>
                   <Input
                     inputSize="sm"

@@ -139,6 +139,7 @@ export interface OverallProgressItem {
 }
 
 export interface NWDPItem {
+  id?: string;
   workDoneLabel?: string;
   workDonePct?: number | string;
   nextWeekLabel?: string;
@@ -1226,7 +1227,7 @@ async function buildIntro(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
     font: { bold: true, size: 12, name: 'Arial' },
     alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
   };
-  ws.getRow(r).height = 22;
+  ws.getRow(r).height = 22.5;
   r++;
 
   // Project Overview Content
@@ -1241,7 +1242,7 @@ async function buildIntro(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
       font: { bold: true, size: 12, name: 'Arial' },
       alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
     };
-    ws.getRow(r).height = 22;
+    ws.getRow(r).height = 22.5;
     r++;
 
     ws.getCell(r, 2).value ='\n'+ d.designConstruction + '\n';
@@ -1464,15 +1465,202 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 
   ws.properties.tabColor = { argb: 'FF0070C0' };
 
+  // Set column widths
+  ws.getColumn('A').width = 5;
+  ws.getColumn('B').width = 43;
+  ws.getColumn('C').width = 10;
+  ws.getColumn('D').width = 43;
+  ws.getColumn('E').width = 10;
+  ws.getColumn('F').width = 5;
+
   let r = 2;
 
+  // Set row heights
+  ws.getRow(1).height = 30;
+  ws.getRow(2).height = 20;
+  ws.getRow(4).height = 20;
+
   ws.getCell(r, 2).value = '3. ACTIVITIES OF WORK DONE / NEXT WEEK PLAN';
-  ws.getCell(r, 2).style = styles.sectionHdr;
-  ws.mergeCells(r, 2, r, 7);
+  ws.getCell(r, 2).style = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } },
+    alignment: { horizontal: 'left', vertical: 'middle' }
+  };
+  ws.mergeCells(r, 2, r, 5);
   r += 2;
 
-  // Add NWDP content here
-  // Implementation for activities and next week plan
+  // Table headers
+  const headers = ['Activities of Work Done', 'Next Week Plan'];
+  const headerCols = [2, 4];
+  
+  headers.forEach((header, index) => {
+    const cell = ws.getCell(r, headerCols[index]);
+    cell.value = header;
+    cell.style = {
+      font: { bold: true, name: 'Arial' },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: '9BC2E6' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: {
+        top: { style: 'hair' },
+        bottom: { style: 'hair' },
+        left: { style: 'thin' },
+        right: { style: 'thin' }
+      }
+    };
+    
+    // Merge headers: B+C for first header, D+E for second header
+    if (index === 0) {
+      ws.mergeCells(r, 2, r, 3); // Merge B to C
+    } else if (index === 1) {
+      ws.mergeCells(r, 4, r, 5); // Merge D to E
+    }
+  });
+  r += 1;
+
+  // Helper function to calculate indentation level based on ID structure
+  const getIndentationLevel = (id: string): number => {
+    if (!id) return 0;
+    
+    const trimmed = id.trim();
+    
+    // Roman numerals (I, II, III, etc.) - level 0
+    if (/^[IVX]+$/.test(trimmed)) return 0;
+    
+    // Arabic numbers with dots (1., 2., etc.) - level 1
+    if (/^\d+\.$/.test(trimmed)) return 2;
+    
+    // Decimal numbers (1.1, 1.2, etc.) - level 1
+    if (/^\d+\.\d+$/.test(trimmed)) return 1;
+    
+    // Triple decimal (1.1.1, etc.) - level 1
+    if (/^\d+\.\d+\.\d+$/.test(trimmed)) return 1;
+    
+    // Letters (a, b, c) - level 2
+    if (/^[a-zA-Z]\.$/.test(trimmed)) return 2;
+    
+    // Dash only (-) - level 3 (treated as deepest level)
+    if (/^-+$/.test(trimmed)) return 3;
+    
+    return 0;
+  };
+
+  // Helper function to add indentation spaces
+  const addIndentation = (text: string, level: number): string => {
+    let spaces = 0;
+    
+    // Custom spacing based on level
+    switch (level) {
+      case 0: // Roman numerals - no spaces
+        spaces = 0;
+        break;
+      case 1: // Decimal numbers (1.1) - 8 spaces
+        spaces = 8;
+        break;
+      case 2: // Arabic numbers (1., 2.) - 4 spaces  
+        spaces = 4;
+        break;
+      case 3: // Dashes (-) - 16 spaces
+        spaces = 16;
+        break;
+      default:
+        spaces = level * 4;
+    }
+    
+    return ' '.repeat(spaces) + text;
+  };
+
+  // Helper function to handle dash indentation specially
+  const formatWithDashIndentation = (text: string, level: number): string => {
+    // If the text is just a dash (no dots allowed), add proper indentation
+    if (/^-+$/.test(text.trim()) && !text.includes('.')) {
+      const spaces = level * 4;
+      return ' '.repeat(spaces) + text.trim();
+    }
+    // Otherwise use regular indentation
+    return addIndentation(text, level);
+  };
+
+  // Add data rows
+  if (d.nwdpItems && d.nwdpItems.length > 0) {
+    d.nwdpItems.forEach((item, index) => {
+      // ID + Scope of work (combined in column B) with indentation
+      const itemId = item.id || '';
+      const scopeText = item.workDoneLabel || '';
+      const workDoneIndentLevel = getIndentationLevel(itemId);
+      const workDoneText = itemId && scopeText ? `${itemId}. ${scopeText}` : (itemId || scopeText);
+      const indentedWorkDone = formatWithDashIndentation(workDoneText, workDoneIndentLevel);
+      
+      ws.getCell(r, 2).value = indentedWorkDone;
+      ws.getCell(r, 2).style = {
+        font: { bold: workDoneIndentLevel <= 0 ? true : false, size: 10, name: 'Arial' },
+        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+        border: {
+          top: { style: 'hair' },
+          bottom: { style: 'hair' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        }
+      };
+
+      // Work done percentage
+      ws.getCell(r, 3).value = item.workDonePct !== undefined && item.workDonePct !== null ? `${item.workDonePct}%` : '';
+      ws.getCell(r, 3).style = {
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: {
+          top: { style: 'hair' },
+          bottom: { style: 'hair' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        }
+      };
+
+      // Next week plan description (with ID) and indentation
+      const nextWeekId = item.id || '';
+      const nextWeekText = item.nextWeekLabel || '';
+      const nextWeekIndentLevel = getIndentationLevel(nextWeekId);
+      const nextWeekCombined = nextWeekId && nextWeekText ? `${nextWeekId}. ${nextWeekText}` : (nextWeekId || nextWeekText);
+      const indentedNextWeek = formatWithDashIndentation(nextWeekCombined, nextWeekIndentLevel);
+      
+      ws.getCell(r, 4).value = indentedNextWeek;
+      ws.getCell(r, 4).style = {
+        font: { bold: nextWeekIndentLevel <= 0 ? true : false, size: 10, name: 'Arial' },
+        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+        border: {
+          top: { style: 'hair' },
+          bottom: { style: 'hair' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        }
+      };
+
+      // Next week plan percentage
+      ws.getCell(r, 5).value = item.nextWeekPct !== undefined && item.nextWeekPct !== null ? `${item.nextWeekPct}%` : '';
+      ws.getCell(r, 5).style = {
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: {
+          top: { style: 'hair' },
+          bottom: { style: 'hair' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        }
+      };
+
+      r += 1;
+    });
+  } else {
+    // Empty row if no data
+    for (let col = 2; col <= 5; col++) {
+      ws.getCell(r, col).style = {
+        border: {
+          top: { style: 'hair' },
+          bottom: { style: 'hair' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        }
+      };
+    }
+    r += 1;
+  }
 }
 
 // SHEET 8: 4. QAQC
@@ -1482,15 +1670,204 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 
   ws.properties.tabColor = { argb: 'FF0070C0' };
 
+  // Set column widths
+  ws.getColumn(1).width = 6;
+  ws.getColumn(2).width = 32; // Column B
+  ws.getColumn(3).width = 50; // Column C
+  ws.getColumn(4).width = 16; // Column D
+  ws.getColumn(5).width = 17; // Column E
+  ws.getColumn(6).width = 5;  // Column F
+
   let r = 3;
 
   ws.getCell(r, 2).value = '4. QA/QC STATUS';
-  ws.getCell(r, 2).style = styles.sectionHdr;
-  ws.mergeCells(r, 2, r, 11);
+  ws.getCell(r, 2).style = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } },
+    alignment: { horizontal: 'left', vertical: 'middle' }
+  };
+  ws.mergeCells(r, 2, r, 5);
   r += 2;
 
-  // Add QAQC content here
-  // Implementation for QA/QC sections
+  // Display all 13 QAQC sections with default empty tables
+  const qaqcSectionList = [
+    { id: '4.1', title: 'Non-Conformity Report (NCR)' },
+    { id: '4.2', title: 'Corrective Action Request (CAR)' },
+    { id: '4.3', title: 'Safety Corrective Action Request (SCAR)' },
+    { id: '4.4', title: 'PM Site Instruction (SI)' },
+    { id: '4.5', title: 'Client Site Instruction (SI)' },
+    { id: '4.6', title: 'Inspection Request (IR)' },
+    { id: '4.7', title: 'Material for Approval (MFA)' },
+    { id: '4.8', title: 'Request for Information (RFI)' },
+    { id: '4.9', title: 'Request for Approval (RFA)' },
+    { id: '4.10', title: 'Field Change Request (FCR)' },
+    { id: '4.11', title: 'Variation Order (VO)' },
+    { id: '4.12', title: 'Transmittal (TR)' },
+    { id: '4.13', title: 'Material Inspection Approval (MIR)' }
+  ];
+
+  // Display first 5 sections with default empty tables
+  for (let i = 0; i < 5; i++) {
+    const section = qaqcSectionList[i];
+    ws.getCell(r, 2).value = `${section.id} ${section.title}`;
+    ws.getCell(r, 2).style = {
+      font: { bold: true, size: 11, name: 'Arial' }
+    };
+    ws.getRow(r).height = 22.5;
+    r += 1;
+
+    // Table headers - special case for Client Site Instruction and Inspection Request
+    if (section.id === '4.5') {
+      ws.getCell(r, 2).value = 'Code';
+      ws.getCell(r, 3).value = 'Description';
+      ws.getCell(r, 4).value = 'Issued By';
+      ws.getCell(r, 5).value = 'Issued Date';
+    } else if (section.id === '4.6') {
+      ws.getCell(r, 2).value = 'Code';
+      ws.getCell(r, 3).value = 'Description';
+      ws.getCell(r, 4).value = 'Received Date';
+      ws.getCell(r, 5).value = 'Inspection Date';
+    } else {
+      ws.getCell(r, 2).value = 'Code';
+      ws.getCell(r, 3).value = 'Status';
+      ws.getCell(r, 4).value = 'Description';
+      ws.getCell(r, 5).value = 'Date Responded';
+    }
+    
+    // Style headers as bold with background color
+    const headerStyle = {
+      font: { bold: true, size: 11, name: 'Arial' },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } }
+    };
+    
+    ws.getCell(r, 2).style = headerStyle;
+    ws.getCell(r, 3).style = headerStyle;
+    ws.getCell(r, 4).style = headerStyle;
+    ws.getCell(r, 5).style = headerStyle;
+    ws.getCell(r, 6).style = styles.tableHeader;
+    
+    r += 1;
+
+    // Empty data rows (5 rows)
+    for (let j = 0; j < 5; j++) {
+      ws.getCell(r, 2).value = '';
+      ws.getCell(r, 3).value = '';
+      ws.getCell(r, 4).value = '';
+      ws.getCell(r, 5).value = '';
+      
+      // Style data cells
+      ws.getCell(r, 2).style = styles.data;
+      ws.getCell(r, 3).style = styles.data;
+      ws.getCell(r, 4).style = styles.data;
+      ws.getCell(r, 5).style = styles.data;
+      
+      r += 1;
+    }
+
+    // Comments section below table
+    ws.getCell(r, 2).value = 'Comments:';
+    ws.getCell(r, 2).style = styles.boldText;
+    ws.mergeCells(r, 2, r, 5); // Merge B-E
+    ws.getRow(r).height = 42; // Default height
+    r += 1;
+    
+    // Empty comment row
+    ws.getCell(r, 2).value = '';
+    ws.getCell(r, 2).style = styles.data;
+    ws.mergeCells(r, 2, r, 5);
+    ws.getRow(r).height = 42;
+    r += 2; // Space between sections
+  }
+
+  // Display remaining 8 sections just as headers
+  for (let i = 5; i < 13; i++) {
+    const section = qaqcSectionList[i];
+    ws.getCell(r, 1).value = section.id;
+    ws.getCell(r, 2).value = section.title;
+    ws.getCell(r, 2).style = {
+      font: { bold: true, size: 11, name: 'Arial' }
+    };
+    ws.getRow(r).height = 22.5;
+    r += 2; // Space between sections
+  }
+
+  r += 1; // Space before actual data
+
+  // Process actual QAQC data
+  if (d.qaqcSections && d.qaqcSections.length > 0) {
+    for (const section of d.qaqcSections) {
+      // Section title
+      if (section.sectionTitle) {
+        ws.getCell(r, 2).value = section.sectionTitle;
+        ws.getCell(r, 2).style = styles.subsectionHdr;
+        ws.mergeCells(r, 2, r, 11);
+        r += 2;
+      }
+
+      // Headers
+      ws.getCell(r, 2).value = section.codeHeader || 'Code';
+      ws.getCell(r, 3).value = section.statusHeader || 'Status';
+      ws.getCell(r, 4).value = 'Description';
+      ws.getCell(r, 5).value = section.dateHeader || 'Date Submit/Response';
+      ws.getCell(r, 6).value = 'Comments';
+      
+      // Style headers
+      ws.getCell(r, 2).style = styles.tableHeader;
+      ws.getCell(r, 3).style = styles.tableHeader;
+      ws.getCell(r, 4).style = styles.tableHeader;
+      ws.getCell(r, 5).style = styles.tableHeader;
+      ws.getCell(r, 6).style = styles.tableHeader;
+      
+      r += 1;
+
+      // Items
+      if (section.items && section.items.length > 0) {
+        for (const item of section.items) {
+          ws.getCell(r, 2).value = item.code || '';
+          ws.getCell(r, 3).value = item.status || '';
+          ws.getCell(r, 4).value = item.description || '';
+          ws.getCell(r, 5).value = item.date || '';
+          
+          // Style data cells
+          ws.getCell(r, 2).style = styles.data;
+          ws.getCell(r, 3).style = styles.data;
+          ws.getCell(r, 4).style = styles.data;
+          ws.getCell(r, 5).style = styles.data;
+          
+          r += 1;
+        }
+      } else {
+        // Empty row for sections with no items
+        r += 1;
+      }
+
+      // Comments section - merge B-E with default height 42
+      if (section.comments) {
+        ws.getCell(r, 2).value = 'Comments:';
+        ws.getCell(r, 2).style = styles.boldText;
+        ws.mergeCells(r, 2, r, 5); // Merge B-E
+        ws.getRow(r).height = 42; // Default height
+        r += 1;
+        
+        // Split comments into multiple rows if needed
+        const commentLines = section.comments.split('\n');
+        for (const line of commentLines) {
+          ws.getCell(r, 2).value = line;
+          ws.getCell(r, 2).style = styles.data;
+          ws.mergeCells(r, 2, r, 5); // Merge B-E
+          ws.getRow(r).height = 42; // Default height, will expand based on content
+          r += 1;
+        }
+      }
+      
+      r += 1; // Space between sections
+    }
+  } else {
+    // No QAQC data
+    ws.getCell(r, 2).value = 'No QA/QC data available';
+    ws.getCell(r, 2).style = styles.data;
+    ws.mergeCells(r, 2, r, 11);
+  }
 }
 
 // SHEET 9: 5. HSE

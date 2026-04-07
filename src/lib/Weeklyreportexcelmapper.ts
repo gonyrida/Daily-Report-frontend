@@ -146,6 +146,7 @@ export interface MapperInput {
 
   // from useActivities() / useWeeklyReportContent()
   nwdpItems?: Array<{
+    sourceId?: string;
     workDoneLabel?: string;
     label?: string;
     activity?: string;
@@ -332,19 +333,28 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
 
     // ── Overall Progress ─────────────────────────────────────────────────────
     overallProgressRemark: input.overallProgressRemark,
-    overallProgressItems: (input.overallProgress ?? []).map((p, i) => ({
-      no:               p.no ?? p.displayIndex ?? String(i + 1),
-      scopeOfWorks:     p.scopeOfWorks ?? p.description,
-      pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
-      pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
-      pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
-      pctRemaining:     p.pctRemaining     ?? p.remaining,
-      pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
-      pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
-    })),
+    overallProgressItems: (input.overallProgress ?? [])
+      .filter(row => {
+        if (!row.sourceId) return true;
+        const trimmed = row.sourceId.trim();
+        const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
+        const isRomanNumeralIorV = /^(I|V)$/i.test(trimmed);
+        return !(isSingleAlpha && !isRomanNumeralIorV);
+      })
+      .map((p, i) => ({
+        no:               p.no ?? p.displayIndex ?? String(i + 1),
+        scopeOfWorks:     p.scopeOfWorks ?? p.description,
+        pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
+        pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
+        pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
+        pctRemaining:     p.pctRemaining     ?? p.remaining,
+        pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
+        pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
+      })),
 
     // ── NWDP ─────────────────────────────────────────────────────────────────
     nwdpItems: (input.nwdpItems ?? []).map(item => ({
+      id: item.sourceId,
       workDoneLabel: item.workDoneLabel ?? item.label ?? item.activity,
       workDonePct:   item.workDonePct  ?? item.donePct,
       nextWeekLabel: item.nextWeekLabel ?? item.nextLabel,

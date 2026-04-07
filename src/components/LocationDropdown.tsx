@@ -70,8 +70,7 @@ const LocationDropdown = ({
           onValueChange={setLocation}
           disabled={isLoading}
         >
-          <SelectTrigger id="location" className="mt-1.5">
-            <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+          <SelectTrigger id="location" className="mt-1.5 w-full min-w-[200px]">
             <SelectValue placeholder={isLoading ? "Loading locations..." : "Select location..."} />
           </SelectTrigger>
           <SelectContent>
