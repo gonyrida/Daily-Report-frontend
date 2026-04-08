@@ -25,6 +25,7 @@ import { ConstructionProgressData } from "@/types/constructionProgress";
 import { computeAllAmounts } from "@/utils/calculationEngine";
 import { UploadCloud } from "lucide-react";
 import { getQaqcStatus } from "@/integrations/reportsApi";
+import { getProjectById } from "@/integrations/projectsApi";
 import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
@@ -62,6 +63,7 @@ import {
 const WeeklyReport = () => {
   const [searchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
+  const projectId = searchParams.get('projectId');
   const reportId = searchParams.get('reportId');
   const createNew = searchParams.get('createNew');
   const readOnly = searchParams.get('readOnly') === 'true';
@@ -73,6 +75,37 @@ const WeeklyReport = () => {
   );
   const [isReadOnly, setIsReadOnly] = useState(readOnly);
   const [isCreateNewMode, setIsCreateNewMode] = useState(false); // Track if we're creating a new report
+  const [currentProjectName, setCurrentProjectName] = useState<string>(selectedProject || "");
+
+  // Fetch current project name from API (to handle renamed projects)
+  useEffect(() => {
+    const fetchProjectName = async () => {
+      if (projectId) {
+        console.log('📋 [WeeklyReport] Fetching current project name from API for projectId:', projectId);
+        const response = await getProjectById(projectId);
+        if (response.success && response.data && !Array.isArray(response.data)) {
+          const fetchedName = response.data.name;
+          console.log('📋 [WeeklyReport] Fetched project name from API:', fetchedName);
+          console.log('📋 [WeeklyReport] URL parameter was:', selectedProject);
+          if (fetchedName !== selectedProject) {
+            console.log('⚠️ [WeeklyReport] Project name mismatch! Using API value:', fetchedName);
+          }
+          setCurrentProjectName(fetchedName);
+        } else {
+          console.log('⚠️ [WeeklyReport] Failed to fetch project name, using URL parameter:', selectedProject);
+          setCurrentProjectName(selectedProject || "");
+        }
+      } else {
+        console.log('📋 [WeeklyReport] No projectId, using URL parameter:', selectedProject);
+        setCurrentProjectName(selectedProject || "");
+      }
+    };
+
+    fetchProjectName();
+  }, [projectId, selectedProject]);
+
+  // Use currentProjectName instead of selectedProject for all operations
+  const effectiveProjectName = currentProjectName || selectedProject || "";
 
   // Sync currentReportId with URL searchParams and handle createNew
   useEffect(() => {
@@ -291,15 +324,41 @@ const WeeklyReport = () => {
   // Issues hook for state management
   const issuesHook = useIssues();
 
-  // Update projectName when selectedProject changes
+  // Update projectName when effectiveProjectName changes (using API-fetched name)
   useEffect(() => {
-    if (selectedProject) {
+    if (effectiveProjectName) {
+      console.log('📋 [WeeklyReport Init] Using effective project name:', effectiveProjectName);
+      console.log('   - Source: API-fetched (currentProjectName):', currentProjectName);
+      console.log('   - Fallback: URL parameter (selectedProject):', selectedProject);
       setSharedData(prev => ({
         ...prev,
-        projectName: selectedProject
+        projectName: effectiveProjectName
       }));
     }
-  }, [selectedProject]);
+  }, [effectiveProjectName, currentProjectName, selectedProject]);
+
+  // Initialize construction progress when no reportId exists but project is selected
+  useEffect(() => {
+    // Only initialize if: no reportId, has effectiveProjectName, and construction data is empty
+    if (!currentReportId && effectiveProjectName && !constructionProgressHook.constructionData) {
+      console.log('📋 [WeeklyReport Init] Initializing empty construction progress with effective project name:');
+      console.log('   - currentReportId:', currentReportId);
+      console.log('   - effectiveProjectName:', effectiveProjectName);
+      console.log('   - currentProjectName (from API):', currentProjectName);
+      console.log('   - selectedProject (from URL):', selectedProject);
+      console.log('   - constructionProgress.projectInfo.project will be:', effectiveProjectName);
+
+      constructionProgressHook.updateConstructionData({
+        projectInfo: {
+          project: effectiveProjectName,
+          subtitle: '',
+          date: new Date().toISOString().split('T')[0],
+          revision: '0'
+        },
+        items: []
+      });
+    }
+  }, [currentReportId, effectiveProjectName, constructionProgressHook.constructionData, currentProjectName, selectedProject]);
 
   // Sync project name from construction progress to cover page
   useEffect(() => {
@@ -528,7 +587,7 @@ const WeeklyReport = () => {
               // Create empty Construction Progress structure if none exists
               constructionProgressHook.updateConstructionData({
                 projectInfo: {
-                  project: '',
+                  project: sharedData.projectName || selectedProject || '',
                   subtitle: '',
                   date: '',
                   revision: ''
@@ -655,6 +714,13 @@ const WeeklyReport = () => {
   // Create new weekly report function with rolling total logic
   const handleCreateNewWeeklyReportWithRollingTotal = async () => {
     try {
+      // Log project name source for debugging
+      console.log('📋 [Create New Weekly Report With Rolling Total] Project Name Source Check:');
+      console.log('   - effectiveProjectName:', effectiveProjectName);
+      console.log('   - currentProjectName (from API):', currentProjectName);
+      console.log('   - selectedProject (from URL):', selectedProject);
+      console.log('   - Will use for constructionProgress.projectInfo.project:', effectiveProjectName || '(empty)');
+
       // First, check if there are any submitted reports for this project
       let submittedReportData = null;
       try {
@@ -676,7 +742,7 @@ const WeeklyReport = () => {
 
       // Initialize with default data or copy from submitted report with rolling total
       const newReportData = {
-        projectName: selectedProject || 'Default Project',
+        projectName: effectiveProjectName || 'Default Project',
         weekNumber: 1,
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
@@ -770,12 +836,13 @@ const WeeklyReport = () => {
             // Apply rolling total logic when creating new report from submitted report
             const data = submittedReportData.sections.constructionProgress;
             if (!data || !data.items) {
+              console.log('⚠️ [Create New Report] Submitted report has no construction progress data, using effectiveProjectName:', effectiveProjectName);
               return {
                 projectInfo: {
-                  project: '',
+                  project: effectiveProjectName || '',
                   subtitle: '',
-                  date: '',
-                  revision: ''
+                  date: new Date().toISOString().split('T')[0],
+                  revision: '0'
                 },
                 items: []
               };
@@ -818,15 +885,20 @@ const WeeklyReport = () => {
             };
           })() : {
             projectInfo: {
-              project: '',
+              project: selectedProject || '',
               subtitle: '',
-              date: '',
-              revision: ''
+              date: new Date().toISOString().split('T')[0],
+              revision: '0'
             },
             items: []
           }
         }
       };
+
+      // Log the final construction progress project value
+      console.log('✅ [Create New Report] Construction Progress initialized with:');
+      console.log('   - projectInfo.project:', newReportData.sections.constructionProgress.projectInfo?.project);
+      console.log('   - Source was selectedProject (Daily Report filter):', !!selectedProject);
 
       const response = await createWeeklyReport(newReportData);
       if (response.success && response.data) {
@@ -853,6 +925,13 @@ const WeeklyReport = () => {
   // Create new weekly report function
   const handleCreateNewWeeklyReport = async () => {
     try {
+      // Log project name source for debugging
+      console.log('📋 [Create New Weekly Report] Project Name Source Check:');
+      console.log('   - selectedProject from URL:', selectedProject);
+      console.log('   - selectedProject source: Daily Report project filter');
+      console.log('   - sharedData.projectName:', sharedData.projectName);
+      console.log('   - Will use for constructionProgress.projectInfo.project:', selectedProject || '(empty)');
+
       // First, check if there are any submitted reports for this project
       let submittedReportData = null;
       try {
@@ -866,9 +945,10 @@ const WeeklyReport = () => {
 
         if (reportsResponse.success && reportsResponse.data?.length > 0) {
           submittedReportData = reportsResponse.data[0];
+          console.log('✅ Found submitted report for rolling total:', submittedReportData._id);
         }
       } catch (error) {
-        console.log('No submitted reports found, creating new report');
+        console.log('⚠️ No submitted reports found, creating clean report');
       }
 
       // Initialize with default data or copy from submitted report
@@ -967,12 +1047,13 @@ const WeeklyReport = () => {
             // Apply rolling total logic when creating new report from submitted report
             const data = submittedReportData.sections.constructionProgress;
             if (!data || !data.items) {
+              console.log('⚠️ [Create New Report] Submitted report has no construction progress data, using selectedProject:', selectedProject);
               return {
                 projectInfo: {
-                  project: '',
+                  project: selectedProject || '',
                   subtitle: '',
-                  date: '',
-                  revision: ''
+                  date: new Date().toISOString().split('T')[0],
+                  revision: '0'
                 },
                 items: []
               };
@@ -1023,15 +1104,20 @@ const WeeklyReport = () => {
             };
           })() : {
             projectInfo: {
-              project: '',
+              project: selectedProject || '',
               subtitle: '',
-              date: '',
-              revision: ''
+              date: new Date().toISOString().split('T')[0],
+              revision: '0'
             },
             items: []
           }
         }
       };
+
+      // Log the final construction progress project value
+      console.log('✅ [Create New Report] Construction Progress initialized with:');
+      console.log('   - projectInfo.project:', newReportData.sections.constructionProgress.projectInfo?.project);
+      console.log('   - Source was selectedProject (Daily Report filter):', !!selectedProject);
 
       const response = await createWeeklyReport(newReportData);
       if (response.success && response.data) {

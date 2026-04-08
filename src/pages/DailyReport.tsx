@@ -122,6 +122,7 @@ interface Section {
 }
 
 interface ReportData {
+  projectId?: string;
   projectName: string;
   reportDate: string | null;
   location: string;
@@ -199,7 +200,8 @@ const validateAndSetProjectContext = (
 const isNewReportCreation = async (
   reportIdFromUrl: string | null,
   projectFromUrl: string | null,
-  dbReport: any
+  dbReport: any,
+  projectIdFromUrl: string | null = null
 ): Promise<boolean> => {
   // If no reportId and has project context → Always treat as new report
   if (!reportIdFromUrl && projectFromUrl) {
@@ -207,13 +209,18 @@ const isNewReportCreation = async (
   }
 
   // If reportId exists but project context doesn't match → New report for different project
+  // BUT: Check projectId first - if they match, it's the same project (just renamed)
   if (
     reportIdFromUrl &&
     projectFromUrl &&
     dbReport &&
     dbReport.projectName !== projectFromUrl
   ) {
-    return true;
+    // If report has projectId and it matches URL projectId, it's the same project (renamed)
+    if (dbReport.projectId && projectIdFromUrl && dbReport.projectId === projectIdFromUrl) {
+      return false; // Same project, just renamed - treat as existing report
+    }
+    return true; // Different project - treat as new report
   }
 
   // If no reportId and no project context → Main dashboard new report
@@ -227,16 +234,19 @@ const isNewReportCreation = async (
 
 // NEW: Initialize clean state for new reports
 const initializeCleanReportState = (
+  projectId: string | null,
   projectName: string,
+  setProjectId: (id: string | null) => void,
   setProjectName: (name: string) => void,
   setLocation: (location: string) => void,
   setReportStatus: (status: string) => void
 ) => {
   console.log(
-    `🔧 CLEAN STATE: Initializing new report with project "${projectName}"`
+    `🔧 CLEAN STATE: Initializing new report with project "${projectName}" (ID: ${projectId})`
   );
 
-  // Set project name from URL context
+  // Set project info from URL context
+  setProjectId(projectId);
   setProjectName(projectName);
   setLocation(""); // Reset location for new reports
   // ADD THIS: Reset status to draft for new reports
@@ -308,7 +318,8 @@ const loadMostRecentReportForProject = async (
     console.log("🔍 DEBUG: API response:", apiResponse);
 
     // 🚀 PERFORMANCE FIX: No client-side filtering needed - backend already filtered!
-    const projectReports = apiResponse.reports || [];
+    // FIX: Backend returns 'data', not 'reports'
+    const projectReports = apiResponse.data || apiResponse.reports || [];
     console.log("🔍 DEBUG: Project reports count:", projectReports.length);
     console.log(
       "🔍 DEBUG: Project reports:",
@@ -438,9 +449,11 @@ const DailyReport = () => {
   const [searchParams] = useSearchParams();
   const reportIdFromUrl = searchParams.get("reportId");
   const projectFromUrl = searchParams.get("project");
+  const projectIdFromUrl = searchParams.get("projectId");
 
   // Project Info
   const [projectLogo, setProjectLogo] = useState<string>("");
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [location, setLocation] = useState("");
   const [createdBy, setCreatedBy] = useState("");
@@ -588,6 +601,7 @@ const DailyReport = () => {
   // Helper to get current report data
   const getReportData = useCallback(
     (): ReportData => ({
+      projectId: projectId || undefined,
       projectName,
       location,
       createdBy,
@@ -612,6 +626,7 @@ const DailyReport = () => {
       projectLogo,
     }),
     [
+      projectId,
       projectName,
       location,
       createdBy,
@@ -938,7 +953,8 @@ const DailyReport = () => {
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
             projectFromUrl,
-            dbReport
+            dbReport,
+            projectIdFromUrl
           );
 
           if (isNewReport) {
@@ -1087,7 +1103,9 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: No project report found, using clean state"
                 );
                 const cleanState = initializeCleanReportState(
+                  projectIdFromUrl,
                   projectFromUrl || "",
+                  setProjectId,
                   setProjectName,
                   setLocation,
                   setReportStatus
@@ -1120,7 +1138,9 @@ const DailyReport = () => {
                 "🔧 SMART LOAD: No project context, using clean state"
               );
               const cleanState = initializeCleanReportState(
+                projectIdFromUrl,
                 projectFromUrl || "",
+                setProjectId,
                 setProjectName,
                 setLocation,
                 setReportStatus
@@ -1164,11 +1184,10 @@ const DailyReport = () => {
             });
 
             setReportId(dbReport._id || reportIdFromUrl);
-            validateAndSetProjectContext(
-              dbReport.projectName || "",
-              projectFromUrl,
-              setProjectName
-            );
+            setProjectId(dbReport.projectId || null);
+            // For existing reports, always use the saved project name from the database
+            // This ensures edited project names are preserved when reopening the report
+            setProjectName(dbReport.projectName || projectFromUrl || "");
             setLocation(dbReport.location || ""); // Load location from DB
             // Load createdBy from the report, fallback to current user for new reports
             setCreatedBy(dbReport.createdBy || 
@@ -1276,7 +1295,8 @@ const DailyReport = () => {
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
             projectFromUrl,
-            null
+            null,
+            projectIdFromUrl
           );
           console.log("🔍 DEBUG: isNewReport result:", isNewReport);
 
@@ -1469,7 +1489,9 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: No project report found, using clean state"
                 );
                 const cleanState = initializeCleanReportState(
+                  projectIdFromUrl,
                   projectFromUrl || "",
+                  setProjectId,
                   setProjectName,
                   setLocation,
                   setReportStatus
@@ -1502,7 +1524,9 @@ const DailyReport = () => {
                 "🔧 SMART LOAD: No project context, using clean state"
               );
               const cleanState = initializeCleanReportState(
+                projectIdFromUrl,
                 projectFromUrl || "",
+                setProjectId,
                 setProjectName,
                 setLocation,
                 setReportStatus
@@ -1544,7 +1568,8 @@ const DailyReport = () => {
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
             projectFromUrl,
-            null
+            null,
+            projectIdFromUrl
           );
 
           if (isNewReport) {
@@ -1553,7 +1578,9 @@ const DailyReport = () => {
               "🔧 ERROR FALLBACK: Project has no history, using clean state"
             );
             const cleanState = initializeCleanReportState(
+              projectIdFromUrl,
               projectFromUrl || "",
+              setProjectId,
               setProjectName,
               setLocation,
               setReportStatus
@@ -1666,7 +1693,9 @@ const DailyReport = () => {
                   "🔧 CLEAN STATE: No project history found, using clean state"
                 );
                 const cleanState = initializeCleanReportState(
-                  projectFromUrl,
+                  projectIdFromUrl,
+                  projectFromUrl || "",
+                  setProjectId,
                   setProjectName,
                   setLocation,
                   setReportStatus

@@ -42,10 +42,14 @@ import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport, getCompanyReports } from "@/integrations/reportsApi";
+import { getProjectById } from "@/integrations/projectsApi";
 
 interface Report {
   _id: string;
+  projectId?: string;
   projectName: string;
+  folderId?: string;
+  folderName?: string;
   reportDate: string;
   status: "draft" | "submitted";
   submittedAt?: string;
@@ -67,6 +71,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectFilter = searchParams.get('project');
+  const projectId = searchParams.get('projectId');
+  const folderId = searchParams.get('folder');
+  const folderName = searchParams.get('folderName');
   const [companyReports, setCompanyReports] = useState([]);
   const [filteredCompanyReports, setFilteredCompanyReports] = useState([]); // ← ADD THIS
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
@@ -76,6 +83,26 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
+  const [currentProjectName, setCurrentProjectName] = useState<string>(projectFilter || "");
+
+  // Fetch current project name when projectId changes (to handle renamed projects)
+  useEffect(() => {
+    const fetchProjectName = async () => {
+      if (projectId) {
+        const response = await getProjectById(projectId);
+        if (response.success && response.data && !Array.isArray(response.data)) {
+          setCurrentProjectName(response.data.name);
+        } else {
+          // Fallback to URL parameter if fetch fails
+          setCurrentProjectName(projectFilter || "");
+        }
+      } else {
+        setCurrentProjectName(projectFilter || "");
+      }
+    };
+
+    fetchProjectName();
+  }, [projectId, projectFilter]);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -103,9 +130,28 @@ const Dashboard = () => {
   useEffect(() => {
     let filtered = reports;
 
-    // Filter by project (NEW!)
-    if (projectFilter) {
+    // Filter by project - use projectId if report has it, otherwise fallback to projectName
+    if (projectId && projectFilter) {
+      // Check if any reports have projectId set
+      const reportsWithProjectId = filtered.filter(report => report.projectId);
+      
+      if (reportsWithProjectId.length > 0) {
+        // If reports have projectId, use it for reliable filtering
+        filtered = filtered.filter(report => 
+          report.projectId === projectId || report.projectName === projectFilter
+        );
+      } else {
+        // Fallback to projectName if no reports have projectId yet
+        filtered = filtered.filter(report => report.projectName === projectFilter);
+      }
+    } else if (projectFilter) {
+      // Fallback to projectName for backward compatibility
       filtered = filtered.filter(report => report.projectName === projectFilter);
+    }
+
+    // Filter by folder if specified
+    if (folderId) {
+      filtered = filtered.filter(report => report.folderId === folderId);
     }
 
     // Filter by status (case-insensitive)
@@ -124,7 +170,7 @@ const Dashboard = () => {
     }
 
     setFilteredReports(filtered);
-  }, [reports, searchQuery, filterStatus, projectFilter]);
+  }, [reports, searchQuery, filterStatus, projectFilter, projectId]);
 
   useEffect(() => {
     // Always fetch company reports when there's a project filter
@@ -134,11 +180,35 @@ const Dashboard = () => {
       // Also fetch when switching to company tab without project filter
       fetchCompanyReports();
     }
-  }, [activeTab, projectFilter]);
+  }, [activeTab, projectFilter, projectId]);
 
-  // Filter company reports based on search query and status
+  // Filter company reports based on search query, status, and folder
   useEffect(() => {
     let filtered = companyReports;
+
+    // Filter by project - use projectId if report has it, otherwise fallback to projectName
+    if (projectId && projectFilter) {
+      // Check if any reports have projectId set
+      const reportsWithProjectId = filtered.filter(report => report.projectId);
+      
+      if (reportsWithProjectId.length > 0) {
+        // If reports have projectId, use it for reliable filtering
+        filtered = filtered.filter(report => 
+          report.projectId === projectId || report.projectName === projectFilter
+        );
+      } else {
+        // Fallback to projectName if no reports have projectId yet
+        filtered = filtered.filter(report => report.projectName === projectFilter);
+      }
+    } else if (projectFilter) {
+      // Fallback to projectName for backward compatibility
+      filtered = filtered.filter(report => report.projectName === projectFilter);
+    }
+
+    // Filter by folder if specified
+    if (folderId) {
+      filtered = filtered.filter(report => report.folderId === folderId);
+    }
 
     // Filter by status (case-insensitive)
     if (filterStatus !== "all") {
@@ -150,13 +220,14 @@ const Dashboard = () => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(report => 
         report.projectName.toLowerCase().includes(query) ||
+        report.folderName?.toLowerCase().includes(query) ||
         new Date(report.reportDate).toLocaleDateString().toLowerCase().includes(query) ||
         report.status.toLowerCase().includes(query)
       );
     }
 
     setFilteredCompanyReports(filtered);
-  }, [companyReports, searchQuery, filterStatus]);
+  }, [companyReports, searchQuery, filterStatus, projectFilter, projectId, folderId]);
 
   // Helper function to get current user ID from user context
   // No localStorage needed - user info comes from authentication context
@@ -185,8 +256,8 @@ const Dashboard = () => {
   ) => {
     try {
       setIsLoadingCompany(true);
-      // ADD PROJECT FILTER!
-      const response = await getCompanyReports(page, 20, search, projectFilter);
+      // ADD PROJECT FILTER - Pass both project name (for display) and projectId (for reliable lookup)
+      const response = await getCompanyReports(page, 20, search, projectFilter, projectId || undefined);
       setCompanyReports(response.reports);
     } catch (error) {
       console.error("Failed to fetch company reports:", error);
@@ -202,16 +273,24 @@ const Dashboard = () => {
 
   const handleCreateReport = async () => {
     try {
-      if (projectFilter) {
-        // Navigate to daily report with project context
-        navigate(`/daily-report?project=${encodeURIComponent(projectFilter)}`);
+      if (currentProjectName || projectFilter) {
+        // Use currentProjectName (fetched from API) if available, fallback to projectFilter
+        const projectNameToUse = currentProjectName || projectFilter;
+        // Navigate to daily report with project and folder context
+        let url = `/daily-report?project=${encodeURIComponent(projectNameToUse || '')}`;
+        if (projectId) {
+          url += `&projectId=${encodeURIComponent(projectId)}`;
+        }
+        if (folderId) {
+          url += `&folder=${encodeURIComponent(folderId)}&folderName=${encodeURIComponent(folderName || '')}`;
+        }
+        navigate(url);
       } else {
         // Navigate to projects overview to select/create a project
         navigate('/daily-report-projects');
       }
     } catch (error: any) {
-      console.error("🚀 DASHBOARD: Error navigating to report:", error);
-      toast({
+      console.error("🚀 DASHBOARD: Error navigating to report:", error);      toast({
         title: "Error",
         description: "Failed to navigate to report creation",
         variant: "destructive",
@@ -221,14 +300,20 @@ const Dashboard = () => {
 
   const handleOpenReport = (reportId: string) => {
     const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
-    navigate(`/daily-report?reportId=${reportId}${projectParam}`);
+    const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
+    const folderParam = folderId ? `&folder=${encodeURIComponent(folderId)}&folderName=${encodeURIComponent(folderName || '')}` : '';
+    navigate(`/daily-report?reportId=${reportId}${projectParam}${projectIdParam}${folderParam}`);
   };
 
   const handleDeleteReport = async (reportId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent row click
     
+    console.log("🔥 DASHBOARD: handleDeleteReport called with reportId:", reportId);
+    
     try {
+      console.log("🔥 DASHBOARD: Calling deleteReport API...");
       await deleteReport(reportId);
+      console.log("🔥 DASHBOARD: deleteReport API success!");
       
       toast({
         title: "Report Deleted",
@@ -236,13 +321,15 @@ const Dashboard = () => {
       });
       
       // Refresh the reports list
+      console.log("🔥 DASHBOARD: Refreshing reports list...");
       const userReports = await getRecentReports(50);
       setReports(userReports.data || []);
       setFilteredReports(userReports.data || []);
       // Always refresh company reports to keep counts in sync
       await fetchCompanyReports();
+      console.log("🔥 DASHBOARD: Reports list refreshed");
     } catch (error) {
-      console.error("Delete error:", error);
+      console.error("🔥 DASHBOARD: Delete error:", error);
       toast({
         title: "Deletion Failed",
         description: error instanceof Error ? error.message : "Failed to delete report",
@@ -258,8 +345,14 @@ const Dashboard = () => {
     
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
     
+    // Check if any reports have projectId set
+    const hasReportsWithProjectId = reportsToCheck.some(report => report.projectId);
+    
     return reportsToCheck.filter(report => {
-      const matchesProject = !projectFilter || report.projectName === projectFilter;
+      // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
+      const matchesProject = hasReportsWithProjectId && projectId
+        ? report.projectId === projectId || report.projectName === projectFilter
+        : !projectFilter || report.projectName === projectFilter;
       return matchesProject &&
             new Date(report.reportDate) >= oneWeekAgo &&
             report.status === "submitted";
@@ -270,9 +363,15 @@ const Dashboard = () => {
   const getTodayReportStatus = () => {
     const today = new Date().toDateString();
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
+    
+    // Check if any reports have projectId set
+    const hasReportsWithProjectId = reportsToCheck.some(report => report.projectId);
       
     const todayReport = reportsToCheck.find(report => {
-      const matchesProject = !projectFilter || report.projectName === projectFilter;
+      // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
+      const matchesProject = hasReportsWithProjectId && projectId
+        ? report.projectId === projectId || report.projectName === projectFilter
+        : !projectFilter || report.projectName === projectFilter;
       return matchesProject && new Date(report.reportDate).toDateString() === today;
     });
       
@@ -283,8 +382,14 @@ const Dashboard = () => {
   const getLastSubmitted = () => {
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
     
+    // Check if any reports have projectId set
+    const hasReportsWithProjectId = reportsToCheck.some(report => report.projectId);
+    
     const submittedReports = reportsToCheck.filter(report => {
-      const matchesProject = !projectFilter || report.projectName === projectFilter;
+      // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
+      const matchesProject = hasReportsWithProjectId && projectId
+        ? report.projectId === projectId || report.projectName === projectFilter
+        : !projectFilter || report.projectName === projectFilter;
       return matchesProject && report.status === "submitted";
     });
     
@@ -375,12 +480,20 @@ const Dashboard = () => {
             {/* Welcome Section */}
             <div className="space-y-2">
               <h2 className="text-2xl font-bold tracking-tight">
-                {projectFilter ? `${projectFilter} Reports` : 'Welcome back!'}
+                {currentProjectName || projectFilter 
+                  ? folderName
+                    ? <span className="flex items-center gap-2">📁 {folderName} / {currentProjectName || projectFilter}</span>
+                    : `${currentProjectName || projectFilter} Reports`
+                  : 'Welcome back!'}
               </h2>
               <p className="text-muted-foreground">
-                {projectFilter 
-                  ? `Here's an overview of reports for ${projectFilter}.`
-                  : 'Here\'s an overview of your daily reports.'
+                {(currentProjectName || projectFilter)
+                  ? folderName
+                    ? `Reports for "${currentProjectName || projectFilter}" project in "${folderName}" folder.`
+                    : `Here's an overview of reports for ${currentProjectName || projectFilter}.`
+                  : folderName
+                    ? `Reports in "${folderName}" folder.`
+                    : 'Here\'s an overview of your daily reports.'
                 }
               </p>
             </div>
@@ -404,8 +517,20 @@ const Dashboard = () => {
                 >
                   Dashboard
                 </button>
+                {folderName && (
+                  <>
+                    <span>/</span>
+                    <button
+                      onClick={() => navigate(`/dashboard?folder=${encodeURIComponent(folderId || '')}&folderName=${encodeURIComponent(folderName)}`)}
+                      className="hover:text-foreground transition-colors flex items-center gap-1"
+                    >
+                      <span>📁</span>
+                      {folderName}
+                    </button>
+                  </>
+                )}
                 <span>/</span>
-                <span className="text-foreground">{projectFilter}</span>
+                <span className="text-foreground">{currentProjectName || projectFilter}</span>
               </div>
             )}
 
@@ -555,7 +680,13 @@ const Dashboard = () => {
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{report.projectName}</h4>
+                            <h4 className="font-medium">{projectFilter || report.projectName}</h4>
+                            {report.folderName && !folderId && (
+                              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                <span>📁</span>
+                                {report.folderName}
+                              </Badge>
+                            )}
                             {getStatusBadge(report.status)}
                             {new Date(report.updatedAt).getTime() > Date.now() - 5 * 60 * 1000 && (
                               <Badge variant="outline" className="text-blue-600 border-blue-600">
@@ -638,7 +769,10 @@ const Dashboard = () => {
                                       <AlertDialogFooter>
                                         <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
                                         <AlertDialogAction 
-                                          onClick={(e) => handleDeleteReport(report._id, e)}
+                                          onClick={(e) => {
+                                            console.log("🔥 ALERT ACTION: Clicked! report._id:", report._id);
+                                            handleDeleteReport(report._id, e);
+                                          }}
                                           className="bg-red-600 hover:bg-red-700"
                                         >
                                           Delete Report

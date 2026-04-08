@@ -46,6 +46,27 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// Helper function to format dates in DD-MMM-YY format
+const formatDateRange = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+
+  // Extract YYYY-MM-DD from ISO string (ignore time/timezone)
+  const datePart = dateString.split('T')[0];
+  const [year, month, day] = datePart.split('-').map(Number);
+
+  if (!year || !month || !day) return 'Invalid Date';
+
+  // Create date using local components (avoid timezone shift)
+  const date = new Date(year, month - 1, day);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+
+  const formattedDay = day.toString().padStart(2, '0');
+  const monthShort = date.toLocaleString('en-US', { month: 'short' });
+  const yearShort = year.toString().slice(-2);
+
+  return `${formattedDay}-${monthShort}-${yearShort}`;
+};
+
 // Helper function to get the ISO week number
 const getWeekNumber = (date: Date): number => {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -167,6 +188,7 @@ const WeeklyReportDashboard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectFilter = searchParams.get('project');
+  const projectId = searchParams.get('projectId');
   const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
   const [filteredReports, setFilteredReports] = useState<WeeklyReport[]>([]);
   const [companyReports, setCompanyReports] = useState<WeeklyReport[]>([]);
@@ -383,11 +405,13 @@ const WeeklyReportDashboard = () => {
         
         // Navigate to weekly report with the most recent submitted report ID for data fetching
         const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
-        navigate(`/weekly-report?reportId=${mostRecentSubmitted._id || mostRecentSubmitted.id}${projectParam}&createNew=true`);
+        const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
+        navigate(`/weekly-report?reportId=${mostRecentSubmitted._id || mostRecentSubmitted.id}${projectParam}${projectIdParam}&createNew=true`);
       } else {
         // No submitted reports, create new from scratch
         if (projectFilter) {
-          navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}`);
+          const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
+          navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}${projectIdParam}`);
         } else {
           navigate('/weekly-report');
         }
@@ -396,7 +420,8 @@ const WeeklyReportDashboard = () => {
       console.error("Error handling create weekly report:", error);
       // Fallback to basic navigation
       if (projectFilter) {
-        navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}`);
+        const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
+        navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}${projectIdParam}`);
       } else {
         navigate('/weekly-report');
       }
@@ -405,6 +430,7 @@ const WeeklyReportDashboard = () => {
 
   const handleOpenReport = (reportId: string) => {
     const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
+    const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
     
     // Check if this is a company report and determine ownership
     const currentUserId = getCurrentUserId();
@@ -415,7 +441,7 @@ const WeeklyReportDashboard = () => {
     const isOwner = activeTab === 'personal' || (report?.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId));
     const readOnlyParam = !isOwner ? '&readOnly=true' : '';
     
-    navigate(`/weekly-report?reportId=${reportId}${projectParam}${readOnlyParam}`);
+    navigate(`/weekly-report?reportId=${reportId}${projectParam}${projectIdParam}${readOnlyParam}`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -698,7 +724,14 @@ const WeeklyReportDashboard = () => {
                       const currentUserId = getCurrentUserId();
                       const isOwner = activeTab === 'personal' || (report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId));
                       const userName = report.userId ? `${report.userId.firstName} ${report.userId.lastName}` : 'Unknown';
-                      
+                      const startRaw = report.reportDateFrom || report.startDate;
+                      const endRaw = report.reportDateTo || report.endDate;
+                      console.log('Raw start:', startRaw, 'Type:', typeof startRaw);
+                      console.log('Raw end:', endRaw, 'Type:', typeof endRaw);
+
+                      // Test different parsing methods
+                      console.log('new Date(startRaw):', new Date(startRaw));
+                      console.log('new Date(startRaw).getDate():', new Date(startRaw)?.getDate());
                       return (
                         <div
                           key={report._id || report.id}
@@ -707,7 +740,7 @@ const WeeklyReportDashboard = () => {
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <h4 className="font-medium">Week {report.weekNumber}</h4>
+                              <h4 className="font-medium">{projectFilter}</h4>
                               {getStatusBadge(report.status)}
                               {/* User Info - Only show in Company tab */}
                               {activeTab === 'company' && (
@@ -727,7 +760,7 @@ const WeeklyReportDashboard = () => {
                             <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                               <span className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {new Date(report.startDate).toLocaleDateString()} - {new Date(report.endDate).toLocaleDateString()}
+                                {report.sections?.cover?.dateRange || `${formatDateRange(report.startDate)} - ${formatDateRange(report.endDate)}`}
                               </span>
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />

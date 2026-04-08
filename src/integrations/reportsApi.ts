@@ -648,7 +648,8 @@ export const getCompanyReports = async (
   page: number = 1,
   limit: number = 20,
   search: string = "",
-  projectFilter?: string
+  projectFilter?: string,
+  projectId?: string
 ) => {
   try {
     // const token = localStorage.getItem("authToken");
@@ -660,7 +661,8 @@ export const getCompanyReports = async (
       page: page.toString(),
       limit: limit.toString(),
       ...(search && { search }),
-      ...(projectFilter && { project: projectFilter }), // ← ADD PROJECT FILTER
+      ...(projectFilter && { project: projectFilter }), // Legacy project name filter
+      ...(projectId && { projectId }), // New project ID filter (more reliable)
     });
 
     const response = await apiGet(`/daily-reports/company?${queryParams}`);
@@ -672,7 +674,7 @@ export const getCompanyReports = async (
 
     const data = await response.json();
     return {
-      reports: data.reports || [],
+      reports: data.data || [],  // FIX: Backend returns 'data', not 'reports'
       pagination: data.pagination || {
         page: 1,
         limit: 20,

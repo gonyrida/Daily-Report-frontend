@@ -50,6 +50,8 @@ export interface WeeklyReportMeta {
   weekNumber: number;
   startDate: string;
   endDate: string;
+  reportDateFrom?: string;
+  reportDateTo?: string;
   status: WeeklyReportStatus;
   createdAt: string;
   updatedAt: string;
