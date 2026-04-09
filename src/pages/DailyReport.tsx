@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import { useProfileContext } from "@/contexts/ProfileContext";
 import ReportHeader from "@/components/ReportHeader";
 import ProjectInfo from "@/components/ProjectInfo";
@@ -23,7 +23,6 @@ import {
   createDefaultSiteActivitiesSections,
 } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
-import DailyReportProjectsView from "@/components/DailyReportProjectsView";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -73,6 +72,7 @@ import {
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { getProjectById } from "@/integrations/projectsApi";
 import {
   Tooltip,
   TooltipContent,
@@ -196,35 +196,29 @@ const validateAndSetProjectContext = (
   return loadedProjectName;
 };
 
-// UPDATED: Enhanced detection logic with project history awareness
+// UPDATED: Use projectId as source of truth
 const isNewReportCreation = async (
   reportIdFromUrl: string | null,
-  projectFromUrl: string | null,
-  dbReport: any,
-  projectIdFromUrl: string | null = null
+  projectIdFromUrl: string | null,
+  dbReport: any
 ): Promise<boolean> => {
-  // If no reportId and has project context → Always treat as new report
-  if (!reportIdFromUrl && projectFromUrl) {
+  // If no reportId and has projectId → Always treat as new report
+  if (!reportIdFromUrl && projectIdFromUrl) {
     return true; // Always new report creation for smart loading
   }
 
-  // If reportId exists but project context doesn't match → New report for different project
-  // BUT: Check projectId first - if they match, it's the same project (just renamed)
+  // If reportId exists but projectId doesn't match → New report for different project
   if (
     reportIdFromUrl &&
-    projectFromUrl &&
+    projectIdFromUrl &&
     dbReport &&
-    dbReport.projectName !== projectFromUrl
+    dbReport.projectId !== projectIdFromUrl
   ) {
-    // If report has projectId and it matches URL projectId, it's the same project (renamed)
-    if (dbReport.projectId && projectIdFromUrl && dbReport.projectId === projectIdFromUrl) {
-      return false; // Same project, just renamed - treat as existing report
-    }
     return true; // Different project - treat as new report
   }
 
-  // If no reportId and no project context → Main dashboard new report
-  if (!reportIdFromUrl && !projectFromUrl) {
+  // If no reportId and no projectId → Main dashboard new report
+  if (!reportIdFromUrl && !projectIdFromUrl) {
     return true;
   }
 
@@ -235,19 +229,17 @@ const isNewReportCreation = async (
 // NEW: Initialize clean state for new reports
 const initializeCleanReportState = (
   projectId: string | null,
-  projectName: string,
   setProjectId: (id: string | null) => void,
-  setProjectName: (name: string) => void,
   setLocation: (location: string) => void,
   setReportStatus: (status: string) => void
 ) => {
   console.log(
-    `🔧 CLEAN STATE: Initializing new report with project "${projectName}" (ID: ${projectId})`
+    `🔧 CLEAN STATE: Initializing new report (ID: ${projectId})`
   );
 
   // Set project info from URL context
   setProjectId(projectId);
-  setProjectName(projectName);
+  // Note: setProjectName is handled by Effect 2 to avoid race conditions
   setLocation(""); // Reset location for new reports
   // ADD THIS: Reset status to draft for new reports
   setReportStatus("draft");
@@ -300,18 +292,18 @@ const initializeCleanReportState = (
 //   }
 // };
 
-// FIXED: Use existing API endpoint instead of non-existent APIs
+// FIXED: Use projectId to fetch reports
 const loadMostRecentReportForProject = async (
-  projectName: string
+  projectId: string
 ): Promise<any> => {
   try {
     console.log(
-      "🔍 DEBUG: Loading most recent report for project:",
-      projectName
+      "🔍 DEBUG: Loading most recent report for projectId:",
+      projectId
     );
 
-    // 🚀 PERFORMANCE FIX: Use existing project filter instead of downloading all reports
-    const response = await apiGet(`/daily-reports/company?project=${encodeURIComponent(projectName)}&limit=10`);
+    // 🚀 PERFORMANCE FIX: Use projectId filter instead of project name
+    const response = await apiGet(`/daily-reports/company?projectId=${encodeURIComponent(projectId)}&limit=10`);
     if (!response.ok) return null;
 
     const apiResponse = await response.json();
@@ -369,19 +361,19 @@ const loadMostRecentReportForProject = async (
 
 // NEW: Load most recent report for specific project AND location
 const loadMostRecentReportForProjectAndLocation = async (
-  projectName: string,
+  projectId: string,
   location: string
 ): Promise<any> => {
   try {
     console.log(
-      "🔍 DEBUG: Loading most recent report for project:",
-      projectName,
+      "🔍 DEBUG: Loading most recent report for projectId:",
+      projectId,
       "location:",
       location
     );
 
     // Use the location-specific endpoint to get reports for this location
-    const response = await apiGet(`/daily-reports/by-location?location=${encodeURIComponent(location)}&projectName=${encodeURIComponent(projectName)}`);
+    const response = await apiGet(`/daily-reports/by-location?location=${encodeURIComponent(location)}&projectId=${encodeURIComponent(projectId)}`);
     if (!response.ok) return null;
 
     const apiResponse = await response.json();
@@ -404,9 +396,9 @@ const loadMostRecentReportForProjectAndLocation = async (
       }))
     );
 
-    // Filter by project name as well (since location endpoint returns all reports for that location)
+    // Filter by projectId as well (since location endpoint returns all reports for that location)
     const projectLocationReports = locationReports.filter(
-      (report) => report.projectName === projectName
+      (report) => report.projectId === projectId
     );
 
     const sortedReports = projectLocationReports.sort((a, b) => {
@@ -448,7 +440,6 @@ const DailyReport = () => {
   const { profile } = useProfileContext();
   const [searchParams] = useSearchParams();
   const reportIdFromUrl = searchParams.get("reportId");
-  const projectFromUrl = searchParams.get("project");
   const projectIdFromUrl = searchParams.get("projectId");
 
   // Project Info
@@ -472,6 +463,30 @@ const DailyReport = () => {
       setCreatedBy(profile.email.split('@')[0]);
     }
   }, [profile]);
+
+  // Fetch project name when projectId changes
+  useEffect(() => {
+  const fetchProjectName = async () => {
+    if (!projectIdFromUrl) return;
+
+    setProjectId(projectIdFromUrl);
+
+    // Get name from most recent report (user-edited value)
+    const recentReport = await loadMostRecentReportForProject(projectIdFromUrl);
+
+    if (recentReport?.projectName) {
+      setProjectName(recentReport.projectName);
+    } else {
+      // Fallback to projects collection name (first-ever report for this project)
+      const response = await getProjectById(projectIdFromUrl);
+      if (response.success && response.data && !Array.isArray(response.data)) {
+        setProjectName(response.data.name);
+      }
+    }
+  };
+
+  fetchProjectName();
+}, [projectIdFromUrl]);
 
   // Activities
   const [activityToday, setActivityToday] = useState("");
@@ -952,20 +967,19 @@ const DailyReport = () => {
         if (dbReport) {
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
-            projectFromUrl,
-            dbReport,
-            projectIdFromUrl
+            projectIdFromUrl,
+            dbReport
           );
 
           if (isNewReport) {
             // SMART: Check if we should load project's most recent report
-            if (!reportIdFromUrl && projectFromUrl) {
+            if (!reportIdFromUrl && projectIdFromUrl) {
               console.log(
-                "🔧 SMART LOAD: Creating new report for project:",
-                projectFromUrl
+                "🔧 SMART LOAD: Creating new report for projectId:",
+                projectIdFromUrl
               );
               const projectRecentReport = await loadMostRecentReportForProject(
-                projectFromUrl
+                projectIdFromUrl
               );
 
               if (projectRecentReport) {
@@ -974,7 +988,7 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: Found project report, using as template"
                 );
                 setReportId(""); // Keep as new report
-                setProjectName(projectFromUrl);
+                // Note: setProjectName handled by Effect 2
                 setReportDate(new Date());
                 setReportStatus("draft");
                 setLocation(projectRecentReport.location || ""); // Set location from report or URL
@@ -1104,9 +1118,7 @@ const DailyReport = () => {
                 );
                 const cleanState = initializeCleanReportState(
                   projectIdFromUrl,
-                  projectFromUrl || "",
                   setProjectId,
-                  setProjectName,
                   setLocation,
                   setReportStatus
                 );
@@ -1139,9 +1151,7 @@ const DailyReport = () => {
               );
               const cleanState = initializeCleanReportState(
                 projectIdFromUrl,
-                projectFromUrl || "",
                 setProjectId,
-                setProjectName,
                 setLocation,
                 setReportStatus
               );
@@ -1187,7 +1197,7 @@ const DailyReport = () => {
             setProjectId(dbReport.projectId || null);
             // For existing reports, always use the saved project name from the database
             // This ensures edited project names are preserved when reopening the report
-            setProjectName(dbReport.projectName || projectFromUrl || "");
+            setProjectName(dbReport.projectName || projectName || "");
             setLocation(dbReport.location || ""); // Load location from DB
             // Load createdBy from the report, fallback to current user for new reports
             setCreatedBy(dbReport.createdBy || 
@@ -1294,19 +1304,18 @@ const DailyReport = () => {
 
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
-            projectFromUrl,
-            null,
-            projectIdFromUrl
+            projectIdFromUrl,
+            null
           );
           console.log("🔍 DEBUG: isNewReport result:", isNewReport);
 
           if (isNewReport) {
             // SMART: Check if we should load project's most recent report
-            if (!reportIdFromUrl && projectFromUrl) {
+            if (!reportIdFromUrl && projectIdFromUrl) {
               // Always try smart loading for new reports with project context
               console.log(
-                "🔧 SMART LOAD: Creating new report for project:",
-                projectFromUrl
+                "🔧 SMART LOAD: Creating new report for projectId:",
+                projectIdFromUrl
               );
               
               // Get current location from URL or state
@@ -1322,7 +1331,7 @@ const DailyReport = () => {
                   currentLocation
                 );
                 projectRecentReport = await loadMostRecentReportForProjectAndLocation(
-                  projectFromUrl,
+                  projectIdFromUrl,
                   currentLocation
                 );
                 
@@ -1332,7 +1341,7 @@ const DailyReport = () => {
                     "🔧 SMART LOAD: No location-specific report found, trying any location"
                   );
                   projectRecentReport = await loadMostRecentReportForProject(
-                    projectFromUrl
+                    projectIdFromUrl
                   );
                 }
               } else {
@@ -1341,7 +1350,7 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: Loading for any location"
                 );
                 projectRecentReport = await loadMostRecentReportForProject(
-                  projectFromUrl
+                  projectIdFromUrl
                 );
               }
 
@@ -1367,7 +1376,7 @@ const DailyReport = () => {
                 }
                 
                 setReportId(""); // Keep as new report
-                setProjectName(projectFromUrl);
+                // Note: setProjectName handled by Effect 2
                 setReportDate(new Date());
                 setReportStatus("draft");
                 setLocation(projectRecentReport.location || currentLocation); // Set location from report or URL
@@ -1490,9 +1499,7 @@ const DailyReport = () => {
                 );
                 const cleanState = initializeCleanReportState(
                   projectIdFromUrl,
-                  projectFromUrl || "",
                   setProjectId,
-                  setProjectName,
                   setLocation,
                   setReportStatus
                 );
@@ -1525,9 +1532,7 @@ const DailyReport = () => {
               );
               const cleanState = initializeCleanReportState(
                 projectIdFromUrl,
-                projectFromUrl || "",
                 setProjectId,
-                setProjectName,
                 setLocation,
                 setReportStatus
               );
@@ -1567,9 +1572,8 @@ const DailyReport = () => {
         if (localDraft) {
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
-            projectFromUrl,
-            null,
-            projectIdFromUrl
+            projectIdFromUrl,
+            null
           );
 
           if (isNewReport) {
@@ -1579,9 +1583,7 @@ const DailyReport = () => {
             );
             const cleanState = initializeCleanReportState(
               projectIdFromUrl,
-              projectFromUrl || "",
               setProjectId,
-              setProjectName,
               setLocation,
               setReportStatus
             );
@@ -1608,14 +1610,14 @@ const DailyReport = () => {
             setProjectLogo(cleanState.projectLogo);
           } else {
             // SMART: Check if we should load project's most recent report
-            if (!reportIdFromUrl && projectFromUrl) {
+            if (!reportIdFromUrl && projectName) {
               // Always try smart loading for new reports with project context
               console.log(
                 "🔧 SMART LOAD: Creating new report for project:",
-                projectFromUrl
+                projectName
               );
               const projectRecentReport = await loadMostRecentReportForProject(
-                projectFromUrl
+                projectName
               );
 
               if (projectRecentReport) {
@@ -1624,7 +1626,7 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: Found project report, using as template"
                 );
                 setReportId(""); // Keep as new report
-                setProjectName(projectFromUrl);
+                // Note: setProjectName handled by Effect 2
                 setLocation(""); // Reset location for new reports
                 setReportDate(new Date());
 
@@ -1694,9 +1696,7 @@ const DailyReport = () => {
                 );
                 const cleanState = initializeCleanReportState(
                   projectIdFromUrl,
-                  projectFromUrl || "",
                   setProjectId,
-                  setProjectName,
                   setLocation,
                   setReportStatus
                 );
@@ -1738,7 +1738,7 @@ const DailyReport = () => {
               setReportId("");
               validateAndSetProjectContext(
                 localDraft.projectName || "",
-                projectFromUrl,
+                projectName,
                 setProjectName
               );
               setLocation(localDraft.location || ""); // Load location from localStorage
@@ -1845,11 +1845,8 @@ const DailyReport = () => {
             }
           }
         } else {
-          // NEW: Set project name from URL context for new reports (error fallback)
-          if (projectFromUrl) {
-            setProjectName(projectFromUrl);
-            setLocation(""); // Reset location for new reports
-          }
+          // Note: setProjectName handled by Effect 2
+          setLocation(""); // Reset location for new reports
         }
       }
     };
@@ -3582,10 +3579,10 @@ const DailyReport = () => {
               </div>
             )}
 
-            {/* Show Projects View when no specific report is selected */}
-            {!reportIdFromUrl && !projectFromUrl ? (
+            {/* Redirect to dashboard when no specific report is selected */}
+            {!reportIdFromUrl && !projectIdFromUrl ? (
               <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-                <DailyReportProjectsView />
+                <Navigate to="/dashboard" replace />
               </div>
             ) : (
               <>
@@ -3597,11 +3594,9 @@ const DailyReport = () => {
                       <Button
                         variant="ghost"
                         onClick={() => {
-                          if (projectFromUrl) {
+                          if (projectId) {
                             navigate(
-                              `/dashboard?project=${encodeURIComponent(
-                                projectFromUrl
-                              )}`
+                              `/dashboard?projectId=${encodeURIComponent(projectId)}`
                             );
                           } else {
                             navigate("/dashboard");

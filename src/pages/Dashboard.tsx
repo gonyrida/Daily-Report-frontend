@@ -70,7 +70,6 @@ const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const projectFilter = searchParams.get('project');
   const projectId = searchParams.get('projectId');
   const folderId = searchParams.get('folder');
   const folderName = searchParams.get('folderName');
@@ -83,7 +82,7 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
-  const [currentProjectName, setCurrentProjectName] = useState<string>(projectFilter || "");
+  const [currentProjectName, setCurrentProjectName] = useState<string>("");
 
   // Fetch current project name when projectId changes (to handle renamed projects)
   useEffect(() => {
@@ -93,16 +92,15 @@ const Dashboard = () => {
         if (response.success && response.data && !Array.isArray(response.data)) {
           setCurrentProjectName(response.data.name);
         } else {
-          // Fallback to URL parameter if fetch fails
-          setCurrentProjectName(projectFilter || "");
+          setCurrentProjectName("");
         }
       } else {
-        setCurrentProjectName(projectFilter || "");
+        setCurrentProjectName("");
       }
     };
 
     fetchProjectName();
-  }, [projectId, projectFilter]);
+  }, [projectId]);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -131,22 +129,22 @@ const Dashboard = () => {
     let filtered = reports;
 
     // Filter by project - use projectId if report has it, otherwise fallback to projectName
-    if (projectId && projectFilter) {
+    if (projectId && currentProjectName) {
       // Check if any reports have projectId set
       const reportsWithProjectId = filtered.filter(report => report.projectId);
       
       if (reportsWithProjectId.length > 0) {
         // If reports have projectId, use it for reliable filtering
         filtered = filtered.filter(report => 
-          report.projectId === projectId || report.projectName === projectFilter
+          report.projectId === projectId || report.projectName === currentProjectName
         );
       } else {
         // Fallback to projectName if no reports have projectId yet
-        filtered = filtered.filter(report => report.projectName === projectFilter);
+        filtered = filtered.filter(report => report.projectName === currentProjectName);
       }
-    } else if (projectFilter) {
+    } else if (currentProjectName) {
       // Fallback to projectName for backward compatibility
-      filtered = filtered.filter(report => report.projectName === projectFilter);
+      filtered = filtered.filter(report => report.projectName === currentProjectName);
     }
 
     // Filter by folder if specified
@@ -170,39 +168,39 @@ const Dashboard = () => {
     }
 
     setFilteredReports(filtered);
-  }, [reports, searchQuery, filterStatus, projectFilter, projectId]);
+  }, [reports, searchQuery, filterStatus, projectId]);
 
   useEffect(() => {
-    // Always fetch company reports when there's a project filter
-    if (projectFilter) {
+    // Always fetch company reports when there's a projectId
+    if (projectId) {
       fetchCompanyReports();
     } else if (activeTab === 'company') {
-      // Also fetch when switching to company tab without project filter
+      // Also fetch when switching to company tab without projectId
       fetchCompanyReports();
     }
-  }, [activeTab, projectFilter, projectId]);
+  }, [activeTab, projectId]);
 
   // Filter company reports based on search query, status, and folder
   useEffect(() => {
     let filtered = companyReports;
 
     // Filter by project - use projectId if report has it, otherwise fallback to projectName
-    if (projectId && projectFilter) {
+    if (projectId && currentProjectName) {
       // Check if any reports have projectId set
       const reportsWithProjectId = filtered.filter(report => report.projectId);
       
       if (reportsWithProjectId.length > 0) {
         // If reports have projectId, use it for reliable filtering
         filtered = filtered.filter(report => 
-          report.projectId === projectId || report.projectName === projectFilter
+          report.projectId === projectId || report.projectName === currentProjectName
         );
       } else {
         // Fallback to projectName if no reports have projectId yet
-        filtered = filtered.filter(report => report.projectName === projectFilter);
+        filtered = filtered.filter(report => report.projectName === currentProjectName);
       }
-    } else if (projectFilter) {
+    } else if (currentProjectName) {
       // Fallback to projectName for backward compatibility
-      filtered = filtered.filter(report => report.projectName === projectFilter);
+      filtered = filtered.filter(report => report.projectName === currentProjectName);
     }
 
     // Filter by folder if specified
@@ -227,7 +225,7 @@ const Dashboard = () => {
     }
 
     setFilteredCompanyReports(filtered);
-  }, [companyReports, searchQuery, filterStatus, projectFilter, projectId, folderId]);
+  }, [companyReports, searchQuery, filterStatus, currentProjectName, projectId, folderId]);
 
   // Helper function to get current user ID from user context
   // No localStorage needed - user info comes from authentication context
@@ -257,7 +255,7 @@ const Dashboard = () => {
     try {
       setIsLoadingCompany(true);
       // ADD PROJECT FILTER - Pass both project name (for display) and projectId (for reliable lookup)
-      const response = await getCompanyReports(page, 20, search, projectFilter, projectId || undefined);
+      const response = await getCompanyReports(page, 20, search, currentProjectName, projectId || undefined);
       setCompanyReports(response.reports);
     } catch (error) {
       console.error("Failed to fetch company reports:", error);
@@ -273,14 +271,9 @@ const Dashboard = () => {
 
   const handleCreateReport = async () => {
     try {
-      if (currentProjectName || projectFilter) {
-        // Use currentProjectName (fetched from API) if available, fallback to projectFilter
-        const projectNameToUse = currentProjectName || projectFilter;
-        // Navigate to daily report with project and folder context
-        let url = `/daily-report?project=${encodeURIComponent(projectNameToUse || '')}`;
-        if (projectId) {
-          url += `&projectId=${encodeURIComponent(projectId)}`;
-        }
+      if (projectId) {
+        // Navigate to daily report with projectId only
+        let url = `/daily-report?projectId=${encodeURIComponent(projectId)}`;
         if (folderId) {
           url += `&folder=${encodeURIComponent(folderId)}&folderName=${encodeURIComponent(folderName || '')}`;
         }
@@ -299,10 +292,9 @@ const Dashboard = () => {
   };
 
   const handleOpenReport = (reportId: string) => {
-    const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
     const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
     const folderParam = folderId ? `&folder=${encodeURIComponent(folderId)}&folderName=${encodeURIComponent(folderName || '')}` : '';
-    navigate(`/daily-report?reportId=${reportId}${projectParam}${projectIdParam}${folderParam}`);
+    navigate(`/daily-report?reportId=${reportId}${projectIdParam}${folderParam}`);
   };
 
   const handleDeleteReport = async (reportId: string, event: React.MouseEvent) => {
@@ -351,8 +343,8 @@ const Dashboard = () => {
     return reportsToCheck.filter(report => {
       // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
       const matchesProject = hasReportsWithProjectId && projectId
-        ? report.projectId === projectId || report.projectName === projectFilter
-        : !projectFilter || report.projectName === projectFilter;
+        ? report.projectId === projectId || report.projectName === currentProjectName
+        : !currentProjectName || report.projectName === currentProjectName;
       return matchesProject &&
             new Date(report.reportDate) >= oneWeekAgo &&
             report.status === "submitted";
@@ -370,8 +362,8 @@ const Dashboard = () => {
     const todayReport = reportsToCheck.find(report => {
       // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
       const matchesProject = hasReportsWithProjectId && projectId
-        ? report.projectId === projectId || report.projectName === projectFilter
-        : !projectFilter || report.projectName === projectFilter;
+        ? report.projectId === projectId || report.projectName === currentProjectName
+        : !currentProjectName || report.projectName === currentProjectName;
       return matchesProject && new Date(report.reportDate).toDateString() === today;
     });
       
@@ -388,8 +380,8 @@ const Dashboard = () => {
     const submittedReports = reportsToCheck.filter(report => {
       // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
       const matchesProject = hasReportsWithProjectId && projectId
-        ? report.projectId === projectId || report.projectName === projectFilter
-        : !projectFilter || report.projectName === projectFilter;
+        ? report.projectId === projectId || report.projectName === currentProjectName
+        : !currentProjectName || report.projectName === currentProjectName;
       return matchesProject && report.status === "submitted";
     });
     
@@ -480,17 +472,17 @@ const Dashboard = () => {
             {/* Welcome Section */}
             <div className="space-y-2">
               <h2 className="text-2xl font-bold tracking-tight">
-                {currentProjectName || projectFilter 
+                {currentProjectName || currentProjectName 
                   ? folderName
-                    ? <span className="flex items-center gap-2">📁 {folderName} / {currentProjectName || projectFilter}</span>
-                    : `${currentProjectName || projectFilter} Reports`
+                    ? <span className="flex items-center gap-2">📁 {folderName} / {currentProjectName || currentProjectName}</span>
+                    : `${currentProjectName || currentProjectName} Reports`
                   : 'Welcome back!'}
               </h2>
               <p className="text-muted-foreground">
-                {(currentProjectName || projectFilter)
+                {(currentProjectName || currentProjectName)
                   ? folderName
-                    ? `Reports for "${currentProjectName || projectFilter}" project in "${folderName}" folder.`
-                    : `Here's an overview of reports for ${currentProjectName || projectFilter}.`
+                    ? `Reports for "${currentProjectName || currentProjectName}" project in "${folderName}" folder.`
+                    : `Here's an overview of reports for ${currentProjectName || currentProjectName}.`
                   : folderName
                     ? `Reports in "${folderName}" folder.`
                     : 'Here\'s an overview of your daily reports.'
@@ -509,7 +501,7 @@ const Dashboard = () => {
             )}
 
             {/* Breadcrumb Navigation */}
-            {projectFilter && (
+            {currentProjectName && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                 <button 
                   onClick={() => navigate('/dashboard')}
@@ -530,7 +522,7 @@ const Dashboard = () => {
                   </>
                 )}
                 <span>/</span>
-                <span className="text-foreground">{currentProjectName || projectFilter}</span>
+                <span className="text-foreground">{currentProjectName || currentProjectName}</span>
               </div>
             )}
 
@@ -680,7 +672,7 @@ const Dashboard = () => {
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{projectFilter || report.projectName}</h4>
+                            <h4 className="font-medium">{currentProjectName || report.projectName}</h4>
                             {report.folderName && !folderId && (
                               <Badge variant="outline" className="text-xs flex items-center gap-1">
                                 <span>📁</span>
@@ -807,14 +799,14 @@ const Dashboard = () => {
                   <div className="flex flex-col items-center justify-center py-12">
                     <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">
-                      {projectFilter 
-                        ? `No Reports for ${projectFilter}` 
+                      {currentProjectName 
+                        ? `No Reports for ${currentProjectName}` 
                         : 'No Reports Found'
                       }
                     </h3>
                     <p className="text-muted-foreground text-center mb-4">
-                      {projectFilter 
-                        ? `No reports found for ${projectFilter}. Create your first report for this project.`
+                      {currentProjectName 
+                        ? `No reports found for ${currentProjectName}. Create your first report for this project.`
                         : 'Create your first report to get started.'
                       }
                     </p>

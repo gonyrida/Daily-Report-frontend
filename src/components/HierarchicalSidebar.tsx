@@ -644,10 +644,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
   const handleProjectClick = (projectName: string, projectId: string, reportType: 'daily' | 'weekly') => {
     if (reportType === 'daily') {
-      navigate(`/dashboard?project=${encodeURIComponent(projectName)}&projectId=${encodeURIComponent(projectId)}`);
+      navigate(`/dashboard?projectId=${encodeURIComponent(projectId)}`);
     } else {
-      // For weekly report, navigate to weekly reports dashboard with project parameter
-      navigate(`/weekly-reports?project=${encodeURIComponent(projectName)}&projectId=${encodeURIComponent(projectId)}`);
+      // For weekly report, navigate to weekly reports dashboard with projectId only
+      navigate(`/weekly-reports?projectId=${encodeURIComponent(projectId)}`);
     }
   };
 
