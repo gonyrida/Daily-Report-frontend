@@ -45,6 +45,7 @@ import {
   Copy,
   Settings,
   FolderInput,
+  FolderPlus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
@@ -832,7 +833,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                           {showAddFolderInput && (
                             <SidebarMenuSubItem>
                               <div className="flex items-center gap-1 pl-2 py-1">
-                                <span className="text-xs">📁</span>
+                                <FolderPlus className="h-3 w-3" />
                                 <Input
                                   placeholder="Folder name..."
                                   value={newFolderName}
@@ -879,7 +880,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                 <div className="flex items-center justify-between w-full px-2 py-1 group">
                                   {editingFolder === folder._id ? (
                                     <div className="flex items-center gap-1 flex-1">
-                                      <span className="text-xs">📁</span>
+                                      <FolderPlus className="h-3 w-3" />
                                       <Input
                                         value={editFolderName}
                                         onChange={(e) => setEditFolderName(e.target.value)}
@@ -925,7 +926,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                             <ChevronRight className="h-3 w-3" />
                                           )}
                                         </Button>
-                                        <span className="text-xs">📁</span>
+                                        <FolderPlus className="h-3 w-3" />
                                         <span className="text-xs font-medium">{folder.name}</span>
                                       </div>
                                       {folder.createdBy === currentUserId && (
@@ -1321,7 +1322,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                       <ChevronRight className="h-3 w-3" />
                                     )}
                                   </div>
-                                  <span className="text-xs">?</span>
+                                  <FolderPlus className="h-3 w-3" />
                                   <span className="text-xs font-medium text-muted-foreground">{folder.name}</span>
                                 </div>
                               </SidebarMenuSubItem>
@@ -1496,10 +1497,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
               onChange={(e) => setSelectedTargetFolder(e.target.value)}
               className="w-full p-2 border rounded-md text-sm"
             >
-              <option value="">📁 (No Folder - Root)</option>
+              <option value="">(No Folder - Root)</option>
               {folders.map((folder) => (
                 <option key={folder._id} value={folder._id}>
-                  📁 {folder.name}
+                  {folder.name}
                 </option>
               ))}
             </select>
