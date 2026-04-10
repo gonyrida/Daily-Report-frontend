@@ -33,6 +33,7 @@ import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getWeeklyReports, getCompanyWeeklyReports, deleteWeeklyReport } from "@/services/weeklyReportService";
+import { getProjectById } from "@/integrations/projectsApi";
 import type { WeeklyReport } from "@/types/weeklyReport.types";
 import {
   AlertDialog,
@@ -187,9 +188,9 @@ const WeeklyReportDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const projectFilter = searchParams.get('project');
   const projectId = searchParams.get('projectId');
-  const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
+  
+    const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
   const [filteredReports, setFilteredReports] = useState<WeeklyReport[]>([]);
   const [companyReports, setCompanyReports] = useState<WeeklyReport[]>([]);
   const [filteredCompanyReports, setFilteredCompanyReports] = useState<WeeklyReport[]>([]);
@@ -200,6 +201,7 @@ const WeeklyReportDashboard = () => {
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
+  const [projectDisplayName, setProjectDisplayName] = useState<string>("");
 
   // Load weekly reports from API (personal reports - all statuses)
   useEffect(() => {
@@ -208,13 +210,13 @@ const WeeklyReportDashboard = () => {
         setIsLoading(true);
         
         const params: any = {};
-        if (projectFilter) {
-          params.projectName = projectFilter;
+        if (projectId) {
+          params.projectId = projectId;
         }
         
         const response = await getWeeklyReports(params);
         
-        if (response.success && response.data) {
+                if (response.success && response.data) {
           setWeeklyReports(response.data);
         } else {
           console.error("Failed to load weekly reports:", response.error);
@@ -237,14 +239,19 @@ const WeeklyReportDashboard = () => {
     };
 
     loadWeeklyReports();
-  }, [projectFilter, toast]);
+  }, [projectId, toast]);
 
   // Fetch company reports when switching to company tab or when project filter changes
   useEffect(() => {
     const fetchCompanyReports = async () => {
       try {
         setIsLoadingCompany(true);
-        const response = await getCompanyWeeklyReports(1, 20, searchTerm, projectFilter || undefined);
+        const response = await getCompanyWeeklyReports(
+          1,                    // page parameter
+          20,                   // limit parameter  
+          searchTerm,            // search parameter
+          projectId || undefined // projectFilter parameter (using projectId)
+        );
         
         if (response.success && response.data) {
           setCompanyReports(response.data);
@@ -268,41 +275,54 @@ const WeeklyReportDashboard = () => {
       }
     };
 
-    // Always fetch company reports when there's a project filter
-    if (projectFilter) {
+    // Always fetch company reports when there's a projectId
+    if (projectId) {
       fetchCompanyReports();
     } else if (activeTab === 'company') {
       // Also fetch when switching to company tab without project filter
       fetchCompanyReports();
     }
-  }, [activeTab, projectFilter, toast]);
+  }, [activeTab, projectId, toast]);
+
+  // Fetch project display name using projectId
+  useEffect(() => {
+    const fetchProjectName = async () => {
+      if (projectId) {
+        try {
+          const response = await getProjectById(projectId);
+          if (response.success && response.data && !Array.isArray(response.data)) {
+            setProjectDisplayName(response.data.name);
+          }
+        } catch (error) {
+          console.error('Failed to fetch project name:', error);
+        }
+      } else {
+        setProjectDisplayName("");
+      }
+    };
+    
+    fetchProjectName();
+  }, [projectId]);
 
   // Filter personal reports based on search term and status
   useEffect(() => {
     let filtered = weeklyReports;
     const currentUserId = getCurrentUserId();
 
-    // Hide draft reports from non-owners
-    filtered = filtered.filter(report => {
-      // If it's a draft, only show to the owner
-      if (report.status === 'draft') {
-        // Handle different userId formats
-        let isOwner = false;
-        if (!report.userId) {
-          // No userId - show to current user as fallback
-          isOwner = true;
-        } else if (typeof report.userId === 'string') {
-          // If userId is a string, compare directly
-          isOwner = report.userId === currentUserId;
-        } else {
-          // If userId is an object, check _id or id
-          isOwner = report.userId._id === currentUserId || report.userId.id === currentUserId;
-        }
-        return isOwner;
-      }
-      // Show submitted/approved reports to everyone
-      return true;
-    });
+    
+    
+    // Filter by projectId if specified
+    if (projectId) {
+      filtered = filtered.filter(report => {
+        // Handle both string and ObjectId formats
+        const reportProjectId = report.projectId;
+        return reportProjectId === projectId || 
+               (reportProjectId && reportProjectId.toString() === projectId);
+      });
+    }
+
+    // Show all reports for the project (both draft and submitted)
+    // Remove userId-based filtering to show all project reports regardless of owner
 
     // Filter by status (case-insensitive) - only apply to user's own reports
     if (filterStatus !== "all") {
@@ -337,34 +357,26 @@ const WeeklyReportDashboard = () => {
     }
 
     setFilteredReports(filtered);
-  }, [weeklyReports, searchTerm, filterStatus]);
+  }, [weeklyReports, searchTerm, filterStatus, projectId]);
 
   // Filter company reports based on search term
   useEffect(() => {
     let filtered = companyReports;
     const currentUserId = getCurrentUserId();
 
-    // Hide draft reports from non-owners in company view
+    // Filter by projectId if specified
+    if (projectId) {
+      filtered = filtered.filter(report => {
+        // Handle both string and ObjectId formats
+        const reportProjectId = report.projectId;
+        return reportProjectId === projectId || 
+               (reportProjectId && reportProjectId.toString() === projectId);
+      });
+    }
+
+    // Company reports: Only show submitted reports (no draft reports)
     filtered = filtered.filter(report => {
-      // If it's a draft, only show to the owner
-      if (report.status === 'draft') {
-        // Handle different userId formats
-        let isOwner = false;
-        if (!report.userId) {
-          console.log('🔧 TEMP FIX: Company Report has no userId, showing to current user');
-          isOwner = true;
-        } else if (typeof report.userId === 'string') {
-          // If userId is a string, compare directly
-          isOwner = report.userId === currentUserId;
-        } else {
-          // If userId is an object, check _id or id
-          isOwner = report.userId._id === currentUserId || report.userId.id === currentUserId;
-        }
-        
-        return isOwner;
-      }
-      // Show submitted/approved reports to everyone
-      return true;
+      return report.status === 'submitted' || report.status === 'approved';
     });
 
     // Filter by search term
@@ -386,7 +398,7 @@ const WeeklyReportDashboard = () => {
     }
 
     setFilteredCompanyReports(filtered);
-  }, [companyReports, searchTerm]);
+  }, [companyReports, searchTerm, projectId]);
 
   const handleCreateWeeklyReport = async () => {
     try {
@@ -404,14 +416,13 @@ const WeeklyReportDashboard = () => {
         )[0];
         
         // Navigate to weekly report with the most recent submitted report ID for data fetching
-        const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
         const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
-        navigate(`/weekly-report?reportId=${mostRecentSubmitted._id || mostRecentSubmitted.id}${projectParam}${projectIdParam}&createNew=true`);
+        navigate(`/weekly-report?reportId=${mostRecentSubmitted._id || mostRecentSubmitted.id}${projectIdParam}&createNew=true`);
       } else {
         // No submitted reports, create new from scratch
-        if (projectFilter) {
+        if (projectId) {
           const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
-          navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}${projectIdParam}`);
+          navigate(`/weekly-report?${projectIdParam}`);
         } else {
           navigate('/weekly-report');
         }
@@ -419,9 +430,9 @@ const WeeklyReportDashboard = () => {
     } catch (error) {
       console.error("Error handling create weekly report:", error);
       // Fallback to basic navigation
-      if (projectFilter) {
+      if (projectId) {
         const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
-        navigate(`/weekly-report?project=${encodeURIComponent(projectFilter)}${projectIdParam}`);
+        navigate(`/weekly-report?${projectIdParam}`);
       } else {
         navigate('/weekly-report');
       }
@@ -429,7 +440,6 @@ const WeeklyReportDashboard = () => {
   };
 
   const handleOpenReport = (reportId: string) => {
-    const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
     const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
     
     // Check if this is a company report and determine ownership
@@ -441,7 +451,7 @@ const WeeklyReportDashboard = () => {
     const isOwner = activeTab === 'personal' || (report?.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId));
     const readOnlyParam = !isOwner ? '&readOnly=true' : '';
     
-    navigate(`/weekly-report?reportId=${reportId}${projectParam}${projectIdParam}${readOnlyParam}`);
+    navigate(`/weekly-report?reportId=${reportId}${projectIdParam}${readOnlyParam}`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -481,8 +491,8 @@ const WeeklyReportDashboard = () => {
       
       // Refresh reports
       const params: any = {};
-      if (projectFilter) {
-        params.projectName = projectFilter;
+      if (projectId) {
+        params.projectId = projectId;
       }
       const response = await getWeeklyReports(params);
       if (response.success && response.data) {
@@ -491,7 +501,7 @@ const WeeklyReportDashboard = () => {
       
       // Refresh company reports if on company tab
       if (activeTab === 'company') {
-        const companyResponse = await getCompanyWeeklyReports(1, 20, searchTerm, projectFilter || undefined);
+        const companyResponse = await getCompanyWeeklyReports(1, 20, searchTerm, projectId || undefined);
         if (companyResponse.success && companyResponse.data) {
           setCompanyReports(companyResponse.data);
         }
@@ -546,18 +556,18 @@ const WeeklyReportDashboard = () => {
             {/* Welcome Section */}
             <div className="space-y-2">
               <h2 className="text-2xl font-bold tracking-tight">
-                {projectFilter ? `${projectFilter} Weekly Reports` : 'Weekly Reports'}
+                {projectDisplayName ? `${projectDisplayName} Weekly Reports` : 'Weekly Reports'}
               </h2>
               <p className="text-muted-foreground">
-                {projectFilter 
-                  ? `Here's an overview of weekly reports for ${projectFilter}.`
+                {projectDisplayName 
+                  ? `Here's an overview of weekly reports for ${projectDisplayName}.`
                   : 'Here\'s an overview of your weekly reports.'
                 }
               </p>
             </div>
 
             {/* Breadcrumb Navigation */}
-            {projectFilter && (
+            {projectDisplayName && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                 <button 
                   onClick={() => navigate('/weekly-reports')}
@@ -566,7 +576,7 @@ const WeeklyReportDashboard = () => {
                   Weekly Reports
                 </button>
                 <span>/</span>
-                <span className="text-foreground">{projectFilter}</span>
+                <span className="text-foreground">{projectDisplayName}</span>
               </div>
             )}
 
@@ -740,7 +750,7 @@ const WeeklyReportDashboard = () => {
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <h4 className="font-medium">{projectFilter}</h4>
+                              <h4 className="font-medium">{projectDisplayName}</h4>
                               {getStatusBadge(report.status)}
                               {/* User Info - Only show in Company tab */}
                               {activeTab === 'company' && (
@@ -856,18 +866,18 @@ const WeeklyReportDashboard = () => {
                   <div className="flex flex-col items-center justify-center py-12">
                     <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">
-                      {projectFilter 
-                        ? `No Reports for ${projectFilter}` 
+                      {projectDisplayName 
+                        ? `No Reports for ${projectDisplayName}` 
                         : 'No Reports Found'
                       }
                     </h3>
                     <p className="text-muted-foreground text-center mb-4">
                       {activeTab === 'personal'
-                        ? (projectFilter 
-                            ? `No weekly reports found for ${projectFilter}. Create your first report for this project.`
+                        ? (projectDisplayName 
+                            ? `No weekly reports found for ${projectDisplayName}. Create your first report for this project.`
                             : 'Create your first weekly report to get started.')
-                        : (projectFilter
-                            ? `No submitted company reports found for ${projectFilter}.`
+                        : (projectDisplayName
+                            ? `No submitted company reports found for ${projectDisplayName}.`
                             : 'No submitted weekly reports from your company yet.')
                       }
                     </p>

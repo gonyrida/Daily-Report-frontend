@@ -137,7 +137,7 @@ export const getCompanyWeeklyReports = async (
       page: page.toString(),
       limit: limit.toString(),
       ...(search && { search }),
-      ...(projectFilter && { project: projectFilter }),
+      ...(projectFilter && { projectId: projectFilter }), // Send as projectId instead of project
     });
 
     const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/company?${queryParams}`);
