@@ -385,9 +385,9 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   }, []);
 
   // Helper functions
-  const isActive = (path: string) => {
+  const isActive = useCallback((path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "?");
-  };
+  }, [location.pathname]);
 
   const isProjectActive = (projectId: string, reportType: 'daily' | 'weekly') => {
     const searchParams = new URLSearchParams(location.search);
@@ -418,14 +418,17 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
       
       if (containingFolder) {
         // Expand the appropriate folder based on current page
-        if (isActive('/dashboard')) {
+        const isDashboard = location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard?');
+        const isWeeklyReports = location.pathname === '/weekly-reports' || location.pathname.startsWith('/weekly-reports?');
+        
+        if (isDashboard) {
           setExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
-        } else if (isActive('/weekly-reports')) {
+        } else if (isWeeklyReports) {
           setWeeklyExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
         }
       }
     }
-  }, [location.search, folders, isActive]);
+  }, [location.search, folders, location.pathname]);
 
   // // Merge database projects with any locally added projects
   // useEffect(() => {
@@ -759,10 +762,8 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                             Daily Report
                           </span>
                           <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary"
+                            <div
+                              className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary rounded flex items-center justify-center cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (!dailyReportOpen) {
@@ -772,7 +773,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                               }}
                             >
                               <Plus className="h-3 w-3" />
-                            </Button>
+                            </div>
                             {dailyReportOpen ? (
                               <ChevronDown className="h-3 w-3" />
                             ) : (
@@ -1313,22 +1314,14 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                   className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-accent/50 rounded"
                                   onClick={() => toggleWeeklyFolderExpand(folder._id)}
                                 >
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleWeeklyFolderExpand(folder._id);
-                                    }}
-                                  >
+                                  <div className="h-5 w-5 flex items-center justify-center">
                                     {weeklyExpandedFolders[folder._id] ? (
                                       <ChevronDown className="h-3 w-3" />
                                     ) : (
                                       <ChevronRight className="h-3 w-3" />
                                     )}
-                                  </Button>
-                                  <span className="text-xs">📁</span>
+                                  </div>
+                                  <span className="text-xs">?</span>
                                   <span className="text-xs font-medium text-muted-foreground">{folder.name}</span>
                                 </div>
                               </SidebarMenuSubItem>

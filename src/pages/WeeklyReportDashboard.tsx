@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   SidebarInset,
@@ -465,7 +465,7 @@ const WeeklyReportDashboard = () => {
     }
   };
 
-  const getCurrentUserId = () => {
+  const getCurrentUserId = useCallback(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
@@ -476,7 +476,7 @@ const WeeklyReportDashboard = () => {
       }
     }
     return null;
-  };
+  }, []);
 
   const handleDeleteReport = async (reportId: string, event: React.MouseEvent) => {
     event.stopPropagation();
