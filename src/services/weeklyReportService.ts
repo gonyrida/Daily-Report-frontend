@@ -30,6 +30,10 @@ import type {
 
 const WEEKLY_REPORTS_BASE_URL = '/weekly-reports';
 
+// Simple in-memory cache for API responses
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Handles API response and transforms errors into user-friendly messages
  */
@@ -160,6 +164,37 @@ export const getCompanyWeeklyReports = async (
 // ============================================================================
 // Core Weekly Report Operations
 // ============================================================================
+
+/**
+ * Get paginated list of weekly reports metadata (lightweight for dashboard)
+ */
+export const getWeeklyReportsMeta = async (params: GetWeeklyReportsParams = {}): Promise<PaginatedResponse<WeeklyReport>> => {
+  const searchParams = new URLSearchParams();
+  
+  // Add query parameters
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, value.toString());
+    }
+  });
+
+  const url = `${WEEKLY_REPORTS_BASE_URL}/meta?${searchParams.toString()}`;
+  const cacheKey = `meta_${url}`;
+  
+  // Check cache first
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  
+  const response = await apiGet(url);
+  const result = await handlePaginatedResponse<WeeklyReport>(response);
+  
+  // Cache the result
+  cache.set(cacheKey, { data: result, timestamp: Date.now() });
+  
+  return result;
+};
 
 /**
  * Get paginated list of weekly reports

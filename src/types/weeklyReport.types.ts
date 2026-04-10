@@ -316,6 +316,7 @@ export interface GetWeeklyReportsParams {
   projectId?: string;
   startDate?: string;
   endDate?: string;
+  searchTerm?: string;
   sortBy?: 'createdAt' | 'updatedAt' | 'weekNumber';
   sortOrder?: 'asc' | 'desc';
 }
