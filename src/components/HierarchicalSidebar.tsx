@@ -384,10 +384,48 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     getUserInfo();
   }, []);
 
+  // Helper functions
+  const isActive = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(path + "?");
+  };
+
+  const isProjectActive = (projectId: string, reportType: 'daily' | 'weekly') => {
+    const searchParams = new URLSearchParams(location.search);
+    const currentProjectId = searchParams.get('projectId');
+    
+    if (reportType === 'daily') {
+      return isActive('/dashboard') && currentProjectId === projectId;
+    } else {
+      return isActive('/weekly-reports') && currentProjectId === projectId;
+    }
+  };
+
   // Load folders with projects on mount
   useEffect(() => {
     loadFoldersWithProjects();
   }, []); // Change from [loadProjects] to []
+
+  // Auto-expand folders containing active projects
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const currentProjectId = searchParams.get('projectId');
+    
+    if (currentProjectId && folders.length > 0) {
+      // Find which folder contains the current project
+      const containingFolder = folders.find(folder => 
+        folder.projects?.some(project => project._id === currentProjectId)
+      );
+      
+      if (containingFolder) {
+        // Expand the appropriate folder based on current page
+        if (isActive('/dashboard')) {
+          setExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+        } else if (isActive('/weekly-reports')) {
+          setWeeklyExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+        }
+      }
+    }
+  }, [location.search, folders, isActive]);
 
   // // Merge database projects with any locally added projects
   // useEffect(() => {
@@ -643,16 +681,25 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   };
 
   const handleProjectClick = (projectName: string, projectId: string, reportType: 'daily' | 'weekly') => {
+    // Find which folder contains this project and keep it expanded
+    const containingFolder = folders.find(folder => 
+      folder.projects?.some(project => project._id === projectId)
+    );
+    
+    if (containingFolder) {
+      if (reportType === 'daily') {
+        setExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+      } else {
+        setWeeklyExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+      }
+    }
+    
     if (reportType === 'daily') {
       navigate(`/dashboard?projectId=${encodeURIComponent(projectId)}`);
     } else {
       // For weekly report, navigate to weekly reports dashboard with projectId only
       navigate(`/weekly-reports?projectId=${encodeURIComponent(projectId)}`);
     }
-  };
-
-  const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + "?");
   };
 
   return (
@@ -1002,8 +1049,12 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                       <div className="flex items-center justify-between w-full pl-8 pr-2 py-1 group">
                                         <SidebarMenuSubButton
                                           onClick={() => handleProjectClick(project.name, project._id, 'daily')}
-                                          isActive={isActive('/daily-report') && new URLSearchParams(location.search).get('project') === project.name}
-                                          className="flex-1 text-xs cursor-pointer"
+                                          isActive={isProjectActive(project._id, 'daily')}
+                                          className={`flex-1 text-xs cursor-pointer ${
+                                            isProjectActive(project._id, 'daily') 
+                                              ? 'bg-blue-100 text-blue-900 font-medium' 
+                                              : ''
+                                          }`}
                                         >
                                           {project.name}
                                         </SidebarMenuSubButton>
@@ -1133,8 +1184,12 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                       <>
                                         <SidebarMenuSubButton
                                           onClick={() => handleProjectClick(project.name, project._id, 'daily')}
-                                          isActive={isActive('/daily-report') && new URLSearchParams(location.search).get('project') === project.name}
-                                          className="flex-1 text-xs cursor-pointer"
+                                          isActive={isProjectActive(project._id, 'daily')}
+                                          className={`flex-1 text-xs cursor-pointer ${
+                                            isProjectActive(project._id, 'daily') 
+                                              ? 'bg-blue-100 text-blue-900 font-medium' 
+                                              : ''
+                                          }`}
                                         >
                                           {project.name}
                                         </SidebarMenuSubButton>
@@ -1283,7 +1338,12 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                 <SidebarMenuSubItem key={`weekly-proj-${project._id}`}>
                                   <SidebarMenuSubButton
                                     onClick={() => handleProjectClick(project.name, project._id, 'weekly')}
-                                    className="text-muted-foreground pl-8"
+                                    isActive={isProjectActive(project._id, 'weekly')}
+                                    className={`text-muted-foreground pl-8 ${
+                                      isProjectActive(project._id, 'weekly') 
+                                        ? 'bg-blue-100 text-blue-900 font-medium' 
+                                        : ''
+                                    }`}
                                   >
                                     <span className="text-xs">{project.name}</span>
                                   </SidebarMenuSubButton>
@@ -1304,7 +1364,12 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                 <SidebarMenuSubItem key={`weekly-root-${project._id}`}>
                                   <SidebarMenuSubButton
                                     onClick={() => handleProjectClick(project.name, project._id, 'weekly')}
-                                    className="text-muted-foreground"
+                                    isActive={isProjectActive(project._id, 'weekly')}
+                                    className={`text-muted-foreground ${
+                                      isProjectActive(project._id, 'weekly') 
+                                        ? 'bg-blue-100 text-blue-900 font-medium' 
+                                        : ''
+                                    }`}
                                   >
                                     <span className="text-xs">{project.name}</span>
                                   </SidebarMenuSubButton>
