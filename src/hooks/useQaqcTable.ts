@@ -36,7 +36,23 @@ export const useQaqcTable = (sections: Section[]) => {
   // Persist to localStorage whenever data changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem("qaqc_table_data", JSON.stringify(tableData));
+      try {
+        const dataString = JSON.stringify(tableData);
+        // Check if data is too large (localStorage typically has 5-10MB limit)
+        if (dataString.length > 4 * 1024 * 1024) { // 4MB limit
+          console.warn('QAQC data too large for localStorage, skipping save');
+          return;
+        }
+        localStorage.setItem("qaqc_table_data", dataString);
+      } catch (error) {
+        if (error instanceof Error && error.name === 'QuotaExceededError') {
+          console.warn('Storage quota exceeded for QAQC data, clearing old data');
+          // Clear the old data to free up space
+          localStorage.removeItem("qaqc_table_data");
+        } else {
+          console.error('Error saving QAQC data:', error);
+        }
+      }
     }
   }, [tableData]);
 

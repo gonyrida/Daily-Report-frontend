@@ -35,6 +35,8 @@ export interface MapperInput {
     attName?: string;
     ccLines?: string[];
     projectManager?: string;
+    recipientCompany?: string;
+    recipientLocation?: string;
     [k: string]: unknown;
   };
 
@@ -267,6 +269,7 @@ export interface MapperInput {
 export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
   const c = input.coverData ?? {};
 
+  
   return {
     // ── Cover ────────────────────────────────────────────────────────────────
     weekNumber:      c.weekNumber,
@@ -284,7 +287,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     refNo:           c.refNo,
     letterDate:      c.letterDate,
     toName:          c.toName,
-    attName:         c.attName,
+    recipientName:   c.attName,
     ccLines:         c.ccLines ?? [],
     projectManager:  c.projectManager,
     constructorName:  c.constructorName,
@@ -293,6 +296,8 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     companyPhone2:   c.companyPhone2,
     companyEmail1:   c.companyEmail1,
     companyEmail2:   c.companyEmail2,
+    recipientCompany: c.recipientCompany,
+    recipientLocation: c.recipientLocation,
 
     // ── Con. Progress ────────────────────────────────────────────────────────
     conProgressProject:  input.conProgressProject ?? c.projectTitle,

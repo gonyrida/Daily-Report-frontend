@@ -2178,6 +2178,7 @@ const WeeklyReport = () => {
       refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
       letterDate: sharedData.reportDate,
       toName: sharedData.recipientName,
+      attName: sharedData.recipientName,
       ccLines: sharedData.ccList,
       projectManager: sharedData.signatoryName,
       signatureImage: sharedData.signatureImage,  // Add signature image
@@ -2187,6 +2188,8 @@ const WeeklyReport = () => {
       companyPhone2: sharedData.companyPhone2,
       companyEmail1: sharedData.companyEmail1,
       companyEmail2: sharedData.companyEmail2,
+      recipientCompany: sharedData.recipientCompany,
+      recipientLocation: sharedData.recipientLocation,
     },
     constructionProgress: constructionProgressHook.constructionData?.items as any,
     conProgressProject: sharedData.projectName,

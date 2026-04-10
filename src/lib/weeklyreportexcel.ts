@@ -277,7 +277,6 @@ async function addImageToWorksheet(workbook: ExcelJS.Workbook, worksheet: ExcelJ
         extension = urlParts[urlParts.length - 1].split('?')[0].toLowerCase();
       }
 
-      console.log(`✅ Fetched image (${extension}) from ${imagePath} at range ${range}`);
     }
 
     // Add image to workbook
@@ -288,7 +287,6 @@ async function addImageToWorksheet(workbook: ExcelJS.Workbook, worksheet: ExcelJ
 
     // Add image to worksheet at specified range
     worksheet.addImage(imageId, range);
-    console.log(`✅ Added image at range ${range}`);
 
   } catch (error) {
     console.warn(`⚠️ Failed to add image from ${imagePath}:`, error);
@@ -836,18 +834,12 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
   // Cover image area (merged cells C-M, rows 18-35)
   ws.mergeCells(18, 3, 35, 13); // Merge columns C-M, rows 18-35
 
-  // Debug: Log cover image data
-  console.log('🔍 Cover image data:', d.coverImage ? 'Present' : 'Missing');
-  if (d.coverImage) {
-    console.log('🔍 Cover image type:', d.coverImage.startsWith('data:') ? 'Base64' : 'URL');
-    console.log('🔍 Cover image preview:', d.coverImage.substring(0, 100) + '...');
-  }
+  
 
   // Add cover image if available
   if (d.coverImage) {
     try {
       await addImageToWorksheet(workbook, ws, d.coverImage, 'C18:M35');
-      console.log('✅ Cover image added successfully');
     } catch (error) {
       console.warn('❌ Failed to add cover image:', error);
       // Fallback: add placeholder text
@@ -1028,19 +1020,45 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   // Skip rows 6-7
   r = 8;
 
-  // Row 8: height follow value wrap, Employee with "/n" location
-  ws.getRow(8).height = undefined; // Auto height for wrap text
+  // Row 8: Set explicit height for multi-line text
+  ws.getRow(8).height = 60; // Explicit height for multi-line text
 
   // To, Att, CC with Employee location using "\n"
   ws.getCell(r, 2).value = 'To';
   ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
   ws.getCell(r, 3).value = ':';
   ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
-  ws.getCell(r, 4).value = `${d.recipientCompany ?? ''}\n${d.recipientLocation ?? ''}`;
-  ws.getCell(r, 4).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true } };
+  
+  // Set cell alignment (font will be set in rich text)
+  ws.getCell(r, 4).style = { 
+    alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true } 
+  };
+  
+  // Create rich text with different styles
+  const richTextParts = [];
+  
+  if (d.recipientCompany) {
+    richTextParts.push({ 
+      text: d.recipientCompany,
+      font: { bold: true, size: 12, name: 'Arial' }
+    });
+  }
+  
+  if (d.recipientLocation) {
+    richTextParts.push({ 
+      text: '\r\n' + d.recipientLocation,
+      font: { bold: false, size: 12, name: 'Arial' }
+    });
+  }
+  
+  const richTextValue = { richText: richTextParts };
+  ws.getCell(r, 4).value = richTextValue;
   ws.mergeCells(r, 4, r, 10);
   r++;
 
+  // Row 9: height = 30 for Att. field
+  ws.getRow(r).height = 30;
+  
   ws.getCell(r, 2).value = 'Att.';
   ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
   ws.getCell(r, 3).value = ':';
@@ -1052,9 +1070,13 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
 
   (d.ccLines ?? []).forEach((cc, i) => {
     if (i === 0) {
+      // Row for CC: height = 30
+      ws.getRow(r).height = 30;
       ws.getCell(r, 2).value = 'CC';
       ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
     }
+    // Row for CC lines: height = 30
+    ws.getRow(r).height = 30;
     ws.getCell(r, 3).value = ':';
     ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
     ws.getCell(r, 4).value = cc;
@@ -1099,7 +1121,6 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
     try {
       // Add signature image to the merged cells
       const imageRange = 'B16:D16';
-      console.log(`🔍 Attempting to add signature image to range: ${imageRange}`);
       
       await addImageToWorksheet(workbook, ws, d.signatureImage, imageRange);
       
@@ -1127,15 +1148,50 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
     };
   }
   
-  // Signature block (bold formatting)
-  const sigText = `${d.projectManager ?? ''} | Project Manager\n${d.contractor ?? ''}\n\n${d.companyLocation ?? ''}\n\n${d.companyPhone1 ?? ''}${d.companyPhone2 ? ' | ' + d.companyPhone2 : ' | M +885 (0)'}\n${d.companyEmail1 ?? ''}\n${d.companyEmail2 ?? ''}`;
-  ws.getCell(r, 2).value = sigText;
+  // Signature block with rich text (only project manager name bold)
+  const sigRichText = [];
+  
+  // Project Manager name (bold)
+  if (d.projectManager) {
+    sigRichText.push({ 
+      text: d.projectManager, 
+      font: { size: 10, name: 'Arial', bold: true } 
+    });
+  }
+  sigRichText.push({ 
+    text: ' | Project Manager', 
+    font: { size: 10, name: 'Arial', bold: true } 
+  });
+  sigRichText.push({ 
+    text: '\n' + (d.contractor ?? ''), 
+    font: { size: 10, name: 'Arial', bold: true } 
+  });
+  sigRichText.push({ 
+    text: '\n\n' + (d.companyLocation ?? ''), 
+    font: { size: 10, name: 'Arial', bold: false } 
+  });
+  sigRichText.push({ 
+    text: '\n\n' + (d.companyPhone1 ?? '') + (d.companyPhone2 ? ' | ' + d.companyPhone2 : ' | M +885 (0)'), 
+    font: { size: 10, name: 'Arial', bold: false } 
+  });
+  sigRichText.push({ 
+    text: '\n' + (d.companyEmail1 ?? ''), 
+    font: { size: 10, name: 'Arial', bold: false } 
+  });
+  if (d.companyEmail2) {
+    sigRichText.push({ 
+      text: '\n' + d.companyEmail2, 
+      font: { size: 10, name: 'Arial', bold: false } 
+    });
+  }
+  
+  ws.getCell(r, 2).value = { richText: sigRichText };
   ws.getCell(r, 2).style = { 
-    font: { size: 10, name: 'Arial', bold: true }, 
+    font: { size: 10, name: 'Arial' }, 
     alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } 
   };
   ws.mergeCells(r, 2, r, 10);
-  ws.getRow(r).height = estimateRowHeight(sigText, mergedWidthChars, 10); // ✅ Manual height
+  ws.getRow(r).height = estimateRowHeight(sigRichText.map(item => item.text).join(''), mergedWidthChars, 10); // ✅ Manual height
 }
 
 // SHEET 4: CONTENT (Table of Contents)
@@ -1386,6 +1442,13 @@ async function buildOP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
       return `${numValue.toFixed(1)}%`;
     };
 
+  
+  // Debug: Log first item properties
+  if (d.overallProgressItems && d.overallProgressItems.length > 0) {
+    console.log('DEBUG OP: First item properties =', Object.keys(d.overallProgressItems[0]));
+    console.log('DEBUG OP: First item pctThisWeek =', d.overallProgressItems[0].pctThisWeek);
+  }
+
     const heights = [
       calculateHeight(item.no),
       calculateHeight(item.scopeOfWorks)
@@ -1399,28 +1462,28 @@ async function buildOP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
     const rowPercentStyle = isRomanId ? romanStyle : percentStyle;
 
     ws.getCell(r, 2).value = padText(displayValue);
-    ws.getCell(r, 2).style = rowNumberStyle;
+    ws.getCell(r, 2).style = { ...rowNumberStyle, alignment: { horizontal: 'center' as const, vertical: 'middle' as const } };
 
     ws.getCell(r, 3).value = padText(item.scopeOfWorks);
     ws.getCell(r, 3).style = rowStyle;
 
-    ws.getCell(r, 4).value = formatPercentageDisplay(item.pctUpToPrevWeek);
-    ws.getCell(r, 4).style = rowPercentStyle;
+    ws.getCell(r, 4).value = formatPercentageDisplay(item.pctUpToPrevWeek ?? 0);
+    ws.getCell(r, 4).style = { ...rowPercentStyle, alignment: { horizontal: 'center' as const, vertical: 'middle' as const } };
 
-    ws.getCell(r, 5).value = formatPercentageDisplay(item.pctThisWeek);
-    ws.getCell(r, 5).style = rowPercentStyle;
+    ws.getCell(r, 5).value = formatPercentageDisplay(item.pctThisWeek ?? 0);
+    ws.getCell(r, 5).style = { ...rowPercentStyle, alignment: { horizontal: 'center' as const, vertical: 'middle' as const } };
 
-    ws.getCell(r, 6).value = formatPercentageDisplay(item.pctUpToThisWeek);
-    ws.getCell(r, 6).style = rowPercentStyle;
+    ws.getCell(r, 6).value = formatPercentageDisplay(item.pctUpToThisWeek ?? 0);
+    ws.getCell(r, 6).style = { ...rowPercentStyle, alignment: { horizontal: 'center' as const, vertical: 'middle' as const } };
 
-    ws.getCell(r, 7).value = formatPercentageDisplay(item.pctRemaining);
-    ws.getCell(r, 7).style = rowPercentStyle;
+    ws.getCell(r, 7).value = formatPercentageDisplay(item.pctRemaining ?? 0);
+    ws.getCell(r, 7).style = { ...rowPercentStyle, alignment: { horizontal: 'center' as const, vertical: 'middle' as const } };
 
-    ws.getCell(r, 8).value = formatPercentageDisplay(item.pctNextWeekPlan);
-    ws.getCell(r, 8).style = rowPercentStyle;
+    ws.getCell(r, 8).value = formatPercentageDisplay(item.pctNextWeekPlan ?? 0);
+    ws.getCell(r, 8).style = { ...rowPercentStyle, alignment: { horizontal: 'center' as const, vertical: 'middle' as const } };
 
-    ws.getCell(r, 9).value = formatPercentageDisplay(item.pctUpNextWeekPlan);
-    ws.getCell(r, 9).style = rowPercentStyle;
+    ws.getCell(r, 9).value = formatPercentageDisplay(item.pctUpNextWeekPlan ?? 0);
+    ws.getCell(r, 9).style = { ...rowPercentStyle, alignment: { horizontal: 'center' as const, vertical: 'middle' as const } };
 
     // Add borders to all cells (already included in romanStyle)
     if (!isRomanId) {
@@ -1686,6 +1749,7 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } },
     alignment: { horizontal: 'left', vertical: 'middle' }
   };
+  ws.getRow(r).height = 20;
   ws.mergeCells(r, 2, r, 5);
   r += 2;
 
@@ -1706,15 +1770,31 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     { id: '4.13', title: 'Material Inspection Approval (MIR)' }
   ];
 
-  // Display first 5 sections with default empty tables
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 13; i++) {
     const section = qaqcSectionList[i];
-    ws.getCell(r, 2).value = `${section.id} ${section.title}`;
+    
+    // Section title
+    ws.getCell(r, 1).value = section.id;
+    ws.getCell(r, 2).value = section.title;
     ws.getCell(r, 2).style = {
       font: { bold: true, size: 11, name: 'Arial' }
     };
     ws.getRow(r).height = 22.5;
-    r += 1;
+    r += 2; // Space between sections
+
+    // Find matching data for this section
+    console.log('DEBUG QAQC: Looking for section', section.id, section.title);
+    console.log('DEBUG QAQC: Available sections =', d.qaqcSections?.map(s => s.sectionTitle));
+    
+    // Extract acronym from section title (e.g., "Non-Conformity Report (NCR)" -> "NCR")
+    const acronymMatch = section.title.match(/\(([^)]+)\)$/);
+    const sectionAcronym = acronymMatch ? acronymMatch[1] : section.title;
+    
+    const sectionData = d.qaqcSections?.find(s => 
+      s.sectionTitle === sectionAcronym || 
+      s.sectionTitle?.includes(sectionAcronym)
+    );
+    console.log('DEBUG QAQC: Found section data =', sectionData);
 
     // Table headers - special case for Client Site Instruction and Inspection Request
     if (section.id === '4.5') {
@@ -1728,146 +1808,88 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       ws.getCell(r, 4).value = 'Received Date';
       ws.getCell(r, 5).value = 'Inspection Date';
     } else {
+      // Standard order: Code, Description, Status, Date Responded
       ws.getCell(r, 2).value = 'Code';
-      ws.getCell(r, 3).value = 'Status';
-      ws.getCell(r, 4).value = 'Description';
+      ws.getCell(r, 3).value = 'Description';
+      ws.getCell(r, 4).value = 'Status';
       ws.getCell(r, 5).value = 'Date Responded';
     }
     
     // Style headers as bold with background color
     const headerStyle = {
       font: { bold: true, size: 11, name: 'Arial' },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } }
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } }
     };
     
     ws.getCell(r, 2).style = headerStyle;
     ws.getCell(r, 3).style = headerStyle;
     ws.getCell(r, 4).style = headerStyle;
     ws.getCell(r, 5).style = headerStyle;
-    ws.getCell(r, 6).style = styles.tableHeader;
+    ws.getCell(r, 6).style = headerStyle;
     
     r += 1;
 
-    // Empty data rows (5 rows)
-    for (let j = 0; j < 5; j++) {
-      ws.getCell(r, 2).value = '';
-      ws.getCell(r, 3).value = '';
-      ws.getCell(r, 4).value = '';
-      ws.getCell(r, 5).value = '';
+    // Items or empty rows
+    const items = sectionData?.items ?? [];
+    const rowsToRender = Math.max(items.length, 5); // minimum 5 rows
+    
+    for (let j = 0; j < rowsToRender; j++) {
+      const item = items[j];
       
-      // Style data cells
-      ws.getCell(r, 2).style = styles.data;
-      ws.getCell(r, 3).style = styles.data;
-      ws.getCell(r, 4).style = styles.data;
-      ws.getCell(r, 5).style = styles.data;
+      ws.getCell(r, 2).value = item?.code || '';
+      ws.getCell(r, 3).value = item?.description || '';
+      ws.getCell(r, 4).value = item?.status || '';
+      ws.getCell(r, 5).value = item?.date || '';
+      
+      // Style data cells with borders
+      const dataStyleWithBorder = {
+        ...styles.data,
+        border: {
+          top: { style: 'thin' as const },
+          bottom: { style: 'thin' as const },
+          left: { style: 'thin' as const },
+          right: { style: 'thin' as const }
+        }
+      };
+      
+      ws.getCell(r, 2).style = dataStyleWithBorder;
+      ws.getCell(r, 3).style = dataStyleWithBorder;
+      ws.getCell(r, 4).style = dataStyleWithBorder;
+      ws.getCell(r, 5).style = dataStyleWithBorder;
       
       r += 1;
     }
 
-    // Comments section below table
+    // Comments section - merge B-E with default height 42
     ws.getCell(r, 2).value = 'Comments:';
-    ws.getCell(r, 2).style = styles.boldText;
+    ws.getCell(r, 2).style = { 
+      ...styles.boldText, 
+      border: {
+        top: { style: 'thin' as const },
+        bottom: { style: 'thin' as const },
+        left: { style: 'thin' as const },
+        right: { style: 'thin' as const }
+      },
+      alignment: { horizontal: 'left' as const, vertical: 'top' as const }
+    };
     ws.mergeCells(r, 2, r, 5); // Merge B-E
     ws.getRow(r).height = 42; // Default height
     r += 1;
     
-    // Empty comment row
-    ws.getCell(r, 2).value = '';
-    ws.getCell(r, 2).style = styles.data;
-    ws.mergeCells(r, 2, r, 5);
-    ws.getRow(r).height = 42;
-    r += 2; // Space between sections
-  }
-
-  // Display remaining 8 sections just as headers
-  for (let i = 5; i < 13; i++) {
-    const section = qaqcSectionList[i];
-    ws.getCell(r, 1).value = section.id;
-    ws.getCell(r, 2).value = section.title;
-    ws.getCell(r, 2).style = {
-      font: { bold: true, size: 11, name: 'Arial' }
-    };
-    ws.getRow(r).height = 22.5;
-    r += 2; // Space between sections
-  }
-
-  r += 1; // Space before actual data
-
-  // Process actual QAQC data
-  if (d.qaqcSections && d.qaqcSections.length > 0) {
-    for (const section of d.qaqcSections) {
-      // Section title
-      if (section.sectionTitle) {
-        ws.getCell(r, 2).value = section.sectionTitle;
-        ws.getCell(r, 2).style = styles.subsectionHdr;
-        ws.mergeCells(r, 2, r, 11);
-        r += 2;
-      }
-
-      // Headers
-      ws.getCell(r, 2).value = section.codeHeader || 'Code';
-      ws.getCell(r, 3).value = section.statusHeader || 'Status';
-      ws.getCell(r, 4).value = 'Description';
-      ws.getCell(r, 5).value = section.dateHeader || 'Date Submit/Response';
-      ws.getCell(r, 6).value = 'Comments';
-      
-      // Style headers
-      ws.getCell(r, 2).style = styles.tableHeader;
-      ws.getCell(r, 3).style = styles.tableHeader;
-      ws.getCell(r, 4).style = styles.tableHeader;
-      ws.getCell(r, 5).style = styles.tableHeader;
-      ws.getCell(r, 6).style = styles.tableHeader;
-      
+    // Split comments into multiple rows if needed
+    const commentLines = sectionData?.comments?.split('\n') || [];
+    for (const line of commentLines) {
+      ws.getCell(r, 2).value = line;
+      ws.getCell(r, 2).style = styles.data;
+      ws.mergeCells(r, 2, r, 5); // Merge B-E
+      ws.getRow(r).height = 42; // Default height, will expand based on content
       r += 1;
-
-      // Items
-      if (section.items && section.items.length > 0) {
-        for (const item of section.items) {
-          ws.getCell(r, 2).value = item.code || '';
-          ws.getCell(r, 3).value = item.status || '';
-          ws.getCell(r, 4).value = item.description || '';
-          ws.getCell(r, 5).value = item.date || '';
-          
-          // Style data cells
-          ws.getCell(r, 2).style = styles.data;
-          ws.getCell(r, 3).style = styles.data;
-          ws.getCell(r, 4).style = styles.data;
-          ws.getCell(r, 5).style = styles.data;
-          
-          r += 1;
-        }
-      } else {
-        // Empty row for sections with no items
-        r += 1;
-      }
-
-      // Comments section - merge B-E with default height 42
-      if (section.comments) {
-        ws.getCell(r, 2).value = 'Comments:';
-        ws.getCell(r, 2).style = styles.boldText;
-        ws.mergeCells(r, 2, r, 5); // Merge B-E
-        ws.getRow(r).height = 42; // Default height
-        r += 1;
-        
-        // Split comments into multiple rows if needed
-        const commentLines = section.comments.split('\n');
-        for (const line of commentLines) {
-          ws.getCell(r, 2).value = line;
-          ws.getCell(r, 2).style = styles.data;
-          ws.mergeCells(r, 2, r, 5); // Merge B-E
-          ws.getRow(r).height = 42; // Default height, will expand based on content
-          r += 1;
-        }
-      }
-      
-      r += 1; // Space between sections
     }
-  } else {
-    // No QAQC data
-    ws.getCell(r, 2).value = 'No QA/QC data available';
-    ws.getCell(r, 2).style = styles.data;
-    ws.mergeCells(r, 2, r, 11);
+    
+    r += 2; // Space between sections
   }
+
+  
 }
 
 // SHEET 9: 5. HSE
