@@ -27,6 +27,7 @@ import MaterialActualCost from './MaterialActualCost';
 import AttachmentsTab, { Attachment } from './AttachmentsTab';
 import ConfirmationModal from './ConfirmationModal';
 import MaterialSelectionDialog from '@/components/material_master/MaterialSelectionDialog';
+import { exportPurchaseRequestExcel } from './services/exportServices';
 import { version } from 'os';
 
 const parseFileSize = (fileSize) => {
@@ -1280,6 +1281,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 											onClick={() => {
 												// Export logic here
 												console.log("This is final formData: ", formData);
+												exportPurchaseRequestExcel(formData);
 											}}
 										>
 											Export
