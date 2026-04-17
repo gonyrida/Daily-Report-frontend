@@ -2351,12 +2351,12 @@ const WeeklyReport = () => {
       );
     })(),
     qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => ({
-      sectionTitle: key.toUpperCase(),
+      sectionTitle: key,
       codeHeader: "Code",
       statusHeader: "Status",
       dateHeader: "Date Responded",
-      items: value?.items || [],
-      comments: value?.comments || '',
+      items: Array.isArray(value) ? value : [],
+      comments: Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '',
     })) : [],
     hseTraining: hsesData?.training || [],
     hseInspection: hsesData?.inspection || [],

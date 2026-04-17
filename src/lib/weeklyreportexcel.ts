@@ -1774,24 +1774,22 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
   for (let i = 0; i < 13; i++) {
     const section = qaqcSectionList[i];
     
-    // Section title
-    ws.getCell(r, 1).value = section.id;
-    ws.getCell(r, 2).value = section.title;
-    ws.getCell(r, 2).style = {
-      font: { bold: true, size: 11, name: 'Arial' }
+    // Section title - id and title in same column B with bold id
+    ws.getCell(r, 2).value = {
+      richText: [
+        { text: `${section.id} `, font: { bold: true, size: 11, name: 'Arial' } },
+        { text: section.title, font: { size: 11, name: 'Arial' } }
+      ]
     };
+    ws.getCell(r, 2).style = {
+      alignment: { horizontal: 'center', vertical: 'middle' }
+    };
+    ws.mergeCells(r, 2, r, 5);
     ws.getRow(r).height = 22.5;
     r++; // Space between sections
 
-   
-    // Extract acronym from section title (e.g., "Non-Conformity Report (NCR)" -> "NCR")
-    const acronymMatch = section.title.match(/\(([^)]+)\)$/);
-    const sectionAcronym = acronymMatch ? acronymMatch[1] : section.title;
-    
-    const sectionData = d.qaqcSections?.find(s => 
-      s.sectionTitle === sectionAcronym || 
-      s.sectionTitle?.includes(sectionAcronym)
-    );
+    // Match section by sectionTitle which is the key like "4.1", "4.2", etc.
+    const sectionData = d.qaqcSections?.find(s => s.sectionTitle === section.id);
 
     // Table headers - special case for Client Site Instruction and Inspection Request
     if (section.id === '4.5') {
@@ -1823,6 +1821,7 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     ws.getCell(r, 4).style = headerStyle;
     ws.getCell(r, 5).style = headerStyle;
     ws.getCell(r, 6).style = headerStyle;
+    ws.getRow(r).height = 30;
     
     r += 1;
 
@@ -1835,8 +1834,21 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       
       ws.getCell(r, 2).value = item?.code || '';
       ws.getCell(r, 3).value = item?.description || '';
-      ws.getCell(r, 4).value = item?.status || '';
-      ws.getCell(r, 5).value = item?.date || '';
+      
+      // Handle special fields for sections 4.5 and 4.6
+      if (section.id === '4.5') {
+        // Client Site Instruction: Issued By, Issued Date
+        ws.getCell(r, 4).value = (item as any)?.issuedBy || item?.status || '';
+        ws.getCell(r, 5).value = (item as any)?.issuedDate || (item as any)?.dateResponse || '';
+      } else if (section.id === '4.6') {
+        // Inspection Request: Received Date, Inspection Date
+        ws.getCell(r, 4).value = (item as any)?.receivedDate || (item as any)?.dateResponse || '';
+        ws.getCell(r, 5).value = (item as any)?.inspectionDate || '';
+      } else {
+        // Standard: Status, Date Responded
+        ws.getCell(r, 4).value = item?.status || '';
+        ws.getCell(r, 5).value = (item as any)?.dateResponse || '';
+      }
       
       // Style data cells with borders
       const dataStyleWithBorder = {
@@ -1851,42 +1863,47 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       
       ws.getCell(r, 2).style = dataStyleWithBorder;
       ws.getCell(r, 3).style = dataStyleWithBorder;
-      ws.getCell(r, 4).style = dataStyleWithBorder;
+      ws.getCell(r, 4).style = {
+        ...dataStyleWithBorder,
+        alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
+      };
       ws.getCell(r, 5).style = dataStyleWithBorder;
+      ws.getRow(r).height = 22;
       
       r += 1;
     }
 
-    // Comments section - merge B-E with default height 42
-    ws.getCell(r, 2).value = 'Comments:';
+    // Comments section - use section-level comments field
+    const sectionComments = sectionData?.comments || '';
+    
+    // Comments row with rich text: "Comments:" bold+underline, value normal
+    if (sectionComments.trim()) {
+      ws.getCell(r, 2).value = {
+        richText: [
+          { text: 'Comments: ', font: { bold: true, underline: true, name: 'Arial', size: 11 } },
+          { text: sectionComments, font: { name: 'Arial', size: 11 } }
+        ]
+      };
+    } else {
+      ws.getCell(r, 2).value = {
+        richText: [
+          { text: 'Comments:', font: { bold: true, underline: true, name: 'Arial', size: 11 } }
+        ]
+      };
+    }
+    
     ws.getCell(r, 2).style = { 
-      ...styles.boldText, 
       border: {
         top: { style: 'thin' as const },
         bottom: { style: 'thin' as const },
         left: { style: 'thin' as const },
         right: { style: 'thin' as const }
       },
-      alignment: { horizontal: 'left' as const, vertical: 'top' as const }
+      alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true }
     };
     ws.mergeCells(r, 2, r, 5); // Merge B-E
-    ws.getRow(r).height = 42; // Default height
+    ws.getRow(r).height = 42;
     r += 1;
-    
-    // Collect comments from individual rows
-    const rowComments = items?.map(item => item?.comment).filter(comment => comment && comment.trim()) || [];
-    const allComments = rowComments.join('\n\n');
-    
-    if (allComments.trim()) {
-      const commentLines = allComments.split('\n');
-      for (const line of commentLines) {
-        ws.getCell(r, 2).value = line;
-        ws.getCell(r, 2).style = styles.data;
-        ws.mergeCells(r, 2, r, 5); // Merge B-E
-        ws.getRow(r).height = 42; // Default height, will expand based on content
-        r += 1;
-      }
-    }
     
     r += 2; // Space between sections
   }
