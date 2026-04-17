@@ -6,20 +6,9 @@ export const handleCommentChange = (
   onCellChange: (sectionId: string, rowId: string, field: keyof QaqcRow, value: string) => void,
   sectionId: string,
 ) => {
-  if (newValue.trim() === '') {
-    // Clear all comments if textarea is empty
-    rows.forEach((row) => {
-      onCellChange(sectionId, row.id, "comment", "");
-    });
-  } else {
-    // Split and assign comments normally
-    const comments = newValue.split('\n\n---\n\n');
-    rows.forEach((row, idx) => {
-      if (comments[idx] && comments[idx].trim()) {
-        onCellChange(sectionId, row.id, "comment", comments[idx]);
-      } else {
-        onCellChange(sectionId, row.id, "comment", "");
-      }
-    });
+  // Store the same comment value only on the FIRST row
+  // Other rows' comments are ignored
+  if (rows.length > 0) {
+    onCellChange(sectionId, rows[0].id, "comment", newValue);
   }
 };

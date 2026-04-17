@@ -17,14 +17,12 @@ import { useConstructionIssue } from "@/hooks/useConstructionIssue";
 import { useHsesData } from "@/hooks/useHsesData";
 import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
-import { useQaqcTable } from "@/hooks/useQaqcTable";
 import { toRoman } from "@/lib/numberUtils";
 import { useIssues } from "@/hooks/useIssues";
 import { useConstructionProgress } from "@/hooks/useConstructionProgress";
 import { ConstructionProgressData } from "@/types/constructionProgress";
 import { computeAllAmounts } from "@/utils/calculationEngine";
 import { UploadCloud } from "lucide-react";
-import { getQaqcStatus } from "@/integrations/reportsApi";
 import { getProjectById } from "@/integrations/projectsApi";
 import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
@@ -59,6 +57,7 @@ import {
   CheckCircle,
   Lock,
 } from "lucide-react";
+import { transformQaqcData, buildQaqcPayload } from "@/utils/qaqcUtils";
 
 const WeeklyReport = () => {
   const [searchParams] = useSearchParams();
@@ -314,7 +313,7 @@ const WeeklyReport = () => {
   };
 
   // Overall Progress hook
-  const overallProgressHook = useOverallProgress();
+  const overallProgressHook = useOverallProgress(currentReportId || '');
 
   // Issues hook for state management
   const issuesHook = useIssues();
@@ -392,7 +391,7 @@ const WeeklyReport = () => {
 
           if (response.success && response.data) {
             const report = response.data;
-            const reportId = (report as any)._id || report.id;
+            const reportId = String((report as any)._id || report.id);
             setCurrentReportId(reportId);
             setReportStatus(report.status || 'draft');
 
@@ -454,26 +453,42 @@ const WeeklyReport = () => {
                 entries: report.sections.masterSchedule
               }]);
             }
-
-            // Load QAQC data
+            // Load QAQC data using transform function (no API call)
             if (report.sections?.qaqcStatus) {
-              setQaqcData(report.sections.qaqcStatus);
+                const transformedQaqcData = transformQaqcData(report.sections.qaqcStatus, [
+                { id: "4.1", title: "Non-Conformity Report (NCR)" },
+                { id: "4.2", title: "Corrective Action Request (CAR)" },
+                { id: "4.3", title: "Safety Corrective Action Request (SCAR)" },
+                { id: "4.4", title: "PM Site Instruction (SI)" },
+                { id: "4.5", title: "Client Site Instruction (SI)" },
+                { id: "4.6", title: "Inspection Request (IR)" },
+                { id: "4.7", title: "Material for Approval (MFA)" },
+                { id: "4.8", title: "Request for Information (RFI)" },
+                { id: "4.9", title: "Request for Approval (RFA)" },
+                { id: "4.10", title: "Field Change Request (FCR)" },
+                { id: "4.11", title: "Variation Order (VO)" },
+                { id: "4.12", title: "Transmittal (TR)" },
+                { id: "4.13", title: "Material Inspection Approval (MIR)" }
+              ]);
+              setQaqcData(transformedQaqcData);
             } else {
               // Create empty QAQC structure if none exists (no default items)
-              setQaqcData({
-                ncr: { items: [], comments: "" },
-                car: { items: [], comments: "" },
-                scar: { items: [], comments: "" },
-                pmsi: { items: [], comments: "" },
-                csi: { items: [], comments: "" },
-                ir: { items: [], comments: "" },
-                mfa: { items: [], comments: "" },
-                rfi: { items: [], comments: "" },
-                rfa: { items: [], comments: "" },
-                fcr: { items: [], comments: "" },
-                vo: { items: [], comments: "" },
-                tr: { items: [], comments: "" }
-              });
+              const emptyQaqcData = transformQaqcData({}, [
+                { id: "4.1", title: "Non-Conformity Report (NCR)" },
+                { id: "4.2", title: "Corrective Action Request (CAR)" },
+                { id: "4.3", title: "Safety Corrective Action Request (SCAR)" },
+                { id: "4.4", title: "PM Site Instruction (SI)" },
+                { id: "4.5", title: "Client Site Instruction (SI)" },
+                { id: "4.6", title: "Inspection Request (IR)" },
+                { id: "4.7", title: "Material for Approval (MFA)" },
+                { id: "4.8", title: "Request for Information (RFI)" },
+                { id: "4.9", title: "Request for Approval (RFA)" },
+                { id: "4.10", title: "Field Change Request (FCR)" },
+                { id: "4.11", title: "Variation Order (VO)" },
+                { id: "4.12", title: "Transmittal (TR)" },
+                { id: "4.13", title: "Material Inspection Approval (MIR)" }
+              ]);
+              setQaqcData(emptyQaqcData);
             }
 
             // Load HSES data
@@ -875,7 +890,7 @@ const WeeklyReport = () => {
 
       const response = await createWeeklyReport(newReportData);
       if (response.success && response.data) {
-        const newId = (response.data as any)._id || response.data.id;
+        const newId = String((response.data as any)._id || response.data.id);
         if (newId) {
           setCurrentReportId(newId);
           // Update URL to include new report ID and remove createNew parameter
@@ -1084,7 +1099,7 @@ const WeeklyReport = () => {
 
       const response = await createWeeklyReport(newReportData);
       if (response.success && response.data) {
-        const newId = (response.data as any)._id || response.data.id;
+        const newId = String((response.data as any)._id || response.data.id);
         if (newId) {
           setCurrentReportId(newId);
           // Update URL to include new report ID
@@ -1449,7 +1464,7 @@ const WeeklyReport = () => {
         response = await updateWeeklyReport(currentReportId, updateData);
         // Ensure currentReportId is set after successful update
         if (response.success) {
-          const updatedId = (response.data as any)?._id || response.data?.id || currentReportId;
+          const updatedId = String((response.data as any)?._id || response.data?.id || currentReportId);
           setCurrentReportId(updatedId);
           // Update URL to include the report ID
           const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
@@ -1481,7 +1496,7 @@ const WeeklyReport = () => {
         // Create new report
         response = await createWeeklyReport(reportData);
         if (response.success && response.data) {
-          const newId = (response.data as any)._id || response.data.id;
+          const newId = String((response.data as any)._id || response.data.id);
           if (newId) {
             setCurrentReportId(newId);
             // Update URL to include new report ID
@@ -1849,7 +1864,7 @@ const WeeklyReport = () => {
         response = await updateWeeklyReport(currentReportId, updateData);
         // Ensure currentReportId is set after successful update
         if (response.success) {
-          const updatedId = (response.data as any)?._id || response.data?.id || currentReportId;
+          const updatedId = String((response.data as any)?._id || response.data?.id || currentReportId);
           setCurrentReportId(updatedId);
           // Update URL to include the report ID
           const newUrl = `${window.location.pathname}?reportId=${updatedId}${selectedProject ? `&project=${encodeURIComponent(selectedProject)}` : ''}`;
@@ -1868,7 +1883,7 @@ const WeeklyReport = () => {
         // Create new report (for create new mode or when no reportId exists)
         response = await createWeeklyReport(reportData);
         if (response.success && response.data) {
-          const newId = (response.data as any)._id || response.data.id;
+          const newId = String((response.data as any)._id || response.data.id);
           if (newId) {
             setCurrentReportId(newId);
             setIsCreateNewMode(false); // Exit create new mode after successful creation
@@ -2198,7 +2213,8 @@ const WeeklyReport = () => {
     conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
     overallProgress: (() => {
       // Helper function to format rows with displayIndex (same logic as UI)
-      const formatRowsWithDisplayIndex = (rows: any[]) => {
+      const formatRowsWithDisplayIndex = (rows: any[] | null) => {
+        if (!rows) return [];
         let titleCount = 0;
         return rows.map((row, index) => {
           if (row.rowType === "title") {

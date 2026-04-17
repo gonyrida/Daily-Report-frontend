@@ -219,7 +219,8 @@ export const getWeeklyReports = async (params: GetWeeklyReportsParams = {}): Pro
  */
 export const getWeeklyReportById = async (id: string): Promise<ApiResponse<WeeklyReport>> => {
   const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/${id}`);
-  return handleApiResponse<WeeklyReport>(response);
+  const result = await handleApiResponse<WeeklyReport>(response);
+  return result;
 };
 
 /**

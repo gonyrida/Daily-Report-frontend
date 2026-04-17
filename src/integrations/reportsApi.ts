@@ -803,20 +803,5 @@ export const updateQaqcStatus = async (reportId: string, qaqcData: any) => {
   }
 };
 
-export const getQaqcStatus = async (reportId: string) => {
-  try {
-    const response = await apiGet(`/weekly-reports/${reportId}`);
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to get QAQC status" }));
-      throw new Error(error.message || "Failed to get QAQC status");
-    }
-
-    const result = await response.json();
-    return result.sections?.qaqcStatus || null;
-  } catch (error) {
-    throw error;
-  }
-};
+// REMOVED: getQaqcStatus API call - no longer needed
+// QAQC data is now bundled with main report load and transformed using transformQaqcData()

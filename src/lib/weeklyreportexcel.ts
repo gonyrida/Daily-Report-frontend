@@ -160,6 +160,7 @@ export interface QAQCItem {
   description?: string;
   status?: string;
   date?: string;
+  comment?: string;
 }
 
 export interface HSETrainingRow {
@@ -1780,12 +1781,9 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       font: { bold: true, size: 11, name: 'Arial' }
     };
     ws.getRow(r).height = 22.5;
-    r += 2; // Space between sections
+    r++; // Space between sections
 
-    // Find matching data for this section
-    console.log('DEBUG QAQC: Looking for section', section.id, section.title);
-    console.log('DEBUG QAQC: Available sections =', d.qaqcSections?.map(s => s.sectionTitle));
-    
+   
     // Extract acronym from section title (e.g., "Non-Conformity Report (NCR)" -> "NCR")
     const acronymMatch = section.title.match(/\(([^)]+)\)$/);
     const sectionAcronym = acronymMatch ? acronymMatch[1] : section.title;
@@ -1794,7 +1792,6 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       s.sectionTitle === sectionAcronym || 
       s.sectionTitle?.includes(sectionAcronym)
     );
-    console.log('DEBUG QAQC: Found section data =', sectionData);
 
     // Table headers - special case for Client Site Instruction and Inspection Request
     if (section.id === '4.5') {
@@ -1876,14 +1873,19 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     ws.getRow(r).height = 42; // Default height
     r += 1;
     
-    // Split comments into multiple rows if needed
-    const commentLines = sectionData?.comments?.split('\n') || [];
-    for (const line of commentLines) {
-      ws.getCell(r, 2).value = line;
-      ws.getCell(r, 2).style = styles.data;
-      ws.mergeCells(r, 2, r, 5); // Merge B-E
-      ws.getRow(r).height = 42; // Default height, will expand based on content
-      r += 1;
+    // Collect comments from individual rows
+    const rowComments = items?.map(item => item?.comment).filter(comment => comment && comment.trim()) || [];
+    const allComments = rowComments.join('\n\n');
+    
+    if (allComments.trim()) {
+      const commentLines = allComments.split('\n');
+      for (const line of commentLines) {
+        ws.getCell(r, 2).value = line;
+        ws.getCell(r, 2).style = styles.data;
+        ws.mergeCells(r, 2, r, 5); // Merge B-E
+        ws.getRow(r).height = 42; // Default height, will expand based on content
+        r += 1;
+      }
     }
     
     r += 2; // Space between sections

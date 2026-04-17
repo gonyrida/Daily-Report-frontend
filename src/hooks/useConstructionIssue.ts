@@ -1,30 +1,62 @@
 import { useState, useEffect } from "react";
-import { ConstructionIssueProps } from "@/types/constructionIssue.types";
+import { getWeeklyReportById } from "@/services/weeklyReportService";
 
-export const useConstructionIssue = (initialProps: ConstructionIssueProps) => {
-  const [fields, setFields] = useState({
-    location: initialProps.location || "",
-    photo: initialProps.photo || "",
-    problem: initialProps.problem || "",
-    actionBy: initialProps.actionBy || "",
-  });
+export interface ConstructionIssueData {
+  location: string;
+  photo: string | File | null;
+  problem: string;
+  actionBy: string;
+}
+
+export const useConstructionIssue = (reportId: string) => {
+  const [data, setData] = useState<ConstructionIssueData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [slots, setSlots] = useState([
     { id: "construction-issue-photo", image: null, caption: "" },
   ]);
 
-  // Sync with external data when it changes (e.g., after loading from database)
+  // Load construction issue data
+  const refetch = async () => {
+    if (!reportId) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await getWeeklyReportById(reportId);
+
+      if (response.success && response.data) {
+        const issues = response.data.sections.constructionIssues;
+        if (issues && issues.length > 0) {
+          const firstIssue = issues[0];
+          setData({
+            location: firstIssue.location || "",
+            photo: firstIssue.photo || "",
+            problem: firstIssue.problem || "",
+            actionBy: firstIssue.actionBy || "",
+          });
+        }
+      } else {
+        setError(response.error || 'Failed to load construction issues');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load data on mount
   useEffect(() => {
-    setFields({
-      location: initialProps.location || "",
-      photo: initialProps.photo || "",
-      problem: initialProps.problem || "",
-      actionBy: initialProps.actionBy || "",
-    });
-  }, [initialProps.location, initialProps.photo, initialProps.problem, initialProps.actionBy]);
+    if (reportId) {
+      refetch();
+    }
+  }, [reportId]);
 
   const update = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setFields((f) => ({ ...f, [key]: e.target.value }));
+    setData((f) => f ? ({ ...f, [key]: e.target.value }) : null);
 
   const onUpdateSlot = (updatedSlot: any) => {
     setSlots((prev) =>
@@ -41,8 +73,11 @@ export const useConstructionIssue = (initialProps: ConstructionIssueProps) => {
   };
 
   return {
-    fields,
-    setFields,
+    data,
+    setData,
+    isLoading,
+    error,
+    refetch,
     slots,
     setSlots,
     update,

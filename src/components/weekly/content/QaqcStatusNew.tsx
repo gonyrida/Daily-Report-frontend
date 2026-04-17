@@ -1,16 +1,33 @@
-import React from "react";
+import React, { useState } from "react";
 import { CheckCircle, AlertCircle, Clock, XCircle, FileText, Plus, Trash2 } from "lucide-react";
 import { StatusKey, QaqcRow, Section, TableData, QaqcTableProps } from "@/types/qaqc.types";
 import { STATUS_OPTIONS } from "@/constants/qaqcStatus";
 import { handleCommentChange } from "@/lib/tableUtils";
-import { useQaqcTable } from "@/hooks/useQaqcTable";
+import { makeRow } from "@/utils/rowFactory";
 
 interface QaqcStatusNewProps {
   sections: Section[];
-  weeklyReportId?: string;
+  weeklyReportId: string;
   tableData?: TableData;
-  setTableData?: (data: TableData) => void;
+  setTableData?: React.Dispatch<React.SetStateAction<TableData>>;
+  initialQaqcData?: any;
 }
+
+const CommentTextarea: React.FC<{
+  rows: QaqcRow[];
+  sectionId: string;
+  onCellChange: (sectionId: string, rowId: string, field: keyof QaqcRow, value: string) => void;
+}> = ({ rows, sectionId, onCellChange }) => {
+  return (
+    <textarea
+      value={rows[0]?.comment || ''}
+      onChange={(e) => handleCommentChange(e.target.value, rows, onCellChange, sectionId)}
+      placeholder="Add comments for all rows here..."
+      rows={3}
+      className="w-full border rounded px-2 py-1 text-sm resize-none dark:bg-card dark:border-border"
+    />
+  );
+};
 
 const StatusIcon: React.FC<{ status: StatusKey }> = ({ status }) => {
   switch (status) {
@@ -33,6 +50,7 @@ const StatusIcon: React.FC<{ status: StatusKey }> = ({ status }) => {
   }
 };
 
+// QaqcTable Component (moved here to avoid import issues)
 const QaqcTable: React.FC<QaqcTableProps> = ({
   section,
   rows,
@@ -230,14 +248,10 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                             <div className="mb-2">
                               <span className="text-sm font-semibold text-foreground">Comments</span>
                             </div>
-                            <textarea
-                              value={rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n')}
-                              onChange={(e) => {
-                                handleCommentChange(e.target.value, rows, onCellChange, section.id);
-                              }}
-                              placeholder="Add comments for all rows here... "
-                              rows={3}
-                              className="w-full border rounded px-2 py-1 text-sm resize-none dark:bg-card dark:border-border"
+                            <CommentTextarea
+                              rows={rows}
+                              sectionId={section.id}
+                              onCellChange={onCellChange}
                             />
                           </td>
                         </tr>
@@ -252,82 +266,57 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
     </div>
   );
 };
-export default function QaqcStatusNew({
+
+export const QaqcStatusNew: React.FC<QaqcStatusNewProps> = ({
   sections,
   weeklyReportId,
-  tableData: externalTableData,
-  setTableData
-}: QaqcStatusNewProps) {
-  const {
-    tableData,
-    search,
-    setSearch,
-    handleAddRow,
-    handleDeleteRow,
-    handleCellChange,
-    totalRows,
-    openRows,
-    filteredSections,
-    loadExternalData,
-  } = useQaqcTable(sections);
+  tableData,
+  setTableData,
+  initialQaqcData,
+}) => {
+  const [search, setSearch] = useState<string>("");
 
-  // Load external data when component mounts or when external data changes
-  const previousExternalData = React.useRef<any>(null);
-  React.useEffect(() => {
-    if (externalTableData && typeof externalTableData === 'object') {
-      // Only load if external data has actually changed
-      const currentDataStr = JSON.stringify(externalTableData);
-      const previousDataStr = JSON.stringify(previousExternalData.current);
-      
-      if (currentDataStr !== previousDataStr) {
-        loadExternalData(externalTableData);
-        previousExternalData.current = externalTableData;
-      }
-    }
-  }, [externalTableData, loadExternalData]); // Add dependencies to detect changes
+  // Simple row handlers - just call parent's setTableData directly
+  const handleAddRow = (sectionId: string) => {
+    if (!setTableData) return;
+    const newRow = makeRow();
+    setTableData(prev => ({
+      ...prev,
+      [sectionId]: [...(prev[sectionId] || []), newRow]
+    }));
+  };
 
-  // Sync internal tableData changes back to parent (for Excel export and save)
-  const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  React.useEffect(() => {
-    if (!setTableData || !tableData) return;
+  const handleDeleteRow = (sectionId: string, rowId: string) => {
+    if (!setTableData) return;
+    setTableData(prev => ({
+      ...prev,
+      [sectionId]: prev[sectionId]?.filter(row => row.id !== rowId) || []
+    }));
+  };
 
-    // Skip the very first render to avoid syncing initialData back up
-    // before external data has had a chance to load
-    if (syncTimeoutRef.current === null && 
-        !previousExternalData.current) return; // ✅ don't sync before first external load
+  const handleCellChange = (sectionId: string, rowId: string, field: keyof QaqcRow, value: string) => {
+    if (!setTableData) return;
+    setTableData(prev => ({
+      ...prev,
+      [sectionId]: prev[sectionId]?.map(row =>
+        row.id === rowId ? { ...row, [field]: value } : row
+      ) || []
+    }));
+  };
 
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+  // Calculate totals
+  const totalRows = Object.values(tableData).reduce((sum, rows) => sum + (rows?.length || 0), 0);
+  const openRows = Object.values(tableData).reduce((sum, rows) =>
+    sum + (rows?.filter(row => row.status === "Pending" || row.status === "Respond" || row.status === "Submit").length || 0), 0
+  );
 
-    syncTimeoutRef.current = setTimeout(() => {
-      setTableData(tableData);
-    }, 300); // slightly longer debounce gives isLoadingFromBackend time to reset
-
-    return () => {
-      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    };
-  }, [tableData, setTableData]);
+  // Filter sections based on search
+  const filteredSections = sections.filter(section =>
+    section.title.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-4 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <FileText className="w-6 h-6" />
-            <div>
-              <h1 className="text-xl font-bold">QA/QC Status Register</h1>
-              <p className="text-sm opacity-90">Quality Assurance / Quality Control</p>
-            </div>
-            <span className="px-2 py-1 bg-white/20 rounded text-xs font-bold">
-              SECTION 4
-            </span>
-          </div>
-          <div className="flex gap-6 text-sm">
-            <span>Total Entries: <strong>{totalRows}</strong></span>
-            <span>Open Items: <strong className="text-yellow-300">{openRows}</strong></span>
-          </div>
-        </div>
-      </div>
 
       {/* Search and Controls */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -363,13 +352,6 @@ export default function QaqcStatusNew({
         )}
       </div>
 
-      {/* Summary */}
-      <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground border-t pt-4">
-        <div className="flex gap-6">
-          <span>Total Entries: <strong>{totalRows}</strong></span>
-          <span>Open Items: <strong className="text-yellow-600">{openRows}</strong></span>
-        </div>
-      </div>
     </div>
   );
-}
+};

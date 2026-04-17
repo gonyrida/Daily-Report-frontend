@@ -1,70 +1,49 @@
 import { useState, useRef, useEffect } from "react";
 import { IntroductionProps } from "@/types/introduction.types";
 import { autoResize, handleTextChange, handleTabKey, handleBold } from "@/lib/textareaUtils";
+import { getWeeklyReportById } from "@/services/weeklyReportService";
 
-// Storage keys for introduction data
-const INTRODUCTION_STORAGE_KEY = "weekly-report:introduction";
+export const useIntroductionText = (reportId: string) => {
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  
+  const [projectOverview, setProjectOverview] = useState("");
+  const [designNConstruction, setDesignNConstruction] = useState("");
+  const [coverImage, setCoverImage] = useState("");
 
-export const useIntroductionText = (projectLogo: string = "") => {
-  // Load saved data from localStorage on initial mount using lazy initialization
-  const [projectOverview, setProjectOverview] = useState(() => {
+  // Load introduction data from API
+  const refetch = async () => {
+    if (!reportId) return;
+
     try {
-      const saved = localStorage.getItem(INTRODUCTION_STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        return data.projectOverview || "";
-      }
-    } catch (e) {
-      console.error('[useIntroductionText] Failed to load saved projectOverview:', e);
-    }
-    return "";
-  });
+      setIsLoading(true);
+      setError(null);
 
-  const [designNConstruction, setDesignNConstruction] = useState(() => {
-    try {
-      const saved = localStorage.getItem(INTRODUCTION_STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        return data.designNConstruction || "";
-      }
-    } catch (e) {
-      console.error('[useIntroductionText] Failed to load saved designNConstruction:', e);
-    }
-    return "";
-  });
+      const response = await getWeeklyReportById(reportId);
 
-  const [coverImage, setCoverImage] = useState(() => {
-    try {
-      const saved = localStorage.getItem(INTRODUCTION_STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        return data.coverImage || projectLogo || "";
+      if (response.success && response.data) {
+        const intro = response.data.sections.introduction;
+        if (intro) {
+          setProjectOverview(intro.projectOverview || "");
+          setDesignNConstruction(intro.designNConstruction || "");
+          setCoverImage(intro.coverImage || "");
+        }
+      } else {
+        setError(response.error || 'Failed to load introduction data');
       }
-    } catch (e) {
-      console.error('[useIntroductionText] Failed to load saved coverImage:', e);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
-    return projectLogo || "";
-  });
+  };
 
-  // Save data to localStorage whenever it changes
+  // Load data on mount
   useEffect(() => {
-    const dataToSave = {
-      projectOverview,
-      designNConstruction,
-      coverImage
-    };
-    
-    // Use setTimeout to avoid blocking React's render queue
-    const timeoutId = setTimeout(() => {
-      try {
-        localStorage.setItem(INTRODUCTION_STORAGE_KEY, JSON.stringify(dataToSave));
-      } catch (e) {
-        console.error('[useIntroductionText] Failed to save data:', e);
-      }
-    }, 0);
-
-    return () => clearTimeout(timeoutId);
-  }, [projectOverview, designNConstruction, coverImage]);
+    if (reportId) {
+      refetch();
+    }
+  }, [reportId]);
 
   // Refs for textareas
   const projectOverviewRef = useRef<HTMLTextAreaElement>(null);
@@ -113,6 +92,9 @@ export const useIntroductionText = (projectLogo: string = "") => {
   return {
     // Data
     data,
+    isLoading,
+    error,
+    refetch,
     projectOverview,
     setProjectOverview,
     designNConstruction,

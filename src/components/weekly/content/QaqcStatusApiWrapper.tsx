@@ -3,6 +3,9 @@ import { Section, TableData, QaqcTableProps, QaqcRow } from "@/types/qaqc.types"
 import { useQaqcApi } from "@/hooks/useQaqcApi";
 import { STATUS_OPTIONS } from "@/constants/qaqcStatus";
 import { CheckCircle, AlertCircle, Clock, XCircle, FileText, Plus, Trash2 } from "lucide-react";
+import { handleCommentChange } from "@/lib/tableUtils";
+import { transformQaqcData, buildQaqcPayload } from "@/utils/qaqcUtils";
+import { makeRow } from "@/utils/rowFactory";
 // import { toast } from "sonner";
 
 interface QaqcStatusApiWrapperProps {
@@ -11,7 +14,25 @@ interface QaqcStatusApiWrapperProps {
   search?: string;
   setSearch?: React.Dispatch<React.SetStateAction<string>>;
   setTableData?: React.Dispatch<React.SetStateAction<TableData>>;
+  initialQaqcData?: any; // New prop for initial data
 }
+
+// CommentTextarea Component
+const CommentTextarea: React.FC<{
+  rows: QaqcRow[];
+  sectionId: string;
+  onCellChange: (sectionId: string, rowId: string, field: keyof QaqcRow, value: string) => void;
+}> = ({ rows, sectionId, onCellChange }) => {
+  return (
+    <textarea
+      value={rows[0]?.comment || ''}
+      onChange={(e) => handleCommentChange(e.target.value, rows, onCellChange, sectionId)}
+      placeholder="Add comments for all rows here..."
+      rows={3}
+      className="w-full border rounded px-2 py-1 text-sm resize-none dark:bg-card dark:border-border"
+    />
+  );
+};
 
 // Status Icon Component
 const StatusIcon: React.FC<{ status: string }> = ({ status }) => {
@@ -107,15 +128,14 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                   <select
                     value={row.status}
                     onChange={(e) => onCellChange(section.id, row.id, "status", e.target.value)}
-                    className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${
-                        row.status === "Pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
+                    className={`w-full border rounded px-2 py-1 text-sm font-medium dark:bg-card dark:border-border ${row.status === "Pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700" :
                         row.status === "Respond" ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700" :
-                        row.status === "Submit" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
-                        row.status === "Resubmit" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-700" :
-                        row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
-                        row.status === "Approved with Condition" ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700" :
-                        row.status === "Not Approved" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
-                        "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                          row.status === "Submit" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700" :
+                            row.status === "Resubmit" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-700" :
+                              row.status === "Approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700" :
+                                row.status === "Approved with Condition" ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700" :
+                                  row.status === "Not Approved" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700" :
+                                    "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                       }`}
                   >
                     <option value="">— Select —</option>
@@ -155,20 +175,10 @@ const QaqcTable: React.FC<QaqcTableProps> = ({
                           <div className="mb-2">
                             <span className="text-sm font-semibold text-foreground">Comments</span>
                           </div>
-                          <textarea
-                            value={rows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n')}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              const comments = value.split('\n\n---\n\n');
-                              rows.forEach((row, index) => {
-                                if (index < comments.length) {
-                                  onCellChange(section.id, row.id, "comment", comments[index]);
-                                }
-                              });
-                            }}
-                            placeholder="Add comments for all rows here... "
-                            rows={3}
-                            className="w-full border rounded px-2 py-1 text-sm resize-none dark:bg-card dark:border-border"
+                          <CommentTextarea
+                            rows={rows}
+                            sectionId={section.id}
+                            onCellChange={onCellChange}
                           />
                         </td>
                       </tr>
@@ -190,152 +200,118 @@ export const QaqcStatusApiWrapper: React.FC<QaqcStatusApiWrapperProps> = ({
   search: externalSearch,
   setSearch: externalSetSearch,
   setTableData: externalSetTableData, // Add setTableData prop
+  initialQaqcData, // New prop for initial data
 }) => {
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-
-  const {
-    tableData,
-    setTableData: internalSetTableData,
-    search: internalSearch,
-    setSearch: internalSetSearch,
-    handleAddRow,
-    handleDeleteRow,
-    handleCellChange: internalHandleCellChange,
-    totalRows,
-    openRows,
-    filteredSections,
-    isLoading,
-    error,
-    isSaving,
-    saveQaqcData,
-    loadQaqcData,
-  } = useQaqcApi(sections, weeklyReportId);
-
-  // Use external setTableData if provided, otherwise use internal
-  const setTableData = externalSetTableData || internalSetTableData;
+  const [tableData, setTableData] = useState<TableData>(() =>
+    sections.reduce((acc, section) => {
+      acc[section.id] = Array(5).fill(null).map(() => makeRow());
+      return acc;
+    }, {} as TableData)
+  );
   
-  // Custom handleCellChange that updates both internal and external state
+  // Initialize with initialQaqcData when it arrives
+  React.useEffect(() => {
+    if (!initialQaqcData || Object.keys(initialQaqcData).length === 0) return;
+
+    // Rebuild from scratch using sections as source of truth
+    setTableData(() => {
+      return sections.reduce((acc, section) => {
+        const incoming = initialQaqcData[section.id];
+        acc[section.id] = incoming?.length > 0
+          ? incoming
+          : Array(5).fill(null).map(() => makeRow()); // always guarantee 5 rows
+        return acc;
+      }, {} as TableData);
+    });
+  }, [initialQaqcData, sections]);
+  // Transform initial data once on mount (no API calls)
+  const [search, setSearch] = useState<string>(externalSearch || "");
+
+  // Simple row handlers (no complex API logic)
+  const handleAddRow = (sectionId: string) => {
+    setTableData(prev => ({
+      ...prev,
+      [sectionId]: [...(prev[sectionId] || []), makeRow()]
+    }));
+  };
+
+  const handleDeleteRow = (sectionId: string, rowId: string) => {
+    setTableData(prev => ({
+      ...prev,
+      [sectionId]: prev[sectionId]?.filter(row => row.id !== rowId) || []
+    }));
+  };
+
   const handleCellChange = (sectionId: string, rowId: string, field: keyof QaqcRow, value: string) => {
-    // Update internal state
-    internalHandleCellChange(sectionId, rowId, field, value);
-    
-    // If external setTableData is provided, call it to update parent state
-    if (externalSetTableData) {
-      const updatedData = { ...tableData };
-      updatedData[sectionId] = updatedData[sectionId].map(row =>
+    setTableData(prev => ({
+      ...prev,
+      [sectionId]: prev[sectionId]?.map(row =>
         row.id === rowId ? { ...row, [field]: value } : row
-      );
-      externalSetTableData(updatedData);
-    }
+      ) || []
+    }));
   };
 
-
-  // Use external search state if provided, otherwise use internal
-  const search = externalSearch ?? internalSearch;
-  const setSearch = externalSetSearch ?? internalSetSearch;
-
-  const handleManualSave = async () => {
-    if (!weeklyReportId) {
-      return;
+  // Sync with external data when it changes
+  React.useEffect(() => {
+    if (externalSetTableData) {
+      externalSetTableData(tableData);
     }
+  }, [tableData, externalSetTableData]);
 
-    try {
-      await saveQaqcData();
-      setLastSaved(new Date());
-    } catch (err) {
-      // Handle save error silently or show user feedback
+  // Sync search with external
+  React.useEffect(() => {
+    if (externalSetSearch) {
+      externalSetSearch(search);
     }
-  };
+  }, [search, externalSetSearch]);
+
+  // Calculate totals
+  const totalRows = Object.values(tableData).reduce((sum, rows) => sum + (rows?.length || 0), 0);
+  const openRows = Object.values(tableData).reduce((sum, rows) =>
+    sum + (rows?.filter(row => row.status === "Pending" || row.status === "Respond" || row.status === "Submit").length || 0), 0
+  );
+
+  // Filter sections based on search
+  const filteredSections = sections.filter(section =>
+    section.title.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleRefresh = async () => {
-    if (!weeklyReportId) {
-      return;
-    }
-
-    try {
-      await loadQaqcData();
-    } catch (err) {
-      // Handle refresh error silently or show user feedback
-    }
+    // No longer needed - data is bundled with report load
+    console.log('QAQC data refresh not needed - using bundled report data');
   };
 
-  if (isLoading) {
+  if (true) {
+    // No loading/error states needed - data is bundled with report
+    // const isLoading = false;
+    // const error = null;
+
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading QAQC data...</p>
+      <div className="space-y-4">
+
+        {/* Tables */}
+        <div className="space-y-6">
+          {filteredSections.map((section) => (
+            <div key={section.id} id={`section-${section.id}`}>
+              <QaqcTable
+                section={section}
+                rows={tableData[section.id] || []}
+                onAddRow={handleAddRow}
+                onDeleteRow={handleDeleteRow}
+                onCellChange={handleCellChange}
+              />
+            </div>
+          ))}
+
+          {filteredSections.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              No sections match your filter.
+            </div>
+          )}
         </div>
+
+
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="text-red-500 mb-4">
-            <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
-            onClick={handleRefresh}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Status indicator */}
-      {lastSaved && (
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            Last saved: {lastSaved.toLocaleTimeString()}
-          </span>
-        </div>
-      )}
-
-      {/* Tables */}
-      <div className="space-y-6">
-        {filteredSections.map((section) => (
-          <div key={section.id} id={`section-${section.id}`}>
-            <QaqcTable
-              section={section}
-              rows={tableData[section.id] || []}
-              onAddRow={handleAddRow}
-              onDeleteRow={handleDeleteRow}
-              onCellChange={handleCellChange}
-            />
-          </div>
-        ))}
-
-        {filteredSections.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            No sections match your filter.
-          </div>
-        )}
-      </div>
-
-      {/* Summary */}
-      <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground border-t pt-4">
-        <div className="flex gap-6">
-          <span>Total Entries: <strong>{totalRows}</strong></span>
-          <span>Open Items: <strong className="text-yellow-600">{openRows}</strong></span>
-        </div>
-
-        {!weeklyReportId && (
-          <span className="text-orange-600 text-xs">
-            No report ID - changes won't be saved
-          </span>
-        )}
-      </div>
-    </div>
-  );
 };

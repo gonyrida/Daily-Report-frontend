@@ -100,7 +100,7 @@ export default function PercentageCell({
   };
 
   return (
-    <td className={`px-3 py-2 relative ${className}`}>
+    <div className={`px-3 py-2 relative ${className}`}>
       {/* Background bar */}
       {((backgroundType !== "none" && clampedValue > 0) || numericInputValue > 100) && (
         <div
@@ -131,6 +131,6 @@ export default function PercentageCell({
           %
         </span>
       </div>
-    </td>
+    </div>
   );
 }
