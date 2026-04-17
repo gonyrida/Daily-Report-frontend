@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Introduction from "./content/Intoduction";
 import OverallProgress from "./content/OverallProgress";
 import Activities from "./content/Activities";
@@ -282,6 +282,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // }, [qaqcTableHook.tableData, setQaqcData]);
 
   // Load QAQC data from parent into local hook (like other sections)
+  const lastBackendDataRef = useRef<string>("");
   useEffect(() => {
     if (qaqcData && qaqcTableHook.setTableData) {
       // Transform backend data to frontend format
@@ -326,6 +327,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
       });
       
       qaqcTableHook.setTableData(frontendData);
+      lastBackendDataRef.current = JSON.stringify(frontendData);
     }
   }, [qaqcData]); // Add qaqcData dependency to sync when parent changes
 
@@ -439,8 +441,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           tableData={qaqcTableHook.tableData}
           setTableData={(data) => {
             qaqcTableHook.setTableData(data);
+            // ✅ Only sync up if this is a real user edit, not a backend reload
+            const incomingStr = JSON.stringify(data);
             // Also sync to parent state for persistence
-            if (setQaqcData) {
+            if (incomingStr !== lastBackendDataRef.current && setQaqcData) {
               const backendData: any = {};
               const sectionIdMap: Record<string, string> = {
                 "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",

@@ -286,25 +286,24 @@ export default function QaqcStatusNew({
     }
   }, [externalTableData, loadExternalData]); // Add dependencies to detect changes
 
-  // Sync data changes to parent component with debouncing to prevent infinite loops
+  // Sync internal tableData changes back to parent (for Excel export and save)
   const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   React.useEffect(() => {
-    if (setTableData && tableData) {
-      // Clear previous timeout
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-      
-      // Debounce sync to prevent rapid updates
-      syncTimeoutRef.current = setTimeout(() => {
-        setTableData(tableData);
-      }, 100);
-    }
-    
+    if (!setTableData || !tableData) return;
+
+    // Skip the very first render to avoid syncing initialData back up
+    // before external data has had a chance to load
+    if (syncTimeoutRef.current === null && 
+        !previousExternalData.current) return; // ✅ don't sync before first external load
+
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+
+    syncTimeoutRef.current = setTimeout(() => {
+      setTableData(tableData);
+    }, 300); // slightly longer debounce gives isLoadingFromBackend time to reset
+
     return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
   }, [tableData, setTableData]);
 
