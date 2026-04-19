@@ -40,6 +40,9 @@ export default function MaterialDialog({
 
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [customUnits, setCustomUnits] = useState<{ value: string; label: string }[]>([]);
+	// Combine default + custom units:
+	const allUnitOptions = [...UNIT_OPTIONS, ...customUnits];
 
 	// Initialize form when material changes or dialog opens
 	useEffect(() => {
@@ -144,10 +147,23 @@ export default function MaterialDialog({
 	};
 
 	const handleChange = (field: keyof FormData, value: any) => {
-		setFormData(prev => ({
-			...prev,
-			[field]: value,
-		}));
+		if (field === 'unitPrice') {
+
+			const regex = /^\d*\.?\d{0,2}$/;
+			
+			if (regex.test(value) || value === "") {
+				setFormData(prev => ({
+					...prev,
+					[field]: value === "" || value === "." ? 0 : parseFloat(value) || 0
+				}));
+			}
+		} else {
+			setFormData(prev => ({
+				...prev,
+				[field]: value,
+			}));
+		}
+
 		// Clear error for this field
 		if (errors[field]) {
 			setErrors(prev => ({
@@ -155,6 +171,15 @@ export default function MaterialDialog({
 				[field]: '',
 			}));
 		}
+	};
+
+	// Handler for creating new units:
+	const handleCreateUnit = (newUnitLabel: string) => {
+		const newUnit = { 
+			value: newUnitLabel.toLowerCase(), 
+			label: newUnitLabel 
+		};
+		setCustomUnits(prev => [...prev, newUnit]);
 	};
 
 	if (!open) return null;
@@ -260,11 +285,12 @@ export default function MaterialDialog({
 									Unit <span className="text-red-500">*</span>
 								</label>
 								<CreatableCombobox
-									options={UNIT_OPTIONS}
+									options={allUnitOptions}
 									value={formData.unit}
 									onChange={(value) =>
 										handleChange('unit', value)
 									}
+									onCreate={handleCreateUnit}
 									placeholder="Select unit..."
 									width="w-full"
 								/>
@@ -279,7 +305,6 @@ export default function MaterialDialog({
 									id="unitPrice"
 									type="number"
 									step="0.01"
-									min="0"
 									value={formData.unitPrice}
 									onChange={(e) => handleChange('unitPrice', parseFloat(e.target.value) || 0)}
 									placeholder="0.00"

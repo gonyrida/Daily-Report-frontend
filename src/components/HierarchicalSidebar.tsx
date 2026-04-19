@@ -742,33 +742,33 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
               </SidebarGroup>
 
               <SidebarSeparator />
-
-              {/* Other Forms Section */}
-              <SidebarGroup>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild>
-                        <Link to="/request-form" className="flex items-center gap-2">
-                          <ClipboardList className="h-4 w-4" />
-                          <span>Request Form</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild>
-                        <Link to="/admin-form" className="flex items-center gap-2">
-                          <ClipboardList className="h-4 w-4" />
-                          <span>Other Form</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
             </>
           )}
+
+          {/* Other Forms Section */}
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link to="/request-form" className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4" />
+                      <span>Request Form</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link to="/admin-form" className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4" />
+                      <span>Other Form</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         </SidebarContent>
 
         {/* Settings & Logout Section */}

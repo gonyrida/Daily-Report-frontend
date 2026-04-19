@@ -275,10 +275,6 @@ const UserManagement = () => {
                   
                   {/* Action buttons */}
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={exportUsers}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
                     <Button onClick={() => setShowAddUser(true)}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add User

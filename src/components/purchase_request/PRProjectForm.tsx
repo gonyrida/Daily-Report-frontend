@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiPost, apiPut } from '@/lib/apiFetch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MemberInvitationModal from './MemberInvitationModal';
+import { Trash2, Search } from "lucide-react";
 
 interface PRProject {
   _id?: string;
@@ -75,6 +76,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [activeTab, setActiveTab] = useState('general-info');
   const [showMemberModal, setShowMemberModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if ((mode === 'edit' || mode === 'view') && initialData) {
@@ -261,6 +263,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
         description: "Failed to create project"
       });
     } finally {
+      setActiveTab('general-info')
       setIsSubmitting(false);
     }
   };
@@ -290,10 +293,10 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
       _id: Date.now().toString(), // Unique ID
       name: '',
     };
-
+    setSearchQuery(""); // Clear the search so the new item is visible
     setFormData(prev => ({
       ...prev,
-      subProjects: [...prev.subProjects, newSubProject]
+      subProjects: [newSubProject, ...prev.subProjects]
     }));
   };
   
@@ -469,6 +472,10 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
     return 'Project Details Overview'
   }
 
+  const filteredSubProjects = formData.subProjects.filter(project =>
+    project.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <Dialog 
       open={isOpen} 
@@ -480,7 +487,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
       }}
     >
       <DialogContent 
-        className="max-w-6xl max-h-[95vh] overflow-y-auto"
+        className={`max-w-6xl max-h-[95vh] ${isLoading ? 'overflow-y-hidden' : 'overflow-y-auto'}`}
         {...(mode !== 'view' && {
           onPointerDownOutside: (e) => e.preventDefault(),
           onEscapeKeyDown: (e) => e.preventDefault()
@@ -657,7 +664,7 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                   
                   <div className="flex justify-between items-center mt-2">
                     {mode !== 'view' && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center">
                         <Button
                           type="button" 
                           variant="default" 
@@ -666,35 +673,26 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                         >
                           Add Sub-Project
                         </Button>
-                        <Button 
-                          type="button" 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={removeSelectedSubProjects}
-                          disabled={selectedSubProjects.length === 0}
-                        >
-                          Remove Selected Sub-Project(s)
-                        </Button>
+                        {formData.subProjects.length > 0 && <span>Total Sub-Projects: {formData.subProjects.length}</span>}
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-2 mt-2">
-                    {formData.subProjects.map((project) => (
+                  {formData.subProjects.length > 0 && 
+                    <div className="mt-4 mb-2">
+                      <Input
+                        type="text"
+                        placeholder="Filter sub-projects..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-8 w-[25%] text-md"
+                      />
+                    </div>
+                  }
+
+                  <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto pr-2">
+                    {filteredSubProjects.map((project) => (
                       <div key={project._id} className="project-row flex items-center gap-2 p-2 border rounded">
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4"
-                          checked={selectedSubProjects.includes(project._id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedSubProjects(prev => [...prev, project._id]);
-                            } else {
-                              setSelectedSubProjects(prev => prev.filter(id => id !== project._id));
-                            }
-                          }}
-                          disabled={mode === 'view'}
-                        />
                         {project ? (
                           <Input
                             type="text"
@@ -714,8 +712,30 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                         ) : (
                           <span className="flex-1">{project.name}</span>
                         )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              subProjects: prev.subProjects.filter(p => p._id !== project._id)
+                            }));
+                          }}
+                          disabled={mode === 'view'}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Remove
+                        </Button>
                       </div>
                     ))}
+
+                    {/* Empty search result state */}
+                    {filteredSubProjects.length === 0 && searchQuery && (
+                      <p className="text-center text-xs text-muted-foreground py-4">
+                        No sub-projects match "{searchQuery}"
+                      </p>
+                    )}
                   </div>
                 </div>
 

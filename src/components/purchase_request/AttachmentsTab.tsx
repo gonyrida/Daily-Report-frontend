@@ -59,6 +59,7 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
   const [showPDFPreview, setShowPDFPreview] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -376,9 +377,33 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
   };
 
   const handleDownloadFile = (attachment: Attachment) => {
-    // In a real app, this would trigger a download
-    console.log('Downloading file:', attachment.filename);
-    // window.open('/api/attachment/download/' + attachment.id, '_blank');
+    setIsDownloading(true);
+    // Try fileStorageRef first (new uploads)
+    const file = fileStorageRef.current.get(attachment.id);
+    
+    if (file) {
+      // Create download link from File object
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else if (attachment.base64) {
+      // Create download link from base64 data
+      const link = document.createElement('a');
+      link.href = attachment.base64;
+      link.download = attachment.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // Fallback to API endpoint for existing files
+      window.open('/api/attachment/download/' + attachment.id, '_blank');
+    }
+    setIsDownloading(false);
   };
 
   const handlePreviewImage = (attachment: Attachment) => {
@@ -530,9 +555,6 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
             Double-click to select files
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-            Press Ctrl+V (Cmd+V on Mac) to paste files
-          </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
             Max {maxFiles} files • Max {maxFileSize}MB each • {allowedFileTypes.join(', ')}
           </p>
@@ -638,18 +660,8 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
                         className="h-7 px-2 text-xs"
                         onClick={() => handleDownloadFile(attachment)}
                       >
-                        Download
+                        {isDownloading ? 'Downloading...' : 'Download'}
                       </Button>
-                      {isImageFile(attachment.filename) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => handlePreviewImage(attachment)}
-                        >
-                          Preview
-                        </Button>
-                      )}
                     </div>
                     {mode !== 'view' && (
                       <button

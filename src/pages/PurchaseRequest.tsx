@@ -620,23 +620,26 @@ const PurchaseRequest = ({onRefresh}) => {
         : '/purchase-requests';
       const endpoint = `${baseEndpoint}${params.toString() ? `?${params.toString()}` : ''}`;
       
-      const response = await apiGet(endpoint);
-      const result = await response.json();
+      const my_requests_response = await apiGet(endpoint);
+      const pr_projects_response = await apiGet('/purchase-requests/pr-projects');
+      const my_requests_result = await my_requests_response.json();
+      const pr_projects_result = await pr_projects_response.json();
       
-      if (result.success) {
-        setRequests(result.data);
+      if (my_requests_result.success) {
+        setRequests(my_requests_result.data);
+        setPRProjects(pr_projects_result.data);
         // Update the correct pagination state
-        if (result.pagination) {
+        if (my_requests_result.pagination) {
           if (targetTab === 'my-requests') {
-            setPagination(result.pagination);
+            setPagination(my_requests_result.pagination);
           } else {
-            setAllRequestsPagination(result.pagination);
+            setAllRequestsPagination(my_requests_result.pagination);
           }
         }
       } else {
         toast({
           title: "Error",
-          description: result.message || "Failed to load requests data"
+          description: my_requests_result.message || "Failed to load requests data"
         });
       }
     } catch (error) {
@@ -1206,8 +1209,12 @@ const PurchaseRequest = ({onRefresh}) => {
                                       <td className="p-3">
                                         <span className={`px-2 py-1 rounded-full text-xs ${
                                           request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                          request.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                          'bg-yellow-100 text-yellow-800'
+                                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                          request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                          request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                          request.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                                          request.status === 'revised' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-red-100 text-red-800'
                                         }`}>
                                           {getPendingStatusText(request)}
                                         </span>

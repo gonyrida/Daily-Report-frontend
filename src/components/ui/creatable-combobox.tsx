@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Check, ChevronsUpDown, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -42,7 +42,16 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
   const [inputValue, setInputValue] = useState("")
   const [localOptions, setLocalOptions] = useState<Option[]>(options)
 
+  useEffect(() => {
+    if (options) {
+      // Update internal state when initialValue changes
+      setLocalOptions(options);
+    }
+  }, [options]);
+
   const selectedLabel = localOptions.find(opt => opt.value === value)?.label || value
+  console.log('selectedLabel: ', selectedLabel)
+  console.log('localOptions: ', localOptions)
 
   const handleCreate = (inputValue: string) => {
     const trimmed = inputValue.trim()
@@ -78,14 +87,14 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
       <PopoverContent className={cn(width, "p-0")}>
         <Command>
           <CommandInput
-            placeholder="Search or type new..."
+            placeholder={onCreate ? "Search or type new..." : "Search..."}
             value={inputValue}
             onValueChange={setInputValue}
           />
           <CommandList>
             <CommandEmpty className="flex flex-col items-center justify-center p-2">
               <p className="text-sm text-muted-foreground mb-2">No results found.</p>
-              {inputValue.trim() && (
+              {onCreate && inputValue.trim() && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -101,9 +110,9 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
               {localOptions.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value}
-                  onSelect={(currentValue) => {
-                    onChange(currentValue)
+                  value={option.label}
+                  onSelect={() => {
+                    onChange(option.value)
                     setOpen(false)
                   }}
                 >

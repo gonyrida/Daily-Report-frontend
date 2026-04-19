@@ -23,6 +23,8 @@ const ImageViewModal = ({ open, onClose, imageUrl }: ImageViewModalProps) => {
               src={imageUrl}
               alt="Image Preview"
               className="max-w-full max-h-full object-contain"
+              width="85%"
+              height="85%"
             />
           ) : (
             <div className="flex items-center justify-center h-full">

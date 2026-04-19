@@ -32,9 +32,6 @@ const MaterialActualCost = ({
 	currentFormData = null,
 	onFormDataChange
 }) => {
-
-	console.log("This is the MA requet got ", requests)
-
 	// Handle loading state when requests is being fetched
 	if (requests === 'loading') {
 		return (
@@ -106,6 +103,7 @@ const MaterialActualCost = ({
 				// Replace existing report with editable version
 				baseReports[existingIndex] = {
 					...currentFormData,
+          no : !currentFormData.no ? summary.project.counter + 1 : currentFormData.no,
 					isEditable: true
 				};
 			} else if (mode === 'create') {
@@ -114,8 +112,8 @@ const MaterialActualCost = ({
 					...currentFormData,
 					label: `MR #${summary.reportCount + 1}`,
 					version: 0,
-					status: 'draft',
-					no: summary.reportCount + 1,
+					status: 'unknown',
+					no: summary.project.counter + 1,
 					isEditable: true,
 					isNew: true
 				});
@@ -149,7 +147,7 @@ const MaterialActualCost = ({
             <thead className="bg-muted/50">
               <tr>
                 <th className="text-center p-2 text-md font-medium">MR #</th>
-                <th className="text-center p-2 text-md font-medium">Version</th>
+                <th className="text-center p-2 text-md font-medium">Revision</th>
                 <th className="text-center p-2 text-md font-medium">Status</th>
                 <th className="text-center p-2 text-md font-medium">Category</th>
                 <th className="text-center p-2 text-md font-medium">Description</th>
@@ -168,7 +166,7 @@ const MaterialActualCost = ({
                     className={`border-t ${isEditable ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : 'hover:bg-muted/30'}`}
                   >
                     <td className="text-center p-2 text-sm font-medium">
-                      {`MR #${report.no}`}
+                      {`MR #${report.no || 0}`}
                     </td>
                     <td className="text-center p-2 text-sm font-medium">
                       R-{report.version ?? 0}
@@ -185,7 +183,7 @@ const MaterialActualCost = ({
                       </span>
                     </td>
                     <td className="text-center p-2 text-sm font-medium">
-                      {report.purpose || currentFormData?.purpose || 'No category'}
+                      {report.purpose || currentFormData?.purpose || 'None'}
                     </td>
                     <td className="text-center p-2 text-sm font-medium">
                       {isEditable ? (
@@ -194,9 +192,10 @@ const MaterialActualCost = ({
                           onChange={(e) => setEditableRowData(prev => ({ ...prev, description: e.target.value }))}
                           placeholder="Enter description..."
                           className="text-xs h-8 text-center border-blue-200 focus:border-blue-400"
+                          title={editableRowData.description}
                         />
                       ) : (
-                        report.requestDescription || 'No description available'
+                        <p title={report.requestDescription || 'No description available'}>{report.requestDescription || 'No description available'}</p>
                       )}
                     </td>
                     <td className="text-center p-2 text-sm font-medium">
@@ -209,9 +208,10 @@ const MaterialActualCost = ({
                           onChange={(e) => setEditableRowData(prev => ({ ...prev, remarks: e.target.value }))}
                           placeholder="Enter remarks..."
                           className="text-xs h-8 text-center border-blue-200 focus:border-blue-400"
+                          title={editableRowData.remarks}
                         />
                       ) : (
-                        report.requestRemarks || report.remark || '-'
+                        <p title={report.requestRemarks || report.remark || '-'}>{report.requestRemarks || report.remark || '-'}</p>
                       )}
                     </td>
                   </tr>
@@ -223,20 +223,17 @@ const MaterialActualCost = ({
         
         {/* TOTAL Section */}
         <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-700">
-          <div className="flex justify-between items-center">
-            <h4 className="text-lg font-bold text-green-800 dark:text-green-200">TOTAL</h4>
-            <div className="text-right">
-              <p className="text-sm text-green-600 dark:text-green-300 mb-1">
-                Including {unifiedReports.length} request{unifiedReports.length !== 1 ? 's' : ''}
-              </p>
-              <p className="text-2xl font-bold text-green-800 dark:text-green-200">
-                ${unifiedReports.reduce((sum, report) => {
-                  const isCurrent = report._id === currentFormData?._id || report.isNew;
-                  const reportTotal = isCurrent ? getCurrentRequestTotal() : (report.grandTotal || 0);
-                  return sum + reportTotal;
-                }, 0).toLocaleString()}
-              </p>
-            </div>
+          <div className="text-right">
+            <p className="text-sm text-green-600 dark:text-green-300 mb-1">
+              Including {unifiedReports.length} request{unifiedReports.length !== 1 ? 's' : ''}
+            </p>
+            <p className="text-2xl font-bold text-green-800 dark:text-green-200">
+              TOTAL: ${unifiedReports.reduce((sum, report) => {
+                const isCurrent = report._id === currentFormData?._id || report.isNew;
+                const reportTotal = isCurrent ? getCurrentRequestTotal() : (report.grandTotal || 0);
+                return sum + reportTotal;
+              }, 0).toLocaleString()}
+            </p>
           </div>
         </div>
 

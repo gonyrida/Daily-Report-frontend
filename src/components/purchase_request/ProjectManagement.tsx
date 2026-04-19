@@ -126,14 +126,14 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
           <CardTitle className="text-xl font-semibold">Project(s)</CardTitle>
           <div className="flex gap-2">
             <Button 
-              variant="outline" 
+              variant="default" 
               size="sm"
               onClick={handleCreateProject}
             >
               New Project
             </Button>
             <Button 
-              variant="outline" 
+              variant="default"
               size="sm"
               onClick={() => {
                 if (selectedProjects.length === 1) {
@@ -144,12 +144,20 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
               disabled={selectedProjects.length !== 1 || (() => {
                 if (selectedProjects.length === 1) {
                   const project = projects.find(p => p.id === selectedProjects[0] || p._id === selectedProjects[0]);
-                  return project?.status === 'completed' || project?.status === 'on_hold' || false;
+                  return project?.status === 'completed' || project?.status === 'on_hold' || project?.createdBy?._id !== profile?.id || false;
                 }
                 return false;
               })()}
             >
               Edit Project
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRefresh()}
+              disabled={loadingProjects}
+            >
+              {loadingProjects ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
         </CardHeader>

@@ -14,6 +14,8 @@ interface MaterialSelectionDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onMaterialsSelected: (items: any[]) => void;
+  customUnits?: { value: string; label: string }[];
+  onCreateUnit?: (newUnit: { value: string; label: string }) => void;
 }
 
 interface ConfiguredItem {
@@ -47,9 +49,12 @@ export default function MaterialSelectionDialog({
   isOpen,
   onOpenChange,
   onMaterialsSelected,
+  customUnits,
+  onCreateUnit
 }: MaterialSelectionDialogProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'select' | 'configure'>('select');
+  const allUnitOptions = [...UNIT_OPTIONS, ...(customUnits || [])];
   
   // Tab 1: Selection state
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
@@ -184,6 +189,12 @@ export default function MaterialSelectionDialog({
   const handleClose = () => {
     resetState();
     onOpenChange(false);
+  };
+
+  const handleCreateUnit = (materialId: string, newUnitLabel: string) => {
+    const newUnit = { value: newUnitLabel.toLowerCase(), label: newUnitLabel };
+    onCreateUnit?.(newUnit);  // Notify parent
+    updateConfiguredItem(materialId, 'unit', newUnit.value);  // Update this item
   };
 
   return (
@@ -463,13 +474,14 @@ export default function MaterialSelectionDialog({
                           </td>
                           <td className="px-4 py-3">
                             <CreatableCombobox
-                              options={UNIT_OPTIONS}
+                              options={allUnitOptions}
                               value={item.unit}
                               onChange={(value) =>
                                 updateConfiguredItem(item.materialId, 'unit', value)
                               }
+                              onCreate={(newUnit) => handleCreateUnit(item.materialId, newUnit)}
                               placeholder="Select unit..."
-                              width="w-[140px]"
+                              width="w-[178px]"
                             />
                           </td>
                           <td className="px-4 py-3">

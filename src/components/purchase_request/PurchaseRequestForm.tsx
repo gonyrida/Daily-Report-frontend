@@ -27,6 +27,7 @@ import MaterialActualCost from './MaterialActualCost';
 import AttachmentsTab, { Attachment } from './AttachmentsTab';
 import ConfirmationModal from './ConfirmationModal';
 import MaterialSelectionDialog from '@/components/material_master/MaterialSelectionDialog';
+import CreatableCombobox from "@/components/ui/creatable-combobox"
 import { exportPurchaseRequestExcel } from './services/exportServices';
 import { version } from 'os';
 
@@ -96,13 +97,16 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	const [prSummaryData, setPrSummaryData] = useState(null);
 	const [showConfirmModal, setShowConfirmModal] = useState(false);
 	const [showMaterialDialog, setShowMaterialDialog] = useState(false);
+	// Add state for custom units at top level for MaterialSelectionDialog.tsx
+	const [customUnits, setCustomUnits] = useState<{ value: string; label: string }[]>([]);
 
 	useEffect(() => {
 		if (profile) {
 			setFormData(prev => ({
 				...prev,
 				requesterName: profile.fullName || prev.requesterName,
-				requesterDepartment: profile.department || prev.requesterDepartment
+				requesterDepartment: profile.department || prev.requesterDepartment,
+				approvers: { ...prev.approvers, preparedBy: profile.id }
 			}));
 			setIsProfileLoading(false);
 		}
@@ -165,7 +169,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			requesterName: data.requesterName || '',
 			requesterDepartment: data.requesterDepartment || '',
 			version: data.version || 0,
-			no: data.no || '',
+			no: data.no || 0,
 			projectName: data.projectName || '',
 			label: data.label || '',
 			projectFrom: {
@@ -203,10 +207,10 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
     };
 	};
 
-	const getPRSummaryData = async (projectId: string) => {
+	const getPRSummaryData = async (projectId: string, requestId: string = '') => {
 		try {
 			setPrSummaryData('loading'); // Set loading state
-			const response = await apiGet(`/purchase-requests/pr-summary/${projectId}`);
+			const response = await apiGet(`/purchase-requests/pr-summary/${projectId}/${requestId || 'none'}`);
 			const result = await response.json();
 			setPrSummaryData(result.data);
 		} catch (error) {
@@ -218,7 +222,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 
 	useEffect(() => {
 		if (initialData?.projectFrom?.mainId) {
-			getPRSummaryData(initialData.projectFrom.mainId)
+			getPRSummaryData(initialData.projectFrom.mainId, initialData._id)
 		}
 	}, [initialData])
 
@@ -230,6 +234,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
     } else {
       // Default for new request
       return {
+		_id: '',
         requesterName: profile?.fullName || '',
         requesterDepartment: profile?.department || '',
         projectName: '',
@@ -254,7 +259,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
         requestRemarks: '',
         attachments: [],
         approvers: {
-					preparedBy: '',
+					preparedBy: profile?.id || '',
           checkedBy: '',
           verifiedBy: '',
           approvedBy: '',
@@ -344,6 +349,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 
   const resetForm = () => {
 		setFormData({
+			_id: '',
 			requesterName: profile?.fullName || '',
 			requesterDepartment: profile?.department || '',
 			projectName: '',
@@ -362,7 +368,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			requestDescription: '',
 			requestRemarks: '',
 			attachments: [],
-			approvers: { preparedBy: '', checkedBy: '', verifiedBy: '', approvedBy: '', backupCheckedBy: '', backupVerifiedBy: '', backupApprovedBy: '' },
+			approvers: { preparedBy: profile?.id || '', checkedBy: '', verifiedBy: '', approvedBy: '', backupCheckedBy: '', backupVerifiedBy: '', backupApprovedBy: '' },
 			status: '',
 			priority: ''
 		});
@@ -446,6 +452,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
         // Reset form
         if (mode === 'create') {
           setFormData({
+			_id: '',
             requesterName: profile?.fullName || '',
             requesterDepartment: profile?.department || '',
             projectName: '',
@@ -498,6 +505,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			});
 		} finally {
 			setIsSubmitting(false);
+			setActiveTab('purchase-request')
 		}
 	};
 
@@ -588,6 +596,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
         reference: '',
         note: ''
       });
+			setSelectedItems([])
       setEditingIndex(null);
       setShowAddItemModal(false);
     }
@@ -686,6 +695,24 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		setFormData(prev => ({ ...prev, ...updates }));
 	}, []);
 
+	// Transform users data to options format
+	const preparerOptions = preparers.map(user => ({
+		value: user._id || `user-${user.id}`,
+		label: `${user.firstName} ${user.lastName} (${user.role})`
+	}))
+	const checkerOptions = checkers.map(user => ({
+		value: user._id || `user-${user.id}`,
+		label: `${user.firstName} ${user.lastName} (${user.role})`
+	}))
+	const verifierOptions = verifiers.map(user => ({
+		value: user._id || `user-${user.id}`,
+		label: `${user.firstName} ${user.lastName} (${user.role})`
+	}))
+	const approverOptions = approvers.map(user => ({
+		value: user._id || `user-${user.id}`,
+		label: `${user.firstName} ${user.lastName} (${user.role})`
+	}))
+
   return (
 		<>
 			<Dialog 
@@ -702,7 +729,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				<DialogTrigger asChild>
 				</DialogTrigger>
 				<DialogContent 
-					className="max-w-6xl max-h-[95vh] overflow-y-auto"
+					className={`max-w-6xl max-h-[95vh] ${isLoading ? 'overflow-y-hidden' : 'overflow-y-auto'}`}
 					onPointerDownOutside={(e) => e.preventDefault()}
 					onEscapeKeyDown={(e) => e.preventDefault()}
 				>
@@ -752,7 +779,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 															...formData,
 															projectName: subProject?.name || '',
 															projectFrom: {
-																mainProject: project?.parentProjectCode || '',
+																mainProject: project?.projectCode || '',
 																mainId: project?._id || '',
 																subProject: subProject?.name || '',
 																subId: subProject?._id || ''
@@ -786,11 +813,11 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 													options={projectData}
 													optionsFrom='purposes'
 													onChange={(value) => {
-														const project = projectData.find((project) => project.purposes?.some((subProject) => subProject._id === value));
-														const subProject = project.purposes.find((subProject) => subProject._id === value);
+														const project = projectData.find((project) => project.purposes?.some((purpose) => purpose._id === value));
+														const purpose = project.purposes.find((purpose) => purpose._id === value);
 														setFormData({
 															...formData,
-															purpose: subProject?.name || ''
+															purpose: purpose?.name || ''
 														})
 													}}
 													onCreate={(label) => {
@@ -1057,120 +1084,72 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 								
 								{/* Signature Section */}
 								<div className="space-y-4">
-									<h3 className="text-sm font-semibold text-gray-700">Approval Workflow</h3>
+									<h3 className="text-sm font-semibold">Approval Workflow</h3>
 									
 									{/* Primary Approvers Row */}
 									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 										<div>
 											<Label className="text-sm font-medium">Prepared By</Label>
-											<Select
-												value={formData.approvers.preparedBy} 
-												onValueChange={(value) => 
+											<CreatableCombobox
+												options={preparerOptions}
+												value={formData.approvers.preparedBy}
+												onChange={(value) => {
 													setFormData(prev => ({
 														...prev,
 														approvers: { ...prev.approvers, preparedBy: value }
 													}))
-												}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Select preparer" />
-												</SelectTrigger>
-												<SelectContent>
-													{loadingUsers ? (
-														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-													) : (
-														preparers.map((user) => (
-															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-																{user.firstName + ' ' + user.lastName} ({user.role})
-															</SelectItem>
-														))
-													)
-												}</SelectContent>
-											</Select>
+												}}
+												placeholder="Select preparer"
+												width="w-full"
+											/>
 										</div>
-									
+										
 										<div>
-											<Label className="text-sm font-medium">Checked By</Label>
-											<Select 
-												value={formData.approvers.checkedBy} 
-												onValueChange={(value) => 
+											<Label className="text-sm font-medium">Checker</Label>
+											<CreatableCombobox
+												options={checkerOptions}
+												value={formData.approvers.checkedBy}
+												onChange={(value) => 
 													setFormData(prev => ({
 														...prev,
 														approvers: { ...prev.approvers, checkedBy: value }
 													}))
 												}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Select checker" />
-												</SelectTrigger>
-												<SelectContent>
-													{loadingUsers ? (
-														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-													) : (
-														checkers.map((user) => (
-															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-																{user.firstName + ' ' + user.lastName} ({user.role})
-															</SelectItem>
-														))
-													)
-												}</SelectContent>
-											</Select>
+												placeholder="Select checker"
+												width="w-full"
+											/>
 										</div>
-									
+
 										<div>
-											<Label className="text-sm font-medium">Verified By</Label>
-											<Select 
-												value={formData.approvers.verifiedBy} 
-												onValueChange={(value) => 
+											<Label className="text-sm font-medium">Verifier</Label>
+											<CreatableCombobox
+												options={verifierOptions}
+												value={formData.approvers.verifiedBy}
+												onChange={(value) => 
 													setFormData(prev => ({
 														...prev,
 														approvers: { ...prev.approvers, verifiedBy: value }
 													}))
 												}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Select verifier" />
-												</SelectTrigger>
-												<SelectContent>
-													{loadingUsers ? (
-														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-													) : (
-														verifiers.map((user) => (
-															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-																{user.firstName + ' ' + user.lastName} ({user.role})
-															</SelectItem>
-														))
-													)
-												}</SelectContent>
-											</Select>
+												placeholder="Select verifier"
+												width="w-full"
+											/>
 										</div>
-									
+
 										<div>
 											<Label className="text-sm font-medium">Approved By</Label>
-											<Select 
-												value={formData.approvers.approvedBy} 
-												onValueChange={(value) => 
+											<CreatableCombobox
+												options={approverOptions}
+												value={formData.approvers.approvedBy}
+												onChange={(value) => 
 													setFormData(prev => ({
 														...prev,
 														approvers: { ...prev.approvers, approvedBy: value }
 													}))
 												}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Select approver" />
-												</SelectTrigger>
-												<SelectContent>
-													{loadingUsers ? (
-														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-													) : (
-														approvers.map((user) => (
-															<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-																{user.firstName + ' ' + user.lastName} ({user.role})
-															</SelectItem>
-														))
-													)
-												}</SelectContent>
-											</Select>
+												placeholder="Select approver"
+												width="w-full"
+											/>
 										</div>
 									</div>
 
@@ -1178,95 +1157,50 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 									<div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
 										<div>
 											<Label className="text-sm font-medium text-muted-foreground">Backup Checked By</Label>
-											<Select 
-												value={formData.approvers.backupCheckedBy} 
-												onValueChange={(value) => 
+											<CreatableCombobox
+												options={checkerOptions}
+												value={formData.approvers.backupCheckedBy}
+												onChange={(value) => 
 													setFormData(prev => ({
 														...prev,
 														approvers: { ...prev.approvers, backupCheckedBy: value === '__none__' ? '' : value }
 													}))
 												}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Select backup checker (optional)" />
-												</SelectTrigger>
-												<SelectContent>
-													{loadingUsers ? (
-														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-													) : (
-														<>
-															<SelectItem value="__none__">None</SelectItem>
-															{checkers.map((user) => (
-																<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-																	{user.firstName + ' ' + user.lastName} ({user.role})
-																</SelectItem>
-															))}
-														</>
-													)
-												}</SelectContent>
-											</Select>
+												placeholder="Select backup checker (optional)"
+												width="w-full"
+											/>
 										</div>
-									
+
 										<div>
 											<Label className="text-sm font-medium text-muted-foreground">Backup Verified By</Label>
-											<Select 
-												value={formData.approvers.backupVerifiedBy} 
-												onValueChange={(value) => 
+											<CreatableCombobox
+												options={verifierOptions}
+												value={formData.approvers.backupVerifiedBy}
+												onChange={(value) => 
 													setFormData(prev => ({
 														...prev,
 														approvers: { ...prev.approvers, backupVerifiedBy: value === '__none__' ? '' : value }
 													}))
 												}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Select backup verifier (optional)" />
-												</SelectTrigger>
-												<SelectContent>
-													{loadingUsers ? (
-														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-													) : (
-														<>
-															<SelectItem value="__none__">None</SelectItem>
-															{verifiers.map((user) => (
-																<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-																	{user.firstName + ' ' + user.lastName} ({user.role})
-																</SelectItem>
-															))}
-														</>
-													)
-												}</SelectContent>
-											</Select>
+												placeholder="Select backup verifier (optional)"
+												width="w-full"
+											/>
 										</div>
-									
+
 										<div>
 											<Label className="text-sm font-medium text-muted-foreground">Backup Approved By</Label>
-											<Select 
-												value={formData.approvers.backupApprovedBy} 
-												onValueChange={(value) => 
+											<CreatableCombobox
+												options={approverOptions}
+												value={formData.approvers.backupApprovedBy}
+												onChange={(value) => 
 													setFormData(prev => ({
 														...prev,
 														approvers: { ...prev.approvers, backupApprovedBy: value === '__none__' ? '' : value }
 													}))
 												}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Select backup approver (optional)" />
-												</SelectTrigger>
-												<SelectContent>
-													{loadingUsers ? (
-														<SelectItem value="loading_state" disabled>Loading...</SelectItem>
-													) : (
-														<>
-															<SelectItem value="__none__">None</SelectItem>
-															{approvers.map((user) => (
-																<SelectItem key={user._id} value={user._id || `user-${user.id}`}>
-																	{user.firstName + ' ' + user.lastName} ({user.role})
-																</SelectItem>
-															))}
-														</>
-													)
-												}</SelectContent>
-											</Select>
+												placeholder="Select backup approver (optional)"
+												width="w-full"
+											/>
 										</div>
 									</div>
 								</div>
@@ -1373,6 +1307,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				isOpen={showMaterialDialog}
 				onOpenChange={setShowMaterialDialog}
 				onMaterialsSelected={handleMaterialsSelected}
+				customUnits={customUnits}
+				onCreateUnit={(newUnit) => setCustomUnits(prev => [...prev, newUnit])}
 			/>
 
 			{/* Add Item Modal */}

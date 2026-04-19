@@ -114,10 +114,10 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
   };
 
 
-  const getPRSummaryData = async (projectId: string) => {
+  const getPRSummaryData = async (projectId: string, requestId: string) => {
     try {
       setPrSummaryData('loading'); // Set loading state
-      const response = await apiGet(`/purchase-requests/pr-summary/${projectId}`);
+      const response = await apiGet(`/purchase-requests/pr-summary/${projectId}/${requestId}`);
       const result = await response.json();
       setPrSummaryData(result.data);
     } catch (error) {
@@ -129,7 +129,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
 
   useEffect(() => {
     if (selectedRequest?.projectFrom?.mainId) {
-      getPRSummaryData(selectedRequest.projectFrom.mainId)
+      getPRSummaryData(selectedRequest.projectFrom.mainId, selectedRequest._id)
     }
   }, [selectedRequest])
 
@@ -139,7 +139,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
 
   return (
     <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`max-w-6xl max-h-[90vh] ${isLoading ? 'overflow-y-hidden' : 'overflow-y-auto'}`}>
         {isLoading && (
           <div className="absolute inset-0 bg-background/80 z-50 flex flex-col items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -151,7 +151,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
         </DialogHeader>
 
         {/* Edit Button: Top right below close button, only for owner */}
-        {selectedRequest && profile && selectedRequest.approvalWorkflow[0].approver === profile.id && (
+        {/* {selectedRequest && profile && selectedRequest.approvalWorkflow[0].approver === profile.id && (
           <Button
             variant="default"
             size="sm"
@@ -163,7 +163,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
           >
             Edit
           </Button>
-        )}
+        )} */}
 
         {/* Add to your details modal content */}
         {selectedRequest && (

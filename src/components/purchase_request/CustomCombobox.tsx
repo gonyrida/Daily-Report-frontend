@@ -125,11 +125,11 @@ const CustomCombobox: React.FC<CreatableComboboxProps> = ({
               {currentOptions.map((option) => (
                 <CommandItem
                   key={option[defaultValue]}
-                  value={option[defaultValue]}
-                  onSelect={(currentValue) => {
+                  value={option[defaultLabel]}
+                  onSelect={() => {
                     const selectedLabel = option[defaultLabel];
                     setDisplayLabel(selectedLabel);
-                    onChange(currentValue)
+                    onChange(option[defaultValue])
                     setOpen(false)
                   }}
                 >
