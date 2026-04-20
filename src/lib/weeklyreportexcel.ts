@@ -200,6 +200,7 @@ export interface ManpowerRow {
 export interface MaterialRow {
   description?: string;
   unit?: string;
+  dailyData?: (number | string)[];  // 7 days: Fri, Sat, Sun, Mon, Tue, Wed, Thu
   previous?: number | string;
   thisPeriod?: number | string;
   accumulate?: number | string;
@@ -208,6 +209,7 @@ export interface MaterialRow {
 export interface EquipmentRow {
   description?: string;
   unit?: string;
+  dailyData?: (number | string)[];  // 7 days: Fri, Sat, Sun, Mon, Tue, Wed, Thu
   previous?: number | string;
   thisPeriod?: number | string;
   accumulate?: number | string;
@@ -2639,13 +2641,17 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   const firstMatRow = r;
   materialRows.forEach(m => {
     ws.getRow(r).height = 20;
-    ws.getCell(r, 2).value = m.description ?? '';
+    // Description with unit in parentheses
+    const descWithUnit = m.unit ? `${m.description ?? ''} (${m.unit})` : (m.description ?? '');
+    ws.getCell(r, 2).value = descWithUnit;
     safeStyle(ws.getCell(r, 2), dataStyle, 'mat.desc.data');
-    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.desc.data.span');
-    safeMerge(ws, r, 2, r, 8);
 
-    ws.getCell(r, 9).value = m.unit ?? '';
-    safeStyle(ws.getCell(r, 9), numStyle, 'mat.unit.data');
+    // Daily data columns C-I (Fri-Thu)
+    const dd = m.dailyData ?? [];
+    for (let i = 0; i < 7; i++) {
+      ws.getCell(r, 3 + i).value = dd[i] ?? 0;
+      safeStyle(ws.getCell(r, 3 + i), numStyle, `mat.daily.${i}`);
+    }
 
     ws.getCell(r, 10).value = m.previous ?? 0;
     safeStyle(ws.getCell(r, 10), numStyle, 'mat.prev.data');
@@ -2656,31 +2662,6 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
     ws.getCell(r, 12).value = m.accumulate !== undefined && m.accumulate !== ''
       ? m.accumulate
       : { formula: `J${r}+K${r}` };
-    safeStyle(ws.getCell(r, 12), numStyle, 'mat.acc.data');
-
-    r++;
-  });
-
-  if (materialRows.length === 0) {
-    ws.getRow(r).height = 20;
-    safeStyle(ws.getCell(r, 2), dataStyle, 'mat.empty');
-    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.empty.span');
-    safeMerge(ws, r, 2, r, 8);
-    for (let c = 9; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.empty');
-    r++;
-  }
-  const lastMatRow = r - 1;
-
-  ws.getRow(r).height = 22;
-  ws.getCell(r, 2).value = 'Total';
-  safeStyle(ws.getCell(r, 2), totalStyle, 'mat.total.lbl');
-  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), totalStyle, 'mat.total.span');
-  safeMerge(ws, r, 2, r, 8);
-  safeStyle(ws.getCell(r, 9), totalNumStyle, 'mat.total.unit');
-  ws.getCell(r, 10).value = { formula: `SUM(J${firstMatRow}:J${lastMatRow})` };
-  safeStyle(ws.getCell(r, 10), totalNumStyle, 'mat.total.prev');
-  ws.getCell(r, 11).value = { formula: `SUM(K${firstMatRow}:K${lastMatRow})` };
-  safeStyle(ws.getCell(r, 11), totalNumStyle, 'mat.total.this');
   ws.getCell(r, 12).value = { formula: `SUM(L${firstMatRow}:L${lastMatRow})` };
   safeStyle(ws.getCell(r, 12), totalNumStyle, 'mat.total.acc');
   r += 2;
@@ -2735,7 +2716,6 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   // Header row 3: day dates (numeric)
   ws.getRow(r).height = 18;
   dates.forEach((dt, i) => {
-    ws.getCell(r, 3 + i).value = dt;
     safeStyle(ws.getCell(r, 3 + i), headerStyle, `eq.dt.${i}`);
   });
   r++;
@@ -2744,13 +2724,17 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   const firstEqRow = r;
   equipmentRows.forEach(e => {
     ws.getRow(r).height = 20;
-    ws.getCell(r, 2).value = e.description ?? '';
+    // Description with unit in parentheses
+    const descWithUnit = e.unit ? `${e.description ?? ''} (${e.unit})` : (e.description ?? '');
+    ws.getCell(r, 2).value = descWithUnit;
     safeStyle(ws.getCell(r, 2), dataStyle, 'eq.desc.data');
-    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.desc.data.span');
-    safeMerge(ws, r, 2, r, 8);
 
-    ws.getCell(r, 9).value = e.unit ?? '';
-    safeStyle(ws.getCell(r, 9), numStyle, 'eq.unit.data');
+    // Daily data columns C-I (Fri-Thu)
+    const dd = e.dailyData ?? [];
+    for (let i = 0; i < 7; i++) {
+      ws.getCell(r, 3 + i).value = dd[i] ?? 0;
+      safeStyle(ws.getCell(r, 3 + i), numStyle, `eq.daily.${i}`);
+    }
 
     ws.getCell(r, 10).value = e.previous ?? 0;
     safeStyle(ws.getCell(r, 10), numStyle, 'eq.prev.data');
@@ -2768,10 +2752,7 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
 
   if (equipmentRows.length === 0) {
     ws.getRow(r).height = 20;
-    safeStyle(ws.getCell(r, 2), dataStyle, 'eq.empty');
-    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.empty.span');
-    safeMerge(ws, r, 2, r, 8);
-    for (let c = 9; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.empty');
+    for (let c = 2; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.empty');
     r++;
   }
   const lastEqRow = r - 1;
@@ -2779,9 +2760,11 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Total';
   safeStyle(ws.getCell(r, 2), totalStyle, 'eq.total.lbl');
-  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), totalStyle, 'eq.total.span');
-  safeMerge(ws, r, 2, r, 8);
-  safeStyle(ws.getCell(r, 9), totalNumStyle, 'eq.total.unit');
+  // Daily totals
+  for (let i = 0; i < 7; i++) {
+    ws.getCell(r, 3 + i).value = { formula: `SUM(${colLetter(3 + i)}${firstEqRow}:${colLetter(3 + i)}${lastEqRow})` };
+    safeStyle(ws.getCell(r, 3 + i), totalNumStyle, `eq.total.d${i}`);
+  }
   ws.getCell(r, 10).value = { formula: `SUM(J${firstEqRow}:J${lastEqRow})` };
   safeStyle(ws.getCell(r, 10), totalNumStyle, 'eq.total.prev');
   ws.getCell(r, 11).value = { formula: `SUM(K${firstEqRow}:K${lastEqRow})` };

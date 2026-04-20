@@ -133,7 +133,15 @@ export const transformMaterialsToFrontendFormat = (materials: MaterialEntry[]): 
   return materials?.map(entry => ({
     description: entry.description,
     unit: entry.unit,
-    dailyData: ["-", "-", "-", "-", "-", "-", "-"],
+    dailyData: [
+      entry.date?.fri?.toString() || "0",
+      entry.date?.sat?.toString() || "0",
+      entry.date?.sun?.toString() || "0",
+      entry.date?.mon?.toString() || "0",
+      entry.date?.tue?.toString() || "0",
+      entry.date?.wed?.toString() || "0",
+      entry.date?.thu?.toString() || "0"
+    ],
     previousWeek: entry.prevWeek?.toString() || "0",
     thisWeek: entry.thisWeek?.toString() || "0",
     upToThisWeek: entry.accumulated?.toString() || "0"
