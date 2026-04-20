@@ -196,6 +196,12 @@ export interface MapperInput {
   }>;
   hseFirstAid?: string;
   hseOtherConcerns?: string;
+  hsePhotos?: Array<{
+    sectionTitle?: string;
+    images?: string[];
+    footers?: string[];
+    [k: string]: unknown;
+  }>;
 
   // from useResourceTable()
   weekDates?: string[];
@@ -394,6 +400,11 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     })),
     hseFirstAid:       input.hseFirstAid,
     hseOtherConcerns:  input.hseOtherConcerns,
+    hsePhotos:         (input.hsePhotos ?? []).map(row => ({
+      sectionTitle: row.sectionTitle,
+      images:       row.images ?? [],
+      footers:      row.footers ?? [],
+    })),
 
     // ── Resources ────────────────────────────────────────────────────────────
     weekDates: input.weekDates,

@@ -76,6 +76,7 @@ export interface WeeklyReportExportData {
   hsePermits?: HSEPermitRow[];
   hseFirstAid?: string;
   hseOtherConcerns?: string;
+  hsePhotos?: HSEPhotoEntry[];
 
   // ── 6. Resources ─────────────────────────────────────────────────────────────
   weekDates?: string[];           // 7 day-date strings e.g. ["13","14","15","16","17","18","19"]
@@ -223,6 +224,12 @@ export interface ConstructionIssue {
   siteLocation?: string;
   problemDescription?: string;
   actionBy?: string;
+}
+
+export interface HSEPhotoEntry {
+  sectionTitle?: string;      // e.g., "5.6.1 HSES Training Photos"
+  images?: string[];            // Array of image URLs or base64 data
+  footers?: string[];           // Footer text for each image (caption)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -794,10 +801,10 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
       console.warn('❌ Failed to add client logo:', error);
     }
   }
-  
+
   // Merge cells 3-5, columns G-I for client logo area
   ws.mergeCells(3, 7, 5, 9); // Merge rows 3-5, columns G-I 
-  
+
 
   // "KINGDOM OF CAMBODIA" banner row 9
   ws.getCell(9, 3).value = 'KINGDOM OF CAMBODIA';
@@ -835,7 +842,7 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
   // Cover image area (merged cells C-M, rows 18-35)
   ws.mergeCells(18, 3, 35, 13); // Merge columns C-M, rows 18-35
 
-  
+
 
   // Add cover image if available
   if (d.coverImage) {
@@ -988,10 +995,10 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   // Row 2: height = 20, merge col B-J
   ws.getRow(2).height = 20;
   ws.getCell(2, 2).value = `LETTER FOR WEEKLY PROGRESS REPORT No.${d.weekNumber ?? ''}`;
-  ws.getCell(2, 2).style = { 
-    font: { bold: true, size: 14, name: 'Arial', color: { argb: 'FFFFFFFF' } }, 
+  ws.getCell(2, 2).style = {
+    font: { bold: true, size: 14, name: 'Arial', color: { argb: 'FFFFFFFF' } },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2F75B5' } },
-    alignment: { horizontal: 'left' as const, vertical: 'middle' as const } 
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const }
   };
   ws.mergeCells(2, 2, 2, 10);
 
@@ -1029,29 +1036,29 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
   ws.getCell(r, 3).value = ':';
   ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
-  
+
   // Set cell alignment (font will be set in rich text)
-  ws.getCell(r, 4).style = { 
-    alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true } 
+  ws.getCell(r, 4).style = {
+    alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true }
   };
-  
+
   // Create rich text with different styles
   const richTextParts = [];
-  
+
   if (d.recipientCompany) {
-    richTextParts.push({ 
+    richTextParts.push({
       text: d.recipientCompany,
       font: { bold: true, size: 12, name: 'Arial' }
     });
   }
-  
+
   if (d.recipientLocation) {
-    richTextParts.push({ 
+    richTextParts.push({
       text: '\r\n' + d.recipientLocation,
       font: { bold: false, size: 12, name: 'Arial' }
     });
   }
-  
+
   const richTextValue = { richText: richTextParts };
   ws.getCell(r, 4).value = richTextValue;
   ws.mergeCells(r, 4, r, 10);
@@ -1059,7 +1066,7 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
 
   // Row 9: height = 30 for Att. field
   ws.getRow(r).height = 30;
-  
+
   ws.getCell(r, 2).value = 'Att.';
   ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
   ws.getCell(r, 3).value = ':';
@@ -1090,9 +1097,9 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   // Letter body
   // "Dear Sir," row
   ws.getCell(r, 2).value = 'Dear Sir,';
-  ws.getCell(r, 2).style = { 
-    font: { bold: true, size: 11, name: 'Arial' }, 
-    alignment: { horizontal: 'left' as const, vertical: 'middle' as const } 
+  ws.getCell(r, 2).style = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const }
   };
   ws.mergeCells(r, 2, r, 10);
   ws.getRow(r).height = 20; // Single line, fixed is fine
@@ -1103,30 +1110,30 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   const bodyText = `We are pleased to submit Weekly Progress Report No-${d.weekNumber ?? ''} from ${d.reportDateFrom ?? ''} to ${d.reportDateTo ?? ''} for ${d.projectTitle ?? ''}.\n\n\nSincerely Yours,`;
 
   ws.getCell(r, 2).value = bodyText;
-  ws.getCell(r, 2).style = { 
-    font: { size: 12, name: 'Arial' }, 
-    alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } 
+  ws.getCell(r, 2).style = {
+    font: { size: 12, name: 'Arial' },
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
   };
   ws.mergeCells(r, 2, r, 10);
   ws.getRow(r).height = estimateRowHeight(bodyText, mergedWidthChars, 12); // ✅ Manual height
   r += 2;
 
-   // Row 16: height = 80, merge B-D for signature image
+  // Row 16: height = 80, merge B-D for signature image
   ws.getRow(16).height = 60;
   ws.mergeCells(16, 2, 16, 4); // Merge B16:D16
 
   // E-Sign signature image in row 16
-  
+
   if (d.signatureImage && d.signatureImage.trim() !== '') {
-    
+
     try {
       // Add signature image to the merged cells
       const imageRange = 'B16:D16';
-      
+
       await addImageToWorksheet(workbook, ws, d.signatureImage, imageRange);
-      
+
     } catch (error) {
-      
+
       // Add fallback text when image fails
       ws.getCell(16, 2).value = '[Signature Image - Failed to Load]';
       ws.getCell(16, 2).style = {
@@ -1138,7 +1145,7 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
     }
   } else {
     console.log('ℹ️ No signature image provided or empty value');
-    
+
     // Add placeholder text when no image is provided
     ws.getCell(16, 2).value = '[No Signature Image]';
     ws.getCell(16, 2).style = {
@@ -1148,48 +1155,48 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
       border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
     };
   }
-  
+
   // Signature block with rich text (only project manager name bold)
   const sigRichText = [];
-  
+
   // Project Manager name (bold)
   if (d.projectManager) {
-    sigRichText.push({ 
-      text: d.projectManager, 
-      font: { size: 10, name: 'Arial', bold: true } 
+    sigRichText.push({
+      text: d.projectManager,
+      font: { size: 10, name: 'Arial', bold: true }
     });
   }
-  sigRichText.push({ 
-    text: ' | Project Manager', 
-    font: { size: 10, name: 'Arial', bold: true } 
+  sigRichText.push({
+    text: ' | Project Manager',
+    font: { size: 10, name: 'Arial', bold: true }
   });
-  sigRichText.push({ 
-    text: '\n' + (d.contractor ?? ''), 
-    font: { size: 10, name: 'Arial', bold: true } 
+  sigRichText.push({
+    text: '\n' + (d.contractor ?? ''),
+    font: { size: 10, name: 'Arial', bold: true }
   });
-  sigRichText.push({ 
-    text: '\n\n' + (d.companyLocation ?? ''), 
-    font: { size: 10, name: 'Arial', bold: false } 
+  sigRichText.push({
+    text: '\n\n' + (d.companyLocation ?? ''),
+    font: { size: 10, name: 'Arial', bold: false }
   });
-  sigRichText.push({ 
-    text: '\n\n' + (d.companyPhone1 ?? '') + (d.companyPhone2 ? ' | ' + d.companyPhone2 : ' | M +885 (0)'), 
-    font: { size: 10, name: 'Arial', bold: false } 
+  sigRichText.push({
+    text: '\n\n' + (d.companyPhone1 ?? '') + (d.companyPhone2 ? ' | ' + d.companyPhone2 : ' | M +885 (0)'),
+    font: { size: 10, name: 'Arial', bold: false }
   });
-  sigRichText.push({ 
-    text: '\n' + (d.companyEmail1 ?? ''), 
-    font: { size: 10, name: 'Arial', bold: false } 
+  sigRichText.push({
+    text: '\n' + (d.companyEmail1 ?? ''),
+    font: { size: 10, name: 'Arial', bold: false }
   });
   if (d.companyEmail2) {
-    sigRichText.push({ 
-      text: '\n' + d.companyEmail2, 
-      font: { size: 10, name: 'Arial', bold: false } 
+    sigRichText.push({
+      text: '\n' + d.companyEmail2,
+      font: { size: 10, name: 'Arial', bold: false }
     });
   }
-  
+
   ws.getCell(r, 2).value = { richText: sigRichText };
-  ws.getCell(r, 2).style = { 
-    font: { size: 10, name: 'Arial' }, 
-    alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } 
+  ws.getCell(r, 2).style = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
   };
   ws.mergeCells(r, 2, r, 10);
   ws.getRow(r).height = estimateRowHeight(sigRichText.map(item => item.text).join(''), mergedWidthChars, 10); // ✅ Manual height
@@ -1215,16 +1222,16 @@ async function buildContent(workbook: ExcelJS.Workbook) {
     "4. QA/QC STATUS",
     "4.1 Non-Conformity Report (NCR)",
     "4.2 Corrective Action Request (CAR)",
-    "4.3 Safety Corrective Action Request (SCAR)", 
+    "4.3 Safety Corrective Action Request (SCAR)",
     "4.4 PM Site Instruction (SI)",
-    "4.5 Client Site Instruction (SI)", 
+    "4.5 Client Site Instruction (SI)",
     "4.6 Inspection Request (IR)",
-    "4.7 Material for Approval (MFA)", 
+    "4.7 Material for Approval (MFA)",
     "4.8 Request for Information (RFI)",
-    "4.9 Request for Approval (RFA)", 
+    "4.9 Request for Approval (RFA)",
     "4.10 Field Change Request (FCR)",
-    "4.11 Variation Order (VO)", 
-    "4.12 Transmittal (TR)", 
+    "4.11 Variation Order (VO)",
+    "4.12 Transmittal (TR)",
     "4.13 Material Inspection Approval (MIR)",
     "5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)",
     "5.1 HSES Training / Introduction / Toolbox Meeting",
@@ -1233,12 +1240,12 @@ async function buildContent(workbook: ExcelJS.Workbook) {
     "5.4 First Aid / Accident / Incident / Near Miss / Fatalities (if Any)",
     "5.5 Other HSES Actities Concerns",
     "5.6 HSES Photo Reference",
-    "6. RESOURCES STATUS", 
-    "6.1 Manpower Status", 
-    "6.2 Material Delivery Status", 
+    "6. RESOURCES STATUS",
+    "6.1 Manpower Status",
+    "6.2 Material Delivery Status",
     "6.3 Machinery / Equipment Status",
-    "7. SITE ACTIVITY PHOTOS", 
-    "8. CONSTRUCTION ISSUE", 
+    "7. SITE ACTIVITY PHOTOS",
+    "8. CONSTRUCTION ISSUE",
     "9. MASTER SCHEDULE"
   ];
 
@@ -1302,7 +1309,7 @@ async function buildIntro(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
     ws.getRow(r).height = 22.5;
     r++;
 
-    ws.getCell(r, 2).value ='\n'+ d.designConstruction + '\n';
+    ws.getCell(r, 2).value = '\n' + d.designConstruction + '\n';
     ws.getCell(r, 2).style = styles.dataWhite;
     r++;
   }
@@ -1328,12 +1335,12 @@ async function buildIntro(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
         base64: d.coverImage,
         extension: d.coverImage.includes('png') ? 'png' : 'jpeg'
       });
-      
+
       ws.addImage(imageId, {
         tl: { col: 1, row: 9 }, // Position at B10 (col 1 = Column B, row 9 = row 10)
         ext: { width: 700, height: 400 } // Width for Col B only, full height
       });
-      
+
       ws.getRow(r).height = 400;
     } catch (error) {
       console.error('Error adding cover image:', error);
@@ -1443,12 +1450,12 @@ async function buildOP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
       return `${numValue.toFixed(1)}%`;
     };
 
-  
-  // Debug: Log first item properties
-  if (d.overallProgressItems && d.overallProgressItems.length > 0) {
-    console.log('DEBUG OP: First item properties =', Object.keys(d.overallProgressItems[0]));
-    console.log('DEBUG OP: First item pctThisWeek =', d.overallProgressItems[0].pctThisWeek);
-  }
+
+    // Debug: Log first item properties
+    if (d.overallProgressItems && d.overallProgressItems.length > 0) {
+      console.log('DEBUG OP: First item properties =', Object.keys(d.overallProgressItems[0]));
+      console.log('DEBUG OP: First item pctThisWeek =', d.overallProgressItems[0].pctThisWeek);
+    }
 
     const heights = [
       calculateHeight(item.no),
@@ -1556,7 +1563,7 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
   // Table headers
   const headers = ['Activities of Work Done', 'Next Week Plan'];
   const headerCols = [2, 4];
-  
+
   headers.forEach((header, index) => {
     const cell = ws.getCell(r, headerCols[index]);
     cell.value = header;
@@ -1571,7 +1578,7 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
         right: { style: 'thin' }
       }
     };
-    
+
     // Merge headers: B+C for first header, D+E for second header
     if (index === 0) {
       ws.mergeCells(r, 2, r, 3); // Merge B to C
@@ -1584,34 +1591,34 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
   // Helper function to calculate indentation level based on ID structure
   const getIndentationLevel = (id: string): number => {
     if (!id) return 0;
-    
+
     const trimmed = id.trim();
-    
+
     // Roman numerals (I, II, III, etc.) - level 0
     if (/^[IVX]+$/.test(trimmed)) return 0;
-    
+
     // Arabic numbers with dots (1., 2., etc.) - level 1
     if (/^\d+\.$/.test(trimmed)) return 2;
-    
+
     // Decimal numbers (1.1, 1.2, etc.) - level 1
     if (/^\d+\.\d+$/.test(trimmed)) return 1;
-    
+
     // Triple decimal (1.1.1, etc.) - level 1
     if (/^\d+\.\d+\.\d+$/.test(trimmed)) return 1;
-    
+
     // Letters (a, b, c) - level 2
     if (/^[a-zA-Z]\.$/.test(trimmed)) return 2;
-    
+
     // Dash only (-) - level 3 (treated as deepest level)
     if (/^-+$/.test(trimmed)) return 3;
-    
+
     return 0;
   };
 
   // Helper function to add indentation spaces
   const addIndentation = (text: string, level: number): string => {
     let spaces = 0;
-    
+
     // Custom spacing based on level
     switch (level) {
       case 0: // Roman numerals - no spaces
@@ -1629,7 +1636,7 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       default:
         spaces = level * 4;
     }
-    
+
     return ' '.repeat(spaces) + text;
   };
 
@@ -1653,7 +1660,7 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       const workDoneIndentLevel = getIndentationLevel(itemId);
       const workDoneText = itemId && scopeText ? `${itemId}. ${scopeText}` : (itemId || scopeText);
       const indentedWorkDone = formatWithDashIndentation(workDoneText, workDoneIndentLevel);
-      
+
       ws.getCell(r, 2).value = indentedWorkDone;
       ws.getCell(r, 2).style = {
         font: { bold: workDoneIndentLevel <= 0 ? true : false, size: 10, name: 'Arial' },
@@ -1684,7 +1691,7 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       const nextWeekIndentLevel = getIndentationLevel(nextWeekId);
       const nextWeekCombined = nextWeekId && nextWeekText ? `${nextWeekId}. ${nextWeekText}` : (nextWeekId || nextWeekText);
       const indentedNextWeek = formatWithDashIndentation(nextWeekCombined, nextWeekIndentLevel);
-      
+
       ws.getCell(r, 4).value = indentedNextWeek;
       ws.getCell(r, 4).style = {
         font: { bold: nextWeekIndentLevel <= 0 ? true : false, size: 10, name: 'Arial' },
@@ -1773,7 +1780,7 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 
   for (let i = 0; i < 13; i++) {
     const section = qaqcSectionList[i];
-    
+
     // Section title - id and title in same column B with bold id
     ws.getCell(r, 2).value = {
       richText: [
@@ -1809,32 +1816,32 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       ws.getCell(r, 4).value = 'Status';
       ws.getCell(r, 5).value = 'Date Responded';
     }
-    
+
     // Style headers as bold with background color
     const headerStyle = {
       font: { bold: true, size: 11, name: 'Arial' },
       fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } }
     };
-    
+
     ws.getCell(r, 2).style = headerStyle;
     ws.getCell(r, 3).style = headerStyle;
     ws.getCell(r, 4).style = headerStyle;
     ws.getCell(r, 5).style = headerStyle;
     ws.getCell(r, 6).style = headerStyle;
     ws.getRow(r).height = 30;
-    
+
     r += 1;
 
     // Items or empty rows
     const items = sectionData?.items ?? [];
     const rowsToRender = Math.max(items.length, 5); // minimum 5 rows
-    
+
     for (let j = 0; j < rowsToRender; j++) {
       const item = items[j];
-      
+
       ws.getCell(r, 2).value = item?.code || '';
       ws.getCell(r, 3).value = item?.description || '';
-      
+
       // Handle special fields for sections 4.5 and 4.6
       if (section.id === '4.5') {
         // Client Site Instruction: Issued By, Issued Date
@@ -1849,7 +1856,7 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
         ws.getCell(r, 4).value = item?.status || '';
         ws.getCell(r, 5).value = (item as any)?.dateResponse || '';
       }
-      
+
       // Style data cells with borders
       const dataStyleWithBorder = {
         ...styles.data,
@@ -1860,7 +1867,7 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
           right: { style: 'thin' as const }
         }
       };
-      
+
       ws.getCell(r, 2).style = dataStyleWithBorder;
       ws.getCell(r, 3).style = dataStyleWithBorder;
       ws.getCell(r, 4).style = {
@@ -1869,13 +1876,13 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       };
       ws.getCell(r, 5).style = dataStyleWithBorder;
       ws.getRow(r).height = 22;
-      
+
       r += 1;
     }
 
     // Comments section - use section-level comments field
     const sectionComments = sectionData?.comments || '';
-    
+
     // Comments row with rich text: "Comments:" bold+underline, value normal
     if (sectionComments.trim()) {
       ws.getCell(r, 2).value = {
@@ -1891,8 +1898,8 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
         ]
       };
     }
-    
-    ws.getCell(r, 2).style = { 
+
+    ws.getCell(r, 2).style = {
       border: {
         top: { style: 'thin' as const },
         bottom: { style: 'thin' as const },
@@ -1904,29 +1911,482 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     ws.mergeCells(r, 2, r, 5); // Merge B-E
     ws.getRow(r).height = 42;
     r += 1;
-    
+
     r += 2; // Space between sections
   }
 
-  
-}
 
+}
+const HEADER_FILL = 'FFBDD7EE'; // theme 4, tint 0.4  (grey-blue header bg)
+const TOTAL_FILL = 'FFE2EFDA'; // theme 7, tint 0.8  (light green totals)
+const LOCATION_FILL = 'FFFFF2CC'; // theme 3, tint 0.8  (soft yellow banner)
 // SHEET 9: 5. HSE
 async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('5. HSE');
   const styles = createStyles(workbook);
 
-  ws.properties.tabColor = { argb: 'FF0070C0' };
+  ws.properties.tabColor = { argb: 'FF00B050' };
+
+  // ── Column widths (A–K) exactly as template ──────────────────────────────
+  const widths = [5.71, 30.71, 5.71, 8.43, 8.43, 8.43, 8.43, 8.43, 10.57, 15.71, 20];
+  widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  // ── Reusable style helpers ───────────────────────────────────────────────
+  const sectionTitleStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+  };
+  const subSectionStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+  };
+  const tableHeaderStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const dataCellStyle: Partial<ExcelJS.Style> = {
+    font: { size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const dataCenterStyle: Partial<ExcelJS.Style> = {
+    ...dataCellStyle,
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+  };
+  const noteBoxStyle: Partial<ExcelJS.Style> = {
+    font: { size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'top', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
 
   let r = 3;
 
+  // ── Title row ────────────────────────────────────────────────────────────
+  ws.getRow(r).height = 20.1;
   ws.getCell(r, 2).value = '5. HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)';
-  ws.getCell(r, 2).style = styles.sectionHdr;
-  ws.mergeCells(r, 2, r, 11);
+  safeStyle(ws.getCell(r, 2), sectionTitleStyle, 'hseTitle');
+  safeMerge(ws, r, 2, r, 11);
+  r += 2; // row 5
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5.1 HSES Training / Introduction / Toolbox Meeting
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '5.1 HSES Training / Introduction / Toolbox Meeting';
+  safeStyle(ws.getCell(r, 2), subSectionStyle, 'hse51');
+  r++; // row 6 — header
+
+  // Header row: B=Type, E=Date, G=Venue (merged G-H), I=Trainer, J=Attendee, K=Remarks
+  ws.getRow(r).height = 20.1;
+  const trainingHdr = [
+    { col: 2, val: 'Type of Training' },   // B (merged B-D)
+    { col: 5, val: 'Date' },               // E (merged E-F)
+    { col: 7, val: 'Venue' },              // G (merged G-H)
+    { col: 9, val: 'Trainer' },            // I
+    { col: 10, val: 'Attendee' },          // J
+    { col: 11, val: 'Remarks' },           // K
+  ];
+  trainingHdr.forEach(h => {
+    ws.getCell(r, h.col).value = h.val;
+    safeStyle(ws.getCell(r, h.col), tableHeaderStyle, 'trainingHdr');
+  });
+  // Apply header style to spanned cells so borders render correctly
+  [3, 4, 6, 8].forEach(c => safeStyle(ws.getCell(r, c), tableHeaderStyle, 'hdrSpan'));
+  safeMerge(ws, r, 2, r, 4); // B-D (Type of Training)
+  safeMerge(ws, r, 5, r, 6); // E-F (Date)
+  safeMerge(ws, r, 7, r, 8); // G-H (Venue)
+  r++; // row 7 — first data row
+
+  // Training data rows (min 3 rows so the block always renders)
+  const trainingRows = d.hseTraining ?? [];
+  const trainingCount = Math.max(trainingRows.length, 3);
+  for (let i = 0; i < trainingCount; i++) {
+    const row = trainingRows[i] ?? {};
+    ws.getRow(r).height = 20.1;
+
+    ws.getCell(r, 2).value = row.typeOfTraining ?? '';
+    safeStyle(ws.getCell(r, 2), dataCellStyle, 'train.type');
+    safeStyle(ws.getCell(r, 3), dataCellStyle, 'train.type.span');
+    safeStyle(ws.getCell(r, 4), dataCellStyle, 'train.type.span');
+    safeMerge(ws, r, 2, r, 4);
+
+    ws.getCell(r, 5).value = row.date ?? '';
+    safeStyle(ws.getCell(r, 5), dataCenterStyle, 'train.date');
+    safeStyle(ws.getCell(r, 6), dataCenterStyle, 'train.date.span');
+    safeMerge(ws, r, 5, r, 6);
+
+    ws.getCell(r, 7).value = row.venue ?? '';
+    safeStyle(ws.getCell(r, 7), dataCenterStyle, 'train.venue');
+    safeStyle(ws.getCell(r, 8), dataCenterStyle, 'train.venue.span');
+    safeMerge(ws, r, 7, r, 8);
+
+    ws.getCell(r, 9).value = row.trainer ?? '';
+    safeStyle(ws.getCell(r, 9), dataCenterStyle, 'train.trainer');
+
+    ws.getCell(r, 10).value = row.attendee ?? '';
+    safeStyle(ws.getCell(r, 10), dataCenterStyle, 'train.attendee');
+
+    ws.getCell(r, 11).value = row.remarks ?? '';
+    safeStyle(ws.getCell(r, 11), dataCellStyle, 'train.remarks');
+
+    r++;
+  }
+  r++; // blank spacer row
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5.2 HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value =
+    '5.2 HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist';
+  safeStyle(ws.getCell(r, 2), subSectionStyle, 'hse52');
+  r++;
+
+  // Header: B-H Type of Inspection (merged), I Date, J Inspector, K Remarks
+  ws.getRow(r).height = 35.1;
+  ws.getCell(r, 2).value = 'Type of Inspection';
+  safeStyle(ws.getCell(r, 2), tableHeaderStyle, 'insp.type');
+  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), tableHeaderStyle, 'insp.type.span');
+  safeMerge(ws, r, 2, r, 8);
+
+  ws.getCell(r, 9).value = 'Date';
+  safeStyle(ws.getCell(r, 9), tableHeaderStyle, 'insp.date');
+  ws.getCell(r, 10).value = 'Inspector';
+  safeStyle(ws.getCell(r, 10), tableHeaderStyle, 'insp.inspector');
+  ws.getCell(r, 11).value = 'Remarks';
+  safeStyle(ws.getCell(r, 11), tableHeaderStyle, 'insp.remarks');
+  r++;
+
+  const inspectionRows = d.hseInspection ?? [];
+  const inspCount = Math.max(inspectionRows.length, 3);
+  for (let i = 0; i < inspCount; i++) {
+    const row = inspectionRows[i] ?? {};
+    ws.getRow(r).height = 20.1;
+
+    ws.getCell(r, 2).value = row.typeOfInspection ?? '';
+    safeStyle(ws.getCell(r, 2), dataCellStyle, 'insp.type.data');
+    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataCellStyle, 'insp.type.data.span');
+    safeMerge(ws, r, 2, r, 8);
+
+    ws.getCell(r, 9).value = row.date ?? '';
+    safeStyle(ws.getCell(r, 9), dataCenterStyle, 'insp.date.data');
+
+    ws.getCell(r, 10).value = row.inspector ?? '';
+    safeStyle(ws.getCell(r, 10), dataCenterStyle, 'insp.inspector.data');
+
+    ws.getCell(r, 11).value = row.remarks ?? '';
+    safeStyle(ws.getCell(r, 11), dataCellStyle, 'insp.remarks.data');
+
+    r++;
+  }
+  r++;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5.3 Permit to Work
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '5.3 Permit to Work';
+  safeStyle(ws.getCell(r, 2), subSectionStyle, 'hse53');
+  r++;
+
+  // Header: B-D Type of Permit, E-F Start Date, G-H End Date, I Inspector, J Approver, K Remarks
+  ws.getRow(r).height = 20.1;
+
+  ws.getCell(r, 2).value = 'Type of Permit';
+  safeStyle(ws.getCell(r, 2), tableHeaderStyle, 'permit.type');
+  safeStyle(ws.getCell(r, 3), tableHeaderStyle, 'permit.type.span');
+  safeStyle(ws.getCell(r, 4), tableHeaderStyle, 'permit.type.span');
+  safeMerge(ws, r, 2, r, 4);
+
+  ws.getCell(r, 5).value = 'Start Date';
+  safeStyle(ws.getCell(r, 5), tableHeaderStyle, 'permit.start');
+  safeStyle(ws.getCell(r, 6), tableHeaderStyle, 'permit.start.span');
+  safeMerge(ws, r, 5, r, 6);
+
+  ws.getCell(r, 7).value = 'End Date';
+  safeStyle(ws.getCell(r, 7), tableHeaderStyle, 'permit.end');
+  safeStyle(ws.getCell(r, 8), tableHeaderStyle, 'permit.end.span');
+  safeMerge(ws, r, 7, r, 8);
+
+  ws.getCell(r, 9).value = 'Inspector';
+  safeStyle(ws.getCell(r, 9), tableHeaderStyle, 'permit.inspector');
+
+  ws.getCell(r, 10).value = 'Approver';
+  safeStyle(ws.getCell(r, 10), tableHeaderStyle, 'permit.approver');
+
+  ws.getCell(r, 11).value = 'Remarks';
+  safeStyle(ws.getCell(r, 11), tableHeaderStyle, 'permit.remarks');
+  r++;
+
+  const permitRows = d.hsePermits ?? [];
+  const permitCount = Math.max(permitRows.length, 3);
+  for (let i = 0; i < permitCount; i++) {
+    const row = permitRows[i] ?? {};
+    ws.getRow(r).height = 20.1;
+
+    ws.getCell(r, 2).value = row.typeOfPermit ?? '';
+    safeStyle(ws.getCell(r, 2), dataCellStyle, 'p.type.data');
+    safeStyle(ws.getCell(r, 3), dataCellStyle, 'p.type.data.span');
+    safeStyle(ws.getCell(r, 4), dataCellStyle, 'p.type.data.span');
+    safeMerge(ws, r, 2, r, 4);
+
+    ws.getCell(r, 5).value = row.startDate ?? '';
+    safeStyle(ws.getCell(r, 5), dataCenterStyle, 'p.start.data');
+    safeStyle(ws.getCell(r, 6), dataCenterStyle, 'p.start.data.span');
+    safeMerge(ws, r, 5, r, 6);
+
+    ws.getCell(r, 7).value = row.endDate ?? '';
+    safeStyle(ws.getCell(r, 7), dataCenterStyle, 'p.end.data');
+    safeStyle(ws.getCell(r, 8), dataCenterStyle, 'p.end.data.span');
+    safeMerge(ws, r, 7, r, 8);
+
+    ws.getCell(r, 9).value = row.inspector ?? '';
+    safeStyle(ws.getCell(r, 9), dataCenterStyle, 'p.inspector.data');
+
+    ws.getCell(r, 10).value = row.approver ?? '';
+    safeStyle(ws.getCell(r, 10), dataCenterStyle, 'p.approver.data');
+
+    ws.getCell(r, 11).value = row.remarks ?? '';
+    safeStyle(ws.getCell(r, 11), dataCellStyle, 'p.remarks.data');
+
+    r++;
+  }
+  r++;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5.4 First Aid / Accident / Incident / Near Miss / Fatalities (if Any)
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '5.4 First Aid / Accident / Incident / Near Miss / Fatalities (if Any)';
+  safeStyle(ws.getCell(r, 2), subSectionStyle, 'hse54');
+  r++;
+
+  // Multi-line note box (4 rows tall)
+  const firstAidText = (d.hseFirstAid && d.hseFirstAid.trim() !== '')
+    ? d.hseFirstAid
+    : '…..........................................................................................................................................................................................';
+  ws.getRow(r).height = 80;
+  ws.getCell(r, 2).value = firstAidText;
+  safeStyle(ws.getCell(r, 2), noteBoxStyle, 'hse54.box');
+  for (let c = 3; c <= 11; c++) safeStyle(ws.getCell(r, c), noteBoxStyle, 'hse54.box.span');
+  safeMerge(ws, r, 2, r, 11);
   r += 2;
 
-  // Add HSE content here
-  // Implementation for HSE training, inspection, permits, etc.
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5.5 Other HSES Activities Concerns
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '5.5 Other HSES Activities Concerns';
+  safeStyle(ws.getCell(r, 2), subSectionStyle, 'hse55');
+  r++;
+
+  const otherText = (d.hseOtherConcerns && d.hseOtherConcerns.trim() !== '')
+    ? d.hseOtherConcerns
+    : '…..........................................................................................................................................................................................';
+  ws.getRow(r).height = 80;
+  ws.getCell(r, 2).value = otherText;
+  safeStyle(ws.getCell(r, 2), noteBoxStyle, 'hse55.box');
+  for (let c = 3; c <= 11; c++) safeStyle(ws.getCell(r, c), noteBoxStyle, 'hse55.box.span');
+  safeMerge(ws, r, 2, r, 11);
+  r += 2;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5.6 HSES Photo Reference
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '5.6 HSES Photo Reference';
+  safeStyle(ws.getCell(r, 2), subSectionStyle, 'hse56');
+  r++;
+
+  // Photo reference layout - two columns (lanes) per row
+  // Layout: B-E = Left lane (merged), F-I = Right lane (merged)
+  // Each entry block: header row + spacer + photo row + spacer + footer row
+
+  const photoBoxStyle: Partial<ExcelJS.Style> = {
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+
+  const sectionHeaderStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'center', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+
+  const footerStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+
+  const naStyle: Partial<ExcelJS.Style> = {
+    font: { size: 20, name: 'Arial', color: { argb: 'FF000000' } },
+    alignment: { horizontal: 'center', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+
+  // Process HSE photo entries
+  const hsePhotoEntries = d.hsePhotos ?? [];
+  let lastSection: string | undefined = undefined;
+  let entriesOnCurrentPage = 0;
+
+  for (const entry of hsePhotoEntries) {
+    const currentSection = entry.sectionTitle;
+    const sectionChanged = currentSection && currentSection !== lastSection;
+
+    // Page break after 4 entries
+    if (entriesOnCurrentPage >= 4) {
+      // Add page break before new entry
+      ws.getRow(r).addPageBreak();
+      entriesOnCurrentPage = 0;
+
+      // If section didn't change but page broke, re-print header with "(Continued)"
+      if (!sectionChanged && lastSection) {
+        ws.getRow(r).height = 20.1;
+        ws.getCell(r, 2).value = `${lastSection} (Continued)`;
+        safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.hdr');
+        for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.hdr.span');
+        safeMerge(ws, r, 2, r, 9);
+        r++;
+      }
+    }
+
+    // Handle new section header
+    if (sectionChanged) {
+      ws.getRow(r).height = 20.1;
+      ws.getCell(r, 2).value = currentSection ?? '';
+      safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.hdr');
+      for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.hdr.span');
+      safeMerge(ws, r, 2, r, 9);
+      r++;
+      lastSection = currentSection;
+    }
+
+    // Render photo entry block
+    // Spacer row
+    ws.getRow(r).height = 6.95;
+    r++;
+
+    // Photo row - tall (170pt)
+    const photoRow = r;
+    ws.getRow(r).height = 170.1;
+
+    // Left photo box (B-E merged)
+    safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse56.photoL');
+    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoL.span');
+    safeMerge(ws, r, 2, r, 5);
+
+    // Right photo box (F-I merged)
+    safeStyle(ws.getCell(r, 6), photoBoxStyle, 'hse56.photoR');
+    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoR.span');
+    safeMerge(ws, r, 6, r, 9);
+
+    // Handle images
+    const images = entry.images ?? [];
+    const footers = entry.footers ?? [];
+    const maxImages = 2; // Two lanes
+
+    // Add images or N/A
+    for (let idx = 0; idx < maxImages; idx++) {
+      const imgSource = images[idx];
+      const startCol = idx === 0 ? 2 : 6; // B for left, F for right
+      const endCol = idx === 0 ? 5 : 9;   // E for left, I for right
+
+      if (imgSource) {
+        // Schedule image insertion after worksheet is set up
+        // Images will be added asynchronously
+        addImageToWorksheet(workbook, ws, imgSource, {
+          tl: { col: startCol - 1, row: photoRow - 1 },
+          br: { col: endCol - 1, row: photoRow - 1 },
+          ext: { width: 200, height: 170 },
+          editAs: 'oneCell'
+        } as any).catch(() => {
+          // If image fails, leave the cell empty (border already set)
+        });
+      } else {
+        // No image - show N/A
+        ws.getCell(photoRow, startCol).value = 'N/A';
+        safeStyle(ws.getCell(photoRow, startCol), naStyle, 'hse56.na');
+        safeStyle(ws.getCell(photoRow, startCol + 1), naStyle, 'hse56.na.span');
+        safeStyle(ws.getCell(photoRow, startCol + 2), naStyle, 'hse56.na.span');
+        if (idx === 0) {
+          safeStyle(ws.getCell(photoRow, startCol + 3), naStyle, 'hse56.na.span');
+        }
+      }
+    }
+
+    r++;
+
+    // Spacer row
+    ws.getRow(r).height = 6.95;
+    r++;
+
+    // Footer/caption row (C-D for left, G-H for right)
+    ws.getRow(r).height = 15;
+
+    // Left footer
+    ws.getCell(r, 3).value = footers[0] ?? '';
+    safeStyle(ws.getCell(r, 3), footerStyle, 'hse56.footerL');
+    safeStyle(ws.getCell(r, 4), footerStyle, 'hse56.footerL.span');
+    safeMerge(ws, r, 3, r, 4);
+
+    // Right footer
+    ws.getCell(r, 7).value = footers[1] ?? '';
+    safeStyle(ws.getCell(r, 7), footerStyle, 'hse56.footerR');
+    safeStyle(ws.getCell(r, 8), footerStyle, 'hse56.footerR.span');
+    safeMerge(ws, r, 7, r, 8);
+
+    r++;
+    entriesOnCurrentPage++;
+  }
+
+  // If no entries, render one empty placeholder
+  if (hsePhotoEntries.length === 0) {
+    // Spacer row
+    ws.getRow(r).height = 6.95;
+    r++;
+
+    // Photo row
+    ws.getRow(r).height = 170.1;
+
+    // Left photo box with N/A
+    ws.getCell(r, 2).value = 'N/A';
+    safeStyle(ws.getCell(r, 2), naStyle, 'hse56.na');
+    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse56.na.span');
+    safeMerge(ws, r, 2, r, 5);
+
+    // Right photo box with N/A
+    ws.getCell(r, 6).value = 'N/A';
+    safeStyle(ws.getCell(r, 6), naStyle, 'hse56.na');
+    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse56.na.span');
+    safeMerge(ws, r, 6, r, 9);
+
+    r++;
+  }
 }
 
 // SHEET 10: 6. Resources
@@ -1934,51 +2394,691 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   const ws = workbook.addWorksheet('6. Resources');
   const styles = createStyles(workbook);
 
-  ws.properties.tabColor = { argb: 'FF0070C0' };
+  ws.properties.tabColor = { argb: 'FF00B050' };
+
+  // ── Column widths (A–L) — compact layout without per-site columns ────────
+  // The original template has 100+ site-specific columns (O..DH) for drill-down.
+  // For the app export we summarize with just the 7 daily columns + totals.
+  const widths = [5.71, 42, 8, 8, 8, 8, 8, 8, 8, 14, 14, 18];
+  widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  // ── Styles ───────────────────────────────────────────────────────────────
+  const titleStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+  };
+  const subTitleStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+  };
+  const headerStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const groupHdrStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const dataStyle: Partial<ExcelJS.Style> = {
+    font: { size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const numStyle: Partial<ExcelJS.Style> = {
+    ...dataStyle,
+    alignment: { horizontal: 'center', vertical: 'middle' },
+  };
+  const totalStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: TOTAL_FILL } },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const totalNumStyle: Partial<ExcelJS.Style> = {
+    ...totalStyle,
+    alignment: { horizontal: 'center', vertical: 'middle' },
+  };
+
+  // The 7 short day labels (Fri-Thu matches template)
+  const dayLabels = ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
+  const dates = d.weekDates && d.weekDates.length === 7
+    ? d.weekDates
+    : ['', '', '', '', '', '', ''];
 
   let r = 3;
 
+  // ── Sheet title ──────────────────────────────────────────────────────────
+  ws.getRow(r).height = 20.1;
   ws.getCell(r, 2).value = '6. RESOURCES STATUS';
-  ws.getCell(r, 2).style = styles.sectionHdr;
-  ws.mergeCells(r, 2, r, 8);
+  safeStyle(ws.getCell(r, 2), titleStyle, 'res.title');
+  safeMerge(ws, r, 2, r, 12);
   r += 2;
 
-  // Add Resources content here
-  // Implementation for manpower, materials, equipment
+  // ═══════════════════════════════════════════════════════════════════════
+  // 6.1 Manpower Status
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '6.1 Manpower Status';
+  safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.61');
+  r++;
+
+  // Header row 1: B=Description, C-I=WeekDates band, J=Prev Wk, K=This Wk, L=Up to This Wk
+  const hdrRow1 = r;
+  ws.getRow(r).height = 22;
+  ws.getCell(r, 2).value = 'Description';
+  safeStyle(ws.getCell(r, 2), headerStyle, 'mp.desc');
+
+  // C-I day-dates band — use a title like "Mar-26" or week range summary
+  const weekLabel = (dates[0] && dates[6]) ? `Day ${dates[0]}–${dates[6]}` : 'This Week';
+  ws.getCell(r, 3).value = weekLabel;
+  safeStyle(ws.getCell(r, 3), headerStyle, 'mp.week');
+  for (let c = 4; c <= 9; c++) safeStyle(ws.getCell(r, c), headerStyle, 'mp.week.span');
+  safeMerge(ws, r, 3, r, 9);
+
+  ws.getCell(r, 10).value = 'Previous Week';
+  safeStyle(ws.getCell(r, 10), headerStyle, 'mp.prev');
+  ws.getCell(r, 11).value = 'This Week';
+  safeStyle(ws.getCell(r, 11), headerStyle, 'mp.this');
+  ws.getCell(r, 12).value = 'Up to This Week';
+  safeStyle(ws.getCell(r, 12), headerStyle, 'mp.upto');
+  r++;
+
+  // Header row 2: day names (Fri..Thu)
+  ws.getRow(r).height = 18;
+  dayLabels.forEach((day, i) => {
+    ws.getCell(r, 3 + i).value = day;
+    safeStyle(ws.getCell(r, 3 + i), headerStyle, `mp.day.${day}`);
+  });
+  // Re-apply header style to column B and the totals columns so borders remain
+  safeStyle(ws.getCell(r, 2), headerStyle, 'mp.descBlank');
+  safeStyle(ws.getCell(r, 10), headerStyle, 'mp.prevBlank');
+  safeStyle(ws.getCell(r, 11), headerStyle, 'mp.thisBlank');
+  safeStyle(ws.getCell(r, 12), headerStyle, 'mp.uptoBlank');
+  // Merge B / J / K / L vertically across the two header rows
+  safeMerge(ws, hdrRow1, 2, r, 2);
+  safeMerge(ws, hdrRow1, 10, r, 10);
+  safeMerge(ws, hdrRow1, 11, r, 11);
+  safeMerge(ws, hdrRow1, 12, r, 12);
+  r++;
+
+  // Header row 3: day dates (numeric)
+  ws.getRow(r).height = 18;
+  dates.forEach((dt, i) => {
+    ws.getCell(r, 3 + i).value = dt;
+    safeStyle(ws.getCell(r, 3 + i), headerStyle, `mp.dt.${i}`);
+  });
+  r++;
+
+  // Manpower data rows — single flat list (no group headers, caller controls grouping)
+  const manpowerRows = d.manpowerRows ?? [];
+  const firstMpDataRow = r;
+  manpowerRows.forEach(mp => {
+    ws.getRow(r).height = 20;
+    ws.getCell(r, 2).value = mp.description ?? '';
+    safeStyle(ws.getCell(r, 2), dataStyle, 'mp.desc.data');
+
+    const dc = mp.dailyCounts ?? [];
+    for (let i = 0; i < 7; i++) {
+      ws.getCell(r, 3 + i).value = dc[i] ?? 0;
+      safeStyle(ws.getCell(r, 3 + i), numStyle, `mp.dc.${i}`);
+    }
+
+    ws.getCell(r, 10).value = mp.previousWeek ?? 0;
+    safeStyle(ws.getCell(r, 10), numStyle, 'mp.prev.data');
+
+    // Use Excel formula when thisWeek not provided so totals stay live
+    ws.getCell(r, 11).value = mp.thisWeek !== undefined && mp.thisWeek !== ''
+      ? mp.thisWeek
+      : { formula: `SUM(C${r}:I${r})` };
+    safeStyle(ws.getCell(r, 11), numStyle, 'mp.this.data');
+
+    ws.getCell(r, 12).value = mp.upToThisWeek !== undefined && mp.upToThisWeek !== ''
+      ? mp.upToThisWeek
+      : { formula: `J${r}+K${r}` };
+    safeStyle(ws.getCell(r, 12), numStyle, 'mp.upto.data');
+
+    r++;
+  });
+
+  // Ensure at least one blank data row so the total formula has a valid range
+  if (manpowerRows.length === 0) {
+    ws.getRow(r).height = 20;
+    for (let c = 2; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mp.empty');
+    r++;
+  }
+  const lastMpDataRow = r - 1;
+
+  // Manpower Total row
+  ws.getRow(r).height = 22;
+  ws.getCell(r, 2).value = 'Total';
+  safeStyle(ws.getCell(r, 2), totalStyle, 'mp.total.lbl');
+  for (let i = 0; i < 7; i++) {
+    ws.getCell(r, 3 + i).value = { formula: `SUM(${colLetter(3 + i)}${firstMpDataRow}:${colLetter(3 + i)}${lastMpDataRow})` };
+    safeStyle(ws.getCell(r, 3 + i), totalNumStyle, `mp.total.d${i}`);
+  }
+  ws.getCell(r, 10).value = { formula: `SUM(J${firstMpDataRow}:J${lastMpDataRow})` };
+  safeStyle(ws.getCell(r, 10), totalNumStyle, 'mp.total.prev');
+  ws.getCell(r, 11).value = { formula: `SUM(K${firstMpDataRow}:K${lastMpDataRow})` };
+  safeStyle(ws.getCell(r, 11), totalNumStyle, 'mp.total.this');
+  ws.getCell(r, 12).value = { formula: `SUM(L${firstMpDataRow}:L${lastMpDataRow})` };
+  safeStyle(ws.getCell(r, 12), totalNumStyle, 'mp.total.upto');
+  r += 2;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 6.2 Material Delivery Status
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '6.2 Material Delivery Status';
+  safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.62');
+  r++;
+
+  // Header: B-H Description (merged), I Unit, J Previous, K This Period, L Accumulate
+  ws.getRow(r).height = 22;
+  ws.getCell(r, 2).value = 'Description';
+  safeStyle(ws.getCell(r, 2), headerStyle, 'mat.desc');
+  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), headerStyle, 'mat.desc.span');
+  safeMerge(ws, r, 2, r, 8);
+  ws.getCell(r, 9).value = 'Unit';
+  safeStyle(ws.getCell(r, 9), headerStyle, 'mat.unit');
+  ws.getCell(r, 10).value = 'Previous';
+  safeStyle(ws.getCell(r, 10), headerStyle, 'mat.prev');
+  ws.getCell(r, 11).value = 'This Period';
+  safeStyle(ws.getCell(r, 11), headerStyle, 'mat.this');
+  ws.getCell(r, 12).value = 'Accumulate';
+  safeStyle(ws.getCell(r, 12), headerStyle, 'mat.acc');
+  r++;
+
+  const materialRows = d.materialRows ?? [];
+  const firstMatRow = r;
+  materialRows.forEach(m => {
+    ws.getRow(r).height = 20;
+    ws.getCell(r, 2).value = m.description ?? '';
+    safeStyle(ws.getCell(r, 2), dataStyle, 'mat.desc.data');
+    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.desc.data.span');
+    safeMerge(ws, r, 2, r, 8);
+
+    ws.getCell(r, 9).value = m.unit ?? '';
+    safeStyle(ws.getCell(r, 9), numStyle, 'mat.unit.data');
+
+    ws.getCell(r, 10).value = m.previous ?? 0;
+    safeStyle(ws.getCell(r, 10), numStyle, 'mat.prev.data');
+
+    ws.getCell(r, 11).value = m.thisPeriod ?? 0;
+    safeStyle(ws.getCell(r, 11), numStyle, 'mat.this.data');
+
+    ws.getCell(r, 12).value = m.accumulate !== undefined && m.accumulate !== ''
+      ? m.accumulate
+      : { formula: `J${r}+K${r}` };
+    safeStyle(ws.getCell(r, 12), numStyle, 'mat.acc.data');
+
+    r++;
+  });
+
+  if (materialRows.length === 0) {
+    ws.getRow(r).height = 20;
+    safeStyle(ws.getCell(r, 2), dataStyle, 'mat.empty');
+    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.empty.span');
+    safeMerge(ws, r, 2, r, 8);
+    for (let c = 9; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.empty');
+    r++;
+  }
+  const lastMatRow = r - 1;
+
+  ws.getRow(r).height = 22;
+  ws.getCell(r, 2).value = 'Total';
+  safeStyle(ws.getCell(r, 2), totalStyle, 'mat.total.lbl');
+  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), totalStyle, 'mat.total.span');
+  safeMerge(ws, r, 2, r, 8);
+  safeStyle(ws.getCell(r, 9), totalNumStyle, 'mat.total.unit');
+  ws.getCell(r, 10).value = { formula: `SUM(J${firstMatRow}:J${lastMatRow})` };
+  safeStyle(ws.getCell(r, 10), totalNumStyle, 'mat.total.prev');
+  ws.getCell(r, 11).value = { formula: `SUM(K${firstMatRow}:K${lastMatRow})` };
+  safeStyle(ws.getCell(r, 11), totalNumStyle, 'mat.total.this');
+  ws.getCell(r, 12).value = { formula: `SUM(L${firstMatRow}:L${lastMatRow})` };
+  safeStyle(ws.getCell(r, 12), totalNumStyle, 'mat.total.acc');
+  r += 2;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 6.3 Machinery / Equipment Status
+  // ═══════════════════════════════════════════════════════════════════════
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = '6.3 Machinery / Equipment Status';
+  safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.63');
+  r++;
+
+  // Same header structure as 6.2
+  ws.getRow(r).height = 22;
+  ws.getCell(r, 2).value = 'Description';
+  safeStyle(ws.getCell(r, 2), headerStyle, 'eq.desc');
+  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), headerStyle, 'eq.desc.span');
+  safeMerge(ws, r, 2, r, 8);
+  ws.getCell(r, 9).value = 'Unit';
+  safeStyle(ws.getCell(r, 9), headerStyle, 'eq.unit');
+  ws.getCell(r, 10).value = 'Previous';
+  safeStyle(ws.getCell(r, 10), headerStyle, 'eq.prev');
+  ws.getCell(r, 11).value = 'This Period';
+  safeStyle(ws.getCell(r, 11), headerStyle, 'eq.this');
+  ws.getCell(r, 12).value = 'Accumulate';
+  safeStyle(ws.getCell(r, 12), headerStyle, 'eq.acc');
+  r++;
+
+  const equipmentRows = d.equipmentRows ?? [];
+  const firstEqRow = r;
+  equipmentRows.forEach(e => {
+    ws.getRow(r).height = 20;
+    ws.getCell(r, 2).value = e.description ?? '';
+    safeStyle(ws.getCell(r, 2), dataStyle, 'eq.desc.data');
+    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.desc.data.span');
+    safeMerge(ws, r, 2, r, 8);
+
+    ws.getCell(r, 9).value = e.unit ?? '';
+    safeStyle(ws.getCell(r, 9), numStyle, 'eq.unit.data');
+
+    ws.getCell(r, 10).value = e.previous ?? 0;
+    safeStyle(ws.getCell(r, 10), numStyle, 'eq.prev.data');
+
+    ws.getCell(r, 11).value = e.thisPeriod ?? 0;
+    safeStyle(ws.getCell(r, 11), numStyle, 'eq.this.data');
+
+    ws.getCell(r, 12).value = e.accumulate !== undefined && e.accumulate !== ''
+      ? e.accumulate
+      : { formula: `J${r}+K${r}` };
+    safeStyle(ws.getCell(r, 12), numStyle, 'eq.acc.data');
+
+    r++;
+  });
+
+  if (equipmentRows.length === 0) {
+    ws.getRow(r).height = 20;
+    safeStyle(ws.getCell(r, 2), dataStyle, 'eq.empty');
+    for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.empty.span');
+    safeMerge(ws, r, 2, r, 8);
+    for (let c = 9; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.empty');
+    r++;
+  }
+  const lastEqRow = r - 1;
+
+  ws.getRow(r).height = 22;
+  ws.getCell(r, 2).value = 'Total';
+  safeStyle(ws.getCell(r, 2), totalStyle, 'eq.total.lbl');
+  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), totalStyle, 'eq.total.span');
+  safeMerge(ws, r, 2, r, 8);
+  safeStyle(ws.getCell(r, 9), totalNumStyle, 'eq.total.unit');
+  ws.getCell(r, 10).value = { formula: `SUM(J${firstEqRow}:J${lastEqRow})` };
+  safeStyle(ws.getCell(r, 10), totalNumStyle, 'eq.total.prev');
+  ws.getCell(r, 11).value = { formula: `SUM(K${firstEqRow}:K${lastEqRow})` };
+  safeStyle(ws.getCell(r, 11), totalNumStyle, 'eq.total.this');
+  ws.getCell(r, 12).value = { formula: `SUM(L${firstEqRow}:L${lastEqRow})` };
+  safeStyle(ws.getCell(r, 12), totalNumStyle, 'eq.total.acc');
+}
+
+// Small helper: 1-based column index → Excel letter (A, B, ... Z, AA, AB, ...)
+function colLetter(col: number): string {
+  let s = '';
+  let n = col;
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
 }
 
 // SHEET 11: 7. Site Activity Photos
 async function buildSitePhotos(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('7. Site Photos');
   const styles = createStyles(workbook);
+  // No tab color — matches template
 
-  ws.properties.tabColor = { argb: 'FF0070C0' };
+  // ── Column widths (A–J) ──────────────────────────────────────────────────
+  // Layout mirrors template: two photo blocks side-by-side
+  //   A    = left margin (5.71)
+  //   B-E  = left caption / photo area, where C-D hold the caption text
+  //   F-I  = right caption / photo area, where G-H hold the caption text
+  //   J    = right margin
+  const widths = [5.71, 1.57, 40.71, 10.71, 1.57, 1.57, 40.71, 10.71, 1.57, 4.71];
+  widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  // Styles
+  const titleStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+  };
+  const bannerStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'center', vertical: 'middle' },
+  };
+  const locationStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 10, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: LOCATION_FILL } },
+    alignment: { horizontal: 'center', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const captionStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const photoBoxStyle: Partial<ExcelJS.Style> = {
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
 
   let r = 3;
 
+  // ── Sheet title ──────────────────────────────────────────────────────────
+  ws.getRow(r).height = 20.1;
   ws.getCell(r, 2).value = '7. SITE ACTIVITY PHOTOS';
-  ws.getCell(r, 2).style = styles.sectionHdr;
-  ws.mergeCells(r, 2, r, 9);
+  safeStyle(ws.getCell(r, 2), titleStyle, 'sp.title');
+  for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), titleStyle, 'sp.title.span');
+  safeMerge(ws, r, 2, r, 9);
   r += 2;
 
-  // Add Site Photos content here
-  // Implementation for site photo captions
+  // ── Banner ───────────────────────────────────────────────────────────────
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = 'SITE ACTIVITY PHOTOS';
+  safeStyle(ws.getCell(r, 2), bannerStyle, 'sp.banner');
+  for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), bannerStyle, 'sp.banner.span');
+  safeMerge(ws, r, 2, r, 9);
+  r++;
+
+  // ── Photo entries ────────────────────────────────────────────────────────
+  // Each entry renders a location banner then one row of photo+caption (pairs
+  // of 2 captions side-by-side). Layout per entry:
+  //   Row A: location banner (B-I merged, yellow background)
+  //   Row B: blank spacer (6.95)
+  //   Row C: photo area (tall, 170)  → two side-by-side boxes
+  //   Row D: blank spacer (6.95)
+  //   Row E: caption row (C-D = left cap, G-H = right cap)
+  const entries = d.sitePhotoCaptions ?? [];
+
+  if (entries.length === 0) {
+    // Render one empty placeholder entry so the sheet doesn't look broken
+    renderPhotoEntry(ws, r, {
+      siteLocation: 'Site Location',
+      caption1: '',
+      caption2: '',
+    });
+    return;
+  }
+
+  // Group consecutive entries that share a site location so the banner shows once
+  let i = 0;
+  while (i < entries.length) {
+    const entry = entries[i];
+    const nextR = renderPhotoEntry(ws, r, entry);
+    r = nextR;
+    i++;
+  }
+
+  // Inner helper: render a single location+photo-pair block starting at row `r`.
+  // Returns the next free row.
+  function renderPhotoEntry(
+    ws: ExcelJS.Worksheet,
+    startRow: number,
+    entry: SitePhotoEntry,
+  ): number {
+    let row = startRow;
+
+    // Location banner (B-I, yellow)
+    ws.getRow(row).height = 20.1;
+    ws.getCell(row, 2).value = entry.siteLocation ?? '';
+    safeStyle(ws.getCell(row, 2), locationStyle, 'sp.loc');
+    for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(row, c), locationStyle, 'sp.loc.span');
+    safeMerge(ws, row, 2, row, 9);
+    row++;
+
+    // Spacer
+    ws.getRow(row).height = 6.95;
+    row++;
+
+    // Photo row — tall (170pt). Left photo: B-E merged. Right photo: F-I merged.
+    ws.getRow(row).height = 170.1;
+    // Left photo box
+    safeStyle(ws.getCell(row, 2), photoBoxStyle, 'sp.photoL');
+    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(row, c), photoBoxStyle, 'sp.photoL.span');
+    safeMerge(ws, row, 2, row, 5);
+    // Right photo box
+    safeStyle(ws.getCell(row, 6), photoBoxStyle, 'sp.photoR');
+    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(row, c), photoBoxStyle, 'sp.photoR.span');
+    safeMerge(ws, row, 6, row, 9);
+    row++;
+
+    // Spacer
+    ws.getRow(row).height = 6.95;
+    row++;
+
+    // Caption row — C-D (left), G-H (right)
+    ws.getRow(row).height = 15;
+    ws.getCell(row, 3).value = entry.caption1 ?? '';
+    safeStyle(ws.getCell(row, 3), captionStyle, 'sp.cap1');
+    safeStyle(ws.getCell(row, 4), captionStyle, 'sp.cap1.span');
+    safeMerge(ws, row, 3, row, 4);
+
+    ws.getCell(row, 7).value = entry.caption2 ?? '';
+    safeStyle(ws.getCell(row, 7), captionStyle, 'sp.cap2');
+    safeStyle(ws.getCell(row, 8), captionStyle, 'sp.cap2.span');
+    safeMerge(ws, row, 7, row, 8);
+    row++;
+
+    return row;
+  }
 }
 
 // SHEET 12: 8. Construction Issues
 async function buildConstructionIssues(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('8. Issues');
   const styles = createStyles(workbook);
+  // No tab color — matches template
 
-  ws.properties.tabColor = { argb: 'FF0070C0' };
+  // ── Column widths (A–S) ──────────────────────────────────────────────────
+  const widths = [
+    5.71,  // A margin
+    6.29,  // B issue-number column
+    9, 9, 9, 9, 9, 9, 9, 9,      // C-J text block (issue text spans B-J)
+    4.57,  // K gap
+    9, 9, 9, 9,                  // L-O photo area
+    4.57,  // P gap
+    9,     // Q
+    10.71, // R
+    20.71, // S end
+  ];
+  widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
-  let r = 3;
+  // Styles
+  const titleStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+  };
+  const bannerStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 12, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
+    alignment: { horizontal: 'center', vertical: 'middle' },
+  };
+  const issueNumberStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const labelStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const photoRefStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'center', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const descBoxStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'top', wrapText: true },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const photoBoxStyle: Partial<ExcelJS.Style> = {
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+  const footerStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'top' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
 
+  let r = 2;
+
+  // ── Sheet title row (row 2) ──────────────────────────────────────────────
+  ws.getRow(r).height = 20.1;
   ws.getCell(r, 2).value = '8. CONSTRUCTION ISSUE';
-  ws.getCell(r, 2).style = styles.sectionHdr;
-  ws.mergeCells(r, 2, r, 6);
-  r += 2;
+  safeStyle(ws.getCell(r, 2), titleStyle, 'ci.title');
+  for (let c = 3; c <= 19; c++) safeStyle(ws.getCell(r, c), titleStyle, 'ci.title.span');
+  safeMerge(ws, r, 2, r, 19);
+  r++; // 3
 
-  // Add Construction Issues content here
-  // Implementation for construction issues
+  // ── Sub-header: project title on left, company name on right ─────────────
+  ws.getRow(r).height = 45;
+  ws.getCell(r, 2).value = d.projectTitle ?? '';
+  safeStyle(ws.getCell(r, 2), {
+    font: { size: 12, name: 'Arial' },
+    alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+  }, 'ci.proj');
+  ws.getCell(r, 19).value = d.contractor ?? 'CACPM Co.,Ltd';
+  safeStyle(ws.getCell(r, 19), {
+    font: { size: 12, name: 'Arial' },
+    alignment: { horizontal: 'right', vertical: 'middle' },
+  }, 'ci.contractor');
+  r += 2; // skip to row 5
+
+  // ── "Construction Issue" banner ──────────────────────────────────────────
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = 'Construction Issue';
+  safeStyle(ws.getCell(r, 2), bannerStyle, 'ci.banner');
+  for (let c = 3; c <= 19; c++) safeStyle(ws.getCell(r, c), bannerStyle, 'ci.banner.span');
+  safeMerge(ws, r, 2, r, 19);
+  r++; // 6
+
+  // ── Issue blocks ─────────────────────────────────────────────────────────
+  const issues = d.constructionIssues ?? [];
+  // Render at least one empty issue so the sheet has the template structure
+  const issuesToRender = issues.length > 0 ? issues : [{ number: 1 } as ConstructionIssue];
+
+  for (let idx = 0; idx < issuesToRender.length; idx++) {
+    const issue = issuesToRender[idx];
+
+    // One issue block spans 12 rows total, matching template rows 6..17:
+    //   +0  : issue number (B6 etc., 1 row)
+    //   +1  : "Site Location:" label row | "Photo Reference" label (K)
+    //   +2  : "Problems / Descriptions:" label | (photo box continues)
+    //   +3..+9 : description body (merged vertically) | photo box continues
+    //   +10 : "Action by:" footer row
+    //   +11 : spacer (optional; we tighten to 11 rows and leave natural flow)
+
+    // Issue number row
+    ws.getRow(r).height = 18;
+    ws.getCell(r, 2).value = issue.number ?? (idx + 1);
+    safeStyle(ws.getCell(r, 2), issueNumberStyle, 'ci.num');
+    for (let c = 3; c <= 19; c++) safeStyle(ws.getCell(r, c), issueNumberStyle, 'ci.num.span');
+    safeMerge(ws, r, 2, r, 19);
+    r++;
+
+    // Site Location | Photo Reference labels
+    ws.getRow(r).height = 18;
+    ws.getCell(r, 2).value = `Site Location: ${issue.siteLocation ?? ''}`;
+    safeStyle(ws.getCell(r, 2), labelStyle, 'ci.loc');
+    for (let c = 3; c <= 10; c++) safeStyle(ws.getCell(r, c), labelStyle, 'ci.loc.span');
+    safeMerge(ws, r, 2, r, 10);
+
+    ws.getCell(r, 11).value = 'Photo Reference';
+    safeStyle(ws.getCell(r, 11), photoRefStyle, 'ci.photoLbl');
+    for (let c = 12; c <= 19; c++) safeStyle(ws.getCell(r, c), photoRefStyle, 'ci.photoLbl.span');
+    safeMerge(ws, r, 11, r, 19);
+    r++;
+
+    // "Problems / Descriptions:" label (top of description area)
+    const descStartRow = r;
+    ws.getRow(r).height = 18;
+    ws.getCell(r, 2).value = 'Problems / Descriptions:';
+    safeStyle(ws.getCell(r, 2), labelStyle, 'ci.probLbl');
+    for (let c = 3; c <= 10; c++) safeStyle(ws.getCell(r, c), labelStyle, 'ci.probLbl.span');
+    safeMerge(ws, r, 2, r, 10);
+    r++;
+
+    // Photo area: rows descStartRow..descStartRow+8 (9 rows total) in K-S
+    // Merge K-S across those 9 rows (matching template K7:S16 pattern)
+    const photoStartRow = descStartRow;
+    const photoEndRow = descStartRow + 8;
+    safeStyle(ws.getCell(photoStartRow, 11), photoBoxStyle, 'ci.photo');
+    for (let c = 12; c <= 19; c++) safeStyle(ws.getCell(photoStartRow, c), photoBoxStyle, 'ci.photo.span');
+    safeMerge(ws, photoStartRow, 11, photoEndRow, 19);
+
+    // Description body: merged from descStartRow+1 .. descStartRow+8 (8 rows)
+    const descBodyStart = descStartRow + 1;
+    const descBodyEnd = descStartRow + 8;
+    for (let rr = descBodyStart; rr <= descBodyEnd; rr++) {
+      ws.getRow(rr).height = 18;
+    }
+    ws.getCell(descBodyStart, 2).value = issue.problemDescription ?? '';
+    safeStyle(ws.getCell(descBodyStart, 2), descBoxStyle, 'ci.desc');
+    for (let rr = descBodyStart; rr <= descBodyEnd; rr++) {
+      for (let c = 3; c <= 10; c++) safeStyle(ws.getCell(rr, c), descBoxStyle, 'ci.desc.span');
+    }
+    safeMerge(ws, descBodyStart, 2, descBodyEnd, 10);
+
+    // Advance r past description body
+    r = descBodyEnd + 1;
+
+    // "Action by:" footer row (spans B-J, then K-S continues photo area NO — footer is B-J only)
+    ws.getRow(r).height = 18;
+    ws.getCell(r, 2).value = `Action by: ${issue.actionBy ?? ''}`;
+    safeStyle(ws.getCell(r, 2), footerStyle, 'ci.action');
+    for (let c = 3; c <= 10; c++) safeStyle(ws.getCell(r, c), footerStyle, 'ci.action.span');
+    safeMerge(ws, r, 2, r, 10);
+
+    // Right side of footer row — keep inside photo box (already merged above)
+    r++;
+  }
 }
