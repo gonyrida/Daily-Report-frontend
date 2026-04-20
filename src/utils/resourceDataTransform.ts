@@ -1,5 +1,5 @@
-import { Resources, ManPowerTeams, ManPowerEntry } from "@/types/resources.types";
-import { Section } from "@/types/resourceTable.types";
+import { Resources, ManPowerTeams, ManPowerEntry, MaterialEntry, MachineryEntry } from "@/types/resources.types";
+import { Section, SubRow } from "@/types/resourceTable.types";
 
 /**
  * Transform the legacy UI data structure to the new payload format
@@ -55,8 +55,110 @@ export const transformResourceDataToNewPayload = (sections: Section[], dateRange
   };
 
   return {
-    manPower
+    manPower,
+    material: [],
+    machinery: []
   };
+};
+
+/**
+ * Transform backend manpower data to frontend format (alias for transformNewPayloadToUIData)
+ */
+export const transformBackendToFrontendFormat = (manPower: ManPowerTeams): Section[] => {
+  return [
+    {
+      title: "I. Site Management Team",
+      subtitle: "",
+      subRows: manPower.managementTeam?.map(entry => ({
+        description: entry.description,
+        dailyData: [
+          entry.date?.fri?.toString() || "0",
+          entry.date?.sat?.toString() || "0",
+          entry.date?.sun?.toString() || "0",
+          entry.date?.mon?.toString() || "0",
+          entry.date?.tue?.toString() || "0",
+          entry.date?.wed?.toString() || "0",
+          entry.date?.thu?.toString() || "0"
+        ],
+        previousWeek: entry.prevWeek?.toString() || "0",
+        thisWeek: entry.thisWeek?.toString() || "0",
+        upToThisWeek: entry.accumulated?.toString() || "0"
+      })) || []
+    },
+    {
+      title: "II. Site Working Team Interior",
+      subtitle: "",
+      subRows: manPower.workingTeamInterior?.map(entry => ({
+        description: entry.description,
+        dailyData: [
+          entry.date?.fri?.toString() || "0",
+          entry.date?.sat?.toString() || "0",
+          entry.date?.sun?.toString() || "0",
+          entry.date?.mon?.toString() || "0",
+          entry.date?.tue?.toString() || "0",
+          entry.date?.wed?.toString() || "0",
+          entry.date?.thu?.toString() || "0"
+        ],
+        previousWeek: entry.prevWeek?.toString() || "0",
+        thisWeek: entry.thisWeek?.toString() || "0",
+        upToThisWeek: entry.accumulated?.toString() || "0"
+      })) || []
+    },
+    {
+      title: "III. Site Working Team MEP",
+      subtitle: "",
+      subRows: manPower.workingTeamMEP?.map(entry => ({
+        description: entry.description,
+        dailyData: [
+          entry.date?.fri?.toString() || "0",
+          entry.date?.sat?.toString() || "0",
+          entry.date?.sun?.toString() || "0",
+          entry.date?.mon?.toString() || "0",
+          entry.date?.tue?.toString() || "0",
+          entry.date?.wed?.toString() || "0",
+          entry.date?.thu?.toString() || "0"
+        ],
+        previousWeek: entry.prevWeek?.toString() || "0",
+        thisWeek: entry.thisWeek?.toString() || "0",
+        upToThisWeek: entry.accumulated?.toString() || "0"
+      })) || []
+    }
+  ];
+};
+
+/**
+ * Transform backend material data to frontend subRows format
+ */
+export const transformMaterialsToFrontendFormat = (materials: MaterialEntry[]): SubRow[] => {
+  return materials?.map(entry => ({
+    description: entry.description,
+    unit: entry.unit,
+    dailyData: ["-", "-", "-", "-", "-", "-", "-"],
+    previousWeek: entry.prevWeek?.toString() || "0",
+    thisWeek: entry.thisWeek?.toString() || "0",
+    upToThisWeek: entry.accumulated?.toString() || "0"
+  })) || [];
+};
+
+/**
+ * Transform backend machinery data to frontend subRows format
+ */
+export const transformMachineryToFrontendFormat = (machinery: MachineryEntry[]): SubRow[] => {
+  return machinery?.map(entry => ({
+    description: entry.description,
+    dailyData: [
+      entry.date?.fri?.toString() || "0",
+      entry.date?.sat?.toString() || "0",
+      entry.date?.sun?.toString() || "0",
+      entry.date?.mon?.toString() || "0",
+      entry.date?.tue?.toString() || "0",
+      entry.date?.wed?.toString() || "0",
+      entry.date?.thu?.toString() || "0"
+    ],
+    previousWeek: entry.prevWeek?.toString() || "0",
+    thisWeek: entry.thisWeek?.toString() || "0",
+    upToThisWeek: entry.accumulated?.toString() || "0"
+  })) || [];
 };
 
 /**

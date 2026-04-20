@@ -189,7 +189,8 @@ const WeeklyReport = () => {
     weekNumber: "",
     refNoPrefix: "ICT-CPM-WRP",
     dateRange: "",
-    projectName: selectedProject || "Default Project Name",
+    projectName: (selectedProject || "Default Project Name").trim(),
+    projectId: projectId || "",
     employer: "Client Name",
     coverImage: "",
     clientLogo: "",
@@ -291,6 +292,9 @@ const WeeklyReport = () => {
   // NEW: Add Schedule state to WeeklyReport page (like other sections)
   const [scheduleData, setScheduleData] = useState<any>(null);
 
+  // NEW: Add Resources state to WeeklyReport page (for rolling total logic)
+  const [resourcesData, setResourcesData] = useState<any>(null);
+
   // NEW: Add state to store the clearQaqcData function reference
   const clearQaqcDataRef = useRef<(() => void) | null>(null);
 
@@ -318,15 +322,16 @@ const WeeklyReport = () => {
   // Issues hook for state management
   const issuesHook = useIssues();
 
-  // Update projectName when effectiveProjectName changes (using API-fetched name)
+  // Update projectName and projectId when effectiveProjectName changes (using API-fetched name)
   useEffect(() => {
     if (effectiveProjectName) {
       setSharedData(prev => ({
         ...prev,
-        projectName: effectiveProjectName
+        projectName: effectiveProjectName.trim(),  // Trim whitespace/tabs
+        projectId: projectId || ""
       }));
     }
-  }, [effectiveProjectName, currentProjectName, selectedProject]);
+  }, [effectiveProjectName, currentProjectName, selectedProject, projectId]);
 
   // Initialize construction progress when no reportId exists but project is selected
   useEffect(() => {
@@ -580,6 +585,24 @@ const WeeklyReport = () => {
               // Create empty Schedule structure if none exists
               setScheduleData([]);
             }
+
+            // Load Resources data (without rolling total - for viewing existing report)
+            if (report.sections?.resources) {
+              setResourcesData(report.sections.resources);
+            } else {
+              // Create empty Resources structure if none exists
+              setResourcesData({
+                manPower: {
+                  dateRange: report.sections?.cover?.dateRange || "",
+                  managementTeam: [],
+                  workingTeamInterior: [],
+                  workingTeamMEP: []
+                },
+                material: [],
+                machinery: []
+              });
+            }
+
             // Load Construction Progress data
             if (report.sections?.constructionProgress) {
               constructionProgressHook.updateConstructionData(report.sections.constructionProgress);
@@ -680,6 +703,55 @@ const WeeklyReport = () => {
                     // No submitted reports found in project
                   }
                 }
+              }
+
+              // Apply rolling total logic for resources if report has resources data
+              if (report.sections?.resources?.manPower) {
+                const resources = report.sections.resources;
+
+                // Apply rolling total: copy accumulated to prevWeek, reset thisWeek
+                const rolledManPower = {
+                  dateRange: sharedData.dateRange || "",
+                  managementTeam: resources.manPower.managementTeam?.map((item: any) => ({
+                    ...item,
+                    prevWeek: item.accumulated || 0,
+                    thisWeek: 0,
+                    accumulated: item.accumulated || 0
+                  })) || [],
+                  workingTeamInterior: resources.manPower.workingTeamInterior?.map((item: any) => ({
+                    ...item,
+                    prevWeek: item.accumulated || 0,
+                    thisWeek: 0,
+                    accumulated: item.accumulated || 0
+                  })) || [],
+                  workingTeamMEP: resources.manPower.workingTeamMEP?.map((item: any) => ({
+                    ...item,
+                    prevWeek: item.accumulated || 0,
+                    thisWeek: 0,
+                    accumulated: item.accumulated || 0
+                  })) || []
+                };
+
+                // Apply rolling total to materials and machinery too
+                const rolledMaterial = resources.material?.map((item: any) => ({
+                  ...item,
+                  prevWeek: item.accumulated || 0,
+                  thisWeek: 0,
+                  accumulated: item.accumulated || 0
+                })) || [];
+
+                const rolledMachinery = resources.machinery?.map((item: any) => ({
+                  ...item,
+                  prevWeek: item.accumulated || 0,
+                  thisWeek: 0,
+                  accumulated: item.accumulated || 0
+                })) || [];
+
+                setResourcesData({
+                  manPower: rolledManPower,
+                  material: rolledMaterial,
+                  machinery: rolledMachinery
+                });
               }
 
               // Reset reportId to indicate this is a new report (not saved yet)
@@ -1839,7 +1911,18 @@ const WeeklyReport = () => {
                 upToThisWeek: item.upToThisWeek
               }))
             };
-          })()
+          })(),
+          // NEW: Add Resources section to save payload
+          resources: resourcesData || {
+            manPower: {
+              dateRange: sharedData.dateRange || "",
+              managementTeam: [],
+              workingTeamInterior: [],
+              workingTeamMEP: []
+            },
+            material: [],
+            machinery: []
+          }
         }
       };
 
@@ -2847,6 +2930,8 @@ const WeeklyReport = () => {
                     setWeeklyActivities={setWeeklyActivities}
                     nextWeekPlan={nextWeekPlan}
                     setNextWeekPlan={setNextWeekPlan}
+                    resourcesData={resourcesData}
+                    setResourcesData={setResourcesData}
                   />
                 </div>
               </>

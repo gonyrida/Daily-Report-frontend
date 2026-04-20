@@ -32,4 +32,6 @@ export interface WeeklyReportContentProps {
   onClearQaqcData?: (clearFn: () => void) => void;
   onClearHsesData?: (clearFn: () => void) => void;
   constructionProgressItems?: ConstructionProgressItem[];
+  resourcesData?: any;
+  setResourcesData?: (resourcesData: any) => void;
 }

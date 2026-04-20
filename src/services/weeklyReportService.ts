@@ -523,12 +523,22 @@ export const getMasterScheduleFiles = async (reportId: string): Promise<ApiRespo
 /**
  * Aggregate manpower data for a weekly report
  */
-export const aggregateManpower = async (projectName: string, startDate: string, endDate: string, options: { includePrevWeek?: boolean; includeAccumulated?: boolean } = {}): Promise<ApiResponse<any>> => {
+export const aggregateManpower = async (
+  projectName: string, 
+  startDate: string, 
+  endDate: string, 
+  options: { includePrevWeek?: boolean; includeAccumulated?: boolean; projectId?: string } = {}
+): Promise<ApiResponse<any>> => {
   const params = new URLSearchParams({
-    projectName,
+    projectName,  // Always send this (backend requires it)
     startDate,
     endDate
   });
+  
+  // Also send projectId when available so backend can use it for accurate lookup
+  if (options.projectId) {
+    params.append('projectId', options.projectId);
+  }
   
   const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/aggregate-manpower?${params}`, options);
   return handleApiResponse<any>(response);

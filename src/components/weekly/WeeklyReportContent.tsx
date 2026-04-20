@@ -42,7 +42,9 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   onQaqcDataChange,
   onClearQaqcData,
   onClearHsesData,
-  constructionProgressItems
+  constructionProgressItems,
+  resourcesData,
+  setResourcesData
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -437,7 +439,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           6. RESOURCES STATUS
         </h2>
-        <Resource 
+        <Resource
           sharedData={sharedData}
           sections={resourceTableHook.data || []}
           setSections={resourceTableHook.setData}
@@ -446,6 +448,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
           monthYearDisplay={resourceTableHook.monthYearDisplay}
           dates={resourceTableHook.dates}
           reportId={reportId}
+          initialResourcesData={resourcesData}
+          onResourcesChange={(resources) => {
+            if (setResourcesData) {
+              setResourcesData(resources);
+            }
+          }}
         />
       </div>
 

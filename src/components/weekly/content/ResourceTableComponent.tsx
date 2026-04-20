@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { SubRow, Section, ResourceTableComponentProps } from "@/types/resourceTable.types";
 import { DAY_NAMES } from "@/constants/dayNames";
 import { calculateGrandTotal } from "@/utils/calculationUtils";
@@ -57,6 +57,24 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
       ],
     },
   ]);
+
+  // Sync localSections with passedSections when they change (e.g., after aggregation)
+  // Use a ref to track previous data to prevent infinite loops
+  const prevSectionsRef = useRef<string>('');
+  
+  useEffect(() => {
+    if (passedSections && passedSections.length > 0) {
+      // Only update if the data is actually different (not just reference)
+      const hasData = passedSections.some(s => s.subRows && s.subRows.length > 0);
+      const sectionsJson = JSON.stringify(passedSections);
+      
+      if (hasData && sectionsJson !== prevSectionsRef.current) {
+        console.log('🔄 ResourceTableComponent syncing passedSections:', passedSections);
+        setLocalSections(passedSections);
+        prevSectionsRef.current = sectionsJson;
+      }
+    }
+  }, [passedSections]);
 
   const sections = Array.isArray(passedSections) ? passedSections : localSections;
   const setSections = passedSetSections || setLocalSections;
