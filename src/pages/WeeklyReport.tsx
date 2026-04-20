@@ -2446,16 +2446,109 @@ const WeeklyReport = () => {
     hsePermits: hsesData?.permit || [],
     hseFirstAid: hsesData?.firstAidAccident,
     hseOtherConcerns: hsesData?.otherActivities,
-    weekDates: sharedData.dateRange?.split(' - ')[0]
-      ? Array.from({ length: 7 }, (_, i) => {
-        const start = new Date(sharedData.dateRange.split(' - ')[0]);
-        start.setDate(start.getDate() + i);
-        return start.getDate().toString();
-      })
-      : ['13', '14', '15', '16', '17', '18', '19'],
-    manpowerRows: [], // Resource data managed in WeeklyReportContent
-    materialRows: [],
-    equipmentRows: [],
+    weekDates: (() => {
+      // Parse "06-Mar-26 ~ 12-Mar-26" format from sharedData.dateRange
+      if (!sharedData.dateRange) return ['', '', '', '', '', '', ''];
+      const cleaned = sharedData.dateRange.trim().replace(/\s*~\s*/, '~');
+      const [startStr] = cleaned.split('~');
+      if (!startStr) return ['', '', '', '', '', '', ''];
+      const monthMap: { [k: string]: number } = {
+        Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+        Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+      };
+      const [dayStr, monStr, yrStr] = startStr.trim().split('-');
+      const start = new Date(2000 + parseInt(yrStr, 10), monthMap[monStr] ?? 0, parseInt(dayStr, 10));
+      if (isNaN(start.getTime())) return ['', '', '', '', '', '', ''];
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        return d.getDate().toString();
+      });
+    })(),
+    // Manpower: team-based groups with group header rows for Excel export
+    manpowerRows: (() => {
+      const mp = resourcesData?.manPower;
+      if (!mp) return [];
+
+      const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
+      const mapMember = (m: any) => {
+        const daily = m.date
+          ? dk.map(k => m.date?.[k] ?? 0)
+          : Array.isArray(m.dailyData)
+            ? m.dailyData
+            : Array(7).fill(0);
+        return {
+          description: m.description ?? '',
+          dailyCounts: daily,
+          previousWeek: m.prevWeek ?? m.previousWeek ?? 0,
+          thisWeek: m.thisWeek ?? 0,
+          upToThisWeek: m.accumulated ?? m.upToThisWeek ?? 0,
+          isGroupHeader: false,  // marker for renderer
+        };
+      };
+
+      const groups: Array<{ title: string; members: any[] }> = [
+        { title: 'I. Site Management Team',     members: mp.managementTeam ?? [] },
+        { title: 'II. Site Working Team Interior', members: mp.workingTeamInterior ?? [] },
+        { title: 'III. Site Working Team MEP',  members: mp.workingTeamMEP ?? [] },
+      ];
+
+      const out: any[] = [];
+      for (const g of groups) {
+        const realMembers = g.members.filter((m: any) => (m?.description ?? '').trim() !== '');
+        if (realMembers.length === 0) continue;  // skip empty teams
+
+        // Insert group header row
+        out.push({
+          description: g.title,
+          dailyCounts: ['', '', '', '', '', '', ''],
+          previousWeek: '',
+          thisWeek: '',
+          upToThisWeek: '',
+          isGroupHeader: true,  // ← marker
+        });
+
+        // Then members
+        realMembers.forEach(m => out.push(mapMember(m)));
+      }
+      return out;
+    })(),
+    materialRows: (resourcesData?.material ?? [])
+      .filter((m: any) => (m?.description ?? m?.name ?? '').trim() !== '')
+      .map((m: any) => {
+        const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
+        const daily = m.date
+          ? dk.map(k => m.date?.[k] ?? 0)
+          : Array.isArray(m.dailyData)
+            ? m.dailyData
+            : Array(7).fill(0);
+        return {
+          description: m.description ?? m.name ?? '',
+          unit: m.unit ?? '',
+          dailyData: daily,
+          previous: m.prevWeek ?? m.previous ?? 0,
+          thisPeriod: m.thisWeek ?? m.thisPeriod ?? 0,
+          accumulate: m.accumulated ?? m.accumulate ?? 0,
+        };
+      }),
+    equipmentRows: (resourcesData?.machinery ?? [])
+      .filter((m: any) => (m?.description ?? m?.name ?? '').trim() !== '')
+      .map((m: any) => {
+        const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
+        const daily = m.date
+          ? dk.map(k => m.date?.[k] ?? 0)
+          : Array.isArray(m.dailyData)
+            ? m.dailyData
+            : Array(7).fill(0);
+        return {
+          description: m.description ?? m.name ?? '',
+          unit: m.unit ?? '',
+          dailyData: daily,
+          previous: m.prevWeek ?? m.previous ?? 0,
+          thisPeriod: m.thisWeek ?? m.thisPeriod ?? 0,
+          accumulate: m.accumulated ?? m.accumulate ?? 0,
+        };
+      }),
     sitePhotoCaptions: siteActivitiesSections.flatMap((section: any) =>
       section.slots?.map((slot: any, idx: number) => ({
         siteLocation: section.title,

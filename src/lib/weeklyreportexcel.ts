@@ -195,6 +195,7 @@ export interface ManpowerRow {
   previousWeek?: number | string;
   thisWeek?: number | string;
   upToThisWeek?: number | string;
+  isGroupHeader?: boolean;  // marker for team group headers (I. / II. / III.)
 }
 
 export interface MaterialRow {
@@ -2391,6 +2392,18 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   }
 }
 
+// Small helper: 1-based column index → Excel letter (A, B, ... Z, AA, AB, ...)
+function colLetter(col: number): string {
+  let s = '';
+  let n = col;
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
 // SHEET 10: 6. Resources
 async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('6. Resources');
@@ -2527,11 +2540,35 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   });
   r++;
 
-  // Manpower data rows — single flat list (no group headers, caller controls grouping)
+  // Manpower data rows — with group headers for team sections
   const manpowerRows = d.manpowerRows ?? [];
   const firstMpDataRow = r;
+
+  // Style for group header rows (I. / II. / III.)
+  const groupHeaderStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, size: 11, name: 'Arial' },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' },
+    },
+  };
+
   manpowerRows.forEach(mp => {
     ws.getRow(r).height = 20;
+
+    if (mp.isGroupHeader) {
+      // Render the group header as a merged bold banner across B..L
+      ws.getCell(r, 2).value = mp.description ?? '';
+      safeStyle(ws.getCell(r, 2), groupHeaderStyle, 'mp.group');
+      for (let c = 3; c <= 12; c++) safeStyle(ws.getCell(r, c), groupHeaderStyle, 'mp.group.span');
+      safeMerge(ws, r, 2, r, 12);
+      r++;
+      return;
+    }
+
+    // Normal data row
     ws.getCell(r, 2).value = mp.description ?? '';
     safeStyle(ws.getCell(r, 2), dataStyle, 'mp.desc.data');
 
@@ -2566,9 +2603,9 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   }
   const lastMpDataRow = r - 1;
 
-  // Manpower Total row
+  // Manpower Grand Total row
   ws.getRow(r).height = 22;
-  ws.getCell(r, 2).value = 'Total';
+  ws.getCell(r, 2).value = 'Grand Total';
   safeStyle(ws.getCell(r, 2), totalStyle, 'mp.total.lbl');
   for (let i = 0; i < 7; i++) {
     ws.getCell(r, 3 + i).value = { formula: `SUM(${colLetter(3 + i)}${firstMpDataRow}:${colLetter(3 + i)}${lastMpDataRow})` };
@@ -2662,6 +2699,30 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
     ws.getCell(r, 12).value = m.accumulate !== undefined && m.accumulate !== ''
       ? m.accumulate
       : { formula: `J${r}+K${r}` };
+    safeStyle(ws.getCell(r, 12), numStyle, 'mat.acc.data');
+
+    r++;
+  });
+
+  if (materialRows.length === 0) {
+    ws.getRow(r).height = 20;
+    for (let c = 2; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.empty');
+    r++;
+  }
+  const lastMatRow = r - 1;
+
+  ws.getRow(r).height = 22;
+  ws.getCell(r, 2).value = 'Total';
+  safeStyle(ws.getCell(r, 2), totalStyle, 'mat.total.lbl');
+  // Daily totals
+  for (let i = 0; i < 7; i++) {
+    ws.getCell(r, 3 + i).value = { formula: `SUM(${colLetter(3 + i)}${firstMatRow}:${colLetter(3 + i)}${lastMatRow})` };
+    safeStyle(ws.getCell(r, 3 + i), totalNumStyle, `mat.total.d${i}`);
+  }
+  ws.getCell(r, 10).value = { formula: `SUM(J${firstMatRow}:J${lastMatRow})` };
+  safeStyle(ws.getCell(r, 10), totalNumStyle, 'mat.total.prev');
+  ws.getCell(r, 11).value = { formula: `SUM(K${firstMatRow}:K${lastMatRow})` };
+  safeStyle(ws.getCell(r, 11), totalNumStyle, 'mat.total.this');
   ws.getCell(r, 12).value = { formula: `SUM(L${firstMatRow}:L${lastMatRow})` };
   safeStyle(ws.getCell(r, 12), totalNumStyle, 'mat.total.acc');
   r += 2;
@@ -2771,18 +2832,6 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 11), totalNumStyle, 'eq.total.this');
   ws.getCell(r, 12).value = { formula: `SUM(L${firstEqRow}:L${lastEqRow})` };
   safeStyle(ws.getCell(r, 12), totalNumStyle, 'eq.total.acc');
-}
-
-// Small helper: 1-based column index → Excel letter (A, B, ... Z, AA, AB, ...)
-function colLetter(col: number): string {
-  let s = '';
-  let n = col;
-  while (n > 0) {
-    const m = (n - 1) % 26;
-    s = String.fromCharCode(65 + m) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
 }
 
 // SHEET 11: 7. Site Activity Photos
