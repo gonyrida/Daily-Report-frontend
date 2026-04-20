@@ -23,9 +23,11 @@ interface Report {
   projectName: string;
   reportDate: string;
   location?: string;
+  projectId?: string;
 }
 
 interface Project {
+  _id?: string;
   name: string;
   reportCount: number;
   lastReportDate?: string;
@@ -70,11 +72,12 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
       // Group reports by project
       const projectMap = new Map<string, Project>();
 
-      allReports.forEach((report: Report) => {
+      allReports.forEach((report: Report & { projectId?: string }) => {
         const projectName = report.projectName || 'Untitled Project';
 
         if (!projectMap.has(projectName)) {
           projectMap.set(projectName, {
+            _id: report.projectId,   // grab it
             name: projectName,
             reportCount: 0,
             lastReportDate: report.reportDate,
@@ -209,8 +212,13 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
     }
   };
 
-  const handleProjectClick = (projectName: string) => {
-    navigate(`/daily-report?project=${encodeURIComponent(projectName)}`);
+  const handleProjectClick = (project: Project) => {
+    if (project._id) {
+      navigate(`/dashboard?projectId=${encodeURIComponent(project._id)}`);
+    } else {
+      // Fallback for legacy reports with no projectId
+      navigate(`/daily-report?project=${encodeURIComponent(project.name)}`);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -322,7 +330,7 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
             <Card
               key={project.name}
               className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => handleProjectClick(project.name)}
+              onClick={() => handleProjectClick(project)}
             >
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">{project.name}</CardTitle>

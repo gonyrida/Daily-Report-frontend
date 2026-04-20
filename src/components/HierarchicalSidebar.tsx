@@ -345,12 +345,15 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
         await loadFoldersWithProjects();
         setShowAddProjectInFolder(prev => ({ ...prev, [folderId]: false }));
         setNewProjectInFolderName(prev => ({ ...prev, [folderId]: '' }));
+        
+        const createdProject = response.data as Project;
+        
         toast({
           title: "Project Created",
-          description: `"${projectName}" created in folder.`,
+          description: `"${createdProject.name}" created in folder.`,
         });
-        // Navigate to the new project
-        navigate(`/dashboard?project=${encodeURIComponent(projectName)}`);
+        // Navigate to the new project using projectId
+        navigate(`/dashboard?projectId=${encodeURIComponent(createdProject._id)}`);
       } else {
         toast({
           title: "Error",
@@ -496,25 +499,27 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
         
         if (response.success) {
           // Refresh projects list
-          await loadProjects();
+          await loadFoldersWithProjects();
           
           setNewProjectName("");
           setShowAddProject(false);
           
+          const createdProject = response.data as Project;
+          
           toast({
             title: "Project Added",
-            description: `${newProjectName.trim()} has been added to your project list.`,
+            description: `${createdProject.name} has been added to your project list.`,
           });
 
           // Emit event to other components
           projectEvents.emit('projectAdded', { 
-            projectName: (response.data as Project).name,
-            createdBy: (response.data as Project).createdBy,
-            createdByName: (response.data as Project).createdByName
+            projectName: createdProject.name,
+            createdBy: createdProject.createdBy,
+            createdByName: createdProject.createdByName
           });
           
-          // Navigate to daily report with the new project
-          navigate(`/dashboard?project=${encodeURIComponent(newProjectName.trim())}&tab=company`);
+          // Navigate to dashboard with the new project using projectId
+          navigate(`/dashboard?projectId=${encodeURIComponent(createdProject._id)}`);
         } else {
           toast({
             title: "Error",
@@ -555,40 +560,33 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
   // 🚀 NEW: confirmRename function for dialog
   const confirmRename = async () => {
-    if (!renameData) return; // 🚀 Remove editProjectName check
+    if (!renameData) return;
     
     try {
-      // Find the project to get its ID
-      const project = projects.find(p => p.name === renameData.oldName);
+      // Search everywhere, not just projects array
+      let project: Project | undefined = rootProjects.find(p => p.name === renameData.oldName);
       if (!project) {
-        toast({
-          title: "Error",
-          description: "Project not found",
-          variant: "destructive",
-        });
+        for (const folder of folders) {
+          project = folder.projects?.find(p => p.name === renameData.oldName);
+          if (project) break;
+        }
+      }
+      
+      if (!project) {
+        toast({ title: "Error", description: "Project not found", variant: "destructive" });
         return;
       }
 
-      // 🚀 Use renameData.newName instead of editProjectName
       const response = await updateProject(project._id, renameData.newName);
       
       if (response.success) {
-        // Refresh projects list
-        await loadProjects();
+        await loadFoldersWithProjects();
         
-        // Emit event to other components
         projectEvents.emit('projectUpdated', { 
           oldName: renameData.oldName, 
-          newName: renameData.newName 
+          newName: renameData.newName,
+          projectId: project._id  // also emit projectId so Dashboard knows which one changed
         });
-        
-        // 🚀 Update URL if currently viewing this project
-        const searchParams = new URLSearchParams(window.location.search);
-        if (searchParams.get('project') === renameData.oldName) {
-          searchParams.set('project', renameData.newName);
-          window.location.href = `${window.location.pathname}?${searchParams.toString()}`;
-          return; // Page will reload with new project
-        }
         
         toast({
           title: "Project Updated",
@@ -603,14 +601,9 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
       }
     } catch (error) {
       console.error('Error updating project:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update project",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to update project", variant: "destructive" });
     }
     
-    // Close dialog and reset state
     setRenameConfirmOpen(false);
     setRenameData(null);
     setEditingProject(null);

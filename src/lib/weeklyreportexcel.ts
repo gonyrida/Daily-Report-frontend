@@ -2510,11 +2510,11 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 10), headerStyle, 'mp.prevBlank');
   safeStyle(ws.getCell(r, 11), headerStyle, 'mp.thisBlank');
   safeStyle(ws.getCell(r, 12), headerStyle, 'mp.uptoBlank');
-  // Merge B / J / K / L vertically across the two header rows
-  safeMerge(ws, hdrRow1, 2, r, 2);
-  safeMerge(ws, hdrRow1, 10, r, 10);
-  safeMerge(ws, hdrRow1, 11, r, 11);
-  safeMerge(ws, hdrRow1, 12, r, 12);
+  // Merge B / J / K / L vertically across the three header rows (rows 6-8)
+  safeMerge(ws, hdrRow1, 2, r + 1, 2);
+  safeMerge(ws, hdrRow1, 10, r + 1, 10);
+  safeMerge(ws, hdrRow1, 11, r + 1, 11);
+  safeMerge(ws, hdrRow1, 12, r + 1, 12);
   r++;
 
   // Header row 3: day dates (numeric)
@@ -2588,20 +2588,51 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.62');
   r++;
 
-  // Header: B-H Description (merged), I Unit, J Previous, K This Period, L Accumulate
+  // Header row 1: B=Description, C-I=WeekDates band, J=Prev Wk, K=This Wk, L=Up to This Wk
+  const matHdrRow1 = r;
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Description';
   safeStyle(ws.getCell(r, 2), headerStyle, 'mat.desc');
-  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), headerStyle, 'mat.desc.span');
-  safeMerge(ws, r, 2, r, 8);
-  ws.getCell(r, 9).value = 'Unit';
-  safeStyle(ws.getCell(r, 9), headerStyle, 'mat.unit');
+
+  // C-I day-dates band — use a title like "Mar-26" or week range summary
+  const matWeekLabel = (dates[0] && dates[6]) ? `Day ${dates[0]}–${dates[6]}` : 'This Week';
+  ws.getCell(r, 3).value = matWeekLabel;
+  safeStyle(ws.getCell(r, 3), headerStyle, 'mat.week');
+  for (let c = 4; c <= 9; c++) safeStyle(ws.getCell(r, c), headerStyle, 'mat.week.span');
+  safeMerge(ws, r, 3, r, 9);
+
   ws.getCell(r, 10).value = 'Previous';
   safeStyle(ws.getCell(r, 10), headerStyle, 'mat.prev');
   ws.getCell(r, 11).value = 'This Period';
   safeStyle(ws.getCell(r, 11), headerStyle, 'mat.this');
   ws.getCell(r, 12).value = 'Accumulate';
   safeStyle(ws.getCell(r, 12), headerStyle, 'mat.acc');
+  r++;
+
+  // Header row 2: day names (Fri..Thu)
+  ws.getRow(r).height = 18;
+  dayLabels.forEach((day, i) => {
+    ws.getCell(r, 3 + i).value = day;
+    safeStyle(ws.getCell(r, 3 + i), headerStyle, `mat.day.${day}`);
+  });
+  // Re-apply header style to column B and the totals columns so borders remain
+  safeStyle(ws.getCell(r, 2), headerStyle, 'mat.descBlank');
+  safeStyle(ws.getCell(r, 10), headerStyle, 'mat.prevBlank');
+  safeStyle(ws.getCell(r, 11), headerStyle, 'mat.thisBlank');
+  safeStyle(ws.getCell(r, 12), headerStyle, 'mat.accBlank');
+  // Merge B / J / K / L vertically across the three header rows
+  safeMerge(ws, matHdrRow1, 2, r + 1, 2);
+  safeMerge(ws, matHdrRow1, 10, r + 1, 10);
+  safeMerge(ws, matHdrRow1, 11, r + 1, 11);
+  safeMerge(ws, matHdrRow1, 12, r + 1, 12);
+  r++;
+
+  // Header row 3: day dates (numeric)
+  ws.getRow(r).height = 18;
+  dates.forEach((dt, i) => {
+    ws.getCell(r, 3 + i).value = dt;
+    safeStyle(ws.getCell(r, 3 + i), headerStyle, `mat.dt.${i}`);
+  });
   r++;
 
   const materialRows = d.materialRows ?? [];
@@ -2662,20 +2693,51 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.63');
   r++;
 
-  // Same header structure as 6.2
+  // Header row 1: B=Description, C-I=WeekDates band, J=Prev Wk, K=This Wk, L=Up to This Wk
+  const eqHdrRow1 = r;
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Description';
   safeStyle(ws.getCell(r, 2), headerStyle, 'eq.desc');
-  for (let c = 3; c <= 8; c++) safeStyle(ws.getCell(r, c), headerStyle, 'eq.desc.span');
-  safeMerge(ws, r, 2, r, 8);
-  ws.getCell(r, 9).value = 'Unit';
-  safeStyle(ws.getCell(r, 9), headerStyle, 'eq.unit');
+
+  // C-I day-dates band — use a title like "Mar-26" or week range summary
+  const eqWeekLabel = (dates[0] && dates[6]) ? `Day ${dates[0]}–${dates[6]}` : 'This Week';
+  ws.getCell(r, 3).value = eqWeekLabel;
+  safeStyle(ws.getCell(r, 3), headerStyle, 'eq.week');
+  for (let c = 4; c <= 9; c++) safeStyle(ws.getCell(r, c), headerStyle, 'eq.week.span');
+  safeMerge(ws, r, 3, r, 9);
+
   ws.getCell(r, 10).value = 'Previous';
   safeStyle(ws.getCell(r, 10), headerStyle, 'eq.prev');
   ws.getCell(r, 11).value = 'This Period';
   safeStyle(ws.getCell(r, 11), headerStyle, 'eq.this');
   ws.getCell(r, 12).value = 'Accumulate';
   safeStyle(ws.getCell(r, 12), headerStyle, 'eq.acc');
+  r++;
+
+  // Header row 2: day names (Fri..Thu)
+  ws.getRow(r).height = 18;
+  dayLabels.forEach((day, i) => {
+    ws.getCell(r, 3 + i).value = day;
+    safeStyle(ws.getCell(r, 3 + i), headerStyle, `eq.day.${day}`);
+  });
+  // Re-apply header style to column B and the totals columns so borders remain
+  safeStyle(ws.getCell(r, 2), headerStyle, 'eq.descBlank');
+  safeStyle(ws.getCell(r, 10), headerStyle, 'eq.prevBlank');
+  safeStyle(ws.getCell(r, 11), headerStyle, 'eq.thisBlank');
+  safeStyle(ws.getCell(r, 12), headerStyle, 'eq.accBlank');
+  // Merge B / J / K / L vertically across the three header rows
+  safeMerge(ws, eqHdrRow1, 2, r + 1, 2);
+  safeMerge(ws, eqHdrRow1, 10, r + 1, 10);
+  safeMerge(ws, eqHdrRow1, 11, r + 1, 11);
+  safeMerge(ws, eqHdrRow1, 12, r + 1, 12);
+  r++;
+
+  // Header row 3: day dates (numeric)
+  ws.getRow(r).height = 18;
+  dates.forEach((dt, i) => {
+    ws.getCell(r, 3 + i).value = dt;
+    safeStyle(ws.getCell(r, 3 + i), headerStyle, `eq.dt.${i}`);
+  });
   r++;
 
   const equipmentRows = d.equipmentRows ?? [];

@@ -43,6 +43,7 @@ import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport, getCompanyReports } from "@/integrations/reportsApi";
 import { getProjectById } from "@/integrations/projectsApi";
+import { projectEvents } from '@/utils/eventEmitter';
 
 interface Report {
   _id: string;
@@ -84,6 +85,19 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
   const [currentProjectName, setCurrentProjectName] = useState<string>("");
 
+  // Helper function for unified project matching
+  const matchesProject = (report: Report, projectId: string | null, projectName: string) => {
+    if (!projectId && !projectName) return true; // No filter, show all
+    
+    // Match by projectId (most reliable, for new reports)
+    if (projectId && report.projectId === projectId) return true;
+    
+    // Match by projectName (fallback for old reports OR reports where projectId wasn't saved)
+    if (projectName && report.projectName === projectName) return true;
+    
+    return false;
+  };
+
   // Fetch current project name when projectId changes (to handle renamed projects)
   useEffect(() => {
     const fetchProjectName = async () => {
@@ -103,14 +117,35 @@ const Dashboard = () => {
   }, [projectId]);
 
   useEffect(() => {
+    const handleProjectUpdated = async ({ projectId: updatedId, newName }: any) => {
+      if (updatedId === projectId) {
+        setCurrentProjectName(newName);
+        // Also refresh reports since their projectName may have been updated server-side
+        const userReports = await getRecentReports(50, undefined, projectId || undefined);
+        setReports(userReports.data || []);
+      }
+    };
+    
+    projectEvents.on('projectUpdated', handleProjectUpdated);
+    return () => {
+      projectEvents.off('projectUpdated', handleProjectUpdated);
+    };
+  }, [projectId]);
+
+  useEffect(() => {
     const fetchReports = async () => {
       try {
-        // Use new getRecentReports API - fetch ALL reports without status filter
-        const userReports = await getRecentReports(50);
+       
+        
+        // Use new getRecentReports API - fetch reports with projectId filter if available
+        const userReports = await getRecentReports(50, undefined, projectId || undefined);
+        
+        
+        
         setReports(userReports.data || []);
         setFilteredReports(userReports.data || []);
       } catch (error) {
-        console.error("Failed to fetch reports:", error);
+        console.error("❌ DEBUG DASHBOARD: Failed to fetch reports:", error);
         toast({
           title: "Error",
           description: "Failed to load your reports",
@@ -122,29 +157,15 @@ const Dashboard = () => {
     };
 
     fetchReports();
-  }, [toast]);
+  }, [toast, projectId]);
 
   // Filter reports based on search query and status
   useEffect(() => {
     let filtered = reports;
 
-    // Filter by project - use projectId if report has it, otherwise fallback to projectName
-    if (projectId && currentProjectName) {
-      // Check if any reports have projectId set
-      const reportsWithProjectId = filtered.filter(report => report.projectId);
-      
-      if (reportsWithProjectId.length > 0) {
-        // If reports have projectId, use it for reliable filtering
-        filtered = filtered.filter(report => 
-          report.projectId === projectId || report.projectName === currentProjectName
-        );
-      } else {
-        // Fallback to projectName if no reports have projectId yet
-        filtered = filtered.filter(report => report.projectName === currentProjectName);
-      }
-    } else if (currentProjectName) {
-      // Fallback to projectName for backward compatibility
-      filtered = filtered.filter(report => report.projectName === currentProjectName);
+    // Filter by project - unified logic
+    if (projectId || currentProjectName) {
+      filtered = filtered.filter(report => matchesProject(report, projectId, currentProjectName));
     }
 
     // Filter by folder if specified
@@ -168,7 +189,7 @@ const Dashboard = () => {
     }
 
     setFilteredReports(filtered);
-  }, [reports, searchQuery, filterStatus, projectId]);
+  }, [reports, searchQuery, filterStatus, projectId, currentProjectName, folderId]);
 
   useEffect(() => {
     // Always fetch company reports when there's a projectId
@@ -184,23 +205,9 @@ const Dashboard = () => {
   useEffect(() => {
     let filtered = companyReports;
 
-    // Filter by project - use projectId if report has it, otherwise fallback to projectName
-    if (projectId && currentProjectName) {
-      // Check if any reports have projectId set
-      const reportsWithProjectId = filtered.filter(report => report.projectId);
-      
-      if (reportsWithProjectId.length > 0) {
-        // If reports have projectId, use it for reliable filtering
-        filtered = filtered.filter(report => 
-          report.projectId === projectId || report.projectName === currentProjectName
-        );
-      } else {
-        // Fallback to projectName if no reports have projectId yet
-        filtered = filtered.filter(report => report.projectName === currentProjectName);
-      }
-    } else if (currentProjectName) {
-      // Fallback to projectName for backward compatibility
-      filtered = filtered.filter(report => report.projectName === currentProjectName);
+    // Filter by project - unified logic
+    if (projectId || currentProjectName) {
+      filtered = filtered.filter(report => matchesProject(report, projectId, currentProjectName));
     }
 
     // Filter by folder if specified
@@ -225,7 +232,7 @@ const Dashboard = () => {
     }
 
     setFilteredCompanyReports(filtered);
-  }, [companyReports, searchQuery, filterStatus, currentProjectName, projectId, folderId]);
+  }, [companyReports, searchQuery, filterStatus, projectId, currentProjectName, folderId]);
 
   // Helper function to get current user ID from user context
   // No localStorage needed - user info comes from authentication context
@@ -256,7 +263,7 @@ const Dashboard = () => {
       setIsLoadingCompany(true);
       // ADD PROJECT FILTER - Pass both project name (for display) and projectId (for reliable lookup)
       const response = await getCompanyReports(page, 20, search, currentProjectName, projectId || undefined);
-      setCompanyReports(response.reports);
+      setCompanyReports(response.reports || []);
     } catch (error) {
       console.error("Failed to fetch company reports:", error);
       toast({
@@ -314,7 +321,7 @@ const Dashboard = () => {
       
       // Refresh the reports list
       console.log("🔥 DASHBOARD: Refreshing reports list...");
-      const userReports = await getRecentReports(50);
+      const userReports = await getRecentReports(50, undefined, projectId || undefined);
       setReports(userReports.data || []);
       setFilteredReports(userReports.data || []);
       // Always refresh company reports to keep counts in sync
@@ -337,35 +344,22 @@ const Dashboard = () => {
     
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
     
-    // Check if any reports have projectId set
-    const hasReportsWithProjectId = reportsToCheck.some(report => report.projectId);
-    
-    return reportsToCheck.filter(report => {
-      // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
-      const matchesProject = hasReportsWithProjectId && projectId
-        ? report.projectId === projectId || report.projectName === currentProjectName
-        : !currentProjectName || report.projectName === currentProjectName;
-      return matchesProject &&
-            new Date(report.reportDate) >= oneWeekAgo &&
-            report.status === "submitted";
-    }).length;
+    return reportsToCheck.filter(report => 
+      matchesProject(report, projectId, currentProjectName) &&
+      new Date(report.reportDate) >= oneWeekAgo &&
+      report.status === "submitted"
+    ).length;
   };
 
   // 🚀 NEW: Get today's report status
   const getTodayReportStatus = () => {
     const today = new Date().toDateString();
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
-    
-    // Check if any reports have projectId set
-    const hasReportsWithProjectId = reportsToCheck.some(report => report.projectId);
       
-    const todayReport = reportsToCheck.find(report => {
-      // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
-      const matchesProject = hasReportsWithProjectId && projectId
-        ? report.projectId === projectId || report.projectName === currentProjectName
-        : !currentProjectName || report.projectName === currentProjectName;
-      return matchesProject && new Date(report.reportDate).toDateString() === today;
-    });
+    const todayReport = reportsToCheck.find(report => 
+      matchesProject(report, projectId, currentProjectName) && 
+      new Date(report.reportDate).toDateString() === today
+    );
       
     return todayReport?.status || null;
   };
@@ -374,16 +368,10 @@ const Dashboard = () => {
   const getLastSubmitted = () => {
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
     
-    // Check if any reports have projectId set
-    const hasReportsWithProjectId = reportsToCheck.some(report => report.projectId);
-    
-    const submittedReports = reportsToCheck.filter(report => {
-      // Hybrid matching: use projectId if report has it AND we have projectId, otherwise use projectName
-      const matchesProject = hasReportsWithProjectId && projectId
-        ? report.projectId === projectId || report.projectName === currentProjectName
-        : !currentProjectName || report.projectName === currentProjectName;
-      return matchesProject && report.status === "submitted";
-    });
+    const submittedReports = reportsToCheck.filter(report => 
+      matchesProject(report, projectId, currentProjectName) && 
+      report.status === "submitted"
+    );
     
     if (submittedReports.length === 0) return null;
     return submittedReports.reduce((latest, report) => 

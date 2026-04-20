@@ -492,16 +492,15 @@ export const autoSaveReport = async (reportId: string, partialData: any) => {
   return result;
 };
 
-export const getRecentReports = async (limit: number = 20, status?: string) => {
-  console.log("🔒 GET RECENT REPORTS: Fetching recent reports", { limit, status });
+export const getRecentReports = async (limit: number = 20, status?: string, projectId?: string) => {
 
   const params = new URLSearchParams();
   if (limit) params.append('limit', limit.toString());
   if (status) params.append('status', status);
+  if (projectId) params.append('projectId', projectId);
 
   const response = await apiGet(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/recent?${params.toString()}`);
 
-  console.log(`🔒 GET RECENT REPORTS: Response ${response.status}`);
 
   if (!response.ok) {
     const error = await response
@@ -512,7 +511,6 @@ export const getRecentReports = async (limit: number = 20, status?: string) => {
   }
 
   const result = await response.json();
-  console.log("🔒 GET RECENT REPORTS: Success:", result);
   return result;
 };
 
@@ -665,7 +663,8 @@ export const getCompanyReports = async (
       ...(projectId && { projectId }), // New project ID filter (more reliable)
     });
 
-    const response = await apiGet(`/daily-reports/company?${queryParams}`);
+    const url = `/daily-reports/company?${queryParams}`;
+    const response = await apiGet(url);
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -673,8 +672,9 @@ export const getCompanyReports = async (
     }
 
     const data = await response.json();
+
     return {
-      reports: data.data || [],  // FIX: Backend returns 'data', not 'reports'
+      reports: data.reports || [],  
       pagination: data.pagination || {
         page: 1,
         limit: 20,
