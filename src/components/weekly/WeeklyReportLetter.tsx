@@ -73,11 +73,11 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
       "Cambodian Advanced Construction Project Management (CACPM)",
     companyLocation:
       "8th floor, K1 Tower, No.148, Mao Tse Toung Blvd (245),Sangkat Toul Tumpong II, Khan Chamkamom, Phnom Penh, Cambodia",
-    companyPhone1: "+855 (0) 23 964 417~8",
+    companyPhone1: "T +855 (0) 23 964 417~8",
     companyPhone2: data.companyPhone2 || "",
     companyEmail1: data.companyEmail1 || "",
-    companyEmail2: "info@cacpm.com.kh",
-    refNoPrefix: data.refNoPrefix || "ICT-CPM-LETTER",
+    companyEmail2: "www.cambodiacpm.com",
+    refNoPrefix: data.refNoPrefix || "ICT-CPM-WRP",
   });
   useEffect(() => {
     // Parse date range to get start and end dates

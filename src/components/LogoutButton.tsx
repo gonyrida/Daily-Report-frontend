@@ -36,6 +36,7 @@ const LogoutButton = () => {
       // localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("rememberMe");
+      localStorage.removeItem("rememberedEmail");
       localStorage.removeItem("daily-report:profile");
       console.log("🔒 LOGOUT: localStorage user data cleared");
 
@@ -51,6 +52,7 @@ const LogoutButton = () => {
       // Clear localStorage user data even on error (not auth tokens)
       localStorage.removeItem("user");
       localStorage.removeItem("rememberMe");
+      localStorage.removeItem("rememberedEmail");
       localStorage.removeItem("daily-report:profile");
       console.log("🔒 LOGOUT: localStorage user data cleared on error");
 

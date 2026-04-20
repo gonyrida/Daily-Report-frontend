@@ -492,16 +492,15 @@ export const autoSaveReport = async (reportId: string, partialData: any) => {
   return result;
 };
 
-export const getRecentReports = async (limit: number = 20, status?: string) => {
-  console.log("🔒 GET RECENT REPORTS: Fetching recent reports", { limit, status });
+export const getRecentReports = async (limit: number = 20, status?: string, projectId?: string) => {
 
   const params = new URLSearchParams();
   if (limit) params.append('limit', limit.toString());
   if (status) params.append('status', status);
+  if (projectId) params.append('projectId', projectId);
 
   const response = await apiGet(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/recent?${params.toString()}`);
 
-  console.log(`🔒 GET RECENT REPORTS: Response ${response.status}`);
 
   if (!response.ok) {
     const error = await response
@@ -512,7 +511,6 @@ export const getRecentReports = async (limit: number = 20, status?: string) => {
   }
 
   const result = await response.json();
-  console.log("🔒 GET RECENT REPORTS: Success:", result);
   return result;
 };
 
@@ -648,7 +646,8 @@ export const getCompanyReports = async (
   page: number = 1,
   limit: number = 20,
   search: string = "",
-  projectFilter?: string
+  projectFilter?: string,
+  projectId?: string
 ) => {
   try {
     // const token = localStorage.getItem("authToken");
@@ -660,10 +659,12 @@ export const getCompanyReports = async (
       page: page.toString(),
       limit: limit.toString(),
       ...(search && { search }),
-      ...(projectFilter && { project: projectFilter }), // ← ADD PROJECT FILTER
+      ...(projectFilter && { project: projectFilter }), // Legacy project name filter
+      ...(projectId && { projectId }), // New project ID filter (more reliable)
     });
 
-    const response = await apiGet(`/daily-reports/company?${queryParams}`);
+    const url = `/daily-reports/company?${queryParams}`;
+    const response = await apiGet(url);
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -671,8 +672,9 @@ export const getCompanyReports = async (
     }
 
     const data = await response.json();
+
     return {
-      reports: data.reports || [],
+      reports: data.reports || [],  
       pagination: data.pagination || {
         page: 1,
         limit: 20,
@@ -801,20 +803,5 @@ export const updateQaqcStatus = async (reportId: string, qaqcData: any) => {
   }
 };
 
-export const getQaqcStatus = async (reportId: string) => {
-  try {
-    const response = await apiGet(`/weekly-reports/${reportId}`);
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to get QAQC status" }));
-      throw new Error(error.message || "Failed to get QAQC status");
-    }
-
-    const result = await response.json();
-    return result.sections?.qaqcStatus || null;
-  } catch (error) {
-    throw error;
-  }
-};
+// REMOVED: getQaqcStatus API call - no longer needed
+// QAQC data is now bundled with main report load and transformed using transformQaqcData()

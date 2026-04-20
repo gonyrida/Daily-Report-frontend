@@ -30,6 +30,10 @@ import type {
 
 const WEEKLY_REPORTS_BASE_URL = '/weekly-reports';
 
+// Simple in-memory cache for API responses
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Handles API response and transforms errors into user-friendly messages
  */
@@ -137,7 +141,7 @@ export const getCompanyWeeklyReports = async (
       page: page.toString(),
       limit: limit.toString(),
       ...(search && { search }),
-      ...(projectFilter && { project: projectFilter }),
+      ...(projectFilter && { projectId: projectFilter }), // Send as projectId instead of project
     });
 
     const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/company?${queryParams}`);
@@ -162,6 +166,37 @@ export const getCompanyWeeklyReports = async (
 // ============================================================================
 
 /**
+ * Get paginated list of weekly reports metadata (lightweight for dashboard)
+ */
+export const getWeeklyReportsMeta = async (params: GetWeeklyReportsParams = {}): Promise<PaginatedResponse<WeeklyReport>> => {
+  const searchParams = new URLSearchParams();
+  
+  // Add query parameters
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, value.toString());
+    }
+  });
+
+  const url = `${WEEKLY_REPORTS_BASE_URL}/meta?${searchParams.toString()}`;
+  const cacheKey = `meta_${url}`;
+  
+  // Check cache first
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  
+  const response = await apiGet(url);
+  const result = await handlePaginatedResponse<WeeklyReport>(response);
+  
+  // Cache the result
+  cache.set(cacheKey, { data: result, timestamp: Date.now() });
+  
+  return result;
+};
+
+/**
  * Get paginated list of weekly reports
  */
 export const getWeeklyReports = async (params: GetWeeklyReportsParams = {}): Promise<PaginatedResponse<WeeklyReport>> => {
@@ -184,7 +219,8 @@ export const getWeeklyReports = async (params: GetWeeklyReportsParams = {}): Pro
  */
 export const getWeeklyReportById = async (id: string): Promise<ApiResponse<WeeklyReport>> => {
   const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/${id}`);
-  return handleApiResponse<WeeklyReport>(response);
+  const result = await handleApiResponse<WeeklyReport>(response);
+  return result;
 };
 
 /**
@@ -487,12 +523,22 @@ export const getMasterScheduleFiles = async (reportId: string): Promise<ApiRespo
 /**
  * Aggregate manpower data for a weekly report
  */
-export const aggregateManpower = async (projectName: string, startDate: string, endDate: string, options: { includePrevWeek?: boolean; includeAccumulated?: boolean } = {}): Promise<ApiResponse<any>> => {
+export const aggregateManpower = async (
+  projectName: string, 
+  startDate: string, 
+  endDate: string, 
+  options: { includePrevWeek?: boolean; includeAccumulated?: boolean; projectId?: string } = {}
+): Promise<ApiResponse<any>> => {
   const params = new URLSearchParams({
-    projectName,
+    projectName,  // Always send this (backend requires it)
     startDate,
     endDate
   });
+  
+  // Also send projectId when available so backend can use it for accurate lookup
+  if (options.projectId) {
+    params.append('projectId', options.projectId);
+  }
   
   const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/aggregate-manpower?${params}`, options);
   return handleApiResponse<any>(response);

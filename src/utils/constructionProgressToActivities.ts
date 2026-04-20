@@ -24,8 +24,15 @@ export function mergeConstructionIntoActivityRows(
 
   // Build a lookup so we can preserve user edits by sourceId
   const existingBySourceId = new Map<string, ActivityRow>();
-  existingRows.forEach(row => {
-    if (row.sourceId) existingBySourceId.set(row.sourceId, row);
+  const manuallyAddedRows: ActivityRow[] = [];
+  
+  existingRows.forEach((row, index) => {
+    if (row.sourceId) {
+      existingBySourceId.set(row.sourceId, row);
+    } else {
+      // Preserve manually added rows (those without sourceId)
+      manuallyAddedRows.push(row);
+    }
   });
 
   const rows: ActivityRow[] = [];
@@ -82,7 +89,8 @@ export function mergeConstructionIntoActivityRows(
     });
   });
 
-  return rows;
+  // Combine construction progress rows with manually added rows
+  return [...rows, ...manuallyAddedRows];
 }
 
 /**

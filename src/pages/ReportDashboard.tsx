@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ProfileIcon from "@/components/ProfileIcon";
 import { getAllUserReports } from "@/integrations/reportsApi";
-import { getProjects } from "@/integrations/projectsApi"; // 🚀 ADD THIS
+import { getFoldersWithProjects } from "@/integrations/foldersApi"; // 🚀 Use folders instead of projects
 
 interface ReportType {
   name: string;
@@ -30,6 +30,7 @@ interface ReportType {
   description: string;
   path: string;
   count: number;
+  folderCount?: number;
   lastReportDate?: string;
 }
 
@@ -68,13 +69,16 @@ const ReportDashboard: React.FC = () => {
         console.log('🚨 REPORT DASHBOARD: dailyReports:', dailyReports);
         console.log('🚨 REPORT DASHBOARD: dailyReports.length:', dailyReports.length);
 
-        // 🚀 NEW: Fetch all projects (including empty ones)
-        const projectsResponse = await getProjects();
-        const allProjects = Array.isArray(projectsResponse.data) ? projectsResponse.data : [projectsResponse.data].filter(Boolean);
-        const projectCount = allProjects.length;
-        // 🚨 DEBUG: Check projects
-        console.log('🚨 REPORT DASHBOARD: All projects:', allProjects);
-        console.log('🚨 REPORT DASHBOARD: Project count:', projectCount);
+        // 🚀 NEW: Fetch all folders with projects
+        const foldersResponse = await getFoldersWithProjects();
+        const allFolders = Array.isArray(foldersResponse.data) ? foldersResponse.data : [];
+        const rootProjects = foldersResponse.rootProjects || [];
+        const folderCount = allFolders.length;
+        const totalProjects = allFolders.reduce((acc, folder) => acc + (folder.projects?.length || 0), 0) + rootProjects.length;
+        // 🚨 DEBUG: Check folders
+        console.log('🚨 REPORT DASHBOARD: All folders:', allFolders);
+        console.log('🚨 REPORT DASHBOARD: Folder count:', folderCount);
+        console.log('🚨 REPORT DASHBOARD: Total projects:', totalProjects);
         
         const weeklyReports = allReports.filter((report: any) => 
           report.weekNumber // Weekly reports would have weekNumber
@@ -88,9 +92,10 @@ const ReportDashboard: React.FC = () => {
           {
             name: "Daily Report",
             icon: <Calendar className="h-6 w-6" />,
-            description: "Create and manage daily report projects",
-            path: "/daily-report-projects", // ← Change this!
-            count: projectCount, // ← Use project count instead of dailyReports.length
+            description: `Create and manage daily reports (${folderCount} folders, ${totalProjects} projects)`,
+            path: "/daily-report-projects",
+            count: totalProjects,
+            folderCount: folderCount,
             lastReportDate: dailyReports.length > 0 
               ? Math.max(...dailyReports.map((r: any) => new Date(r.reportDate).getTime()))
                 ? new Date(Math.max(...dailyReports.map((r: any) => new Date(r.reportDate).getTime()))).toISOString()

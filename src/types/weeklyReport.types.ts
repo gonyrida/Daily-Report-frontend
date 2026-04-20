@@ -47,9 +47,12 @@ export interface WeeklyReportMeta {
   id: string;
   _id?: string;  // MongoDB ID (for company reports)
   projectName: string;
+  projectId?: string;  // Project ID for filtering
   weekNumber: number;
   startDate: string;
   endDate: string;
+  reportDateFrom?: string;
+  reportDateTo?: string;
   status: WeeklyReportStatus;
   createdAt: string;
   updatedAt: string;
@@ -122,6 +125,7 @@ export interface WeeklyReportCover {
   clientName: string;
   contractNumber: string;
   coverImage?: string;
+  clientLogo?: string;
   projectTitle?: string;
   employer?: string;
 }
@@ -309,8 +313,10 @@ export interface GetWeeklyReportsParams {
   limit?: number;
   status?: WeeklyReportStatus;
   projectName?: string;
+  projectId?: string;
   startDate?: string;
   endDate?: string;
+  searchTerm?: string;
   sortBy?: 'createdAt' | 'updatedAt' | 'weekNumber';
   sortOrder?: 'asc' | 'desc';
 }
@@ -320,6 +326,7 @@ export interface GetWeeklyReportsParams {
  */
 export interface CreateWeeklyReportRequest {
   projectName: string;
+  projectId?: string;
   weekNumber: number;
   startDate: string;
   endDate: string;

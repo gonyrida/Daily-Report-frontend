@@ -1,4 +1,4 @@
-import { Users, Wrench,Trash2 } from "lucide-react";
+import { Users, Wrench,Trash2, GripVertical } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
 import { useState } from "react";
@@ -19,6 +19,35 @@ const ManagementTeamGroup = ({
 
   // This tracks which row is currently showing the text input
   const [editingId, setEditingId] = useState(null);
+  const [draggedRow, setDraggedRow] = useState<{type: 'management' | 'mep', row: ResourceRow, index: number} | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, row: ResourceRow, index: number, type: 'management' | 'mep') => {
+    setDraggedRow({ type, row, index });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number, type: 'management' | 'mep') => {
+    e.preventDefault();
+    if (draggedRow && draggedRow.index !== dropIndex && draggedRow.type === type) {
+      const rows = type === 'management' ? managementTeam : mepTeam;
+      const setRows = type === 'management' ? setManagementTeam : setMepTeam;
+      const newRows = [...rows];
+      newRows.splice(draggedRow.index, 1);
+      newRows.splice(dropIndex, 0, draggedRow.row);
+      setRows(newRows);
+    }
+    setDraggedRow(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRow(null);
+  };
 
   return (
     <div className="section-card overflow-hidden animate-fade-in">
@@ -56,7 +85,10 @@ const ManagementTeamGroup = ({
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
+                  <th className="text-center px-2 py-2.5 text-sm font-medium text-muted-foreground w-[8%]">
+                    
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[32%]">
                     Description
                   </th>
                   <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
@@ -69,12 +101,13 @@ const ManagementTeamGroup = ({
                     Accum
                   </th>
                   <th className="w-[8%]"></th>
+                  <th className="w-[8%]"></th>
                 </tr>
               </thead>
               <tbody>
                 {managementTeam.length === 0 ? (
                   <tr key="empty-management">
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       No entries yet. Click "Add Row" to begin.
                     </td>
                   </tr>
@@ -83,8 +116,18 @@ const ManagementTeamGroup = ({
                     {managementTeam.map((row) => (
                       <tr
                         key={`management-${row.id}`}
-                        className="border-t border-table-border hover:bg-muted/30 transition-colors"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, row, managementTeam.indexOf(row), 'management')}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, managementTeam.indexOf(row), 'management')}
+                        onDragEnd={handleDragEnd}
+                        className="border-t border-table-border hover:bg-muted/30 transition-colors cursor-move"
                       >
+                        <td className="px-2 py-2 text-center">
+                          <div className="flex justify-center">
+                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           {MANAGEMENT_OPTIONS.length > 0 ? (() => {
                             // 1. Create a temporary list that includes the current custom value
@@ -270,7 +313,10 @@ const ManagementTeamGroup = ({
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
+                  <th className="text-center px-2 py-2.5 text-sm font-medium text-muted-foreground w-[8%]">
+                    
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[32%]">
                     Description
                   </th>
                   <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
@@ -283,12 +329,13 @@ const ManagementTeamGroup = ({
                     Accum
                   </th>
                   <th className="w-[8%]"></th>
+                  <th className="w-[8%]"></th>
                 </tr>
               </thead>
               <tbody>
                 {mepTeam.length === 0 ? (
                   <tr key="empty-mep">
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       No entries yet. Click "Add Row" to begin.
                     </td>
                   </tr>
@@ -297,8 +344,18 @@ const ManagementTeamGroup = ({
                     {mepTeam.map((row) => (
                       <tr
                         key={`mep-${row.id}`}
-                        className="border-t border-table-border hover:bg-muted/30 transition-colors"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, row, mepTeam.indexOf(row), 'mep')}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, mepTeam.indexOf(row), 'mep')}
+                        onDragEnd={handleDragEnd}
+                        className="border-t border-table-border hover:bg-muted/30 transition-colors cursor-move"
                       >
+                        <td className="px-2 py-2 text-center">
+                          <div className="flex justify-center">
+                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           {MEP_TEAM_OPTIONS.length > 0 ? (() => {
                             const isInOptions = MEP_TEAM_OPTIONS.includes(row.description);

@@ -21,3 +21,4 @@ class EventEmitter {
 }
 
 export const projectEvents = new EventEmitter();
+export const folderEvents = new EventEmitter();

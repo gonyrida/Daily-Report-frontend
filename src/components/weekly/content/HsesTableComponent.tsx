@@ -53,8 +53,7 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className="px-2 py-1 text-sm text-muted-foreground"
-                    style={{ width: column.width || 'auto' }}
+                    className={`px-2 py-1 text-sm text-muted-foreground ${column.width || ''}`}
                   >
                     {row[column.key] || "-"}
                   </td>
@@ -78,7 +77,7 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
         <div></div>
         <button
           onClick={addRow}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors text-sm font-medium"
+          className="flex items-center gap-2 px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors text-sm font-medium min-w-[180px] justify-center"
         >
           <Plus size={16} />
           {addButtonText}
@@ -91,8 +90,7 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="px-4 py-2 text-left text-sm font-medium text-foreground"
-                  style={{ width: column.width || 'auto' }}
+                  className={`px-4 py-2 text-left text-sm font-medium text-foreground ${column.width || ''}`}
                 >
                   {column.label}
                 </th>
@@ -108,7 +106,7 @@ const HsesTableComponent: React.FC<HsesTableComponentProps> = ({
             {tableData.map((row, index) => (
               <tr key={row.id || index}>
                 {columns.map((column) => (
-                  <td key={column.key} className="px-2 py-1" style={{ width: column.width || 'auto' }}>
+                  <td key={column.key} className={`px-2 py-1 ${column.width || ''}`}>
                     {column.type === 'date' ? (
                       <input
                         type="date"

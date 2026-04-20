@@ -100,21 +100,21 @@ export function mergeConstructionIntoOverallRows(
 
       // ── Percentage columns ──────────────────────────────────────────────────
       // Field mapping (matches OverallProgressTable column headers):
-      //   unit          → % Up to Previous Week
-      //   prev          → % This Week
-      //   today         → % Up to This Week
-      //   accumulated   → Remaining
-      //   nextWeekPlan  → % Next Week Plan
-      //   upNextWeekPlan→ % Up Next Week Plan
+      //   pctUpToPrevWeek → % Up to Previous Week
+      //   pctThisWeek     → % This Week
+      //   pctUpToThisWeek → % Up to This Week
+      //   pctRemaining    → Remaining
+      //   pctNextWeekPlan → % Next Week Plan
+      //   pctUpNextWeekPlan→ % Up Next Week Plan
       //
       // If the row already existed, preserve the user's values; otherwise seed
       // from construction progress so the table is pre-populated on first load.
-      unit:           existing ? existing.unit           : prevWeekPct.toString(),
-      prev:           existing ? existing.prev           : thisWeekPct,
-      today:          existing ? existing.today          : upToThisWkPct,
-      accumulated:    existing ? existing.accumulated    : remainingPct,
-      nextWeekPlan:   existing ? existing.nextWeekPlan   : nxtWkPlanPct,
-      upNextWeekPlan: existing ? existing.upNextWeekPlan : upNxtWkPct,
+      pctUpToPrevWeek:   existing ? existing.pctUpToPrevWeek   : prevWeekPct.toString(),
+      pctThisWeek:       existing ? existing.pctThisWeek       : thisWeekPct,
+      pctUpToThisWeek:   existing ? existing.pctUpToThisWeek   : upToThisWkPct,
+      pctRemaining:      existing ? existing.pctRemaining      : remainingPct,
+      pctNextWeekPlan:   existing ? existing.pctNextWeekPlan   : nxtWkPlanPct,
+      pctUpNextWeekPlan: existing ? existing.pctUpNextWeekPlan : upNxtWkPct,
 
       searchTerm:    '',
       isCustomInput: false,

@@ -4,7 +4,12 @@ import { SubRow, Section } from "@/types/resourceTable.types";
 import { Package, Download, RefreshCw } from "lucide-react";
 import { Resources } from "@/types/resources.types";
 import { generateWeekDates } from "@/lib/weekDateUtils";
-import { transformResourceDataToNewPayload } from "@/utils/resourceDataTransform";
+import {
+  transformResourceDataToNewPayload,
+  transformBackendToFrontendFormat,
+  transformMaterialsToFrontendFormat,
+  transformMachineryToFrontendFormat
+} from "@/utils/resourceDataTransform";
 import { updateReportManpower, aggregateManpower } from "@/services/weeklyReportService";
 
 const Resource: React.FC<{
@@ -19,6 +24,7 @@ const Resource: React.FC<{
   dates?: string[];
   onResourcesChange?: (resources: Resources) => void;
   reportId?: string; // Add reportId prop
+  initialResourcesData?: any; // Initial resources data from saved report (for rolling total)
 }> = ({
   sharedData,
   resources,
@@ -30,11 +36,13 @@ const Resource: React.FC<{
   monthYearDisplay,
   dates,
   onResourcesChange,
-  reportId
+  reportId,
+  initialResourcesData
 }) => {
     // State for aggregated data
     const [aggregatedSections, setAggregatedSections] = React.useState<any[]>([]);
     const [useAggregatedData, setUseAggregatedData] = React.useState(false);
+    const hasAppliedInitialData = React.useRef(false); // Track if initial data was applied
 
     // Material delivery status data
     const [isAggregating, setIsAggregating] = React.useState(false);
@@ -92,18 +100,73 @@ const Resource: React.FC<{
     };
 
     // Notify parent component when resources change
+    // Skip if using aggregated data (parent already notified in handleAggregateManpower)
+    const lastNotifiedRef = React.useRef<string>("");
+    
     React.useEffect(() => {
-      if (onResourcesChange && sections) {
-        const transformedResources = getTransformedResources();
+      if (!onResourcesChange || !sections || useAggregatedData) return;
+      
+      const transformedResources = getTransformedResources();
+      const serialized = JSON.stringify(transformedResources);
+      
+      // Only notify parent if the data actually changed
+      if (serialized !== lastNotifiedRef.current) {
+        lastNotifiedRef.current = serialized;
         onResourcesChange(transformedResources);
       }
-    }, [sections, sharedData?.dateRange, onResourcesChange]);
+    }, [sections, sharedData?.dateRange, useAggregatedData]);
+    // NOTE: onResourcesChange intentionally omitted from deps to prevent infinite loop
+
+    // Handle initialResourcesData prop - convert to sections format when data is loaded
+    // Only run once and don't overwrite aggregated data
+    React.useEffect(() => {
+      if (
+        initialResourcesData?.manPower && 
+        setSections && 
+        !hasAppliedInitialData.current &&
+        !useAggregatedData
+      ) {
+        console.log('🔄 Applying initialResourcesData (first time only)');
+        const transformedSections = transformBackendToFrontendFormat(initialResourcesData.manPower);
+        setSections(transformedSections);
+
+        // Also transform and set material sections if available
+        if (initialResourcesData.material) {
+          const transformedMaterials = transformMaterialsToFrontendFormat(initialResourcesData.material);
+          setMaterialSections([{
+            title: "",
+            subtitle: "",
+            subRows: transformedMaterials
+          }]);
+        }
+
+        // Also transform and set machinery sections if available
+        if (initialResourcesData.machinery) {
+          const transformedMachinery = transformMachineryToFrontendFormat(initialResourcesData.machinery);
+          setMachinerySections([{
+            title: "",
+            subtitle: "",
+            subRows: transformedMachinery
+          }]);
+        }
+        
+        hasAppliedInitialData.current = true;
+      }
+    }, [initialResourcesData, setSections, useAggregatedData]);
 
     // Handle manpower aggregation
     const handleAggregateManpower = async () => {
+      console.log('🔍 Aggregating for:', {
+        projectName: sharedData?.projectName,
+        dateRange: sharedData?.dateRange,
+        projectId: sharedData?.projectId
+      });
 
-      if (!sharedData?.projectName || !sharedData?.dateRange) {
-        alert('Project name and date range are required for manpower aggregation');
+      if (
+        !sharedData?.dateRange || 
+        (!sharedData?.projectId && (!sharedData?.projectName || sharedData.projectName === "Default Project Name"))
+      ) {
+        alert('Project ID or valid project name and date range are required for manpower aggregation');
         return;
       }
 
@@ -111,12 +174,21 @@ const Resource: React.FC<{
 
       try {
         // Parse the dateRange string "06-Mar-26 ~ 12-Mar-26"
-        const dateRangeStr = sharedData.dateRange;
-        const [startDateStr, endDateStr] = dateRangeStr.split(' ~ ');
+        // Handle extra whitespace and tabs
+        const dateRangeStr = sharedData.dateRange.trim().replace(/\s*~\s*/, '~');
+        const [startDateStr, endDateStr] = dateRangeStr.split('~');
+
+        console.log('🔍 Date parsing:', {
+          original: sharedData.dateRange,
+          cleaned: dateRangeStr,
+          startDateStr,
+          endDateStr
+        });
 
         // Convert "DD-MMM-YY" to "YYYY-MM-DD" format
         const parseDate = (dateStr: string) => {
-          const [day, month, year] = dateStr.split('-');
+          const cleanDateStr = dateStr.trim();
+          const [day, month, year] = cleanDateStr.split('-');
           const monthMap: { [key: string]: string } = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
             'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
@@ -128,92 +200,85 @@ const Resource: React.FC<{
         const startDate = parseDate(startDateStr);
         const endDate = parseDate(endDateStr);
 
+        console.log('🔍 Parsed dates:', { startDate, endDate });
 
-        if (reportId) {
-          // Update existing report
-          const result = await updateReportManpower(reportId, {
+
+        // Always use aggregateManpower with date parameters
+        console.log('🔍 Calling aggregateManpower with:', {
+          projectName: sharedData.projectName,
+          startDate,
+          endDate,
+          projectId: sharedData.projectId,
+          reportId: reportId || 'none'
+        });
+        
+        const result = await aggregateManpower(
+          (sharedData.projectName || '').trim(),  // Trim whitespace/tabs
+          startDate,
+          endDate,
+          {
             includePrevWeek: true,
-            includeAccumulated: true
-          });
-
-          if (result.success && result.data?.sections?.resources) {
-            const resources = result.data.sections.resources;
-            
-            // Transform manpower data
-            if (resources.manPower) {
-              const transformedSections = transformBackendToFrontendFormat(resources.manPower);
-              setAggregatedSections(transformedSections);
-              setUseAggregatedData(true);
-              setSections(transformedSections);
-            }
-            
-            // Transform and set materials data
-            if (resources.material) {
-              const transformedMaterials = transformMaterialsToFrontendFormat(resources.material);
-              setMaterialSections([{
-                title: "",
-                subtitle: "",
-                subRows: transformedMaterials
-              }]);
-            }
-            
-            // Transform and set machinery data
-            if (resources.machinery) {
-              const transformedMachinery = transformMachineryToFrontendFormat(resources.machinery);
-              setMachinerySections([{
-                title: "",
-                subtitle: "",
-                subRows: transformedMachinery
-              }]);
-            }
-          } else {
-            alert(`Aggregation failed: ${result.error}`);
+            includeAccumulated: true,
+            projectId: sharedData.projectId
           }
+        );
+
+        if (result.success && result.data) {
+          console.log('✅ Aggregation success - raw data:', result.data);
+          
+          // Transform manpower data - keep local to prevent parent state conflict
+          if (result.data.manPower) {
+            console.log('🔍 Transforming manPower:', result.data.manPower);
+            const transformedSections = transformBackendToFrontendFormat(result.data.manPower);
+            console.log('✅ Transformed sections:', transformedSections);
+            setAggregatedSections(transformedSections);
+            setUseAggregatedData(true);
+            // NOTE: Don't call setSections(transformedSections) - it triggers parent re-render and overwrites data
+            console.log('✅ State updated - useAggregatedData: true, sections count:', transformedSections.length);
+          } else {
+            console.log('⚠️ No manPower data in result');
+          }
+          
+          // Transform and set materials data
+          if (result.data.material) {
+            const transformedMaterials = transformMaterialsToFrontendFormat(result.data.material);
+            setMaterialSections([{
+              title: "",
+              subtitle: "",
+              subRows: transformedMaterials
+            }]);
+          }
+          
+          // Transform and set machinery data
+          if (result.data.machinery) {
+            const transformedMachinery = transformMachineryToFrontendFormat(result.data.machinery);
+            setMachinerySections([{
+              title: "",
+              subtitle: "",
+              subRows: transformedMachinery
+            }]);
+          }
+          
+          // Notify parent with aggregated data for save functionality
+          if (onResourcesChange) {
+            const newResources: Resources = {
+              manPower: {
+                dateRange: sharedData?.dateRange || "",
+                managementTeam: result.data.manPower?.managementTeam || [],
+                workingTeamInterior: result.data.manPower?.workingTeamInterior || [],
+                workingTeamMEP: result.data.manPower?.workingTeamMEP || []
+              },
+              material: result.data.material || [],
+              machinery: result.data.machinery || []
+            };
+            onResourcesChange(newResources);
+            console.log('✅ Notified parent with aggregated resources');
+          }
+          
         } else {
-          // Just aggregate data (no report to update)
-          const result = await aggregateManpower(
-            sharedData.projectName,
-            startDate,
-            endDate,
-            {
-              includePrevWeek: true,
-              includeAccumulated: true
-            }
-          );
-
-          if (result.success && result.data) {
-            // Transform manpower data
-            if (result.data.manPower) {
-              const transformedSections = transformBackendToFrontendFormat(result.data.manPower);
-              setAggregatedSections(transformedSections);
-              setUseAggregatedData(true);
-              setSections(transformedSections);
-            }
-            
-            // Transform and set materials data
-            if (result.data.material) {
-              const transformedMaterials = transformMaterialsToFrontendFormat(result.data.material);
-              setMaterialSections([{
-                title: "",
-                subtitle: "",
-                subRows: transformedMaterials
-              }]);
-            }
-            
-            // Transform and set machinery data
-            if (result.data.machinery) {
-              const transformedMachinery = transformMachineryToFrontendFormat(result.data.machinery);
-              setMachinerySections([{
-                title: "",
-                subtitle: "",
-                subRows: transformedMachinery
-              }]);
-            }
-            
-          } else {
-            console.error('Aggregation failed:', result.error);
-            alert(`Aggregation failed: ${result.error}`);
-          }
+          const errorMessage = (result as any).details || result.error || 'Unknown error';
+          console.error('Aggregation failed:', { error: result.error, details: (result as any).details });
+          alert(`Aggregation failed: ${errorMessage}`);
         }
       } catch (error) {
         console.error('Error during aggregation:', error);
@@ -223,101 +288,6 @@ const Resource: React.FC<{
       }
     };
 
-    // Transform backend format to frontend format
-    const transformBackendToFrontendFormat = (manPowerData: any) => {
-      const transformed = [
-        {
-          title: "I. Site Management Team",
-          subtitle: "",
-          subRows: manPowerData.managementTeam?.map((item: any) => ({
-            description: item.description || "",
-            dailyData: [
-              item.date?.fri?.toString() || "0",
-              item.date?.sat?.toString() || "0",
-              item.date?.sun?.toString() || "0",
-              item.date?.mon?.toString() || "0",
-              item.date?.tue?.toString() || "0",
-              item.date?.wed?.toString() || "0",
-              item.date?.thu?.toString() || "0"
-            ],
-            previousWeek: item.prevWeek?.toString() || "0",
-            thisWeek: item.thisWeek?.toString() || "0",
-            upToThisWeek: item.accumulated?.toString() || "0",
-          })) || []
-        },
-        {
-          title: "II. Site Working Team Interior",
-          subtitle: "",
-          subRows: manPowerData.workingTeamInterior?.map((item: any) => ({
-            description: item.description || "",
-            dailyData: [
-              item.date?.fri?.toString() || "0",
-              item.date?.sat?.toString() || "0",
-              item.date?.sun?.toString() || "0",
-              item.date?.mon?.toString() || "0",
-              item.date?.tue?.toString() || "0",
-              item.date?.wed?.toString() || "0",
-              item.date?.thu?.toString() || "0"
-            ],
-            previousWeek: item.prevWeek?.toString() || "0",
-            thisWeek: item.thisWeek?.toString() || "0",
-            upToThisWeek: item.accumulated?.toString() || "0",
-          })) || []
-        },
-        {
-          title: "III. Site Working Team MEP",
-          subtitle: "",
-          subRows: manPowerData.workingTeamMEP?.map((item: any) => ({
-            description: item.description || "",
-            dailyData: [
-              item.date?.fri?.toString() || "0",
-              item.date?.sat?.toString() || "0",
-              item.date?.sun?.toString() || "0",
-              item.date?.mon?.toString() || "0",
-              item.date?.tue?.toString() || "0",
-              item.date?.wed?.toString() || "0",
-              item.date?.thu?.toString() || "0"
-            ],
-            previousWeek: item.prevWeek?.toString() || "0",
-            thisWeek: item.thisWeek?.toString() || "0",
-            upToThisWeek: item.accumulated?.toString() || "0",
-          })) || []
-        }
-      ];
-
-      return transformed;
-    };
-
-    // Transform materials to frontend format (no daily breakdown)
-    const transformMaterialsToFrontendFormat = (materials: any[]): SubRow[] => {
-      return materials.map((item: any) => ({
-        description: item.description || "",
-        dailyData: ["", "", "", "", "", "", ""], // No daily breakdown for materials
-        previousWeek: item.prevWeek?.toString() || "0",
-        thisWeek: item.thisWeek?.toString() || "0",
-        upToThisWeek: item.accumulated?.toString() || "0",
-      }));
-    };
-
-    // Transform machinery to frontend format (with daily breakdown)
-    const transformMachineryToFrontendFormat = (machinery: any[]): SubRow[] => {
-      return machinery.map((item: any) => ({
-        description: item.description || "",
-        dailyData: [
-          item.date?.fri?.toString() || "0",
-          item.date?.sat?.toString() || "0",
-          item.date?.sun?.toString() || "0",
-          item.date?.mon?.toString() || "0",
-          item.date?.tue?.toString() || "0",
-          item.date?.wed?.toString() || "0",
-          item.date?.thu?.toString() || "0"
-        ],
-        previousWeek: item.prevWeek?.toString() || "0",
-        thisWeek: item.thisWeek?.toString() || "0",
-        upToThisWeek: item.accumulated?.toString() || "0",
-      }));
-    };
-
     return (
       <div className="space-y-6">
         <div id="section-6.1">
@@ -325,7 +295,7 @@ const Resource: React.FC<{
             <h3 className="text-lg font-semibold"><span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">6.1</span> Manpower Status</h3>
             <button
               onClick={handleAggregateManpower}
-              disabled={isAggregating || !sharedData?.projectName || !sharedData?.dateRange}
+              disabled={isAggregating || !sharedData?.dateRange || (!sharedData?.projectId && (!sharedData?.projectName || sharedData.projectName === "Default Project Name"))}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${isAggregating ? 'animate-spin' : ''}`} />
@@ -344,8 +314,8 @@ const Resource: React.FC<{
             setSections={setSections}
             handleInputChange={handleInputChange}
             removeSubRow={removeSubRow}
-            monthYearDisplay={monthYearDisplay}
-            dates={dates}
+            monthYearDisplay={monthYearDisplay || getDateDisplay()}
+            dates={dates && dates.length > 0 && dates[0] !== "-" ? dates : getDates()}
             showTitles={true}
           />
         </div>

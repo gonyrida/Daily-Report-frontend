@@ -60,7 +60,7 @@ const LocationFilter = ({
   }, []);
 
   const handleClearFilter = () => {
-    onLocationChange("");
+    onLocationChange("all");
     onClearFilter();
   };
 
@@ -78,7 +78,7 @@ const LocationFilter = ({
             <SelectValue placeholder={isLoading ? "Loading locations..." : "All locations"} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All locations</SelectItem>
+            <SelectItem value="all">All locations</SelectItem>
             {locations.map((loc) => (
               <SelectItem key={loc} value={loc}>
                 {loc}
@@ -88,7 +88,7 @@ const LocationFilter = ({
         </Select>
       </div>
       
-      {selectedLocation && (
+      {selectedLocation && selectedLocation !== "all" && (
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             {selectedLocation}

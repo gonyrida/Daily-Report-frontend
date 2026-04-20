@@ -1,52 +1,78 @@
 import { useState, useEffect } from "react";
-import { HsesData } from "@/types/hses.types";
-import { createHSESections } from "@/utils/hseSectionUtils";
+import { HsesData } from "@/types/weeklyReport.types";
+import { getWeeklyReportById } from "@/services/weeklyReportService";
 
 export const defaultHsesData: HsesData = {
   training: [
-    { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-    { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
-    { id: crypto.randomUUID(), typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
+    { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+    { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" },
+    { typeOfTraining: "", date: "", venue: "", trainer: "", attendee: "", remarks: "" }
   ],
   inspection: [
-    { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
-    { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" },
-    { id: crypto.randomUUID(), typeOfInspection: "", date: "", inspector: "", remarks: "" }
+    { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+    { typeOfInspection: "", date: "", inspector: "", remarks: "" },
+    { typeOfInspection: "", date: "", inspector: "", remarks: "" }
   ],
   permit: [
-    { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-    { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
-    { id: crypto.randomUUID(), typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
+    { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+    { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" },
+    { typeOfPermit: "", startDate: "", endDate: "", inspector: "", approver: "", remarks: "" }
   ],
   firstAidAccident: "",
   otherActivities: "",
-  hsePhotoReferences: createHSESections(),
+  hsePhotoReferences: [],
 };
 
-export const useHsesData = (initialData?: HsesData, isEditing: boolean = false) => {
-  const [hsesData, setHsesData] = useState<HsesData>(() => {
-    return initialData || defaultHsesData;
-  });
+export const useHsesData = (reportId: string) => {
+  const [data, setData] = useState<HsesData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Sync with external data when it changes (e.g., after loading from database)
-  useEffect(() => {
-    if (initialData) {
-      setHsesData(initialData);
+  // Load HSES data
+  const refetch = async () => {
+    if (!reportId) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await getWeeklyReportById(reportId);
+
+      if (response.success && response.data) {
+        setData(response.data.sections.hses || defaultHsesData);
+      } else {
+        setError(response.error || 'Failed to load HSES data');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
-  }, [initialData]);
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    if (reportId) {
+      refetch();
+    }
+  }, [reportId]);
 
   const updateData = (section: keyof HsesData, value: any) => {
-    const newData = { ...hsesData, [section]: value };
-    setHsesData(newData);
+    if (!data) return;
+    const newData = { ...data, [section]: value };
+    setData(newData);
   };
 
   const clearHsesData = () => {
-    setHsesData(defaultHsesData);
+    setData(defaultHsesData);
   };
 
   return {
-    hsesData,
-    setHsesData,
+    data,
+    setData,
+    isLoading,
+    error,
+    refetch,
     updateData,
     clearHsesData,
   };

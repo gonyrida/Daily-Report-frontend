@@ -18,7 +18,7 @@ const sizeClasses: Record<InputSize, string> = {
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, showIndicator = true, inputSize = "md", ...props }, ref) => {
     return (
-      <div className="relative">
+      <div className="relative min-w-0">
         <input
           type={type}
           className={cn(

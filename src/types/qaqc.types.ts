@@ -7,6 +7,11 @@ export interface QaqcRow {
   status: StatusKey;
   dateResponse: string;
   comment: string;
+  // Additional fields for specific sections
+  issuedBy?: string; // For section 4.5 Client Site Instruction (SI)
+  issuedDate?: string; // For section 4.5 Client Site Instruction (SI)
+  receivedDate?: string; // For section 4.6 Inspection Request (IR)
+  inspectionDate?: string; // For section 4.6 Inspection Request (IR)
 }
 
 export interface Section {

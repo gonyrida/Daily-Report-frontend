@@ -109,4 +109,13 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/projects/${id}`,
     DELETE: (id: string) => `/projects/${id}`,
   },
+  FOLDERS: {
+    BASE: `/folders`,
+    CREATE: `/folders`,
+    GET_ALL: `/folders`,
+    GET_BY_PROJECT: (projectId: string) => `/folders/project/${projectId}`,
+    GET_PROJECTS: (folderId: string) => `/folders/${folderId}/projects`,
+    UPDATE: (id: string) => `/folders/${id}`,
+    DELETE: (id: string) => `/folders/${id}`,
+  },
 };

@@ -1,4 +1,4 @@
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -85,6 +85,7 @@ interface ResourceTableProps {
     value: string | number,
   ) => void;
   unitNumberOnly?: boolean;
+  enableDragDrop?: boolean;
 }
 
 const ResourceTable = ({
@@ -104,7 +105,11 @@ const ResourceTable = ({
   customHeaders = {},
   customUpdateRow,
   unitNumberOnly = false,
+  enableDragDrop = false,
 }: ResourceTableProps) => {
+  const [draggedRow, setDraggedRow] = useState<ResourceRow | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
   const addRow = () => {
     const newRow: ResourceRow = {
       id: crypto.randomUUID(),
@@ -124,6 +129,35 @@ const ResourceTable = ({
 
   const removeRow = (id: string) => {
     setRows(rows.filter((row) => row.id !== id));
+  };
+
+  const handleDragStart = (e: React.DragEvent, row: ResourceRow, index: number) => {
+    setDraggedRow(row);
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedRow !== null && draggedIndex !== null && draggedIndex !== dropIndex) {
+      const newRows = [...rows];
+      newRows.splice(draggedIndex, 1);
+      newRows.splice(dropIndex, 0, draggedRow);
+      setRows(newRows);
+    }
+    setDraggedRow(null);
+    setDraggedIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRow(null);
+    setDraggedIndex(null);
   };
 
   const updateRow = (
@@ -219,30 +253,35 @@ const ResourceTable = ({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div>
+        <table className="w-full table-fixed">
           <thead>
             <tr className="bg-muted dark:bg-muted">
+              {enableDragDrop && (
+                <th className="text-center px-2 py-2.5 text-base font-medium w-[6%]">
+                  
+                </th>
+              )}
               {showAddButtons && (
                 <th className="text-center px-4 py-2.5 text-base font-medium w-[8%]">
                   No
                 </th>
               )}
-              <th className="text-left px-4 py-2.5 text-base font-medium w-[20%]">
+              <th className="text-left px-4 py-2.5 text-base font-medium w-[35%]">
                 {customHeaders.description || "Description"}
               </th>
               {showUnit && (
-                <th className="text-center px-4 py-2.5 text-base font-medium w-[8%]">
+                <th className="text-center px-4 py-2.5 text-base font-medium w-[80px]">
                   {customHeaders.unit || "Unit"}
                 </th>
               )}
-              <th className="text-center py-2.5 text-base font-medium w-[20%]">
+              <th className="text-center py-2.5 text-base font-medium w-[80px]">
                 {customHeaders.prev || "Prev"}
               </th>
-              <th className="text-center py-2.5 text-base font-medium w-[20%]">
+              <th className="text-center py-2.5 text-base font-medium w-[80px]">
                 {customHeaders.today || "Today"}
               </th>
-              <th className="text-center py-2.5 text-base font-medium w-[23%]">
+              <th className="text-center py-2.5 text-base font-medium w-[80px]">
                 {customHeaders.accumulated || "Accum"}
               </th>
               {showExtraColumns && (
@@ -255,7 +294,7 @@ const ResourceTable = ({
                   </th>
                 </>
               )}
-              <th className="w-[5%]"></th>
+              <th className="w-[8%]"></th>
             </tr>
           </thead>
           <tbody>
@@ -263,21 +302,14 @@ const ResourceTable = ({
               <tr key="empty-row">
                 <td
                   colSpan={
-                    showAddButtons
-                      ? showUnit
-                        ? showExtraColumns
-                          ? 9
-                          : 7
-                        : showExtraColumns
-                          ? 8
-                          : 6
-                      : showUnit
-                        ? showExtraColumns
-                          ? 8
-                          : 6
-                        : showExtraColumns
-                          ? 7
-                          : 5
+                    (() => {
+                      let colSpan = 5; // Base columns: Description, Prev, Today, Accum, Delete
+                      if (enableDragDrop) colSpan += 1; // Drag handle column
+                      if (showAddButtons) colSpan += 1; // No column
+                      if (showUnit) colSpan += 1; // Unit column
+                      if (showExtraColumns) colSpan += 2; // Extra columns
+                      return colSpan;
+                    })()
                   }
                   className="text-center py-8 text-muted-foreground"
                 >
@@ -295,10 +327,22 @@ const ResourceTable = ({
                 return (
                   <tr
                     key={`${title}-${row.id}`}
+                    draggable={enableDragDrop}
+                    onDragStart={(e) => handleDragStart(e, row, rows.indexOf(row))}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, rows.indexOf(row))}
+                    onDragEnd={handleDragEnd}
                     className={`border-t border-border hover:bg-muted/30 transition-colors ${
                       row.rowType === "title" ? "bg-muted dark:bg-muted" : ""
-                    }`}
+                    } ${enableDragDrop ? "cursor-move" : ""}`}
                   >
+                    {enableDragDrop && (
+                      <td className="px-2 py-2 text-center">
+                        <div className="flex justify-center">
+                          <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
+                        </div>
+                      </td>
+                    )}
                     {showAddButtons && (
                       <td className="px-3 py-2 text-center font-medium text-muted-foreground">
                         {(() => {
@@ -327,82 +371,82 @@ const ResourceTable = ({
                       </td>
                     )}
                     {/* Description / Dropdown */}
-                    <td className="px-1 py-2">
+                    <td className="px-1 py-2 max-w-0 w-full overflow-hidden">
                       {useDropdown && dropdownOptions.length > 0 ? (() => {
                         const allOptions = row.description && !dropdownOptions.includes(row.description) 
                           ? [...dropdownOptions, row.description] 
                           : dropdownOptions;
 
                         return !row.isCustomInput ? (
-                          <Select
-                            value={row.description}
-                            onValueChange={(value) => {
-                              if (value === "__custom__") {
-                                updateRow(row.id, "isCustomInput", "true");
-                              } else {
-                                updateRow(row.id, "description", value);
-                              }
-                            }}
-                          >
-                            <SelectTrigger 
-                              className="border-0 bg-transparent focus:ring-1 w-[100px] truncate"
-                              title={row.description} // Add title to the trigger
+                          <div className="w-full">
+                            <Select
+                              value={row.description}
+                              onValueChange={(value) => {
+                                if (value === "__custom__") {
+                                  updateRow(row.id, "isCustomInput", "true");
+                                } else {
+                                  updateRow(row.id, "description", value);
+                                }
+                              }}
                             >
-                              <SelectValue placeholder="Select..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <div className="p-2">
-                                <Input
-                                  placeholder="Search..."
-                                  value={row.searchTerm || ""}
-                                  onChange={(e) =>
-                                    updateRow(
-                                      row.id,
-                                      "searchTerm",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="h-8"
-                                />
-                              </div>
-                              {allOptions.filter(option => 
-                                option.toLowerCase().includes((row.searchTerm || "").toLowerCase())
-                              ).map((option, index) => (
-                                <SelectItem
-                                  key={`${title}-opt-${option}-${index}`}
-                                  value={option}
-                                  className="p-0 px-4"
-                                >
-                                  <div 
-                                    className="truncate whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] px-2 py-1.5"
+                              <SelectTrigger 
+                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                title={row.description} // Add title to trigger
+                              >
+                                <SelectValue placeholder="Select..." className="min-w-[200px]" />
+                              </SelectTrigger>
+                              <SelectContent className="w-[32%]">
+                                <div className="p-2">
+                                  <Input
+                                    placeholder="Search..."
+                                    value={row.searchTerm || ""}
+                                    onChange={(e) =>
+                                      updateRow(
+                                        row.id,
+                                        "searchTerm",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="h-8 w-full"
+                                  />
+                                </div>
+                                {allOptions.filter(option => 
+                                  option.toLowerCase().includes((row.searchTerm || "").toLowerCase())
+                                ).map((option, index) => (
+                                  <SelectItem
+                                    key={`${title}-opt-${option}-${index}`}
+                                    value={option}
+                                    className="p-0 px-4"
                                   >
-                                    {option}
-                                  </div>
+                                    <div 
+                                      className="truncate whitespace-nowrap overflow-hidden text-ellipsis px-2 py-1.5"
+                                    >
+                                      {option}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                                <SelectItem key="custom-entry" value="__custom__">
+                                  <span className="text-primary">
+                                    + Custom Entry
+                                  </span>
                                 </SelectItem>
-                              ))}
-                              <SelectItem key="custom-entry" value="__custom__">
-                                <span className="text-primary">
-                                  + Custom Entry
-                                </span>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         ) : (
                           <div className="flex items-center gap-1">
-                            <Input
+                            <input
+                              type="text"
                               value={row.description}
-                              onChange={(e) =>
-                                updateRow(row.id, "description", e.target.value)
-                              }
+                              onChange={(e) => updateRow(row.id, "description", e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   updateRow(row.id, "isCustomInput", "false");
                                 }
                               }}
                               placeholder="Enter custom..."
-                              className="border-0 bg-transparent focus-visible:ring-1"
+                              className="flex-1 min-w-0 border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate"
                               autoFocus
-                              showIndicator={false}
                             />
                             <Button
                               variant="ghost"
@@ -417,7 +461,7 @@ const ResourceTable = ({
                           </div>
                         );
                       })() : (
-                        <Input
+                        <input
                           value={row.description}
                           onChange={(e) =>
                             updateRow(
@@ -429,19 +473,18 @@ const ResourceTable = ({
                             )
                           }
                           placeholder="Enter description..."
-                          className={`border-0 bg-transparent focus-visible:ring-1 ${
+                          className={`w-full min-w-0 border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis ${
                             row.rowType === "title"
                               ? "font-bold text-foreground"
                               : ""
                           }`}
-                          showIndicator={false}
                         />
                       )}
                     </td>
 
                     {/* Unit */}
                     {showUnit && (
-                      <td className="px-1 py-2">
+                      <td className="px-1 py-2 ">
                         {unitOptions.length > 0 ? (() => {
                           const allUnitOptions = row.unit && row.unit !== "" && !unitOptions.includes(row.unit) 
                             ? [...unitOptions, row.unit] 
@@ -459,7 +502,7 @@ const ResourceTable = ({
                               }}
                             >
                               <SelectTrigger
-                                className={`border-0 bg-transparent focus:ring-1 ${
+                                className={`w-full border-0 bg-transparent focus:ring-1 ${
                                   row.rowType === "title"
                                     ? "font-bold text-foreground"
                                     : ""
@@ -528,8 +571,9 @@ const ResourceTable = ({
                                 Number(e.target.value) || 0,
                               )
                             }
+                            onWheel={(e) => e.currentTarget.blur()}
                             placeholder="0"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
                             showIndicator={false}
                           />
                         ) : (
@@ -539,7 +583,7 @@ const ResourceTable = ({
                               updateRow(row.id, "unit", e.target.value)
                             }
                             placeholder="Unit"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1 w-full"
                             showIndicator={false}
                           />
                         )}
@@ -547,21 +591,22 @@ const ResourceTable = ({
                     )}
 
                     {/* Prev */}
-                    <td className="px-3 py-2">
+                    <td className="px-1 py-2 text-center">
                       <Input
                         type="number"
                         value={row.prev || ""}
                         onChange={(e) =>
                           updateRow(row.id, "prev", Number(e.target.value) || 0)
                         }
+                        onWheel={(e) => e.currentTarget.blur()}
                         placeholder="0"
-                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-[70px]"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-full [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
                         showIndicator={false}
                       />
                     </td>
 
                     {/* Today */}
-                    <td className="px-3 py-2">
+                    <td className="px-1 py-2 text-center">
                       <Input
                         type="number"
                         value={row.today || ""}
@@ -572,27 +617,23 @@ const ResourceTable = ({
                             Number(e.target.value) || 0,
                           )
                         }
+                        onWheel={(e) => e.currentTarget.blur()}
                         placeholder="0"
-                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-[70px]"
+                        className="border-0 bg-transparent text-center focus-visible:ring-1 w-full [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
                         showIndicator={false}
                       />
                     </td>
 
                     {/* Accumulated */}
-                    <td className="px-3 py-2">
+                    <td className="px-1 py-2 text-center">
                       <Input
                         type="number"
                         showIndicator={false}
                         value={row.accumulated || ""}
-                        onChange={(e) =>
-                          updateRow(
-                            row.id,
-                            "accumulated",
-                            Number(e.target.value) || 0,
-                          )
-                        }
+                        disabled
+                        onWheel={(e) => e.currentTarget.blur()}
                         placeholder="0"
-                        className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1 w-[70px]"
+                        className="border-0 bg-transparent text-center font-semibold text-primary focus-visible:ring-1 w-full [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none disabled:cursor-not-allowed disabled:opacity-100"
                       />
                     </td>
 
@@ -610,8 +651,9 @@ const ResourceTable = ({
                                 Number(e.target.value) || 0,
                               )
                             }
+                            onWheel={(e) => e.currentTarget.blur()}
                             placeholder="0"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
                             showIndicator={false}
                           />
                         </td>
@@ -626,8 +668,9 @@ const ResourceTable = ({
                                 Number(e.target.value) || 0,
                               )
                             }
+                            onWheel={(e) => e.currentTarget.blur()}
                             placeholder="0"
-                            className="border-0 bg-transparent text-center focus-visible:ring-1"
+                            className="border-0 bg-transparent text-center focus-visible:ring-1 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
                             showIndicator={false}
                           />
                         </td>
@@ -635,7 +678,7 @@ const ResourceTable = ({
                     )}
 
                     {/* Delete button */}
-                    <td className="px-2 py-2">
+                    <td className="py-2">
                       <Button
                         variant="ghost"
                         size="icon"

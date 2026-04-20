@@ -13,15 +13,15 @@ import {
   updateWeeklyReport,
   submitWeeklyReport,
   approveWeeklyReport,
-  rejectWeeklyReport,
-  autoSaveWeeklyReport
+  rejectWeeklyReport
 } from "@/services/weeklyReportService";
 
 // Import section hooks (these will be updated next)
 import { useActivities } from "./useActivities";
 import { useHsesData } from "./useHsesData";
 import { useResourceTable } from "./useResourceTable";
-import { useQaqcTable } from "./useQaqcTable";
+import { useQaqcApi } from "./useQaqcApi";
+import { QAQC_SECTIONS } from "@/constants/qaqcSections";
 import { useConstructionIssue } from "./useConstructionIssue";
 import { useOverallProgress } from "./useOverallProgress";
 import { useIntroductionText } from "./useIntroductionText";
@@ -37,14 +37,12 @@ export const useWeeklyReportContent = (reportId: string) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WeeklyReportTabType>("cover");
-  const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   // Section hooks - each manages its own state
   const activities = useActivities(reportId);
   const hsesData = useHsesData(reportId);
   const resourceTable = useResourceTable(reportId);
-  const qaqcTable = useQaqcTable(reportId);
+  const qaqcApi = useQaqcApi(QAQC_SECTIONS, reportId);
   const constructionIssues = useConstructionIssue(reportId);
   const overallProgress = useOverallProgress(reportId);
   const introductionText = useIntroductionText(reportId);
@@ -60,7 +58,6 @@ export const useWeeklyReportContent = (reportId: string) => {
       
       if (response.success && response.data) {
         setReport(response.data);
-        setLastSaved(new Date(response.data.updatedAt));
       } else {
         setError(response.error || 'Failed to load weekly report');
       }
@@ -68,28 +65,6 @@ export const useWeeklyReportContent = (reportId: string) => {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Auto-save functionality
-  const autoSave = async (updates: Partial<WeeklyReport>) => {
-    if (!reportId || isAutoSaving) return;
-
-    try {
-      setIsAutoSaving(true);
-      
-      const response = await autoSaveWeeklyReport(reportId, updates);
-      
-      if (response.success && response.data) {
-        setReport(response.data);
-        setLastSaved(new Date());
-      } else {
-        console.error('Auto-save failed:', response.error);
-      }
-    } catch (err) {
-      console.error('Auto-save error:', err);
-    } finally {
-      setIsAutoSaving(false);
     }
   };
 
@@ -101,25 +76,49 @@ export const useWeeklyReportContent = (reportId: string) => {
       setIsLoading(true);
       setError(null);
 
+      // Transform resourceTable data to Resources format
+      const resourcesData = resourceTable.data ? {
+        manPower: {
+          dateRange: resourceTable.dates?.join('~') || '',
+          managementTeam: [],
+          workingTeamInterior: [],
+          workingTeamMEP: [],
+        },
+        material: [],
+        machinery: [],
+      } : undefined;
+
+      // Transform construction issues to match backend schema format
+      const constructionIssuesData = constructionIssues.data ? [{
+        no: '1',
+        location: constructionIssues.data.location || '',
+        problem: constructionIssues.data.problem || '',
+        actionBy: constructionIssues.data.actionBy || '',
+        photo: typeof constructionIssues.data.photo === 'string' ? constructionIssues.data.photo : '',
+      } as any] : undefined;
+
       // Collect all section data
       const updates: Partial<WeeklyReport> = {
         sections: {
           activities: activities.data || undefined,
           hses: hsesData.data || undefined,
-          resources: resourceTable.data || undefined,
-          qaqcStatus: qaqcTable.data || undefined,
-          constructionIssues: constructionIssues.data || undefined,
-          overallProgress: overallProgress.data || undefined,
+          resources: resourcesData,
+          qaqcStatus: qaqcApi.tableData || undefined,
+          constructionIssues: constructionIssuesData,
+          overallProgress: overallProgress.data ? { rows: overallProgress.data } : undefined,
           introduction: introductionText.data || undefined,
           letter: weeklyReportLetter.data || undefined,
-        }
+          cover: undefined,
+          photos: undefined,
+          masterSchedule: undefined,
+          constructionProgress: undefined,
+        } as any
       };
 
       const response = await updateWeeklyReport(reportId, updates);
       
       if (response.success && response.data) {
         setReport(response.data);
-        setLastSaved(new Date());
         return true;
       } else {
         setError(response.error || 'Failed to save weekly report');
@@ -218,7 +217,7 @@ export const useWeeklyReportContent = (reportId: string) => {
       activities.refetch(),
       hsesData.refetch(),
       resourceTable.refetch(),
-      qaqcTable.refetch(),
+      // qaqcApi.loadQaqcData(), // Removed - no longer needed
       constructionIssues.refetch(),
       overallProgress.refetch(),
       introductionText.refetch(),
@@ -232,7 +231,7 @@ export const useWeeklyReportContent = (reportId: string) => {
     return activities.error !== null ||
            hsesData.error !== null ||
            resourceTable.error !== null ||
-           qaqcTable.error !== null ||
+           qaqcApi.error !== null ||
            constructionIssues.error !== null ||
            overallProgress.error !== null ||
            introductionText.error !== null ||
@@ -245,7 +244,7 @@ export const useWeeklyReportContent = (reportId: string) => {
       activities: activities.data !== null,
       hses: hsesData.data !== null,
       resources: resourceTable.data !== null,
-      qaqc: qaqcTable.data !== null,
+      qaqc: qaqcApi.tableData !== null,
       constructionIssues: constructionIssues.data !== null,
       overallProgress: overallProgress.data !== null,
       introduction: introductionText.data !== null,
@@ -271,41 +270,6 @@ export const useWeeklyReportContent = (reportId: string) => {
     }
   }, [reportId]);
 
-  // Auto-save on section changes (debounced)
-  useEffect(() => {
-    if (!reportId || !report) return;
-
-    const timeoutId = setTimeout(() => {
-      if (hasUnsavedChanges()) {
-        autoSave({
-          sections: {
-            activities: activities.data || undefined,
-            hses: hsesData.data || undefined,
-            resources: resourceTable.data || undefined,
-            qaqcStatus: qaqcTable.data || undefined,
-            constructionIssues: constructionIssues.data || undefined,
-            overallProgress: overallProgress.data || undefined,
-            introduction: introductionText.data || undefined,
-            letter: weeklyReportLetter.data || undefined,
-          }
-        });
-      }
-    }, 2000); // 2 second debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [
-    reportId,
-    report,
-    activities.data,
-    hsesData.data,
-    resourceTable.data,
-    qaqcTable.data,
-    constructionIssues.data,
-    overallProgress.data,
-    introductionText.data,
-    weeklyReportLetter.data
-  ]);
-
   return {
     // Main state
     report,
@@ -313,14 +277,11 @@ export const useWeeklyReportContent = (reportId: string) => {
     error,
     activeTab,
     setActiveTab,
-    isAutoSaving,
-    lastSaved,
-
     // Section states
     activities,
     hsesData,
     resourceTable,
-    qaqcTable,
+    qaqcApi,
     constructionIssues,
     overallProgress,
     introductionText,
@@ -333,8 +294,6 @@ export const useWeeklyReportContent = (reportId: string) => {
     approve,
     reject,
     refresh,
-    autoSave,
-
     // Utilities
     hasUnsavedChanges,
     getValidationStatus,
