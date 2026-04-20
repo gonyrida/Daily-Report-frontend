@@ -29,6 +29,7 @@ import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupaba
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
 import { exportWeeklyReportToExcel } from "@/lib/weeklyreportexcel";
+import { exportWeeklyReportToPdf } from "@/lib/weeklyreportpdf";
 import {
   createWeeklyReport,
   updateWeeklyReport,
@@ -2125,13 +2126,14 @@ const WeeklyReport = () => {
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      // TODO: Implement PDF export functionality
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate export
+      const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.pdf`;
+      await exportWeeklyReportToPdf(excelData, filename);
       toast({
         title: "PDF Exported",
-        description: "Weekly report exported as PDF successfully.",
+        description: `Weekly report exported as ${filename} successfully.`,
       });
     } catch (error) {
+      console.error('PDF export error:', error);
       toast({
         title: "Export Failed",
         description: "Could not export PDF. Please try again.",
