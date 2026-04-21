@@ -2127,7 +2127,37 @@ const WeeklyReport = () => {
     setIsExporting(true);
     try {
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.pdf`;
-      await exportWeeklyReportToPdf(excelData, filename);
+      
+      // Convert File objects to base64 for construction issues
+      const issuesWithBase64Photos = await Promise.all(
+        issuesHook.issuesData.map(async (issue) => {
+          let photo: string | undefined;
+          if (issue.photo instanceof File) {
+            photo = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(issue.photo as File); // Explicit type assertion
+            });
+          } else if (typeof issue.photo === 'string') {
+            photo = issue.photo;
+          }
+          return { ...issue, photo };
+        })
+      );
+
+      // Create export data with converted photos - use original excelData and only override constructionIssues
+      const exportData = buildWeeklyReportExportData({
+        ...excelData as any, // Use type assertion to bypass strict typing
+        constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
+          number: i + 1,
+          siteLocation: issue.location,
+          problemDescription: issue.problem,
+          actionBy: issue.actionBy,
+          photo: issue.photo,
+        })),
+      });
+
+      await exportWeeklyReportToPdf(exportData, filename);
       toast({
         title: "PDF Exported",
         description: `Weekly report exported as ${filename} successfully.`,
@@ -2150,8 +2180,37 @@ const WeeklyReport = () => {
       // Generate filename with project name and week number
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.xlsx`;
 
+      // Convert File objects to base64 for construction issues
+      const issuesWithBase64Photos = await Promise.all(
+        issuesHook.issuesData.map(async (issue) => {
+          let photo: string | undefined;
+          if (issue.photo instanceof File) {
+            photo = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(issue.photo as File); // Explicit type assertion
+            });
+          } else if (typeof issue.photo === 'string') {
+            photo = issue.photo;
+          }
+          return { ...issue, photo };
+        })
+      );
+
+      // Create export data with converted photos - use original excelData and only override constructionIssues
+      const exportData = buildWeeklyReportExportData({
+        ...excelData as any, // Use type assertion to bypass strict typing
+        constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
+          number: i + 1,
+          siteLocation: issue.location,
+          problemDescription: issue.problem,
+          actionBy: issue.actionBy,
+          photo: issue.photo,
+        })),
+      });
+
       // Export to Excel using ExcelJS
-      await exportWeeklyReportToExcel(excelData, filename);
+      await exportWeeklyReportToExcel(exportData, filename);
 
       toast({
         title: "Excel Exported",
@@ -2552,17 +2611,29 @@ const WeeklyReport = () => {
         };
       }),
     sitePhotoCaptions: siteActivitiesSections.flatMap((section: any) =>
-      section.slots?.map((slot: any, idx: number) => ({
-        siteLocation: section.title,
-        caption1: idx === 0 ? slot.caption : undefined,
-        caption2: idx === 1 ? slot.caption : undefined,
-      })) || []
+      (section.entries || []).flatMap((entry: any) =>
+        (entry.slots || []).reduce((acc: any[], slot: any, idx: number) => {
+          // Group slots in pairs (2 slots per row)
+          if (idx % 2 === 0) {
+            const nextSlot = entry.slots[idx + 1];
+            acc.push({
+              siteLocation: section.title,
+              caption1: slot?.caption || '',
+              caption2: nextSlot?.caption || '',
+              image1: slot?.image || '',
+              image2: nextSlot?.image || '',
+            });
+          }
+          return acc;
+        }, [])
+      )
     ),
     constructionIssues: issuesHook.issuesData.map((issue, i) => ({
       number: i + 1,
       siteLocation: issue.location,
       problemDescription: issue.problem,
       actionBy: issue.actionBy,
+      photo: issue.photo,
     })),
     // Introduction fields
     projectOverview: sharedData.projectOverview,

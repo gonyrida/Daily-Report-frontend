@@ -257,6 +257,8 @@ export interface MapperInput {
     location?: string;
     caption1?: string;
     caption2?: string;
+    image1?: string;  // Base64 image data or URL for left photo
+    image2?: string;  // Base64 image data or URL for right photo
     [k: string]: unknown;
   }>;
 
@@ -271,6 +273,7 @@ export interface MapperInput {
     issue?: string;
     actionBy?: string;
     action?: string;
+    photo?: string | File | null;
     [k: string]: unknown;
   }>;
 
@@ -445,6 +448,8 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       siteLocation: e.siteLocation ?? e.location,
       caption1:     e.caption1,
       caption2:     e.caption2,
+      image1:       e.image1,
+      image2:       e.image2,
     })),
 
     // ── Construction Issues ───────────────────────────────────────────────────
@@ -453,6 +458,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       siteLocation:        issue.siteLocation ?? issue.location,
       problemDescription:  issue.problemDescription ?? issue.description ?? issue.issue,
       actionBy:            issue.actionBy ?? issue.action,
+      photo: typeof issue.photo === 'string' ? issue.photo : undefined,
     })),
 
     // ── Introduction (1.Intro) ───────────────────────────────────────────────
