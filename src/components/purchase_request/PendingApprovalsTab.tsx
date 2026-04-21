@@ -153,7 +153,7 @@ const PendingApprovalsTab = ({
     try {
       for (const reqId of selectedRequests) {
         // Find the request to get the workflow step
-        const req = requests.find(r => r.id === reqId);
+        const req = requests.find(r => r._id === reqId);
         if (!req) continue;
         // Find the user's workflow step (role)
         const step = req.approvalWorkflow?.find(w => w.approver?._id === profile.id || w.approver === profile.id);
@@ -237,6 +237,8 @@ const PendingApprovalsTab = ({
     if (!myStep) return false;
     const myStepIdx = ROLE_ORDER.indexOf(myStep.role);
     if (myStepIdx === 0) return true;
+    // If user role is 'approved', they can act on the request
+    if (myStep.role === 'approved') return true;
     return req.approvalWorkflow
       .filter(s => ROLE_ORDER.indexOf(s.role) < myStepIdx)
       .every(s => s.status === 'approved' || s.status === 'rejected' || s.status === 'completed');
@@ -412,7 +414,7 @@ const PendingApprovalsTab = ({
 						<CardTitle>Pending Approvals</CardTitle>
 						<div className="flex flex-wrap gap-4">
 							{/* Status Filter */}
-							<div className="flex items-center gap-2">
+							{/* <div className="flex items-center gap-2">
 								<span className="text-sm text-muted-foreground">Status:</span>
 								<Select value={statusFilter || "__all__"} onValueChange={setStatusFilter}>
 									<SelectTrigger className="w-[140px]">
@@ -427,7 +429,7 @@ const PendingApprovalsTab = ({
 										<SelectItem value="verified">Verified</SelectItem>
 									</SelectContent>
 								</Select>
-							</div>
+							</div> */}
 
 							{/* Sub-Project Filter */}
 							<div className="flex items-center gap-2">
@@ -529,7 +531,11 @@ const PendingApprovalsTab = ({
 										return (
 											<tr
 												key={request._id}
-												className={`border-b cursor-pointer transition-colors ${isSelected ? 'bg-blue-100' : 'hover:bg-muted/30'}`}
+                        className={`border-b cursor-pointer transition-colors ${
+                          isSelected 
+                            ? 'bg-blue-100 dark:bg-blue-900/30 dark:border-l-4 dark:border-l-blue-400' 
+                            : 'hover:bg-muted/30 dark:hover:bg-muted/20'
+                        }`}
 												onClick={e => {
 													// If clicking checkbox, don't open modal
 													if (e.target instanceof HTMLInputElement) return;

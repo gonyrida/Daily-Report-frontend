@@ -175,6 +175,7 @@ const MemberInvitationModal: React.FC<MemberInvitationModalProps> = ({
 
     onMembersAdded(formattedMembers);
     setSelectedUsers([]);
+    setSearchTerm('');
     setIsOpen(false);
     
     toast({
@@ -189,7 +190,18 @@ const MemberInvitationModal: React.FC<MemberInvitationModalProps> = ({
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setIsOpen(false);
+          setSelectedUsers([]);
+          setSearchTerm('');
+        } else {
+          setIsOpen(true);
+        }
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -272,7 +284,11 @@ const MemberInvitationModal: React.FC<MemberInvitationModalProps> = ({
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button
               variant="outline"
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                setIsOpen(false);
+                setSearchTerm("");
+                setSelectedUsers([]);
+              }}
             >
               Cancel
             </Button>

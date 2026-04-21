@@ -55,6 +55,7 @@ import {
 } from '@/components/ui/sidebar';
 import HierarchicalSidebar from '@/components/HierarchicalSidebar';
 import { apiGet, apiPost, apiPut } from '@/lib/apiFetch';
+import { Label } from "@/components/ui/label";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -186,7 +187,7 @@ const UserManagement = () => {
       if (result.success) {
         toast({ 
           title: "Success", 
-          description: isEditMode ? "User updated successfully" : "User created successfully"
+          description: isEditMode ? "User updated successfully" : `User created successfully, Please notify user to verify their email at ${newUser.email}`
         });
         setShowAddUser(false);
         setNewUser({
@@ -420,10 +421,10 @@ const UserManagement = () => {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  {/* <DropdownMenuItem>
                                     <Shield className="mr-2 h-4 w-4" />
                                     Toggle Role
-                                  </DropdownMenuItem>
+                                  </DropdownMenuItem> */}
                                   {/* <DropdownMenuItem>
                                     <Power className="mr-2 h-4 w-4" />
                                     Toggle Status
@@ -491,40 +492,57 @@ const UserManagement = () => {
             </Card>
 
             {/* Add User Dialog */}
-            <Dialog open={showAddUser} onOpenChange={setShowAddUser}>
-              <DialogContent>
+            <Dialog 
+              open={showAddUser}
+              onOpenChange={setShowAddUser}
+            >
+              <DialogContent className="max-h-[95vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{isEditMode ? "Edit User" : "Add New User"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <Input 
-                    placeholder="First Name" 
-                    value={newUser.firstName}
-                    onChange={(e) => setNewUser({...newUser, firstName: e.target.value})}
-                  />
-                  <Input 
-                    placeholder="Last Name" 
-                    value={newUser.lastName}
-                    onChange={(e) => setNewUser({...newUser, lastName: e.target.value})}
-                  />
-                  <Input 
-                    type="email" 
-                    placeholder="Email" 
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                  />
-                  <Input 
-                    placeholder="Position" 
-                    value={newUser.position}
-                    onChange={(e) => setNewUser({...newUser, position: e.target.value})}
-                  />
-                  <Input 
-                    type="department" 
-                    placeholder="Department" 
-                    value={newUser.department}
-                    onChange={(e) => setNewUser({...newUser, department: e.target.value})}
-                  />
-                  
+                  <div>
+                    <Label>First Name *</Label>
+                    <Input 
+                      placeholder="First Name" 
+                      value={newUser.firstName}
+                      onChange={(e) => setNewUser({...newUser, firstName: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Last Name *</Label>
+                    <Input 
+                      placeholder="Last Name" 
+                      value={newUser.lastName}
+                      onChange={(e) => setNewUser({...newUser, lastName: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Email *</Label>
+                    <Input 
+                      type="email" 
+                      placeholder="Email" 
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Position *</Label>
+                    <Input 
+                      placeholder="Position" 
+                      value={newUser.position}
+                      onChange={(e) => setNewUser({...newUser, position: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Department *</Label>
+                    <Input 
+                      type="department" 
+                      placeholder="Department" 
+                      value={newUser.department}
+                      onChange={(e) => setNewUser({...newUser, department: e.target.value})}
+                    />
+                  </div>
                   <Select 
                     value={newUser.orgLevel?.toString()}
                     onValueChange={(value) => setNewUser({...newUser, orgLevel: parseInt(value)})}

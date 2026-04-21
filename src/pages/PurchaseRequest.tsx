@@ -781,10 +781,10 @@ const PurchaseRequest = ({onRefresh}) => {
                               }}
                             >
                               <SelectTrigger className="w-full sm:w-44">
-                                <SelectValue placeholder="All Sub-Projects" />
+                                <SelectValue placeholder="All Projects" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="__all__">All Sub-Projects</SelectItem>
+                                <SelectItem value="__all__">All Projects</SelectItem>
                                 {PRProjects.flatMap((project) => 
                                   project.subProjects?.map((subProject) => (
                                     <SelectItem key={subProject._id} value={subProject.name}>
@@ -1089,13 +1089,13 @@ const PurchaseRequest = ({onRefresh}) => {
 
                             {/* Sub-Project Filter */}
                             <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Sub-Project:</span>
+                              <span className="text-sm text-muted-foreground">Project:</span>
                               <Select value={allProjectFilter} onValueChange={setAllProjectFilter}>
                                 <SelectTrigger className="w-[160px]">
-                                  <SelectValue placeholder="All Sub Projects" />
+                                  <SelectValue placeholder="All Projects" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="__all__">All Sub Projects</SelectItem>
+                                  <SelectItem value="__all__">All Projects</SelectItem>
                                   {PRProjects.flatMap((project) => 
                                     project.subProjects?.map((subProject) => (
                                       <SelectItem key={subProject._id} value={subProject.name}>

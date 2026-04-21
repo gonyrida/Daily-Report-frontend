@@ -103,7 +103,7 @@ const AdminDashboard = () => {
             {/* Recent Users */}
             <Card>
               <CardHeader>
-                <CardTitle>Recent Users</CardTitle>
+                <CardTitle>Recent Active Users</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
