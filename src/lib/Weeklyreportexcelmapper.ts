@@ -222,6 +222,10 @@ export interface MapperInput {
     description?: string;
     name?: string;
     unit?: string;
+    dailyData?: (number | string)[];
+    dailyCounts?: (number | string)[];
+    daily?: (number | string)[];
+    days?: (number | string)[];
     previous?: number | string;
     prev?: number | string;
     thisPeriod?: number | string;
@@ -234,6 +238,10 @@ export interface MapperInput {
     description?: string;
     name?: string;
     unit?: string;
+    dailyData?: (number | string)[];
+    dailyCounts?: (number | string)[];
+    daily?: (number | string)[];
+    days?: (number | string)[];
     previous?: number | string;
     prev?: number | string;
     thisPeriod?: number | string;
@@ -418,6 +426,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     materialRows: (input.materialRows ?? []).map(row => ({
       description: row.description ?? row.name,
       unit:        row.unit,
+      dailyData:   row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0,0,0,0,0,0,0],
       previous:    row.previous  ?? row.prev,
       thisPeriod:  row.thisPeriod ?? row.current,
       accumulate:  row.accumulate ?? row.total,
@@ -425,6 +434,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     equipmentRows: (input.equipmentRows ?? []).map(row => ({
       description: row.description ?? row.name,
       unit:        row.unit,
+      dailyData:   row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0,0,0,0,0,0,0],
       previous:    row.previous  ?? row.prev,
       thisPeriod:  row.thisPeriod ?? row.current,
       accumulate:  row.accumulate ?? row.total,

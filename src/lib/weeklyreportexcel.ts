@@ -2412,8 +2412,6 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   ws.properties.tabColor = { argb: 'FF00B050' };
 
   // ── Column widths (A–L) — compact layout without per-site columns ────────
-  // The original template has 100+ site-specific columns (O..DH) for drill-down.
-  // For the app export we summarize with just the 7 daily columns + totals.
   const widths = [5.71, 42, 8, 8, 8, 8, 8, 8, 8, 14, 14, 18];
   widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
@@ -2431,14 +2429,6 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
     font: { bold: true, size: 11, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
     alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
-  };
-  const groupHdrStyle: Partial<ExcelJS.Style> = {
-    font: { bold: true, size: 11, name: 'Arial' },
-    alignment: { horizontal: 'left', vertical: 'middle' },
     border: {
       top: { style: 'thin' }, bottom: { style: 'thin' },
       left: { style: 'thin' }, right: { style: 'thin' },
@@ -2469,8 +2459,50 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
     ...totalStyle,
     alignment: { horizontal: 'center', vertical: 'middle' },
   };
+  const totalEmptyStyle: Partial<ExcelJS.Style> = {
+    ...totalStyle,
+    alignment: { horizontal: 'center', vertical: 'middle' },
+  };
 
-  // The 7 short day labels (Fri-Thu matches template)
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  // Robust group-header detection (matches "I.", "II.", "III." prefix too).
+  const isGroupHeaderRow = (mp: any): boolean => {
+    if (mp?.isGroupHeader === true) return true;
+    const desc = String(mp?.description ?? '').trim();
+    return /^[IVXLCDM]+\.\s/i.test(desc);
+  };
+
+  // Write formula + pre-computed result so Excel shows the value without
+  // requiring "Enable Editing".
+  const setFormulaWithResult = (
+    cell: ExcelJS.Cell,
+    formula: string,
+    result: number,
+  ) => {
+    cell.value = { formula, result } as ExcelJS.CellFormulaValue;
+  };
+
+  // Numeric coercion — empty/undefined/non-numeric → 0.
+  const num = (v: any): number => {
+    if (v === null || v === undefined || v === '') return 0;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // Defensive daily-data extractor — different record shapes put the daily
+  // values under different field names. Try all the common ones before giving
+  // up and returning zeros. This is why 6.2/6.3 were previously showing 0s:
+  // the caller likely stores dailies under `dailyCounts` (matching 6.1) rather
+  // than `dailyData`, so we now accept either.
+  const pickDailyArray = (row: any): any[] => {
+    if (Array.isArray(row?.dailyData)) return row.dailyData;
+    if (Array.isArray(row?.dailyCounts)) return row.dailyCounts;
+    if (Array.isArray(row?.daily)) return row.daily;
+    if (Array.isArray(row?.days)) return row.days;
+    return [];
+  };
+
   const dayLabels = ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
   const dates = d.weekDates && d.weekDates.length === 7
     ? d.weekDates
@@ -2493,13 +2525,11 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.61');
   r++;
 
-  // Header row 1: B=Description, C-I=WeekDates band, J=Prev Wk, K=This Wk, L=Up to This Wk
   const hdrRow1 = r;
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Description';
   safeStyle(ws.getCell(r, 2), headerStyle, 'mp.desc');
 
-  // C-I day-dates band — use a title like "Mar-26" or week range summary
   const weekLabel = (dates[0] && dates[6]) ? `Day ${dates[0]}–${dates[6]}` : 'This Week';
   ws.getCell(r, 3).value = weekLabel;
   safeStyle(ws.getCell(r, 3), headerStyle, 'mp.week');
@@ -2514,25 +2544,21 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 12), headerStyle, 'mp.upto');
   r++;
 
-  // Header row 2: day names (Fri..Thu)
   ws.getRow(r).height = 18;
   dayLabels.forEach((day, i) => {
     ws.getCell(r, 3 + i).value = day;
     safeStyle(ws.getCell(r, 3 + i), headerStyle, `mp.day.${day}`);
   });
-  // Re-apply header style to column B and the totals columns so borders remain
   safeStyle(ws.getCell(r, 2), headerStyle, 'mp.descBlank');
   safeStyle(ws.getCell(r, 10), headerStyle, 'mp.prevBlank');
   safeStyle(ws.getCell(r, 11), headerStyle, 'mp.thisBlank');
   safeStyle(ws.getCell(r, 12), headerStyle, 'mp.uptoBlank');
-  // Merge B / J / K / L vertically across the three header rows (rows 6-8)
   safeMerge(ws, hdrRow1, 2, r + 1, 2);
   safeMerge(ws, hdrRow1, 10, r + 1, 10);
   safeMerge(ws, hdrRow1, 11, r + 1, 11);
   safeMerge(ws, hdrRow1, 12, r + 1, 12);
   r++;
 
-  // Header row 3: day dates (numeric)
   ws.getRow(r).height = 18;
   dates.forEach((dt, i) => {
     ws.getCell(r, 3 + i).value = dt;
@@ -2540,11 +2566,9 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   });
   r++;
 
-  // Manpower data rows — with group headers for team sections
+  // ── Manpower data rows ───────────────────────────────────────────────────
   const manpowerRows = d.manpowerRows ?? [];
-  const firstMpDataRow = r;
 
-  // Style for group header rows (I. / II. / III.)
   const groupHeaderStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 11, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } },
@@ -2555,67 +2579,109 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
     },
   };
 
-  manpowerRows.forEach(mp => {
+  let mpItemNo = 0;
+  const mpDataRowIndices: number[] = [];
+
+  manpowerRows.forEach((mp: any) => {
     ws.getRow(r).height = 20;
 
-    if (mp.isGroupHeader) {
-      // Render the group header as a merged bold banner across B..L
+    if (isGroupHeaderRow(mp)) {
       ws.getCell(r, 2).value = mp.description ?? '';
       safeStyle(ws.getCell(r, 2), groupHeaderStyle, 'mp.group');
-      for (let c = 3; c <= 12; c++) safeStyle(ws.getCell(r, c), groupHeaderStyle, 'mp.group.span');
+      for (let c = 3; c <= 12; c++) {
+        ws.getCell(r, c).value = null;
+        safeStyle(ws.getCell(r, c), groupHeaderStyle, 'mp.group.span');
+      }
       safeMerge(ws, r, 2, r, 12);
+      mpItemNo = 0;
       r++;
       return;
     }
 
-    // Normal data row
-    ws.getCell(r, 2).value = mp.description ?? '';
+    mpItemNo++;
+    const desc = mp.description ?? '';
+    ws.getCell(r, 2).value = `${mpItemNo}. ${desc}`;
     safeStyle(ws.getCell(r, 2), dataStyle, 'mp.desc.data');
 
-    const dc = mp.dailyCounts ?? [];
+    const dc = pickDailyArray(mp);
+    const dailyNums: number[] = [];
     for (let i = 0; i < 7; i++) {
-      ws.getCell(r, 3 + i).value = dc[i] ?? 0;
+      const v = num(dc[i]);
+      dailyNums.push(v);
+      ws.getCell(r, 3 + i).value = v;
       safeStyle(ws.getCell(r, 3 + i), numStyle, `mp.dc.${i}`);
     }
 
-    ws.getCell(r, 10).value = mp.previousWeek ?? 0;
+    const prevWk = num(mp.previousWeek);
+    ws.getCell(r, 10).value = prevWk;
     safeStyle(ws.getCell(r, 10), numStyle, 'mp.prev.data');
 
-    // Use Excel formula when thisWeek not provided so totals stay live
-    ws.getCell(r, 11).value = mp.thisWeek !== undefined && mp.thisWeek !== ''
-      ? mp.thisWeek
-      : { formula: `SUM(C${r}:I${r})` };
+    const thisWkComputed = mp.thisWeek !== undefined && mp.thisWeek !== ''
+      ? num(mp.thisWeek)
+      : dailyNums.reduce((a, b) => a + b, 0);
+    if (mp.thisWeek !== undefined && mp.thisWeek !== '') {
+      ws.getCell(r, 11).value = thisWkComputed;
+    } else {
+      setFormulaWithResult(ws.getCell(r, 11), `SUM(C${r}:I${r})`, thisWkComputed);
+    }
     safeStyle(ws.getCell(r, 11), numStyle, 'mp.this.data');
 
-    ws.getCell(r, 12).value = mp.upToThisWeek !== undefined && mp.upToThisWeek !== ''
-      ? mp.upToThisWeek
-      : { formula: `J${r}+K${r}` };
+    const upToComputed = mp.upToThisWeek !== undefined && mp.upToThisWeek !== ''
+      ? num(mp.upToThisWeek)
+      : prevWk + thisWkComputed;
+    if (mp.upToThisWeek !== undefined && mp.upToThisWeek !== '') {
+      ws.getCell(r, 12).value = upToComputed;
+    } else {
+      setFormulaWithResult(ws.getCell(r, 12), `J${r}+K${r}`, upToComputed);
+    }
     safeStyle(ws.getCell(r, 12), numStyle, 'mp.upto.data');
 
+    mpDataRowIndices.push(r);
     r++;
   });
 
-  // Ensure at least one blank data row so the total formula has a valid range
   if (manpowerRows.length === 0) {
     ws.getRow(r).height = 20;
     for (let c = 2; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mp.empty');
     r++;
   }
-  const lastMpDataRow = r - 1;
 
-  // Manpower Grand Total row
+  // Manpower Grand Total — only J / K / L.
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Grand Total';
   safeStyle(ws.getCell(r, 2), totalStyle, 'mp.total.lbl');
   for (let i = 0; i < 7; i++) {
-    ws.getCell(r, 3 + i).value = { formula: `SUM(${colLetter(3 + i)}${firstMpDataRow}:${colLetter(3 + i)}${lastMpDataRow})` };
-    safeStyle(ws.getCell(r, 3 + i), totalNumStyle, `mp.total.d${i}`);
+    ws.getCell(r, 3 + i).value = null;
+    safeStyle(ws.getCell(r, 3 + i), totalEmptyStyle, `mp.total.d${i}`);
   }
-  ws.getCell(r, 10).value = { formula: `SUM(J${firstMpDataRow}:J${lastMpDataRow})` };
+
+  if (mpDataRowIndices.length > 0) {
+    const jRefs = mpDataRowIndices.map(idx => `J${idx}`).join(',');
+    const kRefs = mpDataRowIndices.map(idx => `K${idx}`).join(',');
+    const lRefs = mpDataRowIndices.map(idx => `L${idx}`).join(',');
+
+    let prevTotal = 0;
+    let thisTotal = 0;
+    let upToTotal = 0;
+    mpDataRowIndices.forEach(idx => {
+      const jv = ws.getCell(idx, 10).value;
+      const kv = ws.getCell(idx, 11).value;
+      const lv = ws.getCell(idx, 12).value;
+      prevTotal += typeof jv === 'number' ? jv : num((jv as any)?.result);
+      thisTotal += typeof kv === 'number' ? kv : num((kv as any)?.result);
+      upToTotal += typeof lv === 'number' ? lv : num((lv as any)?.result);
+    });
+
+    setFormulaWithResult(ws.getCell(r, 10), `SUM(${jRefs})`, prevTotal);
+    setFormulaWithResult(ws.getCell(r, 11), `SUM(${kRefs})`, thisTotal);
+    setFormulaWithResult(ws.getCell(r, 12), `SUM(${lRefs})`, upToTotal);
+  } else {
+    ws.getCell(r, 10).value = 0;
+    ws.getCell(r, 11).value = 0;
+    ws.getCell(r, 12).value = 0;
+  }
   safeStyle(ws.getCell(r, 10), totalNumStyle, 'mp.total.prev');
-  ws.getCell(r, 11).value = { formula: `SUM(K${firstMpDataRow}:K${lastMpDataRow})` };
   safeStyle(ws.getCell(r, 11), totalNumStyle, 'mp.total.this');
-  ws.getCell(r, 12).value = { formula: `SUM(L${firstMpDataRow}:L${lastMpDataRow})` };
   safeStyle(ws.getCell(r, 12), totalNumStyle, 'mp.total.upto');
   r += 2;
 
@@ -2627,13 +2693,11 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.62');
   r++;
 
-  // Header row 1: B=Description, C-I=WeekDates band, J=Prev Wk, K=This Wk, L=Up to This Wk
   const matHdrRow1 = r;
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Description';
   safeStyle(ws.getCell(r, 2), headerStyle, 'mat.desc');
 
-  // C-I day-dates band — use a title like "Mar-26" or week range summary
   const matWeekLabel = (dates[0] && dates[6]) ? `Day ${dates[0]}–${dates[6]}` : 'This Week';
   ws.getCell(r, 3).value = matWeekLabel;
   safeStyle(ws.getCell(r, 3), headerStyle, 'mat.week');
@@ -2648,25 +2712,21 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 12), headerStyle, 'mat.acc');
   r++;
 
-  // Header row 2: day names (Fri..Thu)
   ws.getRow(r).height = 18;
   dayLabels.forEach((day, i) => {
     ws.getCell(r, 3 + i).value = day;
     safeStyle(ws.getCell(r, 3 + i), headerStyle, `mat.day.${day}`);
   });
-  // Re-apply header style to column B and the totals columns so borders remain
   safeStyle(ws.getCell(r, 2), headerStyle, 'mat.descBlank');
   safeStyle(ws.getCell(r, 10), headerStyle, 'mat.prevBlank');
   safeStyle(ws.getCell(r, 11), headerStyle, 'mat.thisBlank');
   safeStyle(ws.getCell(r, 12), headerStyle, 'mat.accBlank');
-  // Merge B / J / K / L vertically across the three header rows
   safeMerge(ws, matHdrRow1, 2, r + 1, 2);
   safeMerge(ws, matHdrRow1, 10, r + 1, 10);
   safeMerge(ws, matHdrRow1, 11, r + 1, 11);
   safeMerge(ws, matHdrRow1, 12, r + 1, 12);
   r++;
 
-  // Header row 3: day dates (numeric)
   ws.getRow(r).height = 18;
   dates.forEach((dt, i) => {
     ws.getCell(r, 3 + i).value = dt;
@@ -2674,33 +2734,40 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   });
   r++;
 
+  // ── Materials data rows ──────────────────────────────────────────────────
   const materialRows = d.materialRows ?? [];
-  const firstMatRow = r;
-  materialRows.forEach(m => {
+  const matDataRowIndices: number[] = [];
+
+  materialRows.forEach((m: any) => {
     ws.getRow(r).height = 20;
-    // Description with unit in parentheses
+
     const descWithUnit = m.unit ? `${m.description ?? ''} (${m.unit})` : (m.description ?? '');
     ws.getCell(r, 2).value = descWithUnit;
     safeStyle(ws.getCell(r, 2), dataStyle, 'mat.desc.data');
 
-    // Daily data columns C-I (Fri-Thu)
-    const dd = m.dailyData ?? [];
+    // Use the defensive extractor so dailies render regardless of field name.
+    const dd = pickDailyArray(m);
     for (let i = 0; i < 7; i++) {
-      ws.getCell(r, 3 + i).value = dd[i] ?? 0;
+      ws.getCell(r, 3 + i).value = num(dd[i]);
       safeStyle(ws.getCell(r, 3 + i), numStyle, `mat.daily.${i}`);
     }
 
-    ws.getCell(r, 10).value = m.previous ?? 0;
+    const prevVal = num(m.previous);
+    ws.getCell(r, 10).value = prevVal;
     safeStyle(ws.getCell(r, 10), numStyle, 'mat.prev.data');
 
-    ws.getCell(r, 11).value = m.thisPeriod ?? 0;
+    const thisVal = num(m.thisPeriod);
+    ws.getCell(r, 11).value = thisVal;
     safeStyle(ws.getCell(r, 11), numStyle, 'mat.this.data');
 
-    ws.getCell(r, 12).value = m.accumulate !== undefined && m.accumulate !== ''
-      ? m.accumulate
-      : { formula: `J${r}+K${r}` };
+    if (m.accumulate !== undefined && m.accumulate !== '') {
+      ws.getCell(r, 12).value = num(m.accumulate);
+    } else {
+      setFormulaWithResult(ws.getCell(r, 12), `J${r}+K${r}`, prevVal + thisVal);
+    }
     safeStyle(ws.getCell(r, 12), numStyle, 'mat.acc.data');
 
+    matDataRowIndices.push(r);
     r++;
   });
 
@@ -2709,21 +2776,44 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
     for (let c = 2; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'mat.empty');
     r++;
   }
-  const lastMatRow = r - 1;
 
+  // Materials Total — SAME shape as 6.1 Grand Total: blank daily columns,
+  // only sum Previous (J), This Period (K), Accumulate (L).
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Total';
   safeStyle(ws.getCell(r, 2), totalStyle, 'mat.total.lbl');
-  // Daily totals
   for (let i = 0; i < 7; i++) {
-    ws.getCell(r, 3 + i).value = { formula: `SUM(${colLetter(3 + i)}${firstMatRow}:${colLetter(3 + i)}${lastMatRow})` };
-    safeStyle(ws.getCell(r, 3 + i), totalNumStyle, `mat.total.d${i}`);
+    ws.getCell(r, 3 + i).value = null;
+    safeStyle(ws.getCell(r, 3 + i), totalEmptyStyle, `mat.total.d${i}`);
   }
-  ws.getCell(r, 10).value = { formula: `SUM(J${firstMatRow}:J${lastMatRow})` };
+
+  if (matDataRowIndices.length > 0) {
+    const jRefs = matDataRowIndices.map(idx => `J${idx}`).join(',');
+    const kRefs = matDataRowIndices.map(idx => `K${idx}`).join(',');
+    const lRefs = matDataRowIndices.map(idx => `L${idx}`).join(',');
+
+    let prevTotal = 0;
+    let thisTotal = 0;
+    let accTotal = 0;
+    matDataRowIndices.forEach(idx => {
+      const jv = ws.getCell(idx, 10).value;
+      const kv = ws.getCell(idx, 11).value;
+      const lv = ws.getCell(idx, 12).value;
+      prevTotal += typeof jv === 'number' ? jv : num((jv as any)?.result);
+      thisTotal += typeof kv === 'number' ? kv : num((kv as any)?.result);
+      accTotal += typeof lv === 'number' ? lv : num((lv as any)?.result);
+    });
+
+    setFormulaWithResult(ws.getCell(r, 10), `SUM(${jRefs})`, prevTotal);
+    setFormulaWithResult(ws.getCell(r, 11), `SUM(${kRefs})`, thisTotal);
+    setFormulaWithResult(ws.getCell(r, 12), `SUM(${lRefs})`, accTotal);
+  } else {
+    ws.getCell(r, 10).value = 0;
+    ws.getCell(r, 11).value = 0;
+    ws.getCell(r, 12).value = 0;
+  }
   safeStyle(ws.getCell(r, 10), totalNumStyle, 'mat.total.prev');
-  ws.getCell(r, 11).value = { formula: `SUM(K${firstMatRow}:K${lastMatRow})` };
   safeStyle(ws.getCell(r, 11), totalNumStyle, 'mat.total.this');
-  ws.getCell(r, 12).value = { formula: `SUM(L${firstMatRow}:L${lastMatRow})` };
   safeStyle(ws.getCell(r, 12), totalNumStyle, 'mat.total.acc');
   r += 2;
 
@@ -2735,13 +2825,11 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 2), subTitleStyle, 'res.63');
   r++;
 
-  // Header row 1: B=Description, C-I=WeekDates band, J=Prev Wk, K=This Wk, L=Up to This Wk
   const eqHdrRow1 = r;
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Description';
   safeStyle(ws.getCell(r, 2), headerStyle, 'eq.desc');
 
-  // C-I day-dates band — use a title like "Mar-26" or week range summary
   const eqWeekLabel = (dates[0] && dates[6]) ? `Day ${dates[0]}–${dates[6]}` : 'This Week';
   ws.getCell(r, 3).value = eqWeekLabel;
   safeStyle(ws.getCell(r, 3), headerStyle, 'eq.week');
@@ -2756,58 +2844,61 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
   safeStyle(ws.getCell(r, 12), headerStyle, 'eq.acc');
   r++;
 
-  // Header row 2: day names (Fri..Thu)
   ws.getRow(r).height = 18;
   dayLabels.forEach((day, i) => {
     ws.getCell(r, 3 + i).value = day;
     safeStyle(ws.getCell(r, 3 + i), headerStyle, `eq.day.${day}`);
   });
-  // Re-apply header style to column B and the totals columns so borders remain
   safeStyle(ws.getCell(r, 2), headerStyle, 'eq.descBlank');
   safeStyle(ws.getCell(r, 10), headerStyle, 'eq.prevBlank');
   safeStyle(ws.getCell(r, 11), headerStyle, 'eq.thisBlank');
   safeStyle(ws.getCell(r, 12), headerStyle, 'eq.accBlank');
-  // Merge B / J / K / L vertically across the three header rows
   safeMerge(ws, eqHdrRow1, 2, r + 1, 2);
   safeMerge(ws, eqHdrRow1, 10, r + 1, 10);
   safeMerge(ws, eqHdrRow1, 11, r + 1, 11);
   safeMerge(ws, eqHdrRow1, 12, r + 1, 12);
   r++;
 
-  // Header row 3: day dates (numeric)
   ws.getRow(r).height = 18;
   dates.forEach((dt, i) => {
+    ws.getCell(r, 3 + i).value = dt;
     safeStyle(ws.getCell(r, 3 + i), headerStyle, `eq.dt.${i}`);
   });
   r++;
 
+  // ── Equipment data rows ──────────────────────────────────────────────────
   const equipmentRows = d.equipmentRows ?? [];
-  const firstEqRow = r;
-  equipmentRows.forEach(e => {
+  const eqDataRowIndices: number[] = [];
+
+  equipmentRows.forEach((e: any) => {
     ws.getRow(r).height = 20;
-    // Description with unit in parentheses
+
     const descWithUnit = e.unit ? `${e.description ?? ''} (${e.unit})` : (e.description ?? '');
     ws.getCell(r, 2).value = descWithUnit;
     safeStyle(ws.getCell(r, 2), dataStyle, 'eq.desc.data');
 
-    // Daily data columns C-I (Fri-Thu)
-    const dd = e.dailyData ?? [];
+    const dd = pickDailyArray(e);
     for (let i = 0; i < 7; i++) {
-      ws.getCell(r, 3 + i).value = dd[i] ?? 0;
+      ws.getCell(r, 3 + i).value = num(dd[i]);
       safeStyle(ws.getCell(r, 3 + i), numStyle, `eq.daily.${i}`);
     }
 
-    ws.getCell(r, 10).value = e.previous ?? 0;
+    const prevVal = num(e.previous);
+    ws.getCell(r, 10).value = prevVal;
     safeStyle(ws.getCell(r, 10), numStyle, 'eq.prev.data');
 
-    ws.getCell(r, 11).value = e.thisPeriod ?? 0;
+    const thisVal = num(e.thisPeriod);
+    ws.getCell(r, 11).value = thisVal;
     safeStyle(ws.getCell(r, 11), numStyle, 'eq.this.data');
 
-    ws.getCell(r, 12).value = e.accumulate !== undefined && e.accumulate !== ''
-      ? e.accumulate
-      : { formula: `J${r}+K${r}` };
+    if (e.accumulate !== undefined && e.accumulate !== '') {
+      ws.getCell(r, 12).value = num(e.accumulate);
+    } else {
+      setFormulaWithResult(ws.getCell(r, 12), `J${r}+K${r}`, prevVal + thisVal);
+    }
     safeStyle(ws.getCell(r, 12), numStyle, 'eq.acc.data');
 
+    eqDataRowIndices.push(r);
     r++;
   });
 
@@ -2816,21 +2907,44 @@ async function buildResources(workbook: ExcelJS.Workbook, d: WeeklyReportExportD
     for (let c = 2; c <= 12; c++) safeStyle(ws.getCell(r, c), dataStyle, 'eq.empty');
     r++;
   }
-  const lastEqRow = r - 1;
 
+  // Equipment Total — SAME shape as 6.1 Grand Total: blank daily columns,
+  // only sum Previous (J), This Period (K), Accumulate (L).
   ws.getRow(r).height = 22;
   ws.getCell(r, 2).value = 'Total';
   safeStyle(ws.getCell(r, 2), totalStyle, 'eq.total.lbl');
-  // Daily totals
   for (let i = 0; i < 7; i++) {
-    ws.getCell(r, 3 + i).value = { formula: `SUM(${colLetter(3 + i)}${firstEqRow}:${colLetter(3 + i)}${lastEqRow})` };
-    safeStyle(ws.getCell(r, 3 + i), totalNumStyle, `eq.total.d${i}`);
+    ws.getCell(r, 3 + i).value = null;
+    safeStyle(ws.getCell(r, 3 + i), totalEmptyStyle, `eq.total.d${i}`);
   }
-  ws.getCell(r, 10).value = { formula: `SUM(J${firstEqRow}:J${lastEqRow})` };
+
+  if (eqDataRowIndices.length > 0) {
+    const jRefs = eqDataRowIndices.map(idx => `J${idx}`).join(',');
+    const kRefs = eqDataRowIndices.map(idx => `K${idx}`).join(',');
+    const lRefs = eqDataRowIndices.map(idx => `L${idx}`).join(',');
+
+    let prevTotal = 0;
+    let thisTotal = 0;
+    let accTotal = 0;
+    eqDataRowIndices.forEach(idx => {
+      const jv = ws.getCell(idx, 10).value;
+      const kv = ws.getCell(idx, 11).value;
+      const lv = ws.getCell(idx, 12).value;
+      prevTotal += typeof jv === 'number' ? jv : num((jv as any)?.result);
+      thisTotal += typeof kv === 'number' ? kv : num((kv as any)?.result);
+      accTotal += typeof lv === 'number' ? lv : num((lv as any)?.result);
+    });
+
+    setFormulaWithResult(ws.getCell(r, 10), `SUM(${jRefs})`, prevTotal);
+    setFormulaWithResult(ws.getCell(r, 11), `SUM(${kRefs})`, thisTotal);
+    setFormulaWithResult(ws.getCell(r, 12), `SUM(${lRefs})`, accTotal);
+  } else {
+    ws.getCell(r, 10).value = 0;
+    ws.getCell(r, 11).value = 0;
+    ws.getCell(r, 12).value = 0;
+  }
   safeStyle(ws.getCell(r, 10), totalNumStyle, 'eq.total.prev');
-  ws.getCell(r, 11).value = { formula: `SUM(K${firstEqRow}:K${lastEqRow})` };
   safeStyle(ws.getCell(r, 11), totalNumStyle, 'eq.total.this');
-  ws.getCell(r, 12).value = { formula: `SUM(L${firstEqRow}:L${lastEqRow})` };
   safeStyle(ws.getCell(r, 12), totalNumStyle, 'eq.total.acc');
 }
 
