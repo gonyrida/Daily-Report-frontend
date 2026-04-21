@@ -225,10 +225,7 @@ const buildNwdpTable = (items?: WeeklyReportExportData["nwdpItems"]) => {
 
   if (!items || items.length === 0) {
     body.push([
-      { text: "No activities available", colSpan: 4, style: "tableCell" },
-      {},
-      {},
-      {},
+      { text: "No activities available", colSpan: 4, style: "tableCell" }
     ]);
   }
 
@@ -265,10 +262,7 @@ const buildQaqcSection = (section: WeeklyReportExportData["qaqcSections"][number
 
   if (!section.items || section.items.length === 0) {
     body.push([
-      { text: "No QAQC items available", colSpan: 4, style: "tableCell" },
-      {},
-      {},
-      {},
+      { text: "No QAQC items available", colSpan: 4, style: "tableCell" }
     ]);
   }
 

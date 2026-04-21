@@ -348,7 +348,9 @@ function safeStyle(cell: ExcelJS.Cell, style: Partial<ExcelJS.Style>, styleName:
 // Helper function for error tracking
 async function safeBuild(name: string, fn: () => Promise<void>) {
   try {
+    console.log(`🔍 safeBuild - starting ${name}`);
     await fn();
+    console.log(`🔍 safeBuild - completed ${name}`);
   } catch (err) {
     console.error(`❌ Error in ${name}:`, err);
     throw err;
@@ -367,14 +369,12 @@ const padText = (text: string | number | undefined) => {
 
 export async function exportWeeklyReportToExcel(data: WeeklyReportExportData, filename?: string) {
   const workbook = new ExcelJS.Workbook();
-
-  // Create all worksheets with error tracking
+  
+  // Build all sheets
   await safeBuild('ConProgress', () => buildConProgress(workbook, data));
   await safeBuild('Cover', () => buildCover(workbook, data));
-  await safeBuild('Letter', () => buildLetter(workbook, data));
-  await safeBuild('Content', () => buildContent(workbook));
-  await safeBuild('Intro', () => buildIntro(workbook, data));
-  await safeBuild('OP', () => buildOP(workbook, data));
+  await safeBuild('Introduction', () => buildIntro(workbook, data));
+  await safeBuild('OverallProgress', () => buildOP(workbook, data));
   await safeBuild('NWDP', () => buildNWDP(workbook, data));
   await safeBuild('QAQC', () => buildQAQC(workbook, data));
   await safeBuild('HSE', () => buildHSE(workbook, data));
@@ -776,8 +776,6 @@ async function buildConProgress(workbook: ExcelJS.Workbook, d: WeeklyReportExpor
 // SHEET 2: Cover
 async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('Cover');
-  const styles = createStyles(workbook);
-
   ws.properties.tabColor = { argb: 'FF002060' };
 
   // Set column A width for proper spacing
@@ -808,7 +806,6 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
   if (d.clientLogo) {
     try {
       await addImageToWorksheet(workbook, ws, d.clientLogo, 'G3:I5');
-      console.log('✅ Client logo added successfully');
     } catch (error) {
       console.warn('❌ Failed to add client logo:', error);
     }
@@ -876,7 +873,6 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
       font: { bold: true, size: 14, color: { argb: 'FF888888' } },
       alignment: { horizontal: 'center', vertical: 'middle' }
     };
-    console.log('ℹ️ No cover image data provided');
   }
 
   // Project title (merged rows 38-40, columns C-M)
@@ -1370,6 +1366,9 @@ async function buildIntro(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
 
 // SHEET 6: 2.OP (Overall Progress)
 async function buildOP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
+  console.log(' buildOP - called with overallProgressItems:', d.overallProgressItems?.length || 0);
+  console.log(' buildOP - overallProgressItems data:', d.overallProgressItems);
+  
   const ws = workbook.addWorksheet('2.OP');
   const styles = createStyles(workbook);
 
@@ -1462,12 +1461,6 @@ async function buildOP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
       return `${numValue.toFixed(1)}%`;
     };
 
-
-    // Debug: Log first item properties
-    if (d.overallProgressItems && d.overallProgressItems.length > 0) {
-      console.log('DEBUG OP: First item properties =', Object.keys(d.overallProgressItems[0]));
-      console.log('DEBUG OP: First item pctThisWeek =', d.overallProgressItems[0].pctThisWeek);
-    }
 
     const heights = [
       calculateHeight(item.no),

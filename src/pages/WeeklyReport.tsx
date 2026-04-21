@@ -2145,9 +2145,20 @@ const WeeklyReport = () => {
         })
       );
 
-      // Create export data with converted photos - use original excelData and only override constructionIssues
+      // Create export data with converted photos - include coverData and override constructionIssues
+      const dateParts = sharedData.dateRange?.split(' ~ ') || [];
       const exportData = buildWeeklyReportExportData({
-        ...excelData as any, // Use type assertion to bypass strict typing
+        coverData: {
+          weekNumber: sharedData.weekNumber,
+          reportDateFrom: dateParts[0],
+          reportDateTo: dateParts[1],
+          projectTitle: sharedData.projectName,
+          employer: sharedData.employer || 'Client Name',
+          contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+          coverImage: sharedData.coverImage,
+          clientLogo: sharedData.clientLogo,
+          refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+        },
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
           siteLocation: issue.location,
@@ -2197,9 +2208,30 @@ const WeeklyReport = () => {
         })
       );
 
-      // Create export data with converted photos - use original excelData and only override constructionIssues
+      // Create export data with converted photos - include all required data
+      const dateParts = sharedData.dateRange?.split(' ~ ') || [];
       const exportData = buildWeeklyReportExportData({
-        ...excelData as any, // Use type assertion to bypass strict typing
+        coverData: {
+          weekNumber: sharedData.weekNumber,
+          reportDateFrom: dateParts[0],
+          reportDateTo: dateParts[1],
+          projectTitle: sharedData.projectName,
+          employer: sharedData.employer || 'Client Name',
+          contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+          coverImage: sharedData.coverImage,
+          clientLogo: sharedData.clientLogo,
+          refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+        },
+        // Add missing overall progress data
+        overallProgress: formatRowsWithDisplayIndex(overallProgressHook.rows),
+        overallProgressRemark: '', // Using empty string since property doesn't exist on sharedData
+        // Add construction progress data - cast to any to bypass type mismatch
+        constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
+        conProgressProject: sharedData.projectName,
+        conProgressDate: dateParts[0],
+        // Add activities data - cast to any to bypass type mismatch
+        nwdpItems: [...(weeklyActivities || []), ...(nextWeekPlan || [])] as any,
+        // Add construction issues with converted photos
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
           siteLocation: issue.location,
@@ -2207,6 +2239,9 @@ const WeeklyReport = () => {
           actionBy: issue.actionBy,
           photo: issue.photo,
         })),
+        // Add other data if available
+        projectOverview: sharedData.projectOverview,
+        designConstruction: sharedData.designNConstruction,
       });
 
       // Export to Excel using ExcelJS
@@ -2323,14 +2358,105 @@ const WeeklyReport = () => {
     handleScheduleUpload(files);
   };
 
+  // Pre-compute overallProgress data to prevent race condition
+  const formatRowsWithDisplayIndex = (rows: any[] | null) => {
+    if (!rows || rows.length === 0) return [];
+    let titleCount = 0;
+    return rows.map((row, index) => {
+      if (row.rowType === "title") {
+        titleCount++;
+        return {
+          ...row,
+          displayIndex: `${toRoman(titleCount)}.`,
+        };
+      }
+      if (row.rowType === "detail") {
+        let detailCount = 0;
+        for (let i = 0; i <= index; i++) {
+          if (rows[i].rowType === "title") {
+            detailCount = 0;
+          } else if (rows[i].rowType === "detail") {
+            detailCount++;
+          }
+        }
+        return {
+          ...row,
+          displayIndex: `${detailCount}.`,
+        };
+      }
+      if (row.rowType === "subDetail") {
+        // Find parent detail number for this sub-detail
+        let parentDetailNumber = 0;
+        for (let i = index; i >= 0; i--) {
+          if (rows[i].rowType === "detail") {
+            let detailCount = 0;
+            for (let j = 0; j <= i; j++) {
+              if (rows[j].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            parentDetailNumber = detailCount;
+            break;
+          }
+        }
+
+        // Count sub-details under the same parent
+        let subDetailCount = 0;
+        for (let i = 0; i <= index; i++) {
+          if (rows[i].rowType === "detail") {
+            let detailCount = 0;
+            for (let j = 0; j <= i; j++) {
+              if (rows[j].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            if (detailCount === parentDetailNumber) {
+              subDetailCount = 0;
+            }
+          } else if (rows[i].rowType === "subDetail") {
+            let currentParentDetail = 0;
+            for (let k = i; k >= 0; k--) {
+              if (rows[k].rowType === "detail") {
+                let detailCount = 0;
+                for (let j = 0; j <= k; j++) {
+                  if (rows[j].rowType === "detail") {
+                    detailCount++;
+                  }
+                }
+                currentParentDetail = detailCount;
+                break;
+              }
+            }
+            if (currentParentDetail === parentDetailNumber) {
+              subDetailCount++;
+            }
+          }
+        }
+
+        return {
+          ...row,
+          displayIndex: `${parentDetailNumber}.${subDetailCount}`,
+        };
+      }
+      return row;
+    });
+  };
+
+  // Debug: Check what data we have
+  console.log('🔍 Excel export - overallProgressHook.rows:', overallProgressHook.rows?.length || 0);
+  const computedOverallProgress = formatRowsWithDisplayIndex(overallProgressHook.rows);
+  console.log('🔍 Excel export - computedOverallProgress:', computedOverallProgress.length, 'items');
+
   // Build excel export data from all available hook states
+  // Fix date parsing - handle the actual format '20-Mar-26 ~ 26-Mar-26'
+  const dateParts = sharedData.dateRange?.split(' ~ ') || [];
   const excelData = buildWeeklyReportExportData({
     coverData: {
       weekNumber: sharedData.weekNumber,
-      reportDateFrom: sharedData.dateRange?.split(' - ')[0],
-      reportDateTo: sharedData.dateRange?.split(' - ')[1],
+      reportDateFrom: dateParts[0],
+      reportDateTo: dateParts[1],
       projectTitle: sharedData.projectName,
-      employer: sharedData.employer,
+      employer: sharedData.employer || 'Client Name',
       contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
       coverImage: sharedData.coverImage,  // Add cover image
       clientLogo: sharedData.clientLogo,  // Add client logo
@@ -2350,98 +2476,12 @@ const WeeklyReport = () => {
       recipientCompany: sharedData.recipientCompany,
       recipientLocation: sharedData.recipientLocation,
     },
-    constructionProgress: constructionProgressHook.constructionData?.items as any,
+    constructionProgress: constructionProgressHook.constructionData?.items as any[],
     conProgressProject: sharedData.projectName,
     conProgressSubtitle: constructionProgressHook.constructionData?.projectInfo?.subtitle || '',
     conProgressDate: constructionProgressHook.constructionData?.projectInfo?.date || sharedData.dateRange?.split(' - ')[0],
     conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
-    overallProgress: (() => {
-      // Helper function to format rows with displayIndex (same logic as UI)
-      const formatRowsWithDisplayIndex = (rows: any[] | null) => {
-        if (!rows) return [];
-        let titleCount = 0;
-        return rows.map((row, index) => {
-          if (row.rowType === "title") {
-            titleCount++;
-            return {
-              ...row,
-              displayIndex: `${toRoman(titleCount)}.`,
-            };
-          }
-          if (row.rowType === "detail") {
-            let detailCount = 0;
-            for (let i = 0; i <= index; i++) {
-              if (rows[i].rowType === "title") {
-                detailCount = 0;
-              } else if (rows[i].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            return {
-              ...row,
-              displayIndex: `${detailCount}.`,
-            };
-          }
-          if (row.rowType === "subDetail") {
-            // Find parent detail number for this sub-detail
-            let parentDetailNumber = 0;
-            for (let i = index; i >= 0; i--) {
-              if (rows[i].rowType === "detail") {
-                let detailCount = 0;
-                for (let j = 0; j <= i; j++) {
-                  if (rows[j].rowType === "detail") {
-                    detailCount++;
-                  }
-                }
-                parentDetailNumber = detailCount;
-                break;
-              }
-            }
-
-            // Count sub-details under the same parent
-            let subDetailCount = 0;
-            for (let i = 0; i <= index; i++) {
-              if (rows[i].rowType === "detail") {
-                let detailCount = 0;
-                for (let j = 0; j <= i; j++) {
-                  if (rows[j].rowType === "detail") {
-                    detailCount++;
-                  }
-                }
-                if (detailCount === parentDetailNumber) {
-                  subDetailCount = 0;
-                }
-              } else if (rows[i].rowType === "subDetail") {
-                let currentParentDetail = 0;
-                for (let k = i; k >= 0; k--) {
-                  if (rows[k].rowType === "detail") {
-                    let detailCount = 0;
-                    for (let j = 0; j <= k; j++) {
-                      if (rows[j].rowType === "detail") {
-                        detailCount++;
-                      }
-                    }
-                    currentParentDetail = detailCount;
-                    break;
-                  }
-                }
-                if (currentParentDetail === parentDetailNumber) {
-                  subDetailCount++;
-                }
-              }
-            }
-
-            return {
-              ...row,
-              displayIndex: `${parentDetailNumber}.${subDetailCount}`,
-            };
-          }
-          return row;
-        });
-      };
-
-      return formatRowsWithDisplayIndex(overallProgressHook.rows);
-    })(),
+    overallProgress: computedOverallProgress,
     nwdpItems: (() => {
       // Create array to hold all individual rows
       const allItems = [];

@@ -283,11 +283,19 @@ export interface MapperInput {
   designList?: string[];
 }
 
+// Cache for valid construction progress data
+let cachedConProgressItems: any[] = [];
+
 export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
+  // Debug: Add stack trace to identify caller
+  const stack = new Error().stack;
+  const caller = stack?.split('\n')[2]?.trim() || 'unknown';
+  console.log('🔍 Mapper called from:', caller);
+  console.log('🔍 Mapper - overallProgress input:', input.overallProgress?.length || 0, 'items');
+  
   const c = input.coverData ?? {};
 
-  
-  return {
+  const result = {
     // ── Cover ────────────────────────────────────────────────────────────────
     weekNumber:      c.weekNumber,
     reportDateFrom:  c.reportDateFrom,
@@ -321,7 +329,10 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     conProgressSubtitle: input.conProgressSubtitle,
     conProgressDate:     input.conProgressDate ?? c.reportDateFrom,
     conProgressRevision: input.conProgressRevision,
-    conProgressItems: (input.constructionProgress ?? []).map(p => ({
+    conProgressItems: (() => {
+      // Cache valid data when available
+      if (input.constructionProgress && input.constructionProgress.length > 0) {
+        cachedConProgressItems = input.constructionProgress.map(p => ({
       id:               p.id,
       scopeOfWorks:     p.scopeOfWorks ?? p.description,
       detailDescription:p.detailDescription,
@@ -351,28 +362,42 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       upToNextWeekAmount:p.upToNextWeekPlan?.amount ?? p.upToNextWeekAmount,
       upToNextWeekPct:  p.upToNextWeekPlan?.percentage ?? p.upToNextWeekPct,
       isBold:           p.isBold,
-    })),
+    }));
+    return cachedConProgressItems;
+      }
+      
+      // Use cached data if current data is empty
+      if (cachedConProgressItems.length > 0) {
+        return cachedConProgressItems;
+      }
+      
+      return [];
+    })(),
 
     // ── Overall Progress ─────────────────────────────────────────────────────
     overallProgressRemark: input.overallProgressRemark,
-    overallProgressItems: (input.overallProgress ?? [])
-      .filter(row => {
-        if (!row.sourceId) return true;
-        const trimmed = row.sourceId.trim();
-        const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
-        const isRomanNumeralIorV = /^(I|V)$/i.test(trimmed);
-        return !(isSingleAlpha && !isRomanNumeralIorV);
-      })
-      .map((p, i) => ({
-        no:               p.no ?? p.displayIndex ?? String(i + 1),
-        scopeOfWorks:     p.scopeOfWorks ?? p.description,
-        pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
-        pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
-        pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
-        pctRemaining:     p.pctRemaining     ?? p.remaining,
-        pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
-        pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
-      })),
+    overallProgressItems: (() => {
+      console.log('🔍 Mapper - processing overallProgress:', input.overallProgress?.length || 0, 'items');
+      const filtered = (input.overallProgress ?? [])
+        .filter(row => {
+          // Remove the overly aggressive filter - keep all rows for now
+          // If you need to filter, do it based on actual business logic
+          console.log(`🔍 Mapper - keeping row ${row.sourceId}`);
+          return true;
+        })
+        .map((p, i) => ({
+          no:               p.no ?? p.displayIndex ?? String(i + 1),
+          scopeOfWorks:     p.scopeOfWorks ?? p.description,
+          pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
+          pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
+          pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
+          pctRemaining:     p.pctRemaining     ?? p.remaining,
+          pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
+          pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
+        }));
+      console.log('🔍 Mapper - final overallProgressItems:', filtered.length, 'items');
+      return filtered;
+    })(),
 
     // ── NWDP ─────────────────────────────────────────────────────────────────
     nwdpItems: (input.nwdpItems ?? []).map(item => ({
@@ -466,4 +491,6 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     designConstruction: input.designConstruction,
     designList: input.designList,
   };
+
+  return result;
 }
