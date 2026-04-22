@@ -1812,77 +1812,121 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     if (!id) return 0;
 
     const trimmed = id.trim();
+    
+    // Debug: Log the ID being processed
+    console.log(`Processing ID: "${trimmed}"`);
 
-    // Roman numerals (I, II, III, etc.) - level 0
-    if (/^[IVX]+$/.test(trimmed)) return 0;
+    // Roman numerals (I, II, III, IV, V, etc.) - level 0
+    if (/^[IVX]+$/.test(trimmed)) {
+      console.log(`Matched Roman numeral: ${trimmed}`);
+      return 0;
+    }
 
-    // Arabic numbers with dots (1., 2., etc.) - level 1
-    if (/^\d+\.$/.test(trimmed)) return 2;
+    // Arabic numbers with dots (1., 2., 3., etc.) - level 1
+    if (/^\d+\.$/.test(trimmed)) {
+      console.log(`Matched Arabic number with dot: ${trimmed}`);
+      return 1;
+    }
 
-    // Decimal numbers (1.1, 1.2, etc.) - level 1
-    if (/^\d+\.\d+$/.test(trimmed)) return 1;
+    // Decimal numbers (1.1, 1.2, 2.1, etc.) - level 2
+    if (/^\d+\.\d+$/.test(trimmed)) {
+      console.log(`Matched decimal number: ${trimmed}`);
+      return 2;
+    }
 
-    // Triple decimal (1.1.1, etc.) - level 1
-    if (/^\d+\.\d+\.\d+$/.test(trimmed)) return 1;
+    // Triple decimal (1.1.1, 1.2.1, etc.) - level 3
+    if (/^\d+\.\d+\.\d+$/.test(trimmed)) {
+      console.log(`Matched triple decimal: ${trimmed}`);
+      return 3;
+    }
 
-    // Letters (a, b, c) - level 2
-    if (/^[a-zA-Z]\.$/.test(trimmed)) return 2;
+    // Dash only (-, --, ---) - level 4 (treated as deepest level)
+    if (/^-+$/.test(trimmed)) {
+      console.log(`Matched dash: ${trimmed}`);
+      return 4;
+    }
 
-    // Dash only (-) - level 3 (treated as deepest level)
-    if (/^-+$/.test(trimmed)) return 3;
+    // Handle other common patterns that might not match above
+    // Numbers without dots (1, 2, 3) - treat as level 1
+    if (/^\d+$/.test(trimmed)) {
+      console.log(`Matched plain number: ${trimmed}, treating as level 1`);
+      return 1;
+    }
 
-    return 0;
+    // Letters (A, B, C) - treat as level 1
+    if (/^[A-Za-z]+$/.test(trimmed)) {
+      console.log(`Matched letters: ${trimmed}, treating as level 1`);
+      return 1;
+    }
+
+    // Anything else - log and return level 1 as default
+    console.log(`Unmatched ID pattern: "${trimmed}", treating as level 1`);
+    return 1;
   };
 
-  // Helper function to add indentation spaces
+  // Helper function to add indentation with custom spacing
   const addIndentation = (text: string, level: number): string => {
     let spaces = 0;
 
-    // Custom spacing based on level
     switch (level) {
-      case 0: // Roman numerals - no spaces
-        spaces = 0;
+      case 0: // Roman numerals - 2 spaces
+        spaces = 2;
         break;
-      case 1: // Decimal numbers (1.1) - 8 spaces
-        spaces = 8;
-        break;
-      case 2: // Arabic numbers (1., 2.) - 4 spaces  
+      case 1: // Arabic numbers (1., 2.) - 4 spaces
         spaces = 4;
         break;
-      case 3: // Dashes (-) - 16 spaces
-        spaces = 16;
+      case 2: // Decimal numbers (1.1) - 4 spaces
+        spaces = 4;
+        break;
+      case 3: // Triple decimal (1.1.1) - 4 spaces
+        spaces = 4;
+        break;
+      case 4: // Dashes (-) - 8 spaces
+        spaces = 8;
         break;
       default:
-        spaces = level * 4;
+        spaces = 0;
     }
 
     return ' '.repeat(spaces) + text;
   };
 
-  // Helper function to handle dash indentation specially
-  const formatWithDashIndentation = (text: string, level: number): string => {
-    // If the text is just a dash (no dots allowed), add proper indentation
-    if (/^-+$/.test(text.trim()) && !text.includes('.')) {
-      const spaces = level * 4;
-      return ' '.repeat(spaces) + text.trim();
-    }
-    // Otherwise use regular indentation
-    return addIndentation(text, level);
-  };
-
   // Add data rows
   if (d.nwdpItems && d.nwdpItems.length > 0) {
+    // Debug: Log the full nwdpItems structure to diagnose data misalignment
+    console.log('Full nwdpItems:', JSON.stringify(d.nwdpItems, null, 2));
+    
     d.nwdpItems.forEach((item, index) => {
       // ID + Scope of work (combined in column B) with indentation
       const itemId = item.id || '';
       const scopeText = item.workDoneLabel || '';
-      const workDoneIndentLevel = getIndentationLevel(itemId);
       const workDoneText = itemId && scopeText ? `${itemId}. ${scopeText}` : (itemId || scopeText);
-      const indentedWorkDone = formatWithDashIndentation(workDoneText, workDoneIndentLevel);
+      const workDoneIndentLevel = getIndentationLevel(itemId);
+      const isRomanLevel = workDoneIndentLevel === 0;
+      const formattedWorkDone = addIndentation(workDoneText, workDoneIndentLevel);
 
-      ws.getCell(r, 2).value = indentedWorkDone;
+      // Debug logging to help identify issues
+      console.log(`Item ${index}: ID="${itemId}", Level=${workDoneIndentLevel}, WorkDone="${workDoneText}"`);
+      console.log(`Item ${index}: Row=${r}, FormattedWorkDone="${formattedWorkDone}"`);
+
+      ws.getCell(r, 2).value = formattedWorkDone;
+      console.log(`Item ${index}: Set cell(${r},2) value to: "${formattedWorkDone}"`);
+      
+      // Verify the cell value was actually set
+      const verifyValue = ws.getCell(r, 2).value;
+      console.log(`Item ${index}: Verified cell(${r},2) value: "${verifyValue}"`);
+      
+      // Set explicit row height to ensure visibility
+      ws.getRow(r).height = 20;
+      
+      // Additional debugging for dash items
+      if (itemId === '-') {
+        console.log(`Item ${index}: Dash item - Row=${r}, Check if row is hidden: ${ws.getRow(r).hidden || false}`);
+        console.log(`Item ${index}: Dash item - Cell style: ${JSON.stringify(ws.getCell(r, 2).style)}`);
+      }
+      
       ws.getCell(r, 2).style = {
-        font: { bold: workDoneIndentLevel <= 0 ? true : false, size: 10, name: 'Arial' },
+        font: { bold: isRomanLevel, size: 10, name: 'Arial' },
         alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
         border: {
           top: { style: 'hair' },
@@ -1904,16 +1948,30 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
         }
       };
 
-      // Next week plan description (with ID) and indentation
-      const nextWeekId = item.id || '';
+      // Next week plan description (with same indentation as work done)
       const nextWeekText = item.nextWeekLabel || '';
-      const nextWeekIndentLevel = getIndentationLevel(nextWeekId);
-      const nextWeekCombined = nextWeekId && nextWeekText ? `${nextWeekId}. ${nextWeekText}` : (nextWeekId || nextWeekText);
-      const indentedNextWeek = formatWithDashIndentation(nextWeekCombined, nextWeekIndentLevel);
+      const nextWeekWithId = itemId && nextWeekText 
+        ? `${itemId}. ${nextWeekText}` 
+        : (nextWeekText || (itemId ? `${itemId}.` : ''));
+      const displayText = nextWeekWithId || '(No next week plan)';
+      const formattedNextWeek = addIndentation(displayText, workDoneIndentLevel);
 
-      ws.getCell(r, 4).value = indentedNextWeek;
+      // Debug logging specifically for Next Week Plan column
+      console.log(`Item ${index}: NextWeekPlan - Text="${nextWeekText}", Formatted="${formattedNextWeek}"`);
+
+      ws.getCell(r, 4).value = formattedNextWeek;
+      
+      // Verify the Next Week Plan cell value was actually set
+      const verifyNextWeekValue = ws.getCell(r, 4).value;
+      console.log(`Item ${index}: Verified NextWeekPlan cell(${r},4) value: "${verifyNextWeekValue}"`);
+      
+      // Additional debugging for dash items in Next Week Plan
+      if (itemId === '-') {
+        console.log(`Item ${index}: Dash NextWeekPlan - Row=${r}, Cell(${r},4) value: "${verifyNextWeekValue}"`);
+        console.log(`Item ${index}: Dash NextWeekPlan - Cell(${r},4) style: ${JSON.stringify(ws.getCell(r, 4).style)}`);
+      }
       ws.getCell(r, 4).style = {
-        font: { bold: nextWeekIndentLevel <= 0 ? true : false, size: 10, name: 'Arial' },
+        font: { bold: isRomanLevel, size: 10, name: 'Arial' },
         alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
         border: {
           top: { style: 'hair' },

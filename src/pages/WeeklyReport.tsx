@@ -2269,8 +2269,59 @@ const WeeklyReport = () => {
         constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
         conProgressProject: sharedData.projectName,
         conProgressDate: dateParts[0],
-        // Add activities data - cast to any to bypass type mismatch
-        nwdpItems: [...(weeklyActivities || []), ...(nextWeekPlan || [])] as any,
+        // Add activities data - properly transform to match expected structure
+        nwdpItems: (() => {
+          // Create array to hold all individual rows
+          const allItems = [];
+
+          // First, add all weekly activities as individual items
+          (weeklyActivities || []).forEach(a => {
+            allItems.push({
+              sourceId: a.sourceId || '',
+              workDoneLabel: a.description,
+              workDonePct: a.percent,
+              nextWeekLabel: undefined,
+              nextWeekPct: undefined
+            });
+          });
+
+          // Then, try to match next week plan items with existing weekly activities
+          // or add them as new items if no match found
+          (nextWeekPlan || []).forEach(a => {
+            const id = a.sourceId || '';
+
+            // Try to find matching weekly activity by sourceId
+            let matched = false;
+            if (id) {
+              // Only try to match if there's a non-empty ID
+              for (let i = 0; i < allItems.length; i++) {
+                if (allItems[i].sourceId === id && allItems[i].nextWeekLabel === undefined) {
+                  // Found match, add next week data to this item
+                  allItems[i].nextWeekLabel = a.description;
+                  allItems[i].nextWeekPct = a.percent;
+                  matched = true;
+                  break;
+                }
+              }
+            }
+
+            // If no match found (or ID is empty), add as separate item
+            if (!matched) {
+              allItems.push({
+                sourceId: id,
+                workDoneLabel: undefined,
+                workDonePct: undefined,
+                nextWeekLabel: a.description,
+                nextWeekPct: a.percent
+              });
+            }
+          });
+
+          // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
+          return allItems.filter(item =>
+            item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
+          );
+        })(),
         // Add construction issues with converted photos
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
@@ -2781,7 +2832,7 @@ const WeeklyReport = () => {
             <ReportHeader
               projectLogo={sharedData.clientLogo}
               setProjectLogo={(logo) => setSharedData(prev => ({ ...prev, clientLogo: logo }))}
-              title={`WEEKLY REPORT - ${selectedProject || 'No Project Selected'}`}
+              title={false}
             />
 
             {/* Navigation Bar */}
@@ -2789,7 +2840,7 @@ const WeeklyReport = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <SidebarTrigger />
-                  <Button
+                  {/* <Button
                     variant="ghost"
                     onClick={() => {
                       // Navigate back to dashboard
@@ -2813,7 +2864,7 @@ const WeeklyReport = () => {
                       <path d="M19 12H5"></path>
                     </svg>
                     Back to Dashboard
-                  </Button>
+                  </Button> */}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
