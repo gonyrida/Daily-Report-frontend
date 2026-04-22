@@ -290,8 +290,6 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
   // Debug: Add stack trace to identify caller
   const stack = new Error().stack;
   const caller = stack?.split('\n')[2]?.trim() || 'unknown';
-  console.log('🔍 Mapper called from:', caller);
-  console.log('🔍 Mapper - overallProgress input:', input.overallProgress?.length || 0, 'items');
   
   const c = input.coverData ?? {};
 
@@ -377,12 +375,10 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     // ── Overall Progress ─────────────────────────────────────────────────────
     overallProgressRemark: input.overallProgressRemark,
     overallProgressItems: (() => {
-      console.log('🔍 Mapper - processing overallProgress:', input.overallProgress?.length || 0, 'items');
       const filtered = (input.overallProgress ?? [])
         .filter(row => {
           // Remove the overly aggressive filter - keep all rows for now
           // If you need to filter, do it based on actual business logic
-          console.log(`🔍 Mapper - keeping row ${row.sourceId}`);
           return true;
         })
         .map((p, i) => ({
@@ -395,7 +391,6 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
           pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
           pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
         }));
-      console.log('🔍 Mapper - final overallProgressItems:', filtered.length, 'items');
       return filtered;
     })(),
 

@@ -2188,23 +2188,48 @@ const WeeklyReport = () => {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
+      
       // Generate filename with project name and week number
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.xlsx`;
 
-      // Convert File objects to base64 for construction issues
+      // Validate required data before processing
+      if (!sharedData.weekNumber) {
+        console.warn('Week number is missing, using default');
+      }
+      if (!sharedData.projectName) {
+        console.warn('Project name is missing, using default');
+      }
+
+      // Convert File objects to base64 for construction issues with error handling
       const issuesWithBase64Photos = await Promise.all(
-        issuesHook.issuesData.map(async (issue) => {
-          let photo: string | undefined;
-          if (issue.photo instanceof File) {
-            photo = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.readAsDataURL(issue.photo as File); // Explicit type assertion
-            });
-          } else if (typeof issue.photo === 'string') {
-            photo = issue.photo;
+        issuesHook.issuesData.map(async (issue, index) => {
+          try {
+            let photo: string | undefined;
+            if (issue.photo instanceof File) {
+              console.log(`Converting photo ${index + 1} to base64...`);
+              photo = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const result = reader.result as string;
+                  if (result && result.startsWith('data:')) {
+                    resolve(result);
+                  } else {
+                    reject(new Error('Failed to convert file to base64'));
+                  }
+                };
+                reader.onerror = () => reject(new Error('FileReader error'));
+                reader.readAsDataURL(issue.photo as File);
+              });
+              console.log(`Photo ${index + 1} converted successfully`);
+            } else if (typeof issue.photo === 'string') {
+              photo = issue.photo;
+              console.log(`Photo ${index + 1} is already a string`);
+            }
+            return { ...issue, photo };
+          } catch (photoError) {
+            console.error(`Failed to convert photo ${index + 1}:`, photoError);
+            return { ...issue, photo: undefined }; // Continue without photo
           }
-          return { ...issue, photo };
         })
       );
 
@@ -2220,7 +2245,22 @@ const WeeklyReport = () => {
           contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
           coverImage: sharedData.coverImage,
           clientLogo: sharedData.clientLogo,
-          refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+          signatureImage: sharedData.signatureImage || '/cacpm_logo.png', // Add signature image with fallback
+          refNo: `${sharedData.refNoPrefix || 'WR'}-${sharedData.weekNumber}`,
+          letterDate: new Date().toISOString().split('T')[0], // Current date
+          projectManager: sharedData.signatoryName || 'Project Manager',
+          companyLocation: sharedData.companyLocation || 'Phnom Penh, Cambodia',
+          companyPhone1: sharedData.companyPhone1 || '+855 23 123 456',
+          companyPhone2: sharedData.companyPhone2 || '+855 23 789 012',
+          companyEmail1: sharedData.companyEmail1 || 'info@cacpm.com',
+          companyEmail2: sharedData.companyEmail2,
+          recipientCompany: sharedData.recipientCompany || sharedData.employer || 'Client Organization',
+          recipientLocation: sharedData.recipientLocation || 'Phnom Penh, Cambodia',
+          // Add missing fields for Att. and CC using actual user input
+          recipientName: sharedData.recipientName || 'Project Manager',
+          attName: sharedData.recipientName || 'Project Manager',
+          toName: sharedData.recipientName || 'Project Manager',
+          ccLines: sharedData.ccList || [],
         },
         // Add missing overall progress data
         overallProgress: formatRowsWithDisplayIndex(overallProgressHook.rows),
@@ -2234,15 +2274,37 @@ const WeeklyReport = () => {
         // Add construction issues with converted photos
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
-          siteLocation: issue.location,
-          problemDescription: issue.problem,
-          actionBy: issue.actionBy,
+          siteLocation: issue.location || `Site Location ${i + 1}`,
+          problemDescription: issue.problem || 'No description provided',
+          actionBy: issue.actionBy || 'To be determined',
           photo: issue.photo,
         })),
         // Add other data if available
-        projectOverview: sharedData.projectOverview,
-        designConstruction: sharedData.designNConstruction,
+        projectOverview: sharedData.projectOverview || 'Project overview will be added here.',
+        designConstruction: sharedData.designNConstruction || 'Design and construction details will be added here.',
+        // Add resources data if available
+        weekDates: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
+        manpowerRows: [],
+        materialRows: [],
+        equipmentRows: [],
+        // Add site photos if available
+        sitePhotoCaptions: [],
+        // Add HSE data if available
+        hseTraining: [],
+        hseInspection: [],
+        hsePermits: [],
+        hseFirstAid: '',
+        hseOtherConcerns: '',
+        hsePhotos: [],
+        // Add QAQC data if available
+        qaqcSections: [],
       });
+
+     
+      // Validate export data
+      if (!exportData.weekNumber) {
+        console.warn('Week number is still missing in export data');
+      }
 
       // Export to Excel using ExcelJS
       await exportWeeklyReportToExcel(exportData, filename);
@@ -2252,11 +2314,40 @@ const WeeklyReport = () => {
         description: `Weekly report exported as ${filename} successfully.`,
       });
     } catch (error) {
-      console.error('Excel export error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Could not export Excel. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('saveAs') || error.message.includes('File save failed')) {
+          errorMessage = "File save failed. Please check your browser's download settings and allow file downloads.";
+        } else if (error.message.includes('buffer') || error.message.includes('empty')) {
+          errorMessage = "Failed to generate Excel file content. Please check your data and try again.";
+        } else if (error.message.includes('sheet')) {
+          errorMessage = "Failed to build Excel sheets. Some data might be invalid. Please check your report data.";
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = "Network error occurred while loading images. Please check your internet connection and try again.";
+        } else {
+          errorMessage = `Excel export failed: ${error.message}`;
+        }
+      }
+      
       toast({
         title: "Export Failed",
-        description: "Could not export Excel. Please try again.",
+        description: errorMessage,
         variant: "destructive",
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              console.log('Retrying Excel export...');
+              handleExportExcel();
+            }}
+          >
+            Retry
+          </Button>
+        ),
       });
     } finally {
       setIsExporting(false);
@@ -2443,9 +2534,7 @@ const WeeklyReport = () => {
   };
 
   // Debug: Check what data we have
-  console.log('🔍 Excel export - overallProgressHook.rows:', overallProgressHook.rows?.length || 0);
   const computedOverallProgress = formatRowsWithDisplayIndex(overallProgressHook.rows);
-  console.log('🔍 Excel export - computedOverallProgress:', computedOverallProgress.length, 'items');
 
   // Build excel export data from all available hook states
   // Fix date parsing - handle the actual format '20-Mar-26 ~ 26-Mar-26'

@@ -237,12 +237,10 @@ export interface HSEPhotoEntry {
   images?: string[];            // Array of image URLs or base64 data
   footers?: string[];           // Footer text for each image (caption)
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Helper function to load image from public folder and add to worksheet
+// Enhanced helper function to load image from public folder and add to worksheet
 // Range can be a string (e.g., 'C3:E5') or an object with tl/br/ext properties
 async function addImageToWorksheet(
   workbook: ExcelJS.Workbook,
@@ -250,66 +248,177 @@ async function addImageToWorksheet(
   imagePath: string,
   range: string | { tl: { col: number; row: number }; br: { col: number; row: number }; ext?: { width: number; height: number }; editAs?: string }
 ) {
+  // Input validation
+  if (!imagePath || typeof imagePath !== 'string') {
+    throw new Error('Invalid image path: must be a non-empty string');
+  }
+
+  if (!workbook || !worksheet) {
+    throw new Error('Invalid workbook or worksheet provided');
+  }
+
+  const cleanImagePath = imagePath.trim();
+
   try {
     let imageBuffer: ArrayBuffer;
     let extension: string = 'png';
 
     // Check if it's a base64 data URL
-    if (imagePath.startsWith('data:')) {
-      // Extract the base64 part and extension from data URL
-      const matches = imagePath.match(/^data:(image\/[\w+]+);base64,(.+)$/);
-      if (!matches) {
-        console.warn(`⚠️ Invalid data URL format for image`);
-        return;
+    if (cleanImagePath.startsWith('data:')) {
+      
+      // Enhanced base64 validation
+      const matches = cleanImagePath.match(/^data:(image\/[\w+]+);base64,(.+)$/);
+      if (!matches || !matches[2]) {
+        throw new Error('Invalid base64 data URL format');
       }
 
       const mimeType = matches[1];
       const base64Data = matches[2];
 
-      // Determine extension from MIME type
+      // Validate base64 data
+      if (base64Data.length === 0) {
+        throw new Error('Empty base64 image data');
+      }
+
+      // Check for reasonable base64 size (max 10MB)
+      const estimatedSize = base64Data.length * 0.75; // Base64 to bytes approximation
+      if (estimatedSize > 10 * 1024 * 1024) {
+        throw new Error('Image size too large (max 10MB)');
+      }
+
+      // Determine extension from MIME type with validation
+      const validMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/svg+xml'];
+      if (!validMimeTypes.includes(mimeType)) {
+        throw new Error(`Unsupported image format: ${mimeType}`);
+      }
+
       if (mimeType === 'image/svg+xml') {
         extension = 'svg';
       } else {
         extension = mimeType.split('/')[1] || 'png';
       }
 
-      // Convert base64 to ArrayBuffer
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      try {
+        // Convert base64 to ArrayBuffer with error handling
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        imageBuffer = bytes.buffer;
+        
+        if (imageBuffer.byteLength === 0) {
+          throw new Error('Converted image buffer is empty');
+        }
+      } catch (base64Error) {
+        throw new Error(`Failed to decode base64 image: ${base64Error instanceof Error ? base64Error.message : 'Unknown error'}`);
       }
-      imageBuffer = bytes.buffer;
 
     } else {
-      // Fetch image from URL or public folder
-      const response = await fetch(imagePath);
-      if (!response.ok) {
-        console.warn(`⚠️ Failed to fetch image ${imagePath}: ${response.statusText}`);
-        return;
+      
+      // Validate URL format - handle both absolute and relative paths
+      try {
+        // Check if it's a relative path (starts with / or ./)
+        if (cleanImagePath.startsWith('/') || cleanImagePath.startsWith('./') || cleanImagePath.startsWith('../')) {
+          // For relative paths, we'll fetch them directly
+        } else {
+          // For absolute URLs, validate the format
+          new URL(cleanImagePath);
+        }
+      } catch {
+        throw new Error('Invalid image URL format');
       }
 
-      imageBuffer = await response.arrayBuffer();
+      // Fetch image with timeout and error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      // Determine extension from URL if possible
-      const urlParts = imagePath.split('.');
+      try {
+        const response = await fetch(cleanImagePath, { 
+          signal: controller.signal,
+          headers: {
+            'Accept': 'image/*'
+          }
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // Validate content type
+        const contentType = response.headers.get('content-type');
+        if (contentType && !contentType.startsWith('image/')) {
+          console.warn(`\u26a0\ufe0f Unexpected content type: ${contentType}`);
+        }
+
+        imageBuffer = await response.arrayBuffer();
+
+        if (imageBuffer.byteLength === 0) {
+          throw new Error('Downloaded image is empty');
+        }
+
+        // Check image size
+        if (imageBuffer.byteLength > 10 * 1024 * 1024) {
+          throw new Error('Downloaded image too large (max 10MB)');
+        }
+
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Image download timeout (30s)');
+        }
+        throw fetchError;
+      }
+
+      // Determine extension from URL with validation
+      const urlParts = cleanImagePath.split('.');
       if (urlParts.length > 1) {
-        extension = urlParts[urlParts.length - 1].split('?')[0].toLowerCase();
+        const extWithQuery = urlParts[urlParts.length - 1].split('?')[0].toLowerCase();
+        const validExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
+        if (validExtensions.includes(extWithQuery)) {
+          extension = extWithQuery;
+        } else {
+          console.warn(`\u26a0\ufe0f Unknown extension: ${extWithQuery}, defaulting to png`);
+          extension = 'png';
+        }
+      } else {
+        console.warn('\u26a0\ufe0f No file extension found, defaulting to png');
+        extension = 'png';
       }
-
     }
 
-    // Add image to workbook
+    // Validate image buffer before adding to workbook
+    if (!imageBuffer || imageBuffer.byteLength === 0) {
+      throw new Error('Invalid image buffer: empty or null');
+    }
+
+    // Add image to workbook with proper extension casting
+    const validExtensions = ['png', 'jpeg', 'jpg', 'gif', 'svg'] as const;
+    if (!validExtensions.includes(extension as any)) {
+      throw new Error(`Unsupported image extension: ${extension}`);
+    }
+
     const imageId = workbook.addImage({
       buffer: imageBuffer,
       extension: extension as 'png' | 'jpeg' | 'gif',
     });
 
-    // Add image to worksheet at specified range
+    // Validate range and add image to worksheet
+    if (!range) {
+      throw new Error('Invalid range: range is required');
+    }
+
     worksheet.addImage(imageId, range as any);
 
   } catch (error) {
-    console.warn(`⚠️ Failed to add image from ${imagePath}:`, error);
+    // Enhanced error logging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error(`\u274c Failed to add image from ${cleanImagePath.substring(0, 50)}...: ${errorMessage}`);
+    
+    // Re-throw with more context
+    throw new Error(`Image processing failed: ${errorMessage}`);
   }
 }
 
@@ -348,9 +457,7 @@ function safeStyle(cell: ExcelJS.Cell, style: Partial<ExcelJS.Style>, styleName:
 // Helper function for error tracking
 async function safeBuild(name: string, fn: () => Promise<void>) {
   try {
-    console.log(`🔍 safeBuild - starting ${name}`);
     await fn();
-    console.log(`🔍 safeBuild - completed ${name}`);
   } catch (err) {
     console.error(`❌ Error in ${name}:`, err);
     throw err;
@@ -368,32 +475,82 @@ const padText = (text: string | number | undefined) => {
 };
 
 export async function exportWeeklyReportToExcel(data: WeeklyReportExportData, filename?: string) {
-  const workbook = new ExcelJS.Workbook();
-  
-  // Build all sheets
-  await safeBuild('ConProgress', () => buildConProgress(workbook, data));
-  await safeBuild('Cover', () => buildCover(workbook, data));
-  await safeBuild('Introduction', () => buildIntro(workbook, data));
-  await safeBuild('OverallProgress', () => buildOP(workbook, data));
-  await safeBuild('NWDP', () => buildNWDP(workbook, data));
-  await safeBuild('QAQC', () => buildQAQC(workbook, data));
-  await safeBuild('HSE', () => buildHSE(workbook, data));
-  await safeBuild('Resources', () => buildResources(workbook, data));
-  await safeBuild('SitePhotos', () => buildSitePhotos(workbook, data));
-  await safeBuild('ConstructionIssues', () => buildConstructionIssues(workbook, data));
+ 
+  try {
+    // Validate input data
+    if (!data) {
+      throw new Error('No export data provided');
+    }
 
-  // Generate filename if not provided
-  const finalFilename = filename || `WeeklyReport_${data.projectTitle || 'Project'}_W${data.weekNumber || 'XX'}.xlsx`;
+    const workbook = new ExcelJS.Workbook();
+    
+    // Build all sheets with detailed error tracking
+    const sheetBuilders = [
+      { name: 'ConProgress', fn: () => buildConProgress(workbook, data) },
+      { name: 'Cover', fn: () => buildCover(workbook, data) },
+      { name: 'Content', fn: () => buildContent(workbook) },
+      { name: 'Letter', fn: () => buildLetter(workbook, data) },
+      { name: 'Introduction', fn: () => buildIntro(workbook, data) },
+      { name: 'OverallProgress', fn: () => buildOP(workbook, data) },
+      { name: 'NWDP', fn: () => buildNWDP(workbook, data) },
+      { name: 'QAQC', fn: () => buildQAQC(workbook, data) },
+      { name: 'HSE', fn: () => buildHSE(workbook, data) },
+      { name: 'Resources', fn: () => buildResources(workbook, data) },
+      { name: 'SitePhotos', fn: () => buildSitePhotos(workbook, data) },
+      { name: 'ConstructionIssues', fn: () => buildConstructionIssues(workbook, data) }
+    ];
 
-  // Write to buffer and save
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  saveAs(blob, finalFilename);
+    for (const sheet of sheetBuilders) {
+      try {
+        await safeBuild(sheet.name, sheet.fn);
+      } catch (sheetError) {
+        // Continue with other sheets instead of failing completely
+        throw new Error(`Failed to build ${sheet.name} sheet: ${sheetError instanceof Error ? sheetError.message : 'Unknown error'}`);
+      }
+    }
+
+
+    // Generate filename if not provided
+    const finalFilename = filename || `WeeklyReport_${data.projectTitle || 'Project'}_W${data.weekNumber || 'XX'}.xlsx`;
+
+    // Write to buffer with error handling
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    if (buffer.byteLength === 0) {
+      throw new Error('Generated Excel file is empty');
+    }
+
+    // Create blob and save
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    // Check if saveAs is available
+    if (typeof saveAs !== 'function') {
+      throw new Error('saveAs function is not available. Make sure file-saver is properly imported.');
+    }
+
+    saveAs(blob, finalFilename);
+
+  } catch (error) {
+    console.error('Error details:', error);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Excel export failed';
+    
+    if (error instanceof Error) {
+      if (error.message.includes('saveAs')) {
+        errorMessage = 'File save failed. Please check your browser settings and try again.';
+      } else if (error.message.includes('buffer') || error.message.includes('empty')) {
+        errorMessage = 'Failed to generate Excel file content. Please check your data and try again.';
+      } else if (error.message.includes('sheet')) {
+        errorMessage = 'Failed to build Excel sheets. Please check your data and try again.';
+      } else {
+        errorMessage = `Excel export failed: ${error.message}`;
+      }
+    }
+    
+    throw new Error(errorMessage);
+  }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// WORKSHEET BUILDERS
-// ═══════════════════════════════════════════════════════════════════════════════
 
 // Helper function to create styles
 function createStyles(workbook: ExcelJS.Workbook): { [key: string]: Partial<ExcelJS.Style> } {
@@ -1015,10 +1172,43 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   // Row 4: height = 20
   ws.getRow(4).height = 20;
 
+  // Helper function to format date properly
+  const formatDate = (dateValue: any): string => {
+    if (!dateValue) return new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) {
+        console.warn('⚠️ Invalid date value provided:', dateValue);
+        return new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      }
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      console.warn('⚠️ Error formatting date:', error);
+      return new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    }
+  };
+
   // Ref No and Date - no bg color, all values bold
   const letterInfo = [
-    ['Ref. No.', d.refNo ?? ''],
-    ['Date', d.letterDate ?? '']
+    ['Ref. No.', d.refNo || `WR-${d.weekNumber || 'N/A'}/${new Date().getFullYear()}`],
+    ['Date', formatDate(d.letterDate)]
   ];
 
   let r = 4;
@@ -1050,19 +1240,21 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
     alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true }
   };
 
-  // Create rich text with different styles
+  // Create rich text with different styles - use \n for Excel compatibility
   const richTextParts = [];
 
-  if (d.recipientCompany) {
-    richTextParts.push({
-      text: d.recipientCompany,
-      font: { bold: true, size: 12, name: 'Arial' }
-    });
-  }
+  // Ensure we have valid recipient data
+  const company = d.recipientCompany?.trim() || 'Company Name';
+  const location = d.recipientLocation?.trim() || '';
 
-  if (d.recipientLocation) {
+  richTextParts.push({
+    text: company,
+    font: { bold: true, size: 12, name: 'Arial' }
+  });
+
+  if (location) {
     richTextParts.push({
-      text: '\r\n' + d.recipientLocation,
+      text: '\n' + location,
       font: { bold: false, size: 12, name: 'Arial' }
     });
   }
@@ -1079,7 +1271,11 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
   ws.getCell(r, 2).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
   ws.getCell(r, 3).value = ':';
   ws.getCell(r, 3).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
-  ws.getCell(r, 4).value = d.recipientName ?? d.consultant ?? 'Attention';
+  // Improved Att. field with better fallback handling
+  const attentionTo = d.recipientName?.trim() || 
+                      d.consultant?.trim() || 
+                      'Project Manager';
+  ws.getCell(r, 4).value = attentionTo;
   ws.getCell(r, 4).style = { font: { bold: true, size: 12, name: 'Arial' }, alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true } };
   ws.mergeCells(r, 4, r, 10);
   r++;
@@ -1123,46 +1319,66 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
     alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
   };
   ws.mergeCells(r, 2, r, 10);
-  ws.getRow(r).height = estimateRowHeight(bodyText, mergedWidthChars, 12); // ✅ Manual height
+  ws.getRow(r).height = estimateRowHeight(bodyText, mergedWidthChars, 12); // Manual height
   r += 2;
 
-  // Row 16: height = 80, merge B-D for signature image
-  ws.getRow(16).height = 60;
-  ws.mergeCells(16, 2, 16, 4); // Merge B16:D16
+  // Enhanced signature image handling with better error management
+  const signatureRow = 16;
+  const signatureRange = 'B16:D16';
+  
+  // Set row height with dynamic sizing
+  ws.getRow(signatureRow).height = 80; // Increased height for better signature display
+  ws.mergeCells(signatureRow, 2, signatureRow, 4); // Merge B16:D16 for signature image
 
-  // E-Sign signature image in row 16
+  // Validate and process signature image
+  const signatureImage = d.signatureImage?.trim();
+  const hasValidSignature = signatureImage && signatureImage !== '' && signatureImage !== 'null' && signatureImage !== 'undefined';
 
-  if (d.signatureImage && d.signatureImage.trim() !== '') {
-
+  if (hasValidSignature) {
+    
     try {
-      // Add signature image to the merged cells
-      const imageRange = 'B16:D16';
-
-      await addImageToWorksheet(workbook, ws, d.signatureImage, imageRange);
-
-    } catch (error) {
-
-      // Add fallback text when image fails
-      ws.getCell(16, 2).value = '[Signature Image - Failed to Load]';
-      ws.getCell(16, 2).style = {
-        font: { size: 10, name: 'Arial', color: { argb: 'FFFF0000' } },
-        alignment: { horizontal: 'center', vertical: 'middle' },
+      // Enhanced image validation before adding
+      await addImageToWorksheet(workbook, ws, signatureImage, signatureRange);
+      
+    } catch (imageError) {
+      console.error('Signature image failed to load:', imageError);
+      
+      // Detailed error handling with specific error types
+      let errorMessage = '[Signature Image - Failed to Load]';
+      
+      if (imageError instanceof Error) {
+        if (imageError.message.includes('fetch')) {
+          errorMessage = '[Signature - Network Error]';
+        } else if (imageError.message.includes('base64')) {
+          errorMessage = '[Signature - Invalid Format]';
+        } else if (imageError.message.includes('size')) {
+          errorMessage = '[Signature - File Too Large]';
+        }
+      }
+      
+      // Add informative fallback with styling
+      ws.getCell(signatureRow, 2).value = errorMessage;
+      ws.getCell(signatureRow, 2).style = {
+        font: { size: 10, name: 'Arial', color: { argb: 'FFFF0000' }, bold: true },
+        alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
         fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } },
         border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
       };
     }
   } else {
-    console.log('ℹ️ No signature image provided or empty value');
-
-    // Add placeholder text when no image is provided
-    ws.getCell(16, 2).value = '[No Signature Image]';
-    ws.getCell(16, 2).style = {
-      font: { size: 10, name: 'Arial', color: { argb: 'FF888888' } },
-      alignment: { horizontal: 'center', vertical: 'middle' },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } },
-      border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+    
+    // Add professional placeholder when no signature is available
+    ws.getCell(signatureRow, 2).value = '[Digital Signature Required]';
+    ws.getCell(signatureRow, 2).style = {
+      font: { size: 11, name: 'Arial', color: { argb: 'FF666666' }, italic: true },
+      alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } },
+      border: { top: { style: 'dashed' }, bottom: { style: 'dashed' }, left: { style: 'dashed' }, right: { style: 'dashed' } }
     };
   }
+
+  // Set row counter to row 17 for signature block text (after signature image at row 16)
+  r = 17;
 
   // Signature block with rich text (only project manager name bold)
   const sigRichText = [];
@@ -1207,7 +1423,7 @@ async function buildLetter(workbook: ExcelJS.Workbook, d: WeeklyReportExportData
     alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
   };
   ws.mergeCells(r, 2, r, 10);
-  ws.getRow(r).height = estimateRowHeight(sigRichText.map(item => item.text).join(''), mergedWidthChars, 10); // ✅ Manual height
+  ws.getRow(r).height = estimateRowHeight(sigRichText.map(item => item.text).join(''), mergedWidthChars, 10); // Manual height
 }
 
 // SHEET 4: CONTENT (Table of Contents)
@@ -1366,9 +1582,7 @@ async function buildIntro(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
 
 // SHEET 6: 2.OP (Overall Progress)
 async function buildOP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
-  console.log(' buildOP - called with overallProgressItems:', d.overallProgressItems?.length || 0);
-  console.log(' buildOP - overallProgressItems data:', d.overallProgressItems);
-  
+ 
   const ws = workbook.addWorksheet('2.OP');
   const styles = createStyles(workbook);
 
