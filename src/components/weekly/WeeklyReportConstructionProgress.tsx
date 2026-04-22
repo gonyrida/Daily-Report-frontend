@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Trash2, Plus, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
+import { Trash2, Plus, ArrowUpToLine, ArrowDownToLine, UploadCloud, Download } from 'lucide-react';
 
 // Import extracted modules
 import {
@@ -22,6 +22,8 @@ import {
 } from '../../utils/calculationEngine';
 import { ConstructionProgressTable } from './ConstructionProgressTable';
 import { AddRowsModal } from './AddRowsModal';
+import { ExcelImportModal } from './ExcelImportModal';
+import { Button } from "../ui/button";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -48,6 +50,9 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   const [addRowsCount, setAddRowsCount] = useState(1);
   // -1 means "at end"; otherwise index to insert after
   const [addRowsAfter, setAddRowsAfter] = useState<number>(-1);
+
+  // ── Excel Import State ──
+  const [showImportExcel, setShowImportExcel] = useState(false);
 
   const currentData = data;
 
@@ -469,6 +474,49 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
     }
   };
 
+  // ── Excel Import Handler ──
+  const handleExcelImport = (importedItems: ConstructionProgressItem[]) => {
+    // Enable calculations when importing into an existing report
+    if (!isCreateNewMode && !allowCalculations) {
+      setAllowCalculations(true);
+    }
+
+    // Append imported items to existing items
+    const newItems = [...items, ...importedItems];
+
+    // Calculate with your existing engine
+    const shouldCalculate = isCreateNewMode || allowCalculations;
+    const computed = shouldCalculate ? computeAllAmounts(newItems) : newItems;
+
+    setItems(computed);
+
+    // Notify parent of data change
+    if (onDataChange) {
+      onDataChange({
+        ...currentData,
+        items: computed,
+        projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' }
+      });
+    }
+
+    // Clear backgrounds for any new Alpha rows
+    const newAlphaIndices: number[] = [];
+    for (let i = items.length; i < computed.length; i++) {
+      const itemType = resolveIdType(computed[i].id, computed, i);
+      if (itemType === 'alpha') {
+        newAlphaIndices.push(i);
+      }
+    }
+
+    if (newAlphaIndices.length > 0) {
+      setRowBackgrounds(prev => {
+        const updated = { ...prev };
+        newAlphaIndices.forEach(idx => delete updated[idx]);
+        return updated;
+      });
+    }
+  };
+
   // ── Row Actions ──
   const backgroundColorOptions = [
     { name: 'White', value: 'bg-white', class: 'bg-white border border-gray-300' },
@@ -564,6 +612,12 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
           >
             <Plus size={16} /> Add Rows
           </button>
+          <button 
+            onClick={() => setShowImportExcel(true)}
+            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2"
+          >
+            <UploadCloud size={16} /> Import Excel
+          </button>
         </div>
 
         {/* Table */}
@@ -657,6 +711,17 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
         setAddRowsAfter={setAddRowsAfter}
         items={items}
         onConfirm={confirmAddRows}
+      />
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        show={showImportExcel}
+        onClose={() => setShowImportExcel(false)}
+        onConfirm={handleExcelImport}
+        existingItems={items}
+        isCreateNewMode={isCreateNewMode}
+        allowCalculations={allowCalculations}
+        setAllowCalculations={setAllowCalculations}
       />
     </div>
   );
