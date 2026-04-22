@@ -2,12 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { useProfileContext } from '@/contexts/ProfileContext';
 import { apiGet } from '@/lib/apiFetch';
 import PurchaseRequestAuditTrails from './PurchaseRequestAuditTrails';
 import MaterialActualCost from './MaterialActualCost';
 import AttachmentsTab from './AttachmentsTab';
+import { exportPurchaseRequestExcel, exportPurchaseRequestPDF } from './services/exportServices';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  FileDown,
+  FileSpreadsheet,
+  FileText,
+} from "lucide-react";
+import { set } from 'date-fns';
 
 interface PurchaseRequestDetailProps {
   selectedRequest: any;
@@ -35,9 +47,10 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
   isLoading
 }) => {
   const { profile } = useProfileContext();
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState('purchase-request');
   const [attachments, setAttachments] = useState(selectedRequest?.attachments || []);
   const [prSummaryData, setPrSummaryData] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Helper functions for number to words (from improv.md)
   const numberToWords = (num) => {
@@ -133,9 +146,41 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
     }
   }, [selectedRequest])
 
-  if (!selectedRequest) return null;
+  const handleExport = async (mode: 'excel' | 'pdf') => {
+    setIsExporting(true);
+    const purposesList = structuredClone(prSummaryData.summary.materialsActual);
+    const currentPurposeIdx = purposesList.findIndex((item: any) => item.purpose === selectedRequest.purpose);
+    purposesList[currentPurposeIdx]["actualTotal"] += selectedRequest.grandTotal;
+    try {
+      if (mode === 'excel') {
+        await exportPurchaseRequestExcel({
+          ...selectedRequest,
+          requestDate: new Date(selectedRequest.requestDate).toISOString().split('T')[0],
+          ...prSummaryData,
+          summary: {
+            ...prSummaryData.summary,
+            materialsActual: purposesList
+          }
+        });
+      } else {
+        await exportPurchaseRequestPDF({
+          ...selectedRequest,
+          requestDate: new Date(selectedRequest.requestDate).toISOString().split('T')[0],
+          ...prSummaryData,
+          summary: {
+            ...prSummaryData.summary,
+            materialsActual: purposesList
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error exporting purchase request:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
-  // console.log("This is selectdRequest", selectedRequest.approvalWorkflow[0].approver)
+  if (!selectedRequest) return null;
 
   return (
     <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
@@ -169,13 +214,13 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
         {selectedRequest && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="details">Request Details</TabsTrigger>
+              <TabsTrigger value="purchase-request">Request Details</TabsTrigger>
               <TabsTrigger value="material-cost">Material Actual Cost</TabsTrigger>
               <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
 
             {/* Tab 1: Request Details */}
-            <TabsContent value="details" className="space-y-6 mt-6">
+            <TabsContent value="purchase-request" className="space-y-6 mt-6">
               {/* 1. Document Header (MR Number Info) */}
               <div className="bg-muted/30 p-4 rounded-lg border-l-4 border-blue-500">
                 <div className="flex justify-between items-start">
@@ -432,10 +477,53 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowDetailsModal(false)}>
-                  Close
-                </Button>
+              <div className="flex justify-between items-center pt-4 border-t">
+                <div className="flex space-x-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="min-w-[160px] bg-primary hover:bg-primary/90"
+                        disabled={isExporting}
+                      >
+                        <FileDown className="w-4 h-4 mr-2" />
+                        {isExporting ? "Exporting..." : "Export"}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleExport('pdf')}
+                        disabled={isExporting}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Export As PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          handleExport('excel')}
+                        }
+                        disabled={isExporting}
+                      >
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Export As Excel
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="flex space-x-2">
+                  <Button 
+                    type="button" 
+                    onClick={() => {
+                      // Switch to Material Actual Cost tab
+                      setActiveTab('material-cost');
+                    }}
+                  >
+                    Next →
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowDetailsModal(false)}>
+                    Close
+                  </Button>
+                </div>
               </div>
             </TabsContent>
 
@@ -444,7 +532,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
               <MaterialActualCost
                 mode="view"
                 requests={prSummaryData}
-                setActiveTab={() => {}}
+                setActiveTab={setActiveTab}
                 currentFormData={selectedRequest}
                 onFormDataChange={() => {}}
               />
@@ -457,6 +545,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                 onAttachmentsChange={() => {}}
                 mode="view"
                 isSubmitting={false}
+                setActiveTab={setActiveTab}
                 formData={selectedRequest}
                 handleSubmit={() => {}}
               />

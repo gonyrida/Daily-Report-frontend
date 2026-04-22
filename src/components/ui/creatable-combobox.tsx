@@ -50,8 +50,6 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
   }, [options]);
 
   const selectedLabel = localOptions.find(opt => opt.value === value)?.label || value
-  console.log('selectedLabel: ', selectedLabel)
-  console.log('localOptions: ', localOptions)
 
   const handleCreate = (inputValue: string) => {
     const trimmed = inputValue.trim()

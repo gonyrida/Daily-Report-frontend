@@ -247,7 +247,7 @@ const MaterialActualCost = ({
                   <tr>
                     <th className="text-center p-3 text-sm font-medium">Purpose(s)</th>
                     <th className="text-center p-3 text-sm font-medium">Materials BOQ</th>
-                    <th className="text-center p-3 text-sm font-medium">Direct Materials BOQ</th>
+                    <th className="text-center p-3 text-sm font-medium">Direct Materials BOQ ({summary.project.budgetSettings?.percentage || 0}%)</th>
                     <th className="text-center p-3 text-sm font-medium">Materials Actual</th>
                     <th className="text-center p-3 text-sm font-medium">Remaining Budget</th>
                   </tr>
@@ -309,7 +309,8 @@ const MaterialActualCost = ({
                         : 'text-red-600'
                     }`}>
                       ${(summary.project.purposes.reduce((sum, p) => sum + (p.DMBOQBudget || 0), 0) - 
-                        (summary.materialsActual?.reduce((sum, item) => sum + (item.actualTotal || 0), 0) || 0)).toLocaleString()}
+                        (summary.materialsActual?.reduce((sum, item) => sum + (item.actualTotal || 0), 0) + 
+                        getCurrentRequestTotal() || 0)).toLocaleString()}
                     </td>
                   </tr>
                 </tbody>

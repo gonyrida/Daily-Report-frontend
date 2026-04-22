@@ -695,116 +695,113 @@ const AttachmentsTab: React.FC<AttachmentsTabProps> = ({
       />
 
       {/* Action Buttons - Fixed at Bottom - Hidden in view mode */}
-      {mode !== 'view' && (
-        <div className="mt-auto pt-6 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex justify-between items-center">
-            {/* Left side - Previous button */}
-            <div className="flex space-x-2">
+      <div className="mt-auto pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center">
+          {/* Left side - Previous button */}
+          <div className="flex space-x-2">
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={() => {
+                // Navigate back to Material Actual Cost tab
+                if (setActiveTab) {
+                  setActiveTab('material-cost');
+                }
+              }}
+            >
+              ← Previous
+            </Button>
+          </div>
+          
+          {/* Right side - Export, Preview and Cancel */}
+          <div className="flex space-x-2">
+            {/* <Button 
+              type="button" 
+              variant="outline"
+              onClick={() => {
+                // Export logic here
+                console.log("This is final formData: ", formData);
+              }}
+            >
+              Export
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={() => {
+                // Preview logic here
+                console.log("Preview clicked");
+              }}
+            >
+              Preview
+            </Button> */}
+            {/* <Button 
+              type="button" 
+              variant="outline"
+              onClick={() => {
+                // This would need to be passed as a prop or handled differently
+                console.log("Cancel clicked");
+              }}
+            >
+              Cancel
+            </Button> */}
+            {mode === 'create' ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    type="button" 
+                    disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                  >
+                    {isSubmitting ? "Processing..." : "Options ▼"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleSubmit('post')}>
+                    {isSubmitting ? "Posting..." : "Post"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSubmit('draft')}>
+                    {isSubmitting ? "Saving..." : "Save as Draft"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : mode === 'edit' ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    type="button" 
+                    disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                  >
+                    {isSubmitting ? "Processing..." : "Options ▼"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem 
+                    onClick={() => handleSubmit('post')}
+                    disabled={formData?.status !== 'draft'}
+                    className={formData?.status !== 'draft' ? 'opacity-50 cursor-not-allowed' : ''}
+                  >
+                    {isSubmitting ? "Posting..." : "Post"}
+                    {formData?.status !== 'draft' && (
+                      <span className="ml-2 text-xs text-gray-500">(Only for drafts)</span>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSubmit('update')}>
+                    {isSubmitting ? "Updating..." : "Update"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : mode === 'revise' ? (
               <Button 
                 type="button" 
-                variant="outline"
-                onClick={() => {
-                  // Navigate back to Material Actual Cost tab
-                  if (setActiveTab) {
-                    setActiveTab('placeholder1');
-                  }
-                }}
+                disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
+                onClick={() => onReviseClick ? onReviseClick() : handleSubmit('revise')}
               >
-                ← Previous
+                {isSubmitting ? "Revising..." : "Revise"}
               </Button>
-            </div>
-            
-            {/* Right side - Export, Preview and Cancel */}
-            <div className="flex space-x-2">
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => {
-                  // Export logic here
-                  console.log("This is final formData: ", formData);
-                }}
-              >
-                Export
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => {
-                  // Preview logic here
-                  console.log("Preview clicked");
-                }}
-              >
-                Preview
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => {
-                  // This would need to be passed as a prop or handled differently
-                  console.log("Cancel clicked");
-                }}
-              >
-                Cancel
-              </Button>
-
-              {mode === 'create' ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      type="button" 
-                      disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-                    >
-                      {isSubmitting ? "Processing..." : "Options ▼"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleSubmit('post')}>
-                      {isSubmitting ? "Posting..." : "Post"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleSubmit('draft')}>
-                      {isSubmitting ? "Saving..." : "Save as Draft"}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : mode === 'edit' ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      type="button" 
-                      disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-                    >
-                      {isSubmitting ? "Processing..." : "Options ▼"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem 
-                      onClick={() => handleSubmit('post')}
-                      disabled={formData?.status !== 'draft'}
-                      className={formData?.status !== 'draft' ? 'opacity-50 cursor-not-allowed' : ''}
-                    >
-                      {isSubmitting ? "Posting..." : "Post"}
-                      {formData?.status !== 'draft' && (
-                        <span className="ml-2 text-xs text-gray-500">(Only for drafts)</span>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleSubmit('update')}>
-                      {isSubmitting ? "Updating..." : "Update"}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Button 
-                  type="button" 
-                  disabled={isSubmitting || !formData.projectName || formData.items.length === 0}
-                  onClick={() => onReviseClick ? onReviseClick() : handleSubmit('revise')}
-                >
-                  {isSubmitting ? "Revising..." : "Revise"}
-                </Button>
-              )}
-            </div>
+            ) : null}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

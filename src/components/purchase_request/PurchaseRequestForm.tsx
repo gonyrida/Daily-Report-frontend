@@ -15,7 +15,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Draggable from 'react-draggable';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Upload } from "lucide-react";
+import { 
+	X, 
+	Upload,
+	FileDown,
+	FileSpreadsheet,
+	FileText 
+} from "lucide-react";
 import { 
 	apiPost,
 	apiGet,
@@ -28,7 +34,10 @@ import AttachmentsTab, { Attachment } from './AttachmentsTab';
 import ConfirmationModal from './ConfirmationModal';
 import MaterialSelectionDialog from '@/components/material_master/MaterialSelectionDialog';
 import CreatableCombobox from "@/components/ui/creatable-combobox"
-import { exportPurchaseRequestExcel } from './services/exportServices';
+import { 
+	exportPurchaseRequestExcel,
+	exportPurchaseRequestPDF
+} from './services/exportServices';
 import { version } from 'os';
 
 const parseFileSize = (fileSize) => {
@@ -99,6 +108,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	const [showMaterialDialog, setShowMaterialDialog] = useState(false);
 	// Add state for custom units at top level for MaterialSelectionDialog.tsx
 	const [customUnits, setCustomUnits] = useState<{ value: string; label: string }[]>([]);
+	const [isExporting, setIsExporting] = useState(false);
+	const [isPreviewing, setIsPreviewing] = useState(false);
 
 	useEffect(() => {
 		if (profile) {
@@ -234,7 +245,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
     } else {
       // Default for new request
       return {
-		_id: '',
+				_id: '',
+				no: 0,
         requesterName: profile?.fullName || '',
         requesterDepartment: profile?.department || '',
         projectName: '',
@@ -350,6 +362,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
   const resetForm = () => {
 		setFormData({
 			_id: '',
+			no: 0,
 			requesterName: profile?.fullName || '',
 			requesterDepartment: profile?.department || '',
 			projectName: '',
@@ -452,7 +465,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
         // Reset form
         if (mode === 'create') {
           setFormData({
-			_id: '',
+						_id: '',
+						no: 0,
             requesterName: profile?.fullName || '',
             requesterDepartment: profile?.department || '',
             projectName: '',
@@ -472,16 +486,16 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
             requestRemarks: '',
             attachments: [],
             approvers: {
-					preparedBy: '',
-          checkedBy: '',
-          verifiedBy: '',
-          approvedBy: '',
-					backupCheckedBy: '',
-					backupVerifiedBy: '',
-					backupApprovedBy: ''
-        },
-				status: '',
-				priority: ''
+							preparedBy: '',
+							checkedBy: '',
+							verifiedBy: '',
+							approvedBy: '',
+							backupCheckedBy: '',
+							backupVerifiedBy: '',
+							backupApprovedBy: ''
+						},
+						status: '',
+						priority: ''
           });
           setAttachments([]);
         }
@@ -713,6 +727,57 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		label: `${user.firstName} ${user.lastName} (${user.role})`
 	}))
 
+	const handleExport = async (mode: 'excel' | 'pdf') => {
+		setIsExporting(true);
+		const purposesList = structuredClone(prSummaryData.summary.materialsActual);
+		const currentPurposeIdx = purposesList.findIndex((item: any) => item.purpose === formData.purpose);
+		purposesList[currentPurposeIdx]["actualTotal"] += formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+		const requestsList = structuredClone(prSummaryData.reports);
+		if (!formData._id) {
+			requestsList.push({
+				grandTotal: formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+				items: formData.items,
+				label: `MR# ${prSummaryData.summary.project.counter + 1}`,
+				purpose: formData.purpose,
+				requestDescription: formData.requestDescription,
+				requestRemarks: formData.requestRemarks
+			});
+		}
+		try {
+			if (mode === 'excel') {
+				await exportPurchaseRequestExcel({
+					...formData,
+					label: formData.no <= 0 || !formData.no ? `MR# ${prSummaryData.summary.project.counter + 1}` : `MR# ${formData.no}`,
+					requestDate: new Date(formData.requestDate).toISOString().split('T')[0],
+					...prSummaryData,
+					reports: requestsList,
+					summary: {
+						...prSummaryData.summary,
+						materialsActual: purposesList,
+						totalSpend: prSummaryData.summary.totalSpend + formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+					}
+				});
+			} else {
+				await exportPurchaseRequestPDF({
+					...formData,
+					requestDate: new Date(formData.requestDate).toISOString().split('T')[0],
+					label: formData.no <= 0 || !formData.no ? `MR# ${prSummaryData.summary.project.counter + 1}` : `MR# ${formData.no}`,
+					...prSummaryData,
+					reports: requestsList,
+					summary: {
+						...prSummaryData.summary,
+						materialsActual: purposesList
+					}
+				});
+			}
+		} catch (error) {
+			console.error('Error exporting purchase request:', error);
+		} finally {
+			setIsExporting(false);
+		}
+	}
+
   return (
 		<>
 			<Dialog 
@@ -747,7 +812,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 						<TabsList className="grid w-full grid-cols-3">
 							<TabsTrigger value="purchase-request">Purchase Request</TabsTrigger>
-							<TabsTrigger value="placeholder1">Material - Actual Cost</TabsTrigger>
+							<TabsTrigger value="material-cost">Material - Actual Cost</TabsTrigger>
 							<TabsTrigger value="attachments">Attachments</TabsTrigger>
 						</TabsList>
 
@@ -1209,20 +1274,39 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 								<div className="flex justify-between items-center pt-4 border-t">
 									{/* Left side - Export and Preview */}
 									<div className="flex space-x-2">
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button
+													className="min-w-[160px] bg-primary hover:bg-primary/90"
+													disabled={isExporting || !formData.projectName || !formData.purpose}
+												>
+													<FileDown className="w-4 h-4 mr-2" />
+													{isExporting ? "Exporting..." : "Export"}
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end">
+												<DropdownMenuItem
+													onClick={() => handleExport('pdf')}
+													disabled={isExporting}
+												>
+													<FileText className="w-4 h-4 mr-2" />
+													Export As PDF
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													onClick={() => {
+														handleExport('excel')}
+													}
+													disabled={isExporting}
+												>
+													<FileSpreadsheet className="w-4 h-4 mr-2" />
+													Export As Excel
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
 										<Button 
 											type="button" 
 											variant="outline"
-											onClick={() => {
-												// Export logic here
-												console.log("This is final formData: ", formData);
-												exportPurchaseRequestExcel(formData);
-											}}
-										>
-											Export
-										</Button>
-										<Button 
-											type="button" 
-											variant="outline"
+											disabled={isPreviewing}
 											onClick={() => {
 												// Preview logic here
 												console.log("Preview clicked");
@@ -1249,7 +1333,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 											type="button" 
 											onClick={() => {
 												// Switch to Material Actual Cost tab
-												setActiveTab('placeholder1');
+												setActiveTab('material-cost');
 											}}
 										>
 											Next →
@@ -1260,7 +1344,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 							</form>
 						</TabsContent>
 
-						<TabsContent value="placeholder1" className="mt-6">
+						<TabsContent value="material-cost" className="mt-6">
 							<MaterialActualCost
 								mode={mode}
 								requests={prSummaryData}
