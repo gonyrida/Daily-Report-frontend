@@ -1208,7 +1208,7 @@ const WeeklyReport = () => {
       // Helper function to format rows with displayIndex
       const formatRowsWithDisplayIndex = (rows: any[]) => {
         let titleCount = 0;
-        return rows.map((row, index) => {
+        return (rows || []).map((row, index) => {
           if (row.rowType === "title") {
             titleCount++;
             return {
@@ -1282,11 +1282,11 @@ const WeeklyReport = () => {
       // Helper function to convert File objects to base64 strings
       const convertImagesToBase64 = async (photoReferences: any[]) => {
         const converted = await Promise.all(
-          photoReferences.map(async (section) => {
+          (photoReferences || []).map(async (section) => {
             const convertedEntries = await Promise.all(
-              section.entries.map(async (entry) => {
+              (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
-                  entry.slots.map(async (slot) => {
+                  (entry.slots || []).map(async (slot) => {
                     if (slot.image instanceof File) {
                       const base64 = await new Promise((resolve) => {
                         const reader = new FileReader();
@@ -1608,7 +1608,7 @@ const WeeklyReport = () => {
       // Helper function to format rows with displayIndex
       const formatRowsWithDisplayIndex = (rows: any[]) => {
         let titleCount = 0;
-        return rows.map((row, index) => {
+        return (rows || []).map((row, index) => {
           if (row.rowType === "title") {
             titleCount++;
             return {
@@ -1682,11 +1682,11 @@ const WeeklyReport = () => {
       // Helper function to convert File objects to base64 strings
       const convertImagesToBase64 = async (photoReferences: any[]) => {
         const converted = await Promise.all(
-          photoReferences.map(async (section) => {
+          (photoReferences || []).map(async (section) => {
             const convertedEntries = await Promise.all(
-              section.entries.map(async (entry) => {
+              (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
-                  entry.slots.map(async (slot) => {
+                  (entry.slots || []).map(async (slot) => {
                     if (slot.image instanceof File) {
                       const base64 = await new Promise((resolve) => {
                         const reader = new FileReader();
@@ -2504,7 +2504,7 @@ const WeeklyReport = () => {
   const formatRowsWithDisplayIndex = (rows: any[] | null) => {
     if (!rows || rows.length === 0) return [];
     let titleCount = 0;
-    return rows.map((row, index) => {
+    return (rows || []).map((row, index) => {
       if (row.rowType === "title") {
         titleCount++;
         return {
