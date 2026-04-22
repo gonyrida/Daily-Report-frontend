@@ -114,8 +114,30 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
     }
   });
 
-  const monthYearDisplay = passedMonthYearDisplay || (sharedData?.dateRange ? generateWeekDates(sharedData.dateRange).monthYearDisplay : "Feb-26");
-  const dates = passedDates || (sharedData?.dateRange ? generateWeekDates(sharedData.dateRange).dates : ["-", "-", "-", "-", "-", "-", "-"]);
+  const getTodayDisplay = () => {
+    const today = new Date();
+    const month = today.toLocaleString('en-US', { month: 'short' });
+    const day = today.getDate().toString().padStart(2, '0');
+    return `${month}-${day}`;
+  };
+  const monthYearDisplay = passedMonthYearDisplay || (sharedData?.dateRange ? generateWeekDates(sharedData.dateRange).monthYearDisplay : getTodayDisplay());
+  const getTodayDates = () => {
+    const today = new Date();
+    const dates: string[] = [];
+    // Generate dates for the current week (Monday to Sunday)
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to get Monday
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      dates.push(date.getDate().toString().padStart(2, '0'));
+    }
+    return dates;
+  };
+  const dates = passedDates || (sharedData?.dateRange ? generateWeekDates(sharedData.dateRange).dates : getTodayDates());
 
   const dayNames = DAY_NAMES;
 

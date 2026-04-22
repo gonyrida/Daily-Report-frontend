@@ -3,7 +3,12 @@ export const generateWeekDates = (dateRange: string) => {
   // dateRange format: "DD-MMM-YY ~ DD-MMM-YY"
   const dateRangeMatch = dateRange.match(/(\d{1,2}-[A-Za-z]{3}-\d{2})\s*~\s*(\d{1,2}-[A-Za-z]{3}-\d{2})/);
   
-  if (!dateRangeMatch) return { monthYearDisplay: "Feb-26", dates: ["-", "-", "-", "-", "-", "-", "-"] };
+  if (!dateRangeMatch) {
+    const today = new Date();
+    const month = today.toLocaleString('en-US', { month: 'short' });
+    const day = today.getDate().toString().padStart(2, '0');
+    return { monthYearDisplay: `${month}-${day}`, dates: ["-", "-", "-", "-", "-", "-", "-"] };
+  }
   
   const startDateStr = dateRangeMatch[1];
   const endDateStr = dateRangeMatch[2];

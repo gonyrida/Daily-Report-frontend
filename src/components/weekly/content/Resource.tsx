@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import ResourceTableComponent from "./ResourceTableComponent";
 import { SubRow, Section } from "@/types/resourceTable.types";
 import { Package, Download, RefreshCw } from "lucide-react";
@@ -70,16 +70,32 @@ const Resource: React.FC<{
         const { monthYearDisplay } = generateWeekDates(sharedData.dateRange);
         return monthYearDisplay;
       }
-      return "Feb-26"; // default fallback
+      const today = new Date();
+      const month = today.toLocaleString('en-US', { month: 'short' });
+      const day = today.getDate().toString().padStart(2, '0');
+      return `${month}-${day}`; // default fallback - today's date
     };
 
-    const getDates = () => {
+    // Use useMemo to cache dates and prevent flickering during re-renders
+    const memoizedDates = useMemo(() => {
       if (sharedData?.dateRange) {
         const { dates } = generateWeekDates(sharedData.dateRange);
+        console.log('🔍 getDates useMemo:', { dateRange: sharedData.dateRange, generatedDates: dates });
         return dates;
       }
-      return ["-", "-", "-", "-", "-", "-"]; // default fallback
-    };
+      return ["-", "-", "-", "-", "-", "-", "-"]; // default fallback - 7 days
+    }, [sharedData?.dateRange]);
+
+    const memoizedMonthYear = useMemo(() => {
+      if (sharedData?.dateRange) {
+        const { monthYearDisplay } = generateWeekDates(sharedData.dateRange);
+        return monthYearDisplay;
+      }
+      return ""; // default fallback
+    }, [sharedData?.dateRange]);
+
+    // Legacy function for backwards compatibility
+    const getDates = () => memoizedDates;
 
     // Get transformed payload for backend API calls
     const getTransformedResources = (): Resources => {
@@ -327,9 +343,9 @@ const Resource: React.FC<{
             setSections={() => { }}
             handleInputChange={() => { }}
             removeSubRow={() => { }}
-            monthYearDisplay={getDateDisplay()}
-            dates={getDates()}
-            showTitles={false}
+            monthYearDisplay={monthYearDisplay || getDateDisplay()}
+            dates={dates && dates.length > 0 && dates[0] !== "-" ? dates : getDates()}
+            showTitles={true}
           />
         </div>
         <div id="section-6.3">
@@ -340,9 +356,9 @@ const Resource: React.FC<{
             setSections={() => { }}
             handleInputChange={() => { }}
             removeSubRow={() => { }}
-            monthYearDisplay={getDateDisplay()}
-            dates={getDates()}
-            showTitles={false}
+            monthYearDisplay={monthYearDisplay || getDateDisplay()}
+            dates={dates && dates.length > 0 && dates[0] !== "-" ? dates : getDates()}
+            showTitles={true}
           />
         </div>
       </div>

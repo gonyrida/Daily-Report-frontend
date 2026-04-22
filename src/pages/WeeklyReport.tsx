@@ -29,6 +29,7 @@ import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupaba
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
 import { exportWeeklyReportToExcel } from "@/lib/weeklyreportexcel";
+import { exportWeeklyReportToPdf } from "@/lib/weeklyreportpdf";
 import {
   createWeeklyReport,
   updateWeeklyReport,
@@ -1207,7 +1208,7 @@ const WeeklyReport = () => {
       // Helper function to format rows with displayIndex
       const formatRowsWithDisplayIndex = (rows: any[]) => {
         let titleCount = 0;
-        return rows.map((row, index) => {
+        return (rows || []).map((row, index) => {
           if (row.rowType === "title") {
             titleCount++;
             return {
@@ -1281,11 +1282,11 @@ const WeeklyReport = () => {
       // Helper function to convert File objects to base64 strings
       const convertImagesToBase64 = async (photoReferences: any[]) => {
         const converted = await Promise.all(
-          photoReferences.map(async (section) => {
+          (photoReferences || []).map(async (section) => {
             const convertedEntries = await Promise.all(
-              section.entries.map(async (entry) => {
+              (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
-                  entry.slots.map(async (slot) => {
+                  (entry.slots || []).map(async (slot) => {
                     if (slot.image instanceof File) {
                       const base64 = await new Promise((resolve) => {
                         const reader = new FileReader();
@@ -1607,7 +1608,7 @@ const WeeklyReport = () => {
       // Helper function to format rows with displayIndex
       const formatRowsWithDisplayIndex = (rows: any[]) => {
         let titleCount = 0;
-        return rows.map((row, index) => {
+        return (rows || []).map((row, index) => {
           if (row.rowType === "title") {
             titleCount++;
             return {
@@ -1681,11 +1682,11 @@ const WeeklyReport = () => {
       // Helper function to convert File objects to base64 strings
       const convertImagesToBase64 = async (photoReferences: any[]) => {
         const converted = await Promise.all(
-          photoReferences.map(async (section) => {
+          (photoReferences || []).map(async (section) => {
             const convertedEntries = await Promise.all(
-              section.entries.map(async (entry) => {
+              (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
-                  entry.slots.map(async (slot) => {
+                  (entry.slots || []).map(async (slot) => {
                     if (slot.image instanceof File) {
                       const base64 = await new Promise((resolve) => {
                         const reader = new FileReader();
@@ -2125,13 +2126,55 @@ const WeeklyReport = () => {
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      // TODO: Implement PDF export functionality
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate export
+      const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.pdf`;
+      
+      // Convert File objects to base64 for construction issues
+      const issuesWithBase64Photos = await Promise.all(
+        issuesHook.issuesData.map(async (issue) => {
+          let photo: string | undefined;
+          if (issue.photo instanceof File) {
+            photo = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(issue.photo as File); // Explicit type assertion
+            });
+          } else if (typeof issue.photo === 'string') {
+            photo = issue.photo;
+          }
+          return { ...issue, photo };
+        })
+      );
+
+      // Create export data with converted photos - include coverData and override constructionIssues
+      const dateParts = sharedData.dateRange?.split(' ~ ') || [];
+      const exportData = buildWeeklyReportExportData({
+        coverData: {
+          weekNumber: sharedData.weekNumber,
+          reportDateFrom: dateParts[0],
+          reportDateTo: dateParts[1],
+          projectTitle: sharedData.projectName,
+          employer: sharedData.employer || 'Client Name',
+          contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+          coverImage: sharedData.coverImage,
+          clientLogo: sharedData.clientLogo,
+          refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+        },
+        constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
+          number: i + 1,
+          siteLocation: issue.location,
+          problemDescription: issue.problem,
+          actionBy: issue.actionBy,
+          photo: issue.photo,
+        })),
+      });
+
+      await exportWeeklyReportToPdf(exportData, filename);
       toast({
         title: "PDF Exported",
-        description: "Weekly report exported as PDF successfully.",
+        description: `Weekly report exported as ${filename} successfully.`,
       });
     } catch (error) {
+      console.error('PDF export error:', error);
       toast({
         title: "Export Failed",
         description: "Could not export PDF. Please try again.",
@@ -2145,22 +2188,217 @@ const WeeklyReport = () => {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
+      
       // Generate filename with project name and week number
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.xlsx`;
 
+      // Validate required data before processing
+      if (!sharedData.weekNumber) {
+        console.warn('Week number is missing, using default');
+      }
+      if (!sharedData.projectName) {
+        console.warn('Project name is missing, using default');
+      }
+
+      // Convert File objects to base64 for construction issues with error handling
+      const issuesWithBase64Photos = await Promise.all(
+        issuesHook.issuesData.map(async (issue, index) => {
+          try {
+            let photo: string | undefined;
+            if (issue.photo instanceof File) {
+              console.log(`Converting photo ${index + 1} to base64...`);
+              photo = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const result = reader.result as string;
+                  if (result && result.startsWith('data:')) {
+                    resolve(result);
+                  } else {
+                    reject(new Error('Failed to convert file to base64'));
+                  }
+                };
+                reader.onerror = () => reject(new Error('FileReader error'));
+                reader.readAsDataURL(issue.photo as File);
+              });
+              console.log(`Photo ${index + 1} converted successfully`);
+            } else if (typeof issue.photo === 'string') {
+              photo = issue.photo;
+              console.log(`Photo ${index + 1} is already a string`);
+            }
+            return { ...issue, photo };
+          } catch (photoError) {
+            console.error(`Failed to convert photo ${index + 1}:`, photoError);
+            return { ...issue, photo: undefined }; // Continue without photo
+          }
+        })
+      );
+
+      // Create export data with converted photos - include all required data
+      const dateParts = sharedData.dateRange?.split(' ~ ') || [];
+      const exportData = buildWeeklyReportExportData({
+        coverData: {
+          weekNumber: sharedData.weekNumber,
+          reportDateFrom: dateParts[0],
+          reportDateTo: dateParts[1],
+          projectTitle: sharedData.projectName,
+          employer: sharedData.employer || 'Client Name',
+          contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+          coverImage: sharedData.coverImage,
+          clientLogo: sharedData.clientLogo,
+          signatureImage: sharedData.signatureImage || '/cacpm_logo.png', // Add signature image with fallback
+          refNo: `${sharedData.refNoPrefix || 'WR'}-${sharedData.weekNumber}`,
+          letterDate: new Date().toISOString().split('T')[0], // Current date
+          projectManager: sharedData.signatoryName || 'Project Manager',
+          companyLocation: sharedData.companyLocation || 'Phnom Penh, Cambodia',
+          companyPhone1: sharedData.companyPhone1 || '+855 23 123 456',
+          companyPhone2: sharedData.companyPhone2 || '+855 23 789 012',
+          companyEmail1: sharedData.companyEmail1 || 'info@cacpm.com',
+          companyEmail2: sharedData.companyEmail2,
+          recipientCompany: sharedData.recipientCompany || sharedData.employer || 'Client Organization',
+          recipientLocation: sharedData.recipientLocation || 'Phnom Penh, Cambodia',
+          // Add missing fields for Att. and CC using actual user input
+          recipientName: sharedData.recipientName || 'Project Manager',
+          attName: sharedData.recipientName || 'Project Manager',
+          toName: sharedData.recipientName || 'Project Manager',
+          ccLines: sharedData.ccList || [],
+        },
+        // Add missing overall progress data
+        overallProgress: formatRowsWithDisplayIndex(overallProgressHook.rows),
+        overallProgressRemark: '', // Using empty string since property doesn't exist on sharedData
+        // Add construction progress data - cast to any to bypass type mismatch
+        constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
+        conProgressProject: sharedData.projectName,
+        conProgressDate: dateParts[0],
+        // Add activities data - properly transform to match expected structure
+        nwdpItems: (() => {
+          // Create array to hold all individual rows
+          const allItems = [];
+
+          // First, add all weekly activities as individual items
+          (weeklyActivities || []).forEach(a => {
+            allItems.push({
+              sourceId: a.sourceId || '',
+              workDoneLabel: a.description,
+              workDonePct: a.percent,
+              nextWeekLabel: undefined,
+              nextWeekPct: undefined
+            });
+          });
+
+          // Then, try to match next week plan items with existing weekly activities
+          // or add them as new items if no match found
+          (nextWeekPlan || []).forEach(a => {
+            const id = a.sourceId || '';
+
+            // Try to find matching weekly activity by sourceId
+            let matched = false;
+            if (id) {
+              // Only try to match if there's a non-empty ID
+              for (let i = 0; i < allItems.length; i++) {
+                if (allItems[i].sourceId === id && allItems[i].nextWeekLabel === undefined) {
+                  // Found match, add next week data to this item
+                  allItems[i].nextWeekLabel = a.description;
+                  allItems[i].nextWeekPct = a.percent;
+                  matched = true;
+                  break;
+                }
+              }
+            }
+
+            // If no match found (or ID is empty), add as separate item
+            if (!matched) {
+              allItems.push({
+                sourceId: id,
+                workDoneLabel: undefined,
+                workDonePct: undefined,
+                nextWeekLabel: a.description,
+                nextWeekPct: a.percent
+              });
+            }
+          });
+
+          // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
+          return allItems.filter(item =>
+            item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
+          );
+        })(),
+        // Add construction issues with converted photos
+        constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
+          number: i + 1,
+          siteLocation: issue.location || `Site Location ${i + 1}`,
+          problemDescription: issue.problem || 'No description provided',
+          actionBy: issue.actionBy || 'To be determined',
+          photo: issue.photo,
+        })),
+        // Add other data if available
+        projectOverview: sharedData.projectOverview || 'Project overview will be added here.',
+        designConstruction: sharedData.designNConstruction || 'Design and construction details will be added here.',
+        // Add resources data if available
+        weekDates: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
+        manpowerRows: [],
+        materialRows: [],
+        equipmentRows: [],
+        // Add site photos if available
+        sitePhotoCaptions: [],
+        // Add HSE data if available
+        hseTraining: [],
+        hseInspection: [],
+        hsePermits: [],
+        hseFirstAid: '',
+        hseOtherConcerns: '',
+        hsePhotos: [],
+        // Add QAQC data if available
+        qaqcSections: [],
+      });
+
+     
+      // Validate export data
+      if (!exportData.weekNumber) {
+        console.warn('Week number is still missing in export data');
+      }
+
       // Export to Excel using ExcelJS
-      await exportWeeklyReportToExcel(excelData, filename);
+      await exportWeeklyReportToExcel(exportData, filename);
 
       toast({
         title: "Excel Exported",
         description: `Weekly report exported as ${filename} successfully.`,
       });
     } catch (error) {
-      console.error('Excel export error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Could not export Excel. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('saveAs') || error.message.includes('File save failed')) {
+          errorMessage = "File save failed. Please check your browser's download settings and allow file downloads.";
+        } else if (error.message.includes('buffer') || error.message.includes('empty')) {
+          errorMessage = "Failed to generate Excel file content. Please check your data and try again.";
+        } else if (error.message.includes('sheet')) {
+          errorMessage = "Failed to build Excel sheets. Some data might be invalid. Please check your report data.";
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = "Network error occurred while loading images. Please check your internet connection and try again.";
+        } else {
+          errorMessage = `Excel export failed: ${error.message}`;
+        }
+      }
+      
       toast({
         title: "Export Failed",
-        description: "Could not export Excel. Please try again.",
+        description: errorMessage,
         variant: "destructive",
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              console.log('Retrying Excel export...');
+              handleExportExcel();
+            }}
+          >
+            Retry
+          </Button>
+        ),
       });
     } finally {
       setIsExporting(false);
@@ -2262,14 +2500,103 @@ const WeeklyReport = () => {
     handleScheduleUpload(files);
   };
 
+  // Pre-compute overallProgress data to prevent race condition
+  const formatRowsWithDisplayIndex = (rows: any[] | null) => {
+    if (!rows || rows.length === 0) return [];
+    let titleCount = 0;
+    return (rows || []).map((row, index) => {
+      if (row.rowType === "title") {
+        titleCount++;
+        return {
+          ...row,
+          displayIndex: `${toRoman(titleCount)}.`,
+        };
+      }
+      if (row.rowType === "detail") {
+        let detailCount = 0;
+        for (let i = 0; i <= index; i++) {
+          if (rows[i].rowType === "title") {
+            detailCount = 0;
+          } else if (rows[i].rowType === "detail") {
+            detailCount++;
+          }
+        }
+        return {
+          ...row,
+          displayIndex: `${detailCount}.`,
+        };
+      }
+      if (row.rowType === "subDetail") {
+        // Find parent detail number for this sub-detail
+        let parentDetailNumber = 0;
+        for (let i = index; i >= 0; i--) {
+          if (rows[i].rowType === "detail") {
+            let detailCount = 0;
+            for (let j = 0; j <= i; j++) {
+              if (rows[j].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            parentDetailNumber = detailCount;
+            break;
+          }
+        }
+
+        // Count sub-details under the same parent
+        let subDetailCount = 0;
+        for (let i = 0; i <= index; i++) {
+          if (rows[i].rowType === "detail") {
+            let detailCount = 0;
+            for (let j = 0; j <= i; j++) {
+              if (rows[j].rowType === "detail") {
+                detailCount++;
+              }
+            }
+            if (detailCount === parentDetailNumber) {
+              subDetailCount = 0;
+            }
+          } else if (rows[i].rowType === "subDetail") {
+            let currentParentDetail = 0;
+            for (let k = i; k >= 0; k--) {
+              if (rows[k].rowType === "detail") {
+                let detailCount = 0;
+                for (let j = 0; j <= k; j++) {
+                  if (rows[j].rowType === "detail") {
+                    detailCount++;
+                  }
+                }
+                currentParentDetail = detailCount;
+                break;
+              }
+            }
+            if (currentParentDetail === parentDetailNumber) {
+              subDetailCount++;
+            }
+          }
+        }
+
+        return {
+          ...row,
+          displayIndex: `${parentDetailNumber}.${subDetailCount}`,
+        };
+      }
+      return row;
+    });
+  };
+
+  // Debug: Check what data we have
+  const computedOverallProgress = formatRowsWithDisplayIndex(overallProgressHook.rows);
+
   // Build excel export data from all available hook states
+  // Fix date parsing - handle the actual format '20-Mar-26 ~ 26-Mar-26'
+  const dateParts = sharedData.dateRange?.split(' ~ ') || [];
   const excelData = buildWeeklyReportExportData({
     coverData: {
       weekNumber: sharedData.weekNumber,
-      reportDateFrom: sharedData.dateRange?.split(' - ')[0],
-      reportDateTo: sharedData.dateRange?.split(' - ')[1],
+      reportDateFrom: dateParts[0],
+      reportDateTo: dateParts[1],
       projectTitle: sharedData.projectName,
-      employer: sharedData.employer,
+      employer: sharedData.employer || 'Client Name',
       contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
       coverImage: sharedData.coverImage,  // Add cover image
       clientLogo: sharedData.clientLogo,  // Add client logo
@@ -2289,98 +2616,12 @@ const WeeklyReport = () => {
       recipientCompany: sharedData.recipientCompany,
       recipientLocation: sharedData.recipientLocation,
     },
-    constructionProgress: constructionProgressHook.constructionData?.items as any,
+    constructionProgress: constructionProgressHook.constructionData?.items as any[],
     conProgressProject: sharedData.projectName,
     conProgressSubtitle: constructionProgressHook.constructionData?.projectInfo?.subtitle || '',
     conProgressDate: constructionProgressHook.constructionData?.projectInfo?.date || sharedData.dateRange?.split(' - ')[0],
     conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
-    overallProgress: (() => {
-      // Helper function to format rows with displayIndex (same logic as UI)
-      const formatRowsWithDisplayIndex = (rows: any[] | null) => {
-        if (!rows) return [];
-        let titleCount = 0;
-        return rows.map((row, index) => {
-          if (row.rowType === "title") {
-            titleCount++;
-            return {
-              ...row,
-              displayIndex: `${toRoman(titleCount)}.`,
-            };
-          }
-          if (row.rowType === "detail") {
-            let detailCount = 0;
-            for (let i = 0; i <= index; i++) {
-              if (rows[i].rowType === "title") {
-                detailCount = 0;
-              } else if (rows[i].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            return {
-              ...row,
-              displayIndex: `${detailCount}.`,
-            };
-          }
-          if (row.rowType === "subDetail") {
-            // Find parent detail number for this sub-detail
-            let parentDetailNumber = 0;
-            for (let i = index; i >= 0; i--) {
-              if (rows[i].rowType === "detail") {
-                let detailCount = 0;
-                for (let j = 0; j <= i; j++) {
-                  if (rows[j].rowType === "detail") {
-                    detailCount++;
-                  }
-                }
-                parentDetailNumber = detailCount;
-                break;
-              }
-            }
-
-            // Count sub-details under the same parent
-            let subDetailCount = 0;
-            for (let i = 0; i <= index; i++) {
-              if (rows[i].rowType === "detail") {
-                let detailCount = 0;
-                for (let j = 0; j <= i; j++) {
-                  if (rows[j].rowType === "detail") {
-                    detailCount++;
-                  }
-                }
-                if (detailCount === parentDetailNumber) {
-                  subDetailCount = 0;
-                }
-              } else if (rows[i].rowType === "subDetail") {
-                let currentParentDetail = 0;
-                for (let k = i; k >= 0; k--) {
-                  if (rows[k].rowType === "detail") {
-                    let detailCount = 0;
-                    for (let j = 0; j <= k; j++) {
-                      if (rows[j].rowType === "detail") {
-                        detailCount++;
-                      }
-                    }
-                    currentParentDetail = detailCount;
-                    break;
-                  }
-                }
-                if (currentParentDetail === parentDetailNumber) {
-                  subDetailCount++;
-                }
-              }
-            }
-
-            return {
-              ...row,
-              displayIndex: `${parentDetailNumber}.${subDetailCount}`,
-            };
-          }
-          return row;
-        });
-      };
-
-      return formatRowsWithDisplayIndex(overallProgressHook.rows);
-    })(),
+    overallProgress: computedOverallProgress,
     nwdpItems: (() => {
       // Create array to hold all individual rows
       const allItems = [];
@@ -2446,28 +2687,133 @@ const WeeklyReport = () => {
     hsePermits: hsesData?.permit || [],
     hseFirstAid: hsesData?.firstAidAccident,
     hseOtherConcerns: hsesData?.otherActivities,
-    weekDates: sharedData.dateRange?.split(' - ')[0]
-      ? Array.from({ length: 7 }, (_, i) => {
-        const start = new Date(sharedData.dateRange.split(' - ')[0]);
-        start.setDate(start.getDate() + i);
-        return start.getDate().toString();
-      })
-      : ['13', '14', '15', '16', '17', '18', '19'],
-    manpowerRows: [], // Resource data managed in WeeklyReportContent
-    materialRows: [],
-    equipmentRows: [],
+    weekDates: (() => {
+      // Parse "06-Mar-26 ~ 12-Mar-26" format from sharedData.dateRange
+      if (!sharedData.dateRange) return ['', '', '', '', '', '', ''];
+      const cleaned = sharedData.dateRange.trim().replace(/\s*~\s*/, '~');
+      const [startStr] = cleaned.split('~');
+      if (!startStr) return ['', '', '', '', '', '', ''];
+      const monthMap: { [k: string]: number } = {
+        Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+        Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+      };
+      const [dayStr, monStr, yrStr] = startStr.trim().split('-');
+      const start = new Date(2000 + parseInt(yrStr, 10), monthMap[monStr] ?? 0, parseInt(dayStr, 10));
+      if (isNaN(start.getTime())) return ['', '', '', '', '', '', ''];
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        return d.getDate().toString();
+      });
+    })(),
+    // Manpower: team-based groups with group header rows for Excel export
+    manpowerRows: (() => {
+      const mp = resourcesData?.manPower;
+      if (!mp) return [];
+
+      const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
+      const mapMember = (m: any) => {
+        const daily = m.date
+          ? dk.map(k => m.date?.[k] ?? 0)
+          : Array.isArray(m.dailyData)
+            ? m.dailyData
+            : Array(7).fill(0);
+        return {
+          description: m.description ?? '',
+          dailyCounts: daily,
+          previousWeek: m.prevWeek ?? m.previousWeek ?? 0,
+          thisWeek: m.thisWeek ?? 0,
+          upToThisWeek: m.accumulated ?? m.upToThisWeek ?? 0,
+          isGroupHeader: false,  // marker for renderer
+        };
+      };
+
+      const groups: Array<{ title: string; members: any[] }> = [
+        { title: 'I. Site Management Team',     members: mp.managementTeam ?? [] },
+        { title: 'II. Site Working Team Interior', members: mp.workingTeamInterior ?? [] },
+        { title: 'III. Site Working Team MEP',  members: mp.workingTeamMEP ?? [] },
+      ];
+
+      const out: any[] = [];
+      for (const g of groups) {
+        const realMembers = g.members.filter((m: any) => (m?.description ?? '').trim() !== '');
+        if (realMembers.length === 0) continue;  // skip empty teams
+
+        // Insert group header row
+        out.push({
+          description: g.title,
+          dailyCounts: ['', '', '', '', '', '', ''],
+          previousWeek: '',
+          thisWeek: '',
+          upToThisWeek: '',
+          isGroupHeader: true,  // ← marker
+        });
+
+        // Then members
+        realMembers.forEach(m => out.push(mapMember(m)));
+      }
+      return out;
+    })(),
+    materialRows: (resourcesData?.material ?? [])
+      .filter((m: any) => (m?.description ?? m?.name ?? '').trim() !== '')
+      .map((m: any) => {
+        const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
+        const daily = m.date
+          ? dk.map(k => m.date?.[k] ?? 0)
+          : Array.isArray(m.dailyData)
+            ? m.dailyData
+            : Array(7).fill(0);
+        return {
+          description: m.description ?? m.name ?? '',
+          unit: m.unit ?? '',
+          dailyData: daily,
+          previous: m.prevWeek ?? m.previous ?? 0,
+          thisPeriod: m.thisWeek ?? m.thisPeriod ?? 0,
+          accumulate: m.accumulated ?? m.accumulate ?? 0,
+        };
+      }),
+    equipmentRows: (resourcesData?.machinery ?? [])
+      .filter((m: any) => (m?.description ?? m?.name ?? '').trim() !== '')
+      .map((m: any) => {
+        const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
+        const daily = m.date
+          ? dk.map(k => m.date?.[k] ?? 0)
+          : Array.isArray(m.dailyData)
+            ? m.dailyData
+            : Array(7).fill(0);
+        return {
+          description: m.description ?? m.name ?? '',
+          unit: m.unit ?? '',
+          dailyData: daily,
+          previous: m.prevWeek ?? m.previous ?? 0,
+          thisPeriod: m.thisWeek ?? m.thisPeriod ?? 0,
+          accumulate: m.accumulated ?? m.accumulate ?? 0,
+        };
+      }),
     sitePhotoCaptions: siteActivitiesSections.flatMap((section: any) =>
-      section.slots?.map((slot: any, idx: number) => ({
-        siteLocation: section.title,
-        caption1: idx === 0 ? slot.caption : undefined,
-        caption2: idx === 1 ? slot.caption : undefined,
-      })) || []
+      (section.entries || []).flatMap((entry: any) =>
+        (entry.slots || []).reduce((acc: any[], slot: any, idx: number) => {
+          // Group slots in pairs (2 slots per row)
+          if (idx % 2 === 0) {
+            const nextSlot = entry.slots[idx + 1];
+            acc.push({
+              siteLocation: section.title,
+              caption1: slot?.caption || '',
+              caption2: nextSlot?.caption || '',
+              image1: slot?.image || '',
+              image2: nextSlot?.image || '',
+            });
+          }
+          return acc;
+        }, [])
+      )
     ),
     constructionIssues: issuesHook.issuesData.map((issue, i) => ({
       number: i + 1,
       siteLocation: issue.location,
       problemDescription: issue.problem,
       actionBy: issue.actionBy,
+      photo: issue.photo,
     })),
     // Introduction fields
     projectOverview: sharedData.projectOverview,
@@ -2486,7 +2832,7 @@ const WeeklyReport = () => {
             <ReportHeader
               projectLogo={sharedData.clientLogo}
               setProjectLogo={(logo) => setSharedData(prev => ({ ...prev, clientLogo: logo }))}
-              title={`WEEKLY REPORT - ${selectedProject || 'No Project Selected'}`}
+              title={false}
             />
 
             {/* Navigation Bar */}
@@ -2494,7 +2840,7 @@ const WeeklyReport = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <SidebarTrigger />
-                  <Button
+                  {/* <Button
                     variant="ghost"
                     onClick={() => {
                       // Navigate back to dashboard
@@ -2518,7 +2864,7 @@ const WeeklyReport = () => {
                       <path d="M19 12H5"></path>
                     </svg>
                     Back to Dashboard
-                  </Button>
+                  </Button> */}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button

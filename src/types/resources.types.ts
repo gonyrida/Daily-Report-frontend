@@ -19,6 +19,15 @@ export interface ManPowerEntry {
 export interface MaterialEntry {
   description: string;
   unit: string;
+  date: {
+    fri: number;
+    sat: number;
+    sun: number;
+    mon: number;
+    tue: number;
+    wed: number;
+    thu: number;
+  };
   prevWeek: number;
   thisWeek: number;
   accumulated: number;

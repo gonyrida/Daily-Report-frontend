@@ -222,6 +222,10 @@ export interface MapperInput {
     description?: string;
     name?: string;
     unit?: string;
+    dailyData?: (number | string)[];
+    dailyCounts?: (number | string)[];
+    daily?: (number | string)[];
+    days?: (number | string)[];
     previous?: number | string;
     prev?: number | string;
     thisPeriod?: number | string;
@@ -234,6 +238,10 @@ export interface MapperInput {
     description?: string;
     name?: string;
     unit?: string;
+    dailyData?: (number | string)[];
+    dailyCounts?: (number | string)[];
+    daily?: (number | string)[];
+    days?: (number | string)[];
     previous?: number | string;
     prev?: number | string;
     thisPeriod?: number | string;
@@ -249,6 +257,8 @@ export interface MapperInput {
     location?: string;
     caption1?: string;
     caption2?: string;
+    image1?: string;  // Base64 image data or URL for left photo
+    image2?: string;  // Base64 image data or URL for right photo
     [k: string]: unknown;
   }>;
 
@@ -263,6 +273,7 @@ export interface MapperInput {
     issue?: string;
     actionBy?: string;
     action?: string;
+    photo?: string | File | null;
     [k: string]: unknown;
   }>;
 
@@ -272,11 +283,17 @@ export interface MapperInput {
   designList?: string[];
 }
 
+// Cache for valid construction progress data
+let cachedConProgressItems: any[] = [];
+
 export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
+  // Debug: Add stack trace to identify caller
+  const stack = new Error().stack;
+  const caller = stack?.split('\n')[2]?.trim() || 'unknown';
+  
   const c = input.coverData ?? {};
 
-  
-  return {
+  const result = {
     // ── Cover ────────────────────────────────────────────────────────────────
     weekNumber:      c.weekNumber,
     reportDateFrom:  c.reportDateFrom,
@@ -310,7 +327,10 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     conProgressSubtitle: input.conProgressSubtitle,
     conProgressDate:     input.conProgressDate ?? c.reportDateFrom,
     conProgressRevision: input.conProgressRevision,
-    conProgressItems: (input.constructionProgress ?? []).map(p => ({
+    conProgressItems: (() => {
+      // Cache valid data when available
+      if (input.constructionProgress && input.constructionProgress.length > 0) {
+        cachedConProgressItems = input.constructionProgress.map(p => ({
       id:               p.id,
       scopeOfWorks:     p.scopeOfWorks ?? p.description,
       detailDescription:p.detailDescription,
@@ -340,28 +360,39 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       upToNextWeekAmount:p.upToNextWeekPlan?.amount ?? p.upToNextWeekAmount,
       upToNextWeekPct:  p.upToNextWeekPlan?.percentage ?? p.upToNextWeekPct,
       isBold:           p.isBold,
-    })),
+    }));
+    return cachedConProgressItems;
+      }
+      
+      // Use cached data if current data is empty
+      if (cachedConProgressItems.length > 0) {
+        return cachedConProgressItems;
+      }
+      
+      return [];
+    })(),
 
     // ── Overall Progress ─────────────────────────────────────────────────────
     overallProgressRemark: input.overallProgressRemark,
-    overallProgressItems: (input.overallProgress ?? [])
-      .filter(row => {
-        if (!row.sourceId) return true;
-        const trimmed = row.sourceId.trim();
-        const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
-        const isRomanNumeralIorV = /^(I|V)$/i.test(trimmed);
-        return !(isSingleAlpha && !isRomanNumeralIorV);
-      })
-      .map((p, i) => ({
-        no:               p.no ?? p.displayIndex ?? String(i + 1),
-        scopeOfWorks:     p.scopeOfWorks ?? p.description,
-        pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
-        pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
-        pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
-        pctRemaining:     p.pctRemaining     ?? p.remaining,
-        pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
-        pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
-      })),
+    overallProgressItems: (() => {
+      const filtered = (input.overallProgress ?? [])
+        .filter(row => {
+          // Remove the overly aggressive filter - keep all rows for now
+          // If you need to filter, do it based on actual business logic
+          return true;
+        })
+        .map((p, i) => ({
+          no:               p.no ?? p.displayIndex ?? String(i + 1),
+          scopeOfWorks:     p.scopeOfWorks ?? p.description,
+          pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
+          pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
+          pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
+          pctRemaining:     p.pctRemaining     ?? p.remaining,
+          pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
+          pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
+        }));
+      return filtered;
+    })(),
 
     // ── NWDP ─────────────────────────────────────────────────────────────────
     nwdpItems: (input.nwdpItems ?? []).map(item => ({
@@ -418,6 +449,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     materialRows: (input.materialRows ?? []).map(row => ({
       description: row.description ?? row.name,
       unit:        row.unit,
+      dailyData:   row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0,0,0,0,0,0,0],
       previous:    row.previous  ?? row.prev,
       thisPeriod:  row.thisPeriod ?? row.current,
       accumulate:  row.accumulate ?? row.total,
@@ -425,6 +457,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     equipmentRows: (input.equipmentRows ?? []).map(row => ({
       description: row.description ?? row.name,
       unit:        row.unit,
+      dailyData:   row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0,0,0,0,0,0,0],
       previous:    row.previous  ?? row.prev,
       thisPeriod:  row.thisPeriod ?? row.current,
       accumulate:  row.accumulate ?? row.total,
@@ -435,6 +468,8 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       siteLocation: e.siteLocation ?? e.location,
       caption1:     e.caption1,
       caption2:     e.caption2,
+      image1:       e.image1,
+      image2:       e.image2,
     })),
 
     // ── Construction Issues ───────────────────────────────────────────────────
@@ -443,6 +478,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       siteLocation:        issue.siteLocation ?? issue.location,
       problemDescription:  issue.problemDescription ?? issue.description ?? issue.issue,
       actionBy:            issue.actionBy ?? issue.action,
+      photo: typeof issue.photo === 'string' ? issue.photo : undefined,
     })),
 
     // ── Introduction (1.Intro) ───────────────────────────────────────────────
@@ -450,4 +486,6 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     designConstruction: input.designConstruction,
     designList: input.designList,
   };
+
+  return result;
 }

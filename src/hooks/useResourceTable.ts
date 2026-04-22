@@ -11,7 +11,13 @@ export const useResourceTable = (reportId: string) => {
   const [error, setError] = useState<string | null>(null);
   
   const dayNames = DAY_NAMES;
-  const [monthYearDisplay, setMonthYearDisplay] = useState<string>("Feb-26");
+  const getTodayDisplay = () => {
+    const today = new Date();
+    const month = today.toLocaleString('en-US', { month: 'short' });
+    const day = today.getDate().toString().padStart(2, '0');
+    return `${month}-${day}`;
+  };
+  const [monthYearDisplay, setMonthYearDisplay] = useState<string>(getTodayDisplay());
   const [dates, setDates] = useState<string[]>(["-", "-", "-", "-", "-", "-", "-"]);
 
   // Load resource table data

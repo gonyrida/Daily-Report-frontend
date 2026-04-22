@@ -12,9 +12,9 @@ interface NewResourceTableComponentProps {
   dates?: string[];
 }
 
-const NewResourceTableComponent: React.FC<NewResourceTableComponentProps> = ({ 
-  sharedData, 
-  showTitles = true, 
+const NewResourceTableComponent: React.FC<NewResourceTableComponentProps> = ({
+  sharedData,
+  showTitles = true,
   resources: passedResources,
   setResources: passedSetResources,
   monthYearDisplay: passedMonthYearDisplay,
@@ -31,7 +31,13 @@ const NewResourceTableComponent: React.FC<NewResourceTableComponentProps> = ({
   const resources = passedResources || localResources;
   const setResources = passedSetResources || setLocalResources;
 
-  const monthYearDisplay = passedMonthYearDisplay || "Feb-26";
+  const getTodayDisplay = () => {
+    const today = new Date();
+    const month = today.toLocaleString('en-US', { month: 'short' });
+    const day = today.getDate().toString().padStart(2, '0');
+    return `${month}-${day}`;
+  };
+  const monthYearDisplay = passedMonthYearDisplay || getTodayDisplay();
   const dates = passedDates || ["-", "-", "-", "-", "-", "-", "-"];
 
   const dayNames = DAY_NAMES;
@@ -51,7 +57,7 @@ const NewResourceTableComponent: React.FC<NewResourceTableComponentProps> = ({
   ) => {
     const newResources = { ...resources };
     const team = [...newResources.manPower[teamType]];
-    
+
     if (field === 'date' && typeof value === 'object') {
       team[index] = {
         ...team[index],
@@ -62,7 +68,7 @@ const NewResourceTableComponent: React.FC<NewResourceTableComponentProps> = ({
         ...team[index],
         [field]: Number(value) || 0
       };
-      
+
       // Auto-calculate accumulated when prevWeek or thisWeek changes
       if (field === 'prevWeek' || field === 'thisWeek') {
         const prevWeek = field === 'prevWeek' ? Number(value) || 0 : team[index].prevWeek;
@@ -75,7 +81,7 @@ const NewResourceTableComponent: React.FC<NewResourceTableComponentProps> = ({
         [field]: value
       };
     }
-    
+
     newResources.manPower[teamType] = team;
     setResources(newResources);
   };
@@ -275,10 +281,10 @@ const NewResourceTableComponent: React.FC<NewResourceTableComponentProps> = ({
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold mb-4">
-        <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">6.1</span> 
+        <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">6.1</span>
         Manpower Status
       </h3>
-      
+
       {renderTeamSection("I. Site Management Team", "managementTeam", resources.manPower.managementTeam)}
       {renderTeamSection("II. Site Working Team Interior", "workingTeamInterior", resources.manPower.workingTeamInterior)}
       {renderTeamSection("III. Site Working Team MEP", "workingTeamMEP", resources.manPower.workingTeamMEP)}
