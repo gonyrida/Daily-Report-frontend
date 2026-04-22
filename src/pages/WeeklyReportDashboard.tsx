@@ -199,6 +199,19 @@ const WeeklyReportDashboard = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
 
+  const getCurrentUserId = useCallback(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        return user.id || user.userId;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+    return null;
+  }, []);
+
   // Parallel data fetching with React Query
   const results = useQueries({
     queries: [
@@ -237,25 +250,59 @@ const WeeklyReportDashboard = () => {
   const projectDisplayName = Array.isArray(projectQuery.data?.data) 
     ? projectQuery.data.data[0]?.name || ""
     : projectQuery.data?.data?.name || "";
-  
+
+    
   const isLoading = weeklyReportsQuery.isLoading;
   const isLoadingCompany = companyReportsQuery.isLoading;
   
   // Filter reports on client side (for now - will move to server side later)
   const filteredReports = weeklyReports.filter(report => {
+    // First check if report belongs to current user
+    const currentUserId = getCurrentUserId();
+    
+    // Handle different userId formats from database
+    let isOwner = false;
+    if (typeof report.userId === 'string') {
+      isOwner = report.userId === currentUserId;
+    } else if (report.userId && typeof report.userId === 'object') {
+      isOwner = (report.userId as any).$oid === currentUserId || 
+                 (report.userId as any)._id === currentUserId || 
+                 (report.userId as any).id === currentUserId;
+    } else if (report.userId) {
+      isOwner = report.userId.toString() === currentUserId;
+    }
+    
+    // If not owner, don't show in personal tab
+    if (!isOwner) return false;
+    
+    // Filter by project if specified
     if (projectId) {
       const reportProjectId = report.projectId;
-      return reportProjectId === projectId || 
+      // If report has no projectId, show it (it's the owner's report with no project assigned)
+      if (!reportProjectId) return true;
+      
+      const projectMatch = reportProjectId === projectId || 
              (reportProjectId && reportProjectId.toString() === projectId);
+      if (!projectMatch) return false;
     }
-    return true;
+    
+    // Filter by status
+    if (filterStatus === 'all') return true;
+    return report.status === filterStatus;
   });
 
   const filteredCompanyReports = companyReports.filter(report => {
+    // Only show submitted reports in company tab
+    if (report.status !== 'submitted' && report.status !== 'approved') {
+      return false;
+    }
+    
+    // Filter by project if specified
     if (projectId) {
       const reportProjectId = report.projectId;
-      return reportProjectId === projectId || 
+      const projectMatch = reportProjectId === projectId || 
              (reportProjectId && reportProjectId.toString() === projectId);
+      return projectMatch;
     }
     return true;
   });
@@ -349,19 +396,6 @@ const WeeklyReportDashboard = () => {
         return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
     }
   };
-
-  const getCurrentUserId = useCallback(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return user.id || user.userId;
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
-    return null;
-  }, []);
 
   
   const weeklyTotal = weeklyReports.filter(r => r.status === 'submitted').length;
