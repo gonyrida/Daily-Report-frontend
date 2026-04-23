@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Introduction from "./content/Intoduction";
 import OverallProgress from "./content/OverallProgress";
 import Activities from "./content/Activities";
@@ -52,24 +52,131 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // Initialize activities state at parent level
   const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
   const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
-  const [overallRows, setOverallRows] = useState<ProgressRow[]>([]);
+// ---------- helper: dedupe an array of rows by id ----------
+// Keeps the FIRST occurrence of each id. Runs once on load and after every
+// merge so React never sees duplicate keys.
+function dedupeRowsById(rows: ProgressRow[]): ProgressRow[] {
+  const seen = new Set<string>();
+  const out: ProgressRow[] = [];
+  for (const row of rows) {
+    // If id is missing or already seen, skip. We also dedupe by sourceId
+    // as a second line of defense, since two rows with different ids but
+    // the same sourceId are also a bug we want to collapse.
+    if (!row.id || seen.has(row.id)) continue;
+    if (row.sourceId && seen.has(`src:${row.sourceId}`)) continue;
+    seen.add(row.id);
+    if (row.sourceId) seen.add(`src:${row.sourceId}`);
+    out.push(row);
+  }
+  return out;
+}
 
-  // Re-merge whenever construction progress changes, preserving user edits
-  useEffect(() => {
-    if (!constructionProgressItems?.length) return;
-    setOverallRows(prev => {
-      const merged = mergeConstructionIntoOverallRows(constructionProgressItems, prev);
-      return merged;
-    });
-  }, [constructionProgressItems]);
+// ---------- state ----------
+const [overallRows, setOverallRows] = useState<ProgressRow[]>(() => {
+  try {
+    const stored = sessionStorage.getItem("overallRows");
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    // CRITICAL: dedupe on load. Cleans up any duplicates already written
+    // to storage by the previous buggy build.
+    return dedupeRowsById(parsed);
+  } catch {
+    return [];
+  }
+});
 
-  // Sync overallRows to overallProgressData when provided (stable reference)
-  const setRowsRef = overallProgressData?.setRows;
-  useEffect(() => {
-    if (setRowsRef && overallRows.length > 0) {
-      setRowsRef(overallRows);
+// Persist every change. We also dedupe before writing, as a belt-and-braces
+// guarantee that storage never contains duplicates.
+useEffect(() => {
+  try {
+    sessionStorage.setItem(
+      "overallRows",
+      JSON.stringify(dedupeRowsById(overallRows)),
+    );
+  } catch {
+    /* ignore */
+  }
+}, [overallRows]);
+
+// ---------- one-shot seed guard ----------
+// Use a ref so it survives remounts via sessionStorage, and so setting it
+// never triggers a re-render loop.
+const hasSeededRef = useRef<boolean>( 
+  (() => {
+    try {
+      return sessionStorage.getItem("overallRowsSeeded") === "true";
+    } catch {
+      return false;
     }
-  }, [overallRows, setRowsRef]);
+  })(),
+);
+
+const markSeeded = () => {
+  hasSeededRef.current = true;
+  try {
+    sessionStorage.setItem("overallRowsSeeded", "true");
+  } catch {
+    /* ignore */
+  }
+};
+
+// ---------- merge effect ----------
+useEffect(() => {
+  if (!constructionProgressItems || constructionProgressItems.length === 0) {
+    return;
+  }
+
+  setOverallRows((prev) => {
+    const merged = mergeConstructionIntoOverallRows(
+      constructionProgressItems,
+      prev,
+    );
+    // Dedupe after merge too. The merge utility is supposed to be safe,
+    // but if something upstream ever sends two construction items with
+    // the same id, this keeps React happy.
+    const deduped = dedupeRowsById(merged);
+
+    // Avoid pointless state update if nothing changed.
+    if (
+      deduped.length === prev.length &&
+      deduped.every((r, i) => r.id === prev[i]?.id)
+    ) {
+      return prev;
+    }
+    return deduped;
+  });
+}, [constructionProgressItems]);
+
+// ---------- user edit handler ----------
+const setOverallRowsFromTable = (
+  next: ProgressRow[] | ((prev: ProgressRow[]) => ProgressRow[]),
+) => {
+  setOverallRows((prev) => {
+    const resolved =
+      typeof next === "function"
+        ? (next as (p: ProgressRow[]) => ProgressRow[])(prev)
+        : next;
+    // Dedupe after every user edit as well. Cheap, and means we never
+    // have to debug "why are there two rows with the same id" again.
+    return dedupeRowsById(resolved);
+  });
+};
+
+// ---------- visible rows (filter tombstones) ----------
+const visibleOverallRows = useMemo(
+  () => overallRows.filter((r) => !r.isDeleted),
+  [overallRows],
+);
+
+// ---------- sync to parent (if a parent hook wants them) ----------
+const setRowsRef = overallProgressData?.setRows;
+useEffect(() => {
+  if (setRowsRef) {
+    // Send ONLY visible rows to the parent — tombstones are internal bookkeeping.
+    setRowsRef(visibleOverallRows);
+  }
+}, [visibleOverallRows, setRowsRef]);
 
   // Use external props if provided, otherwise use internal state
   const currentWeeklyActivities = externalWeeklyActivities || weeklyActivities;
@@ -90,8 +197,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // Use passed overallProgress data or create a simple fallback
   const overallProgressHook = overallProgressData || {
     rows: overallRows,
-    setRows: setOverallRows,
-    updateRows: setOverallRows,
+    setRows: setOverallRowsFromTable,
+    updateRows: setOverallRowsFromTable,
     addTitleRow: () => {},   // disabled — rows come from construction progress
     addDetailRow: () => {},
   };
@@ -492,20 +599,14 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
-        {(!overallRows || overallRows.length === 0) ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Loading construction progress data...
-          </div>
-        ) : (
-          <OverallProgress 
-            rows={overallRows}
-            setRows={setOverallRows}
-            updateRows={setOverallRows}
-            addTitleRow={() => {}}
-            addDetailRow={() => {}}
-            descriptionsReadOnly={true}
-          />
-        )}
+        <OverallProgress
+          rows={visibleOverallRows}
+          setRows={setOverallRowsFromTable}
+          updateRows={setOverallRowsFromTable}
+          addTitleRow={() => {}}
+          addDetailRow={() => {}}
+          descriptionsReadOnly={false}
+        />
       </div>
 
       {/* Table of Content Tab */}
