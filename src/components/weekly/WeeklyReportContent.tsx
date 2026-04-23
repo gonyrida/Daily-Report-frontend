@@ -30,6 +30,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   setSharedData,
   overallProgressData,
   setOverallProgressData,
+  overallProgressRemark,
+  setOverallProgressRemark,
   reportId,
   weeklyActivities: externalWeeklyActivities,
   setWeeklyActivities: externalSetWeeklyActivities,
@@ -52,25 +54,6 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // Initialize activities state at parent level
   const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
   const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
-// ---------- helper: dedupe an array of rows by id ----------
-// Keeps the FIRST occurrence of each id. Runs once on load and after every
-// merge so React never sees duplicate keys.
-function dedupeRowsById(rows: ProgressRow[]): ProgressRow[] {
-  const seen = new Set<string>();
-  const out: ProgressRow[] = [];
-  for (const row of rows) {
-    // If id is missing or already seen, skip. We also dedupe by sourceId
-    // as a second line of defense, since two rows with different ids but
-    // the same sourceId are also a bug we want to collapse.
-    if (!row.id || seen.has(row.id)) continue;
-    if (row.sourceId && seen.has(`src:${row.sourceId}`)) continue;
-    seen.add(row.id);
-    if (row.sourceId) seen.add(`src:${row.sourceId}`);
-    out.push(row);
-  }
-  return out;
-}
-
 // ---------- state ----------
 const [overallRows, setOverallRows] = useState<ProgressRow[]>(() => {
   try {
@@ -78,22 +61,16 @@ const [overallRows, setOverallRows] = useState<ProgressRow[]>(() => {
     if (!stored) return [];
     const parsed = JSON.parse(stored);
     if (!Array.isArray(parsed)) return [];
-    // CRITICAL: dedupe on load. Cleans up any duplicates already written
-    // to storage by the previous buggy build.
-    return dedupeRowsById(parsed);
+    return parsed;
   } catch {
     return [];
   }
 });
 
-// Persist every change. We also dedupe before writing, as a belt-and-braces
-// guarantee that storage never contains duplicates.
+// Persist every change to session storage.
 useEffect(() => {
   try {
-    sessionStorage.setItem(
-      "overallRows",
-      JSON.stringify(dedupeRowsById(overallRows)),
-    );
+    sessionStorage.setItem("overallRows", JSON.stringify(overallRows));
   } catch {
     /* ignore */
   }
@@ -132,19 +109,15 @@ useEffect(() => {
       constructionProgressItems,
       prev,
     );
-    // Dedupe after merge too. The merge utility is supposed to be safe,
-    // but if something upstream ever sends two construction items with
-    // the same id, this keeps React happy.
-    const deduped = dedupeRowsById(merged);
 
     // Avoid pointless state update if nothing changed.
     if (
-      deduped.length === prev.length &&
-      deduped.every((r, i) => r.id === prev[i]?.id)
+      merged.length === prev.length &&
+      merged.every((r, i) => r.id === prev[i]?.id)
     ) {
       return prev;
     }
-    return deduped;
+    return merged;
   });
 }, [constructionProgressItems]);
 
@@ -157,15 +130,16 @@ const setOverallRowsFromTable = (
       typeof next === "function"
         ? (next as (p: ProgressRow[]) => ProgressRow[])(prev)
         : next;
-    // Dedupe after every user edit as well. Cheap, and means we never
-    // have to debug "why are there two rows with the same id" again.
-    return dedupeRowsById(resolved);
+    return resolved;
   });
 };
 
-// ---------- visible rows (filter tombstones) ----------
+// ---------- visible rows (filter tombstones AND subDetail rows) ----------
+// Store ALL rows in session storage (including subDetail), but only display
+// title and detail rows in the table. subDetail rows like "1.1", "2.3" are
+// kept in storage for reference but not shown in Overall Progress table.
 const visibleOverallRows = useMemo(
-  () => overallRows.filter((r) => !r.isDeleted),
+  () => overallRows.filter((r) => !r.isDeleted && r.rowType !== "subDetail"),
   [overallRows],
 );
 
@@ -173,7 +147,8 @@ const visibleOverallRows = useMemo(
 const setRowsRef = overallProgressData?.setRows;
 useEffect(() => {
   if (setRowsRef) {
-    // Send ONLY visible rows to the parent — tombstones are internal bookkeeping.
+    // Send ONLY visible rows to the parent — tombstones and subDetail rows
+    // are kept in storage but not displayed in the table.
     setRowsRef(visibleOverallRows);
   }
 }, [visibleOverallRows, setRowsRef]);
@@ -606,6 +581,8 @@ useEffect(() => {
           addTitleRow={() => {}}
           addDetailRow={() => {}}
           descriptionsReadOnly={false}
+          remark={overallProgressRemark}
+          setRemark={setOverallProgressRemark}
         />
       </div>
 

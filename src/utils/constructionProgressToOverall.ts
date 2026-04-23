@@ -5,7 +5,7 @@ import { ProgressRow } from '@/types/progress.types';
  * Row-type classifier based on construction item's ID pattern.
  *   "I", "II", "III" …  → title row
  *   "1", "2", "3" …     → detail row
- *   "1.1", "2.3" …      → skipped upstream (see merge)
+ *   "1.1", "2.3" …      → subDetail row
  */
 function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' {
   if (!id || id.trim() === '') return 'detail';
@@ -18,7 +18,8 @@ function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' {
   ) {
     return 'title';
   }
-  if (/^\d+(\.\d+)*$/.test(trimmed)) return 'detail';
+  if (/^\d+\.\d+/.test(trimmed)) return 'subDetail';
+  if (/^\d+$/.test(trimmed)) return 'detail';
   return 'detail';
 }
 
@@ -32,8 +33,8 @@ function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' {
  *   2. Existing rows (active or tombstoned) keep their React id, their
  *      position in the array, and all user edits (percentages, description
  *      overrides if any). Construction data does not overwrite them.
- *   3. Brand-new construction items — items whose sourceId has never been
- *      seen before — are appended to the end.
+ *   3. All construction items from the payload are appended. Duplicate sourceIds
+ *      are allowed to support displaying duplicate level 1 IDs.
  *   4. User-added custom rows (no sourceId) are left exactly where they are.
  *
  * The caller is responsible for filtering `isDeleted` out of the UI. This
@@ -50,36 +51,28 @@ export function mergeConstructionIntoOverallRows(
     return existing;
   }
 
-  // Every sourceId the existing array already knows about, deleted or not.
-  // This is the tombstone shield: once a sourceId is here, we will not
-  // append it again.
-  const knownSourceIds = new Set<string>();
+  // Track sourceIds already in the existing array to prevent re-adding them.
+  // This prevents duplicates when the merge runs multiple times (re-renders).
+  const existingSourceIds = new Set<string>();
   for (const row of existing) {
-    if (row.sourceId) knownSourceIds.add(row.sourceId);
+    if (row.sourceId) existingSourceIds.add(row.sourceId);
   }
 
   // Start from the existing array — we only ever APPEND.
   const result: ProgressRow[] = [...existing];
-  const seenInThisPass = new Set<string>();
 
   for (const item of items) {
     if (!item || !item.id) continue;
     const sourceId = item.id.trim();
     if (!sourceId) continue;
 
-    // Skip dotted sub-level IDs (1.1, 2.3.1, etc.) — these aren't surfaced
-    // in Overall Progress per the existing convention.
-    if (/^\d+\.\d+/.test(sourceId)) continue;
-
-    // Duplicate guard within a single construction payload.
-    if (seenInThisPass.has(sourceId)) continue;
-    seenInThisPass.add(sourceId);
-
-    // Already known — either an active row or a tombstone. Either way, leave
-    // it alone. User edits and deletions both survive.
-    if (knownSourceIds.has(sourceId)) continue;
+    // Skip if this sourceId already exists in storage (prevents re-adding on re-render)
+    if (existingSourceIds.has(sourceId)) continue;
 
     // Brand-new construction item → seed a fresh row.
+    // Add to tracking set so we don't add it again if the same item appears
+    // twice in the same payload.
+    existingSourceIds.add(sourceId);
     const rowType = resolveRowType(sourceId);
 
     const prevWeekPct   = item.previousWeek?.percentage     ?? 0;
@@ -90,7 +83,7 @@ export function mergeConstructionIntoOverallRows(
     const upNxtWkPct    = item.upToNextWeekPlan?.percentage ?? (upToThisWkPct + nxtWkPlanPct);
 
     result.push({
-      id: `cp-${sourceId}`,
+      id: `cp-${sourceId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       sourceId,
       description: item.scopeOfWorks || sourceId,
       rowType,

@@ -278,6 +278,9 @@ const WeeklyReport = () => {
   const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
   const [reportStatus, setReportStatus] = useState<string>("draft");
 
+// NEW: Overall progress remark state
+const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
+
   // NEW: Add QAQC state to WeeklyReport page (like other sections)
   const [qaqcData, setQaqcData] = useState<any>(null);
 
@@ -439,6 +442,12 @@ const WeeklyReport = () => {
             // Load overall progress data
             if (report.sections?.overallProgress?.rows) {
               overallProgressHook.setRows(report.sections.overallProgress.rows);
+            }
+            // ADD THIS:
+            if (report.sections?.overallProgress?.remark !== undefined) {
+              setOverallProgressRemark(report.sections.overallProgress.remark || "");
+            } else {
+              setOverallProgressRemark("");
             }
 
             // Load activities data
@@ -1466,7 +1475,8 @@ const WeeklyReport = () => {
             employer: sharedData.employer || 'Client Name'
           },
           overallProgress: {
-            rows: formatRowsWithDisplayIndex(overallProgressHook.rows)
+            rows: formatRowsWithDisplayIndex(overallProgressHook.rows),
+            remark: overallProgressRemark,   // ← ADD THIS
           },
           // NEW: Add activities section to save payload
           activities: {
@@ -1867,7 +1877,8 @@ const WeeklyReport = () => {
             coverImage: sharedData.coverImage || ""
           },
           overallProgress: {
-            rows: formatRowsWithDisplayIndex(overallProgressHook.rows)
+            rows: formatRowsWithDisplayIndex(overallProgressHook.rows),
+            remark: overallProgressRemark,   // ← ADD THIS
           },
           // NEW: Add activities section to save payload
           activities: {
@@ -2264,7 +2275,7 @@ const WeeklyReport = () => {
         },
         // Add missing overall progress data
         overallProgress: formatRowsWithDisplayIndex(overallProgressHook.rows),
-        overallProgressRemark: '', // Using empty string since property doesn't exist on sharedData
+        overallProgressRemark: overallProgressRemark,   // ← use the state
         // Add construction progress data - cast to any to bypass type mismatch
         constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
         conProgressProject: sharedData.projectName,
@@ -2503,84 +2514,39 @@ const WeeklyReport = () => {
   // Pre-compute overallProgress data to prevent race condition
   const formatRowsWithDisplayIndex = (rows: any[] | null) => {
     if (!rows || rows.length === 0) return [];
+
+    // Filter out soft-deleted rows AND the alpha-only filter
+    const filtered = rows.filter((row) => {
+      if (row.isDeleted) return false;              // ← ADD: drop tombstones
+      if (!row.sourceId) return true;               // keep user-added rows
+      const trimmed = row.sourceId.trim();
+      const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
+      const isRomanIorV = /^(I|V)$/i.test(trimmed);
+      return !(isSingleAlpha && !isRomanIorV);
+    });
+
     let titleCount = 0;
-    return (rows || []).map((row, index) => {
+    let detailCount = 0;
+    let subDetailCount = 0;
+
+    return filtered.map((row) => {
       if (row.rowType === "title") {
-        titleCount++;
-        return {
-          ...row,
-          displayIndex: `${toRoman(titleCount)}.`,
-        };
+        titleCount += 1;
+        detailCount = 0;
+        subDetailCount = 0;
+        return { ...row, displayIndex: `${toRoman(titleCount)}.` };
       }
       if (row.rowType === "detail") {
-        let detailCount = 0;
-        for (let i = 0; i <= index; i++) {
-          if (rows[i].rowType === "title") {
-            detailCount = 0;
-          } else if (rows[i].rowType === "detail") {
-            detailCount++;
-          }
-        }
-        return {
-          ...row,
-          displayIndex: `${detailCount}.`,
-        };
+        detailCount += 1;
+        subDetailCount = 0;
+        return { ...row, displayIndex: `${detailCount}.` };
       }
       if (row.rowType === "subDetail") {
-        // Find parent detail number for this sub-detail
-        let parentDetailNumber = 0;
-        for (let i = index; i >= 0; i--) {
-          if (rows[i].rowType === "detail") {
-            let detailCount = 0;
-            for (let j = 0; j <= i; j++) {
-              if (rows[j].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            parentDetailNumber = detailCount;
-            break;
-          }
-        }
-
-        // Count sub-details under the same parent
-        let subDetailCount = 0;
-        for (let i = 0; i <= index; i++) {
-          if (rows[i].rowType === "detail") {
-            let detailCount = 0;
-            for (let j = 0; j <= i; j++) {
-              if (rows[j].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            if (detailCount === parentDetailNumber) {
-              subDetailCount = 0;
-            }
-          } else if (rows[i].rowType === "subDetail") {
-            let currentParentDetail = 0;
-            for (let k = i; k >= 0; k--) {
-              if (rows[k].rowType === "detail") {
-                let detailCount = 0;
-                for (let j = 0; j <= k; j++) {
-                  if (rows[j].rowType === "detail") {
-                    detailCount++;
-                  }
-                }
-                currentParentDetail = detailCount;
-                break;
-              }
-            }
-            if (currentParentDetail === parentDetailNumber) {
-              subDetailCount++;
-            }
-          }
-        }
-
-        return {
-          ...row,
-          displayIndex: `${parentDetailNumber}.${subDetailCount}`,
-        };
+        subDetailCount += 1;
+        const parent = detailCount > 0 ? detailCount : 0;
+        return { ...row, displayIndex: `${parent}.${subDetailCount}` };
       }
-      return row;
+      return { ...row, displayIndex: row.displayIndex ?? "" };
     });
   };
 
@@ -2622,6 +2588,7 @@ const WeeklyReport = () => {
     conProgressDate: constructionProgressHook.constructionData?.projectInfo?.date || sharedData.dateRange?.split(' - ')[0],
     conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
     overallProgress: computedOverallProgress,
+    overallProgressRemark: overallProgressRemark,   // ← ADD THIS
     nwdpItems: (() => {
       // Create array to hold all individual rows
       const allItems = [];
@@ -3143,6 +3110,8 @@ const WeeklyReport = () => {
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={overallProgressHook.setRows}
+                    overallProgressRemark={overallProgressRemark}          // ← ADD
+                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
                     reportId={currentReportId}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}
@@ -3197,6 +3166,8 @@ const WeeklyReport = () => {
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
+                    overallProgressRemark={overallProgressRemark}          // ← ADD
+                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}

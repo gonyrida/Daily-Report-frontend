@@ -1,18 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { BarChart2, Plus, Trash2, X, GripVertical } from "lucide-react";
+import { BarChart2, Plus, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import PercentageCell from "@/components/ui/PercentageCell";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ProgressRow } from "@/types/progress.types";
-import { CAMBODIA_PROVINCES } from "@/constants/cambodiaProvinces";
 import { toRoman } from "@/lib/numberUtils";
 
 interface OverallProgressTableProps {
@@ -24,6 +16,8 @@ interface OverallProgressTableProps {
   addTitleRow?: () => void;
   addDetailRow?: () => void;
   descriptionsReadOnly?: boolean;
+  remark?: string;
+  setRemark?: (remark: string) => void;
 }
 
 export default function OverallProgressTable({
@@ -33,6 +27,8 @@ export default function OverallProgressTable({
   addTitleRow,
   addDetailRow,
   descriptionsReadOnly = false,
+  remark = "",
+  setRemark,
 }: OverallProgressTableProps) {
   const displayRows = rows || [];
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
@@ -116,20 +112,7 @@ export default function OverallProgressTable({
       if (row.id === id) {
         let updatedRow = { ...row };
 
-        if (field === "description" && value === "__custom__") {
-          return { ...row, description: "", isCustomInput: true };
-        }
-        if (field === "scopeOfWorks" && value === "__custom_unit__") {
-          return { ...row, scopeOfWorks: "__custom_unit_input__" };
-        }
-        if (field === "isCustomInput" && value === false) {
-          return {
-            ...row,
-            isCustomInput: false,
-            description: CAMBODIA_PROVINCES[0] || "",
-          };
-        }
-
+        
         // Handle percentage formatting for percentage columns
         const percentageFields = ["pctUpToPrevWeek", "pctThisWeek", "pctNextWeekPlan", "pctUpNextWeekPlan"];
         let processedValue = value;
@@ -154,6 +137,9 @@ export default function OverallProgressTable({
           // Calculate Remaining as 100% - up to this week %
           const upToThisWeek = updatedRow.pctUpToThisWeek;
           updatedRow.pctRemaining = Math.max(0, 100 - upToThisWeek);
+          // Also calculate % Up Next Week Plan when % Up to This Week changes
+          const nextWeekPlan = typeof updatedRow.pctNextWeekPlan === "number" ? updatedRow.pctNextWeekPlan : Number(updatedRow.pctNextWeekPlan) || 0;
+          updatedRow.pctUpNextWeekPlan = upToThisWeek + nextWeekPlan;
         }
 
         // Recalculate Remaining when pctUpToThisWeek field changes directly
@@ -370,46 +356,14 @@ export default function OverallProgressTable({
                         {row.description || <span className="text-muted-foreground italic">—</span>}
                       </span>
                     ) : (
-                      <>
-                        {row.isCustomInput ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              value={row.description}
-                              onChange={(e) =>
-                                customUpdateRow(row.id, "description", e.target.value)
-                              }
-                              placeholder="Enter custom..."
-                              className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
-                            />
-                            <Button
-                              onClick={() => customUpdateRow(row.id, "description", "")}
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                              variant="ghost"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Select
-                            value={row.description}
-                            onValueChange={(value) =>
-                              customUpdateRow(row.id, "description", value)
-                            }
-                          >
-                            <SelectTrigger className={`border-0 bg-transparent focus:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}>
-                              <SelectValue placeholder="Select description" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {CAMBODIA_PROVINCES.map((province) => (
-                                <SelectItem key={province} value={province}>
-                                  {province}
-                                </SelectItem>
-                              ))}
-                              <SelectItem value="__custom__">+ Custom Input</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </>
+                      <Input
+                        value={row.description}
+                        onChange={(e) =>
+                          customUpdateRow(row.id, "description", e.target.value)
+                        }
+                        placeholder="Enter scope of work..."
+                        className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
+                      />
                     )}
                   </td>
 
@@ -418,7 +372,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctUpToPrevWeek}
                       onChange={(value) => customUpdateRow(row.id, "pctUpToPrevWeek", value)}
-                      readOnly={descriptionsReadOnly || !row.isNewlyAdded}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -427,7 +381,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctThisWeek}
                       onChange={(value) => customUpdateRow(row.id, "pctThisWeek", value)}
-                      readOnly={descriptionsReadOnly || !row.isNewlyAdded}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -436,7 +390,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctUpToThisWeek}
                       onChange={(value) => customUpdateRow(row.id, "pctUpToThisWeek", value)}
-                      readOnly={descriptionsReadOnly || !row.isNewlyAdded}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -445,7 +399,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctRemaining}
                       onChange={(value) => customUpdateRow(row.id, "pctRemaining", value)}
-                      readOnly={descriptionsReadOnly || !row.isNewlyAdded}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -454,7 +408,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctNextWeekPlan}
                       onChange={(value) => customUpdateRow(row.id, "pctNextWeekPlan", value)}
-                      readOnly={descriptionsReadOnly || !row.isNewlyAdded}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -463,7 +417,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctUpNextWeekPlan}
                       onChange={(value) => customUpdateRow(row.id, "pctUpNextWeekPlan", value)}
-                      readOnly={descriptionsReadOnly || !row.isNewlyAdded}
+                      readOnly={true}
                     />
                   </td>
 
@@ -536,6 +490,8 @@ export default function OverallProgressTable({
         <Textarea
           placeholder="Enter any additional remarks or notes..."
           className="min-h-[100px] resize-y"
+          value={remark}
+          onChange={(e) => setRemark?.(e.target.value)}
         />
       </div>
     </div>
