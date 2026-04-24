@@ -3,24 +3,61 @@ import { ProgressRow } from '@/types/progress.types';
 
 /**
  * Row-type classifier based on construction item's ID pattern.
- *   "I", "II", "III" …  → title row
- *   "1", "2", "3" …     → detail row
- *   "1.1", "2.3" …      → subDetail row
+ *   Roman numerals (I, II, III, IV, V, …)  → title row
+ *   Pure integers (1, 2, 3, …)             → detail row
+ *   Decimal (1.1, 2.3, …)                  → subDetail row
+ *   Anything else (A, B, a, 1a, …)         → skip (caller drops it)
  */
-function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' {
-  if (!id || id.trim() === '') return 'detail';
+function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' | 'skip' {
+  if (!id) return 'skip';
   const trimmed = id.trim();
+  if (!trimmed) return 'skip';
 
-  if (/^(I|V)$/i.test(trimmed)) return 'title';
-  if (
-    /^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/i.test(trimmed) &&
-    trimmed.length > 1
-  ) {
+  // Strict roman numeral: only uppercase I, V, X, L, C, D, M in valid order.
+  // No case-insensitive flag — lowercase should NOT be a title.
+  const ROMAN = /^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
+  if (trimmed.length > 0 && ROMAN.test(trimmed) && /[IVXLCDM]/.test(trimmed)) {
     return 'title';
   }
-  if (/^\d+\.\d+/.test(trimmed)) return 'subDetail';
+
+  // Decimal detail: "1.1", "2.3", etc.
+  if (/^\d+\.\d+$/.test(trimmed)) return 'subDetail';
+
+  // Pure integer: "1", "2", "12", etc.
   if (/^\d+$/.test(trimmed)) return 'detail';
-  return 'detail';
+
+  // Everything else (alpha, mixed, punctuation) → skip
+  return 'skip';
+}
+
+/**
+ * Build scoped source IDs for construction items.
+ * Prefixes detail/subDetail rows with their parent title (e.g., "I::1", "II::3")
+ * to prevent collisions between items with the same raw ID in different phases.
+ * Returns empty string for skipped items to keep indices aligned.
+ */
+function buildScopedSourceIds(items: ConstructionProgressItem[]): string[] {
+  const keys: string[] = [];
+  let currentTitle = 'ROOT';
+
+  for (const item of items) {
+    if (!item || !item.id) {
+      keys.push('');
+      continue;
+    }
+    const id = item.id.trim();
+    const type = resolveRowType(id);
+
+    if (type === 'title') {
+      currentTitle = id;
+      keys.push(currentTitle);
+    } else if (type === 'skip') {
+      keys.push(''); // placeholder so indices line up with items array
+    } else {
+      keys.push(`${currentTitle}::${id}`);
+    }
+  }
+  return keys;
 }
 
 /**
@@ -61,19 +98,31 @@ export function mergeConstructionIntoOverallRows(
   // Start from the existing array — we only ever APPEND.
   const result: ProgressRow[] = [...existing];
 
-  for (const item of items) {
-    if (!item || !item.id) continue;
-    const sourceId = item.id.trim();
-    if (!sourceId) continue;
+  // Build scoped IDs to prevent collisions between items with same raw ID in different phases
+  const scopedIds = buildScopedSourceIds(items);
 
-    // Skip if this sourceId already exists in storage (prevents re-adding on re-render)
-    if (existingSourceIds.has(sourceId)) continue;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item || !item.id) continue;
+
+    const rawId = item.id.trim();
+    if (!rawId) continue;
+
+    const rowType = resolveRowType(rawId);
+
+    // Skip non-standard IDs (alpha, mixed, etc.)
+    if (rowType === 'skip') continue;
+
+    const scopedId = scopedIds[i];
+    if (!scopedId) continue;
+
+    // Skip if this scoped sourceId already exists in storage (prevents re-adding on re-render)
+    if (existingSourceIds.has(scopedId)) continue;
 
     // Brand-new construction item → seed a fresh row.
     // Add to tracking set so we don't add it again if the same item appears
     // twice in the same payload.
-    existingSourceIds.add(sourceId);
-    const rowType = resolveRowType(sourceId);
+    existingSourceIds.add(scopedId);
 
     const prevWeekPct   = item.previousWeek?.percentage     ?? 0;
     const thisWeekPct   = item.thisWeek?.percentage         ?? 0;
@@ -83,9 +132,10 @@ export function mergeConstructionIntoOverallRows(
     const upNxtWkPct    = item.upToNextWeekPlan?.percentage ?? (upToThisWkPct + nxtWkPlanPct);
 
     result.push({
-      id: `cp-${sourceId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      sourceId,
-      description: item.scopeOfWorks || sourceId,
+      id: `cp-${scopedId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      sourceId: scopedId,
+      no: rawId,
+      description: item.scopeOfWorks || rawId,
       rowType,
       pctUpToPrevWeek:   prevWeekPct.toString(),
       pctThisWeek:       thisWeekPct,

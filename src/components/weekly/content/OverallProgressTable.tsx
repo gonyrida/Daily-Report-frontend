@@ -391,6 +391,7 @@ export default function OverallProgressTable({
                       value={row.pctUpToThisWeek}
                       onChange={(value) => customUpdateRow(row.id, "pctUpToThisWeek", value)}
                       readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
+                      backgroundType="blue"
                     />
                   </td>
 
@@ -400,6 +401,7 @@ export default function OverallProgressTable({
                       value={row.pctRemaining}
                       onChange={(value) => customUpdateRow(row.id, "pctRemaining", value)}
                       readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
+                      backgroundType="orange"
                     />
                   </td>
 
@@ -418,6 +420,7 @@ export default function OverallProgressTable({
                       value={row.pctUpNextWeekPlan}
                       onChange={(value) => customUpdateRow(row.id, "pctUpNextWeekPlan", value)}
                       readOnly={true}
+                      backgroundType="green"
                     />
                   </td>
 
