@@ -18,7 +18,9 @@ import {
   FileDown,
   FileSpreadsheet,
   FileText,
+  Eye
 } from "lucide-react";
+import PDFPreviewModal from "@/components/PDFPreviewModal";
 import { set } from 'date-fns';
 
 interface PurchaseRequestDetailProps {
@@ -51,6 +53,9 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
   const [attachments, setAttachments] = useState(selectedRequest?.attachments || []);
   const [prSummaryData, setPrSummaryData] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState('');
 
   // Helper functions for number to words (from improv.md)
   const numberToWords = (num) => {
@@ -177,6 +182,30 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
       console.error('Error exporting purchase request:', error);
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  const handlePreview = async () => {
+    setIsPreviewing(true);
+    const purposesList = structuredClone(prSummaryData.summary.materialsActual);
+    const currentPurposeIdx = purposesList.findIndex((item: any) => item.purpose === selectedRequest.purpose);
+    purposesList[currentPurposeIdx]["actualTotal"] += selectedRequest.grandTotal;
+    try {
+      const url = await exportPurchaseRequestPDF({
+        ...selectedRequest,
+        requestDate: new Date(selectedRequest.requestDate).toISOString().split('T')[0],
+        ...prSummaryData,
+        summary: {
+          ...prSummaryData.summary,
+          materialsActual: purposesList
+        }
+      }, true);
+      setPreviewUrl(url);
+      setShowPreview(true);
+    } catch (error) {
+      console.error('Error previewing purchase request:', error);
+    } finally {
+      setIsPreviewing(false);
     }
   }
 
@@ -508,6 +537,26 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <Button
+                    variant="outline"
+                    className="min-w-[140px]"
+                    onClick={handlePreview}
+                    disabled={isPreviewing}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    {isPreviewing ? "Previewing ..." : "Preview"}
+                  </Button>
+
+                  <PDFPreviewModal
+                    open={showPreview}
+                    onClose={() => {
+                      setShowPreview(false);
+                      if (previewUrl) {
+                        URL.revokeObjectURL(previewUrl);
+                      }
+                    }}
+                    pdfUrl={previewUrl}
+                  />
                 </div>
 
                 <div className="flex space-x-2">

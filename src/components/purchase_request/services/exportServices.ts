@@ -49,7 +49,7 @@ export const exportPurchaseRequestExcel = async (data: any) => {
   }
 };
 
-export const exportPurchaseRequestPDF = async (data: any) => {
+export const exportPurchaseRequestPDF = async (data: any, preview: boolean = false) => {
   try {
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-pr-pdf`, cleanData(data));
   
@@ -64,6 +64,9 @@ export const exportPurchaseRequestPDF = async (data: any) => {
   
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
+    if (preview) {
+      return url;
+    }
     const link = document.createElement("a");
     link.href = url;
   
@@ -72,8 +75,6 @@ export const exportPurchaseRequestPDF = async (data: any) => {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  
-    return { success: true };
   } catch (error) {
     console.error("Purchase Request PDF generation error:", error);
     throw error;
