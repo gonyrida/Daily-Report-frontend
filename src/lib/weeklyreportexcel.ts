@@ -1966,7 +1966,7 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       const nextWeekWithId = itemId && nextWeekText
         ? `${itemId}. ${nextWeekText}`
         : (nextWeekText || (itemId ? `${itemId}.` : ''));
-      const displayText = nextWeekWithId || '(No next week plan)';
+      const displayText = nextWeekWithId || '';
       const formattedNextWeek = addIndentation(displayText, workDoneIndentLevel);
 
       // Debug logging specifically for Next Week Plan column

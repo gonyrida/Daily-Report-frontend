@@ -6,7 +6,8 @@ export interface ActivityRow {
   source?: "manual" | "bulk" | "construction-progress";  // Same as backend + construction
   bulkImportId?: string;                  // Same as backend
   addedAt?: Date;                        // Same as backend
-  sourceId?: string;                     // Original ID from construction progress
+  sourceId?: string;                     // Original ID from construction progress (real ID for lookups)
+  displayId?: string;                    // What the UI shows in the ID column ("-" for alpha rows)
   indentLevel?: number;                  // Hierarchy level for display indentation
 }
 

@@ -2282,53 +2282,47 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         conProgressDate: dateParts[0],
         // Add activities data - properly transform to match expected structure
         nwdpItems: (() => {
-          // Create array to hold all individual rows
-          const allItems = [];
+          const allItems: any[] = [];
 
-          // First, add all weekly activities as individual items
           (weeklyActivities || []).forEach(a => {
             allItems.push({
-              sourceId: a.sourceId || '',
+              rowId: a.id || '',
+              sourceId: a.displayId || a.sourceId || '',
               workDoneLabel: a.description,
               workDonePct: a.percent,
               nextWeekLabel: undefined,
-              nextWeekPct: undefined
+              nextWeekPct: undefined,
             });
           });
 
-          // Then, try to match next week plan items with existing weekly activities
-          // or add them as new items if no match found
           (nextWeekPlan || []).forEach(a => {
-            const id = a.sourceId || '';
+            const sourceId = a.displayId || a.sourceId || '';
+            const rowId = a.id || '';
 
-            // Try to find matching weekly activity by sourceId
             let matched = false;
-            if (id) {
-              // Only try to match if there's a non-empty ID
-              for (let i = 0; i < allItems.length; i++) {
-                if (allItems[i].sourceId === id && allItems[i].nextWeekLabel === undefined) {
-                  // Found match, add next week data to this item
-                  allItems[i].nextWeekLabel = a.description;
-                  allItems[i].nextWeekPct = a.percent;
-                  matched = true;
-                  break;
-                }
+            for (let i = 0; i < allItems.length; i++) {
+              const byRowId = rowId && allItems[i].rowId === rowId;
+              const bySourceId = sourceId && allItems[i].sourceId === sourceId;
+              if ((byRowId || bySourceId) && allItems[i].nextWeekLabel === undefined) {
+                allItems[i].nextWeekLabel = a.description;
+                allItems[i].nextWeekPct = a.percent;
+                matched = true;
+                break;
               }
             }
 
-            // If no match found (or ID is empty), add as separate item
             if (!matched) {
               allItems.push({
-                sourceId: id,
+                rowId,
+                sourceId,
                 workDoneLabel: undefined,
                 workDonePct: undefined,
                 nextWeekLabel: a.description,
-                nextWeekPct: a.percent
+                nextWeekPct: a.percent,
               });
             }
           });
 
-          // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
           return allItems.filter(item =>
             item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
           );
@@ -2590,53 +2584,47 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     overallProgress: computedOverallProgress,
     overallProgressRemark: overallProgressRemark,   // ← ADD THIS
     nwdpItems: (() => {
-      // Create array to hold all individual rows
-      const allItems = [];
+      const allItems: any[] = [];
 
-      // First, add all weekly activities as individual items
       weeklyActivities.forEach(a => {
         allItems.push({
-          sourceId: a.sourceId || '',
+          rowId: a.id || '',
+          sourceId: a.displayId || a.sourceId || '',
           workDoneLabel: a.description,
           workDonePct: a.percent,
           nextWeekLabel: undefined,
-          nextWeekPct: undefined
+          nextWeekPct: undefined,
         });
       });
 
-      // Then, try to match next week plan items with existing weekly activities
-      // or add them as new items if no match found
       nextWeekPlan.forEach(a => {
-        const id = a.sourceId || '';
+        const sourceId = a.displayId || a.sourceId || '';
+        const rowId = a.id || '';
 
-        // Try to find matching weekly activity by sourceId
         let matched = false;
-        if (id) {
-          // Only try to match if there's a non-empty ID
-          for (let i = 0; i < allItems.length; i++) {
-            if (allItems[i].sourceId === id && allItems[i].nextWeekLabel === undefined) {
-              // Found match, add next week data to this item
-              allItems[i].nextWeekLabel = a.description;
-              allItems[i].nextWeekPct = a.percent;
-              matched = true;
-              break;
-            }
+        for (let i = 0; i < allItems.length; i++) {
+          const byRowId = rowId && allItems[i].rowId === rowId;
+          const bySourceId = sourceId && allItems[i].sourceId === sourceId;
+          if ((byRowId || bySourceId) && allItems[i].nextWeekLabel === undefined) {
+            allItems[i].nextWeekLabel = a.description;
+            allItems[i].nextWeekPct = a.percent;
+            matched = true;
+            break;
           }
         }
 
-        // If no match found (or ID is empty), add as separate item
         if (!matched) {
           allItems.push({
-            sourceId: id,
+            rowId,
+            sourceId,
             workDoneLabel: undefined,
             workDonePct: undefined,
             nextWeekLabel: a.description,
-            nextWeekPct: a.percent
+            nextWeekPct: a.percent,
           });
         }
       });
 
-      // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
       return allItems.filter(item =>
         item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
       );

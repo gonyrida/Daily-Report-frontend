@@ -18,79 +18,86 @@ import { ActivityRow } from '@/types/activity.types';
 export function mergeConstructionIntoActivityRows(
   items: ConstructionProgressItem[],
   existingRows: ActivityRow[],
-  type: 'weekly' | 'next'
+  type: 'weekly' | 'next',
+  deletedRowIds?: Set<string>
 ): ActivityRow[] {
   if (!items || items.length === 0) return existingRows;
 
-  // Build a lookup so we can preserve user edits by sourceId
-  const existingBySourceId = new Map<string, ActivityRow>();
-  const manuallyAddedRows: ActivityRow[] = [];
-  
-  existingRows.forEach((row, index) => {
-    if (row.sourceId) {
-      existingBySourceId.set(row.sourceId, row);
-    } else {
-      // Preserve manually added rows (those without sourceId)
-      manuallyAddedRows.push(row);
-    }
-  });
+  // ── Step 1: build a lookup of all items by their stable key ──────────────
+  // This does NOT determine output order — only provides data for each key.
+  type ItemData = {
+    item: ConstructionProgressItem;
+    percent: number;
+    level: number;
+    displayId: string;
+  };
+  const itemsByKey = new Map<string, ItemData>();
+  const occurrenceCount = new Map<string, number>();
 
-  const rows: ActivityRow[] = [];
-
-  // Deduplicate items by id to prevent duplicate React keys
-  const seenIds = new Set<string>();
-  const uniqueItems = items.filter((item) => {
-    if (!item.id || seenIds.has(item.id)) return false;
-    seenIds.add(item.id);
-    return true;
-  });
-
-  uniqueItems.forEach((item) => {
-    // Skip items with no ID and no description
-    if (!item.scopeOfWorks && !item.id) return;
+  items.forEach((item) => {
     if (!item.id || item.id.trim() === '') return;
+    const trimmedId = item.id.trim();
+    const occIdx = occurrenceCount.get(trimmedId) ?? 0;
+    occurrenceCount.set(trimmedId, occIdx + 1);
+    const stableKey = occIdx === 0 ? trimmedId : `${trimmedId}:${occIdx}`;
+    if (deletedRowIds?.has(stableKey)) return;
 
-    const existing = existingBySourceId.get(item.id);
-
-    // Determine percentage based on type
-    let percent = 0;
-    if (type === 'weekly') {
-      percent = item.upToThisWeek?.percentage ?? 0;
-    } else {
-      percent = item.nextWeekPlan?.percentage ?? 0;
-    }
-
-    // Calculate indentation level and display ID based on ID pattern
-    const { level, displayId } = calculateIndentLevel(item.id);
-
-    rows.push({
-      // Keep existing React key stable
-      id: existing?.id ?? `act-${item.id}-${crypto.randomUUID()}`,
-
-      // Track which construction progress row this came from
-      sourceId: displayId,
-
-      // Description is always driven by source data
-      description: item.scopeOfWorks || item.id,
-
-      // Percentage value
-      percent: existing ? existing.percent : percent,
-      percentage: existing ? existing.percentage : percent.toString(),
-
-      // Source tracking
-      source: 'manual',
-
-      // Indentation level for display hierarchy
-      indentLevel: level,
-
-      // Preserve other fields if existing
-      bulkImportId: existing?.bulkImportId,
-      addedAt: existing?.addedAt || new Date(),
-    });
+    const percent = type === 'weekly'
+      ? (item.upToThisWeek?.percentage ?? 0)
+      : (item.nextWeekPlan?.percentage ?? 0);
+    const { level, displayId } = calculateIndentLevel(trimmedId);
+    itemsByKey.set(stableKey, { item, percent, level, displayId });
   });
 
-  // Combine construction progress rows with manually added rows
-  return [...rows, ...manuallyAddedRows];
+  // ── Step 2: walk existingRows in their current order ─────────────────────
+  // This preserves any reordering the user did via drag-and-drop.
+  const output: ActivityRow[] = [];
+  const usedKeys = new Set<string>();
+
+  for (const row of existingRows) {
+    const rowKey = row.id || '';
+
+    // Drop rows the user explicitly deleted
+    if (deletedRowIds?.has(rowKey)) continue;
+
+    if (row.sourceId) {
+      // Construction-progress row: refresh data from source, keep user's position
+      const data = itemsByKey.get(rowKey);
+      if (!data) continue; // item was removed from source → drop the row
+      usedKeys.add(rowKey);
+      output.push({
+        ...row,
+        description: data.item.scopeOfWorks || data.item.id,
+        percent: data.percent,
+        percentage: data.percent.toString(),
+        indentLevel: data.level,
+        displayId: data.displayId,
+      });
+    } else {
+      // Manual row: keep as-is
+      output.push(row);
+    }
+  }
+
+  // ── Step 3: append any NEW items not yet present in existingRows ──────────
+  // Preserves insertion order from the source items array.
+  for (const [key, data] of itemsByKey) {
+    if (usedKeys.has(key)) continue;
+    const { level, displayId } = data;
+    output.push({
+      id: key,
+      sourceId: data.item.id.trim(),
+      displayId,
+      description: data.item.scopeOfWorks || data.item.id,
+      percent: data.percent,
+      percentage: data.percent.toString(),
+      source: 'manual',
+      indentLevel: level,
+      addedAt: new Date(),
+    });
+  }
+
+  return output;
 }
 
 /**
