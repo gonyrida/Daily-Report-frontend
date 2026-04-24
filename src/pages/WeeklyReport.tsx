@@ -2388,7 +2388,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         hsePermits: [],
         hseFirstAid: '',
         hseOtherConcerns: '',
-        hsePhotos: [],
+        hsePhotoReferences: { hseToolboxMeeting: [], hseActivityPhotos: [] },
         // Pass actual QAQC data — handles both formats:
         // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
         // 2. Frontend TableData format (after DB load): { '4.1': [rows], ... }
@@ -2703,6 +2703,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     hsePermits: hsesData?.permit || [],
     hseFirstAid: hsesData?.firstAidAccident,
     hseOtherConcerns: hsesData?.otherActivities,
+    hsePhotoReferences: hsesData?.hsePhotoReferences,
     weekDates: (() => {
       // Parse "06-Mar-26 ~ 12-Mar-26" format from sharedData.dateRange
       if (!sharedData.dateRange) return ['', '', '', '', '', '', ''];

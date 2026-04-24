@@ -196,12 +196,11 @@ export interface MapperInput {
   }>;
   hseFirstAid?: string;
   hseOtherConcerns?: string;
-  hsePhotos?: Array<{
-    sectionTitle?: string;
-    images?: string[];
-    footers?: string[];
-    [k: string]: unknown;
-  }>;
+  // ReferenceSection format: [{ id, title, entries: [{ id, slots: [{ id, image, caption }] }] }]
+  hsePhotoReferences?: {
+    hseToolboxMeeting?: any[];
+    hseActivityPhotos?: any[];
+  };
 
   // from useResourceTable()
   weekDates?: string[];
@@ -281,6 +280,18 @@ export interface MapperInput {
   projectOverview?: string;
   designConstruction?: string;
   designList?: string[];
+}
+
+// Converts ReferenceSection format → HSEPhotoEntry[] expected by buildHSE.
+// Input sections: [{ id, title, entries: [{ id, slots: [{ id, image, caption }] }] }]
+// Output:         [{ images: string[], descriptions: string[] }]  — one entry per photo row (2 images per row)
+function referenceSectionsToPhotoEntries(sections: any[]): { images: string[]; descriptions: string[] }[] {
+  return sections.flatMap((section: any) =>
+    (section.entries ?? []).map((entry: any) => ({
+      images:       (entry.slots ?? []).map((s: any) => s.image  || '').filter(Boolean),
+      descriptions: (entry.slots ?? []).map((s: any) => s.caption || ''),
+    }))
+  );
 }
 
 // Cache for valid construction progress data
@@ -431,11 +442,10 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     })),
     hseFirstAid:       input.hseFirstAid,
     hseOtherConcerns:  input.hseOtherConcerns,
-    hsePhotos:         (input.hsePhotos ?? []).map(row => ({
-      sectionTitle: row.sectionTitle,
-      images:       row.images ?? [],
-      footers:      row.footers ?? [],
-    })),
+    hsePhotoReferences: {
+      hseToolboxMeeting: referenceSectionsToPhotoEntries(input.hsePhotoReferences?.hseToolboxMeeting ?? []),
+      hseActivityPhotos: referenceSectionsToPhotoEntries(input.hsePhotoReferences?.hseActivityPhotos ?? []),
+    },
 
     // ── Resources ────────────────────────────────────────────────────────────
     weekDates: input.weekDates,

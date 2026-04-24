@@ -300,7 +300,8 @@ async function addImageToWorksheet(
       if (mimeType === 'image/svg+xml') {
         extension = 'svg';
       } else {
-        extension = mimeType.split('/')[1] || 'png';
+        const rawExt = mimeType.split('/')[1] || 'png';
+        extension = rawExt === 'jpg' ? 'jpeg' : rawExt;
       }
 
       try {
@@ -393,6 +394,9 @@ async function addImageToWorksheet(
         extension = 'png';
       }
     }
+
+    // ExcelJS only accepts 'jpeg', not 'jpg'
+    if (extension === 'jpg') extension = 'jpeg';
 
     // Validate image buffer before adding to workbook
     if (!imageBuffer || imageBuffer.byteLength === 0) {
@@ -2517,9 +2521,9 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   for (let rowIdx = 0; rowIdx < 4; rowIdx++) {
     const entry = hsePhotoEntries[rowIdx]; // Get entry if available, otherwise undefined
 
-    // Photo row - tall (170pt)
+    // Photo row — 2.4" = 173pt
     const photoRow = r;
-    ws.getRow(r).height = 170.1;
+    ws.getRow(r).height = 173;
 
     // Left photo box (B-F merged)
     safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse56.photoL');
@@ -2542,14 +2546,15 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
       const endCol = idx === 0 ? 6 : 11;  // F for left, K for right
 
       if (imgSource) {
-        addImageToWorksheet(workbook, ws, imgSource, {
-          tl: { col: startCol - 1, row: photoRow - 1 },
-          br: { col: endCol - 1, row: photoRow - 1 },
-          ext: { width: 200, height: 170 },
-          editAs: 'oneCell'
-        } as any).catch(() => {
+        try {
+          await addImageToWorksheet(workbook, ws, imgSource, {
+            tl: { col: startCol - 1, row: photoRow - 1 },
+            br: { col: endCol, row: photoRow },
+            editAs: 'twoCell'
+          } as any);
+        } catch {
           // If image fails, leave the cell empty (border already set)
-        });
+        }
       } else {
         // No image - show N/A
         ws.getCell(photoRow, startCol).value = 'N/A';
@@ -2601,9 +2606,9 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   for (let rowIdx = 0; rowIdx < 4; rowIdx++) {
     const entry = hseActivityPhotoEntries[rowIdx]; // Get entry if available, otherwise undefined
 
-    // Photo row - tall (170pt)
+    // Photo row — 2.4" = 173pt
     const photoRow = r;
-    ws.getRow(r).height = 170.1;
+    ws.getRow(r).height = 173;
 
     // Left photo box (B-F merged)
     safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse57.photoL');
@@ -2625,12 +2630,15 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
       const endCol = idx === 0 ? 6 : 11;
 
       if (imgSource) {
-        addImageToWorksheet(workbook, ws, imgSource, {
-          tl: { col: startCol - 1, row: photoRow - 1 },
-          br: { col: endCol - 1, row: photoRow - 1 },
-          ext: { width: 200, height: 170 },
-          editAs: 'oneCell'
-        } as any).catch(() => {});
+        try {
+          await addImageToWorksheet(workbook, ws, imgSource, {
+            tl: { col: startCol - 1, row: photoRow - 1 },
+            br: { col: endCol, row: photoRow },
+            editAs: 'twoCell'
+          } as any);
+        } catch {
+          // If image fails, leave the cell empty (border already set)
+        }
       } else {
         ws.getCell(photoRow, startCol).value = 'N/A';
         safeStyle(ws.getCell(photoRow, startCol), naStyle, 'hse57.na');
@@ -3304,10 +3312,10 @@ export async function buildSitePhotos(
   const entries = d.sitePhotoCaptions ?? [];
   const PAIRS_PER_SECTION = 4;
 
-  // If nothing provided, render one empty section with one placeholder pair
+  // If nothing provided, render one section with 4 empty placeholder pairs (8 boxes)
   const renderEntries: SitePhotoEntry[] = entries.length > 0
     ? entries
-    : [{ siteLocation: 'Site Location', caption1: '', caption2: '' }];
+    : Array(4).fill(null).map(() => ({ siteLocation: 'Site Location', caption1: '', caption2: '' }));
 
   // Group consecutive entries into sections by siteLocation change, capped at 4 per section
   let i = 0;
@@ -3344,75 +3352,74 @@ export async function buildSitePhotos(
   ): Promise<number> {
     let row = startRow;
 
-    // Spacer (6.95)
-    ws.getRow(row).height = 6.95;
-    row++;
-
-    // Photo row (170.1): LEFT = B:D merged, RIGHT = E:G merged
-    const photoRow = row;
-    ws.getRow(row).height = 170.1;
-    // Left photo box B:D
-    safeStyle(ws.getCell(row, 2), photoBoxStyle, 'sp.photoL');
-    safeStyle(ws.getCell(row, 3), photoBoxStyle, 'sp.photoL.span');
-    safeStyle(ws.getCell(row, 4), photoBoxStyle, 'sp.photoL.span');
-    safeMerge(ws, row, 2, row, 4);
-    // Right photo box E:G
-    safeStyle(ws.getCell(row, 5), photoBoxStyle, 'sp.photoR');
-    safeStyle(ws.getCell(row, 6), photoBoxStyle, 'sp.photoR.span');
-    safeStyle(ws.getCell(row, 7), photoBoxStyle, 'sp.photoR.span');
-    safeMerge(ws, row, 5, row, 7);
-
-    // Add images to the photo boxes
     const naStyle: Partial<ExcelJS.Style> = {
       font: { size: 10, name: 'Arial', italic: true },
       alignment: { horizontal: 'center', vertical: 'middle' },
     };
 
-    // Left image (B:D) - column index 2-4, ExcelJS is 0-based so 1-3
+    // Row 1 — spacer (6.95)
+    ws.getRow(row).height = 6.95;
+    row++;
+
+    // Row 2 — photo (170.1): LEFT = B:D merged, RIGHT = E:G merged
+    const photoRow = row;
+    ws.getRow(row).height = 170.1;
+
+    safeStyle(ws.getCell(row, 2), photoBoxStyle, 'sp.photoL');
+    safeStyle(ws.getCell(row, 3), photoBoxStyle, 'sp.photoL.span');
+    safeStyle(ws.getCell(row, 4), photoBoxStyle, 'sp.photoL.span');
+    safeMerge(ws, row, 2, row, 4);
+
+    safeStyle(ws.getCell(row, 5), photoBoxStyle, 'sp.photoR');
+    safeStyle(ws.getCell(row, 6), photoBoxStyle, 'sp.photoR.span');
+    safeStyle(ws.getCell(row, 7), photoBoxStyle, 'sp.photoR.span');
+    safeMerge(ws, row, 5, row, 7);
+
+    // Left image — tl at B (col 1, 0-based), br at right of D spanning full photo row
     if (entry.image1) {
-      addImageToWorksheet(workbook, ws, entry.image1, {
-        tl: { col: 1, row: photoRow - 1 },  // B = col 1 (0-based)
-        br: { col: 3, row: photoRow - 1 },  // D = col 3 (0-based)
-        ext: { width: 200, height: 170 },
-        editAs: 'oneCell'
-      }).catch(() => {
-        // If image fails, show N/A
+      try {
+        await addImageToWorksheet(workbook, ws, entry.image1, {
+          tl: { col: 1, row: photoRow - 1 },
+          br: { col: 4, row: photoRow },
+          editAs: 'twoCell'
+        } as any);
+      } catch {
         ws.getCell(photoRow, 2).value = 'N/A';
         safeStyle(ws.getCell(photoRow, 2), naStyle, 'sp.na');
-      });
+      }
     } else {
-      // No image - show N/A
       ws.getCell(photoRow, 2).value = 'N/A';
       safeStyle(ws.getCell(photoRow, 2), naStyle, 'sp.na');
       safeStyle(ws.getCell(photoRow, 3), naStyle, 'sp.na.span');
       safeStyle(ws.getCell(photoRow, 4), naStyle, 'sp.na.span');
     }
 
-    // Right image (E:G) - column index 5-7, ExcelJS is 0-based so 4-6
+    // Right image — tl at E (col 4, 0-based), br at right of G
     if (entry.image2) {
-      addImageToWorksheet(workbook, ws, entry.image2, {
-        tl: { col: 4, row: photoRow - 1 },  // E = col 4 (0-based)
-        br: { col: 6, row: photoRow - 1 },  // G = col 6 (0-based)
-        ext: { width: 200, height: 170 },
-        editAs: 'oneCell'
-      }).catch(() => {
-        // If image fails, show N/A
+      try {
+        await addImageToWorksheet(workbook, ws, entry.image2, {
+          tl: { col: 4, row: photoRow - 1 },
+          br: { col: 7, row: photoRow },
+          editAs: 'twoCell'
+        } as any);
+      } catch {
         ws.getCell(photoRow, 5).value = 'N/A';
         safeStyle(ws.getCell(photoRow, 5), naStyle, 'sp.na');
-      });
+      }
     } else {
-      // No image - show N/A
       ws.getCell(photoRow, 5).value = 'N/A';
       safeStyle(ws.getCell(photoRow, 5), naStyle, 'sp.na');
       safeStyle(ws.getCell(photoRow, 6), naStyle, 'sp.na.span');
       safeStyle(ws.getCell(photoRow, 7), naStyle, 'sp.na.span');
     }
 
-    // Spacer (6.95)
+    row++; // advance past photo row
+
+    // Row 3 — spacer (6.95)
     ws.getRow(row).height = 6.95;
     row++;
 
-    // Caption row (15): LEFT = B:D merged, RIGHT = E:G merged
+    // Row 4 — caption (15): LEFT = B:D merged, RIGHT = E:G merged
     ws.getRow(row).height = 15;
     ws.getCell(row, 2).value = entry.caption1 ?? '';
     safeStyle(ws.getCell(row, 2), captionStyle, 'sp.capL');
