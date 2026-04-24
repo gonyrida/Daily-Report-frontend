@@ -239,7 +239,9 @@ export interface HSEPhotoEntry {
   sectionTitle?: string;      // e.g., "5.6.1 HSES Training Photos"
   images?: string[];            // Array of image URLs or base64 data
   footers?: string[];           // Footer text for each image (caption)
+  descriptions?: string[];      // Description text for each photo box
 }
+
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2460,7 +2462,7 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   r++;
 
   // Photo reference layout - two columns (lanes) per row
-  // Layout: B-E = Left lane (merged), F-I = Right lane (merged)
+  // Layout: B-F = Left lane (merged), G-K = Right lane (merged)
   // Each entry block: header row + spacer + photo row + spacer + footer row
 
   const photoBoxStyle: Partial<ExcelJS.Style> = {
@@ -2500,74 +2502,46 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
 
   // Process HSE photo entries
   const hsePhotoEntries = d.hsePhotoReferences?.hseToolboxMeeting ?? [];
-  let lastSection: string | undefined = undefined;
+  let lastSection: string | undefined = 'HSE Toolbox Meeting';
   let entriesOnCurrentPage = 0;
 
-  for (const entry of hsePhotoEntries) {
-    const currentSection = entry.sectionTitle;
-    const sectionChanged = currentSection && currentSection !== lastSection;
+  // Static header for HSE Toolbox Meeting
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = 'HSE Toolbox Meeting';
+  safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.staticHdr');
+  for (let c = 3; c <= 11; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.staticHdr.span');
+  safeMerge(ws, r, 2, r, 11);
+  r++; // Move to next row for photo boxes (no spacer, keep close to header)
 
-    // Page break after 4 entries
-    if (entriesOnCurrentPage >= 4) {
-      // Add page break before new entry
-      ws.getRow(r).addPageBreak();
-      entriesOnCurrentPage = 0;
-
-      // If section didn't change but page broke, re-print header with "(Continued)"
-      if (!sectionChanged && lastSection) {
-        ws.getRow(r).height = 20.1;
-        ws.getCell(r, 2).value = `${lastSection} (Continued)`;
-        safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.hdr');
-        for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.hdr.span');
-        safeMerge(ws, r, 2, r, 9);
-        r++;
-      }
-    }
-
-    // Handle new section header
-    if (sectionChanged) {
-      ws.getRow(r).height = 20.1;
-      ws.getCell(r, 2).value = currentSection ?? '';
-      safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.hdr');
-      for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.hdr.span');
-      safeMerge(ws, r, 2, r, 9);
-      r++;
-      lastSection = currentSection;
-    }
-
-    // Render photo entry block
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
+  // Always render exactly 4 rows of photo boxes (8 boxes total)
+  for (let rowIdx = 0; rowIdx < 4; rowIdx++) {
+    const entry = hsePhotoEntries[rowIdx]; // Get entry if available, otherwise undefined
 
     // Photo row - tall (170pt)
     const photoRow = r;
     ws.getRow(r).height = 170.1;
 
-    // Left photo box (B-E merged)
+    // Left photo box (B-F merged)
     safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse56.photoL');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoL.span');
-    safeMerge(ws, r, 2, r, 5);
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Right photo box (F-I merged)
-    safeStyle(ws.getCell(r, 6), photoBoxStyle, 'hse56.photoR');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoR.span');
-    safeMerge(ws, r, 6, r, 9);
+    // Right photo box (G-K merged)
+    safeStyle(ws.getCell(r, 7), photoBoxStyle, 'hse56.photoR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoR.span');
+    safeMerge(ws, r, 7, r, 11);
 
     // Handle images
-    const images = entry.images ?? [];
-    const footers = entry.footers ?? [];
+    const images = entry?.images ?? [];
     const maxImages = 2; // Two lanes
 
     // Add images or N/A
     for (let idx = 0; idx < maxImages; idx++) {
       const imgSource = images[idx];
-      const startCol = idx === 0 ? 2 : 6; // B for left, F for right
-      const endCol = idx === 0 ? 5 : 9;   // E for left, I for right
+      const startCol = idx === 0 ? 2 : 7; // B for left, G for right
+      const endCol = idx === 0 ? 6 : 11;  // F for left, K for right
 
       if (imgSource) {
-        // Schedule image insertion after worksheet is set up
-        // Images will be added asynchronously
         addImageToWorksheet(workbook, ws, imgSource, {
           tl: { col: startCol - 1, row: photoRow - 1 },
           br: { col: endCol - 1, row: photoRow - 1 },
@@ -2590,114 +2564,65 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
 
     r++;
 
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    // Footer/caption row (C-D for left, G-H for right)
+    // Description row (below photo boxes) - ALWAYS rendered
     ws.getRow(r).height = 15;
 
-    // Left footer
-    ws.getCell(r, 3).value = footers[0] ?? '';
-    safeStyle(ws.getCell(r, 3), footerStyle, 'hse56.footerL');
-    safeStyle(ws.getCell(r, 4), footerStyle, 'hse56.footerL.span');
-    safeMerge(ws, r, 3, r, 4);
+    // Left description box (B-F merged)
+    const descriptions = entry?.descriptions ?? [];
+    ws.getCell(r, 2).value = descriptions[0] ?? '';
+    safeStyle(ws.getCell(r, 2), footerStyle, 'hse56.descL');
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse56.descL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Right footer
-    ws.getCell(r, 7).value = footers[1] ?? '';
-    safeStyle(ws.getCell(r, 7), footerStyle, 'hse56.footerR');
-    safeStyle(ws.getCell(r, 8), footerStyle, 'hse56.footerR.span');
-    safeMerge(ws, r, 7, r, 8);
-
-    r++;
-    entriesOnCurrentPage++;
-  }
-
-  // If no entries, render one empty placeholder
-  if (hsePhotoEntries.length === 0) {
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    // Photo row
-    ws.getRow(r).height = 170.1;
-
-    // Left photo box with N/A
-    ws.getCell(r, 2).value = 'N/A';
-    safeStyle(ws.getCell(r, 2), naStyle, 'hse56.na');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse56.na.span');
-    safeMerge(ws, r, 2, r, 5);
-
-    // Right photo box with N/A
-    ws.getCell(r, 6).value = 'N/A';
-    safeStyle(ws.getCell(r, 6), naStyle, 'hse56.na');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse56.na.span');
-    safeMerge(ws, r, 6, r, 9);
+    // Right description box (G-K merged)
+    ws.getCell(r, 7).value = descriptions[1] ?? '';
+    safeStyle(ws.getCell(r, 7), footerStyle, 'hse56.descR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse56.descR.span');
+    safeMerge(ws, r, 7, r, 11);
 
     r++;
   }
 
   // Process HSE Activity Photos (5.7)
   const hseActivityPhotoEntries = d.hsePhotoReferences?.hseActivityPhotos ?? [];
-  let activityLastSection: string | undefined = undefined;
+  let activityLastSection: string | undefined = 'HSE Activity Photo';
   let activityEntriesOnCurrentPage = 0;
 
-  for (const entry of hseActivityPhotoEntries) {
-    const currentSection = entry.sectionTitle;
-    const sectionChanged = currentSection && currentSection !== activityLastSection;
+  // ... (rest of the code remains the same)
+  // Static header for HSE Activity Photo
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = 'HSE Activity Photo';
+  safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.staticHdr');
+  for (let c = 3; c <= 11; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.staticHdr.span');
+  safeMerge(ws, r, 2, r, 11);
+  r++;
 
-    // Page break after 4 entries
-    if (activityEntriesOnCurrentPage >= 4) {
-      ws.getRow(r).addPageBreak();
-      activityEntriesOnCurrentPage = 0;
+  // Always render exactly 4 rows of photo boxes (8 boxes total)
+  for (let rowIdx = 0; rowIdx < 4; rowIdx++) {
+    const entry = hseActivityPhotoEntries[rowIdx]; // Get entry if available, otherwise undefined
 
-      if (!sectionChanged && activityLastSection) {
-        ws.getRow(r).height = 20.1;
-        ws.getCell(r, 2).value = `${activityLastSection} (Continued)`;
-        safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.hdr');
-        for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.hdr.span');
-        safeMerge(ws, r, 2, r, 9);
-        r++;
-      }
-    }
-
-    // Handle new section header
-    if (sectionChanged) {
-      ws.getRow(r).height = 20.1;
-      ws.getCell(r, 2).value = currentSection ?? '';
-      safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.hdr');
-      for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.hdr.span');
-      safeMerge(ws, r, 2, r, 9);
-      r++;
-      activityLastSection = currentSection;
-    }
-
-    // Render photo entry block
-    ws.getRow(r).height = 6.95;
-    r++;
-
+    // Photo row - tall (170pt)
     const photoRow = r;
     ws.getRow(r).height = 170.1;
 
-    // Left photo box (B-E merged)
+    // Left photo box (B-F merged)
     safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse57.photoL');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoL.span');
-    safeMerge(ws, r, 2, r, 5);
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Right photo box (F-I merged)
-    safeStyle(ws.getCell(r, 6), photoBoxStyle, 'hse57.photoR');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoR.span');
-    safeMerge(ws, r, 6, r, 9);
+    // Right photo box (G-K merged)
+    safeStyle(ws.getCell(r, 7), photoBoxStyle, 'hse57.photoR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoR.span');
+    safeMerge(ws, r, 7, r, 11);
 
     // Handle images
-    const images = entry.images ?? [];
-    const footers = entry.footers ?? [];
+    const images = entry?.images ?? [];
     const maxImages = 2;
 
     for (let idx = 0; idx < maxImages; idx++) {
       const imgSource = images[idx];
-      const startCol = idx === 0 ? 2 : 6;
-      const endCol = idx === 0 ? 5 : 9;
+      const startCol = idx === 0 ? 2 : 7;
+      const endCol = idx === 0 ? 6 : 11;
 
       if (imgSource) {
         addImageToWorksheet(workbook, ws, imgSource, {
@@ -2719,49 +2644,26 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
 
     r++;
 
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    // Footer/caption row
+    // Description row (below photo boxes) - ALWAYS rendered
     ws.getRow(r).height = 15;
 
-    // Left footer
-    ws.getCell(r, 3).value = footers[0] ?? '';
-    safeStyle(ws.getCell(r, 3), footerStyle, 'hse57.footerL');
-    safeStyle(ws.getCell(r, 4), footerStyle, 'hse57.footerL.span');
-    safeMerge(ws, r, 3, r, 4);
+    // Left description box (B-F merged)
+    const descriptions = entry?.descriptions ?? [];
+    ws.getCell(r, 2).value = descriptions[0] ?? '';
+    safeStyle(ws.getCell(r, 2), footerStyle, 'hse57.descL');
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse57.descL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Right footer
-    ws.getCell(r, 7).value = footers[1] ?? '';
-    safeStyle(ws.getCell(r, 7), footerStyle, 'hse57.footerR');
-    safeStyle(ws.getCell(r, 8), footerStyle, 'hse57.footerR.span');
-    safeMerge(ws, r, 7, r, 8);
+    // Right description box (G-K merged)
+    ws.getCell(r, 7).value = descriptions[1] ?? '';
+    safeStyle(ws.getCell(r, 7), footerStyle, 'hse57.descR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse57.descR.span');
+    safeMerge(ws, r, 7, r, 11);
 
     r++;
-    activityEntriesOnCurrentPage++;
+
   }
-
-  // If no activity photo entries, render empty placeholder
-  if (hseActivityPhotoEntries.length === 0) {
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    ws.getRow(r).height = 170.1;
-
-    ws.getCell(r, 2).value = 'N/A';
-    safeStyle(ws.getCell(r, 2), naStyle, 'hse57.na');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse57.na.span');
-    safeMerge(ws, r, 2, r, 5);
-
-    ws.getCell(r, 6).value = 'N/A';
-    safeStyle(ws.getCell(r, 6), naStyle, 'hse57.na');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse57.na.span');
-    safeMerge(ws, r, 6, r, 9);
-
-    r++;
-  }
-}
+} // <--- Added closing brace here
 
 // Small helper: 1-based column index → Excel letter (A, B, ... Z, AA, AB, ...)
 function colLetter(col: number): string {
