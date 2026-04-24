@@ -450,26 +450,20 @@ export const deleteReport = async (reportId: string) => {
 };
 
 // Google Docs-style auto-save functions
-export const createBlankReport = async (projectName?: string) => {
-  console.log("🔒 CREATE BLANK REPORT: Creating blank report", { projectName });
-
+export const createBlankReport = async (projectName?: string, projectId?: string) => {
   const response = await apiPost(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/blank`, {
-    projectName: projectName || "Untitled Report"
+    projectName: projectName || "Untitled Report",
+    ...(projectId && { projectId }),
   });
-
-  console.log(`🔒 CREATE BLANK REPORT: Response ${response.status}`);
 
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to create blank report" }));
-    console.error("🔒 CREATE BLANK REPORT: Failed:", error);
     throw new Error(error.message || "Failed to create blank report");
   }
 
-  const result = await response.json();
-  console.log("🔒 CREATE BLANK REPORT: Success:", result);
-  return result;
+  return response.json();
 };
 
 export const autoSaveReport = async (reportId: string, partialData: any) => {

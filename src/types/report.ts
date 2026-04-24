@@ -2,6 +2,7 @@ import { ResourceRow } from "@/components/ResourceTable";
 
 export interface ReportData {
   projectName: string;
+  projectId?: string;
   reportDate: string | null;
   location: string;
   createdBy: string;

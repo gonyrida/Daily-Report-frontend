@@ -1624,7 +1624,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
   };
 
   // Internal save logic that can be called from both save and submit functions
-  const handleSaveAsDraftInternal = async () => {
+  const handleSaveAsDraftInternal = async (forceUpdate = false) => {
     // Prevent saving in read-only mode
     if (isReadOnly) {
       toast({
@@ -1983,12 +1983,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
 
       let response;
-      // In create new mode, always create a new report instead of updating
-      if (currentReportId && !isCreateNewMode) {
+      // forceUpdate bypasses isCreateNewMode so submit always updates the existing record
+      if (currentReportId && (!isCreateNewMode || forceUpdate)) {
         // Update existing report - only send sections that changed
         const updateData = {
           sections: reportData.sections,
-          status: 'draft' as const
+          status: 'draft' as const,
+          projectId: sharedData.projectId || projectId || ''
         };
 
         response = await updateWeeklyReport(currentReportId, updateData);
@@ -2110,8 +2111,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     try {
       let reportId = currentReportId;
 
-      // For submitted reports, save WITHOUT rolling total logic (preserve original values)
-      const saveResponse = await handleSaveAsDraftInternal();
+      // Always update the existing record before submitting — never create a new one
+      const saveResponse = await handleSaveAsDraftInternal(true);
 
       if (saveResponse?.success && saveResponse?.data) {
         reportId = (saveResponse.data as any)._id || saveResponse.data.id || currentReportId;
@@ -2323,6 +2324,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             allItems.push({
               rowId: a.id || '',
               sourceId: a.displayId || a.sourceId || '',
+              id: a.displayId || a.sourceId || '',
               workDoneLabel: a.description,
               workDonePct: a.percent,
               nextWeekLabel: undefined,
@@ -2387,11 +2389,24 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         hseFirstAid: '',
         hseOtherConcerns: '',
         hsePhotos: [],
-        // Add QAQC data if available
-        qaqcSections: [],
+        // Pass actual QAQC data — handles both formats:
+        // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
+        // 2. Frontend TableData format (after DB load): { '4.1': [rows], ... }
+        qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => {
+          const isBackendFormat = value && typeof value === 'object' && !Array.isArray(value) && 'items' in value;
+          const rawItems = isBackendFormat ? (value.items || []) : (Array.isArray(value) ? value : []);
+          const items = rawItems.map((item: any) => ({
+            ...item,
+            dateResponse: item.dateResponse || item.dateResponded || '',
+          }));
+          const comments = isBackendFormat
+            ? (value.comments || '')
+            : (Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '');
+          return { sectionTitle: key, items, comments };
+        }) : [],
       });
 
-     
+
       // Validate export data
       if (!exportData.weekNumber) {
         console.warn('Week number is still missing in export data');
@@ -2664,14 +2679,25 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
       );
     })(),
-    qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => ({
-      sectionTitle: key,
-      codeHeader: "Code",
-      statusHeader: "Status",
-      dateHeader: "Date Responded",
-      items: Array.isArray(value) ? value : [],
-      comments: Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '',
-    })) : [],
+    qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => {
+      const isBackendFormat = value && typeof value === 'object' && !Array.isArray(value) && 'items' in value;
+      const rawItems = isBackendFormat ? (value.items || []) : (Array.isArray(value) ? value : []);
+      const items = rawItems.map((item: any) => ({
+        ...item,
+        dateResponse: item.dateResponse || item.dateResponded || '',
+      }));
+      const comments = isBackendFormat
+        ? (value.comments || '')
+        : (Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '');
+      return {
+        sectionTitle: key,
+        codeHeader: "Code",
+        statusHeader: "Status",
+        dateHeader: "Date Responded",
+        items,
+        comments,
+      };
+    }) : [],
     hseTraining: hsesData?.training || [],
     hseInspection: hsesData?.inspection || [],
     hsePermits: hsesData?.permit || [],

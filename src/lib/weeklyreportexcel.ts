@@ -1828,55 +1828,30 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     if (!id) return 0;
 
     const trimmed = id.trim();
+    const idType = detectIdType(trimmed);
 
-    // Debug: Log the ID being processed
-    console.log(`Processing ID: "${trimmed}"`);
-
-    // Roman numerals (I, II, III, IV, V, etc.) - level 0
-    if (/^[IVX]+$/.test(trimmed)) {
-      console.log(`Matched Roman numeral: ${trimmed}`);
-      return 0;
-    }
+    // Roman numerals (I, II, III, IV, V, etc.) and ambiguous single letters
+    // that function as roman numerals (e.g. "I" = section 1) — level 0
+    if (idType === 'roman' || idType === 'ambiguous') return 0;
 
     // Arabic numbers with dots (1., 2., 3., etc.) - level 1
-    if (/^\d+\.$/.test(trimmed)) {
-      console.log(`Matched Arabic number with dot: ${trimmed}`);
-      return 1;
-    }
-
-    // Decimal numbers (1.1, 1.2, 2.1, etc.) - level 2
-    if (/^\d+\.\d+$/.test(trimmed)) {
-      console.log(`Matched decimal number: ${trimmed}`);
-      return 2;
-    }
+    if (/^\d+\.$/.test(trimmed)) return 1;
 
     // Triple decimal (1.1.1, 1.2.1, etc.) - level 3
-    if (/^\d+\.\d+\.\d+$/.test(trimmed)) {
-      console.log(`Matched triple decimal: ${trimmed}`);
-      return 3;
-    }
+    if (/^\d+\.\d+\.\d+$/.test(trimmed)) return 3;
 
-    // Dash only (-, --, ---) - level 4 (treated as deepest level)
-    if (/^-+$/.test(trimmed)) {
-      console.log(`Matched dash: ${trimmed}`);
-      return 4;
-    }
+    // Decimal numbers (1.1, 1.2, 2.1, etc.) - level 2
+    if (/^\d+\.\d+$/.test(trimmed)) return 2;
 
-    // Handle other common patterns that might not match above
-    // Numbers without dots (1, 2, 3) - treat as level 1
-    if (/^\d+$/.test(trimmed)) {
-      console.log(`Matched plain number: ${trimmed}, treating as level 1`);
-      return 1;
-    }
+    // Dash only (-, --, ---) - level 4
+    if (/^-+$/.test(trimmed)) return 4;
 
-    // Letters (A, B, C) - treat as level 1
-    if (/^[A-Za-z]+$/.test(trimmed)) {
-      console.log(`Matched letters: ${trimmed}, treating as level 1`);
-      return 1;
-    }
+    // Numbers without dots (1, 2, 3) - level 1
+    if (/^\d+$/.test(trimmed)) return 1;
 
-    // Anything else - log and return level 1 as default
-    console.log(`Unmatched ID pattern: "${trimmed}", treating as level 1`);
+    // Alpha letters (A, B, C) treated as level-1 subsections
+    if (idType === 'alpha') return 1;
+
     return 1;
   };
 
@@ -1909,40 +1884,22 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 
   // Add data rows
   if (d.nwdpItems && d.nwdpItems.length > 0) {
-    // Debug: Log the full nwdpItems structure to diagnose data misalignment
-    console.log('Full nwdpItems:', JSON.stringify(d.nwdpItems, null, 2));
-
-    d.nwdpItems.forEach((item, index) => {
+    d.nwdpItems.forEach((item) => {
       // ID + Scope of work (combined in column B) with indentation
-      const itemId = item.id || '';
+      const itemId = (item as any).sourceId || item.id || '';
       const scopeText = item.workDoneLabel || '';
       const workDoneText = itemId && scopeText ? `${itemId}. ${scopeText}` : (itemId || scopeText);
       const workDoneIndentLevel = getIndentationLevel(itemId);
       const isRomanLevel = workDoneIndentLevel === 0;
       const formattedWorkDone = addIndentation(workDoneText, workDoneIndentLevel);
 
-      // Debug logging to help identify issues
-      console.log(`Item ${index}: ID="${itemId}", Level=${workDoneIndentLevel}, WorkDone="${workDoneText}"`);
-      console.log(`Item ${index}: Row=${r}, FormattedWorkDone="${formattedWorkDone}"`);
-
       ws.getCell(r, 2).value = formattedWorkDone;
-      console.log(`Item ${index}: Set cell(${r},2) value to: "${formattedWorkDone}"`);
-
-      // Verify the cell value was actually set
-      const verifyValue = ws.getCell(r, 2).value;
-      console.log(`Item ${index}: Verified cell(${r},2) value: "${verifyValue}"`);
 
       // Set explicit row height to ensure visibility
       ws.getRow(r).height = 20;
 
-      // Additional debugging for dash items
-      if (itemId === '-') {
-        console.log(`Item ${index}: Dash item - Row=${r}, Check if row is hidden: ${ws.getRow(r).hidden || false}`);
-        console.log(`Item ${index}: Dash item - Cell style: ${JSON.stringify(ws.getCell(r, 2).style)}`);
-      }
-
       ws.getCell(r, 2).style = {
-        font: { bold: isRomanLevel, size: 10, name: 'Arial' },
+        font: { bold: isRomanLevel, size: isRomanLevel ? 11 : 10, name: 'Arial' },
         alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
         border: {
           top: { style: 'hair' },
@@ -1969,25 +1926,11 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       const nextWeekWithId = itemId && nextWeekText
         ? `${itemId}. ${nextWeekText}`
         : (nextWeekText || (itemId ? `${itemId}.` : ''));
-      const displayText = nextWeekWithId || '';
-      const formattedNextWeek = addIndentation(displayText, workDoneIndentLevel);
-
-      // Debug logging specifically for Next Week Plan column
-      console.log(`Item ${index}: NextWeekPlan - Text="${nextWeekText}", Formatted="${formattedNextWeek}"`);
+      const formattedNextWeek = addIndentation(nextWeekWithId || '', workDoneIndentLevel);
 
       ws.getCell(r, 4).value = formattedNextWeek;
-
-      // Verify the Next Week Plan cell value was actually set
-      const verifyNextWeekValue = ws.getCell(r, 4).value;
-      console.log(`Item ${index}: Verified NextWeekPlan cell(${r},4) value: "${verifyNextWeekValue}"`);
-
-      // Additional debugging for dash items in Next Week Plan
-      if (itemId === '-') {
-        console.log(`Item ${index}: Dash NextWeekPlan - Row=${r}, Cell(${r},4) value: "${verifyNextWeekValue}"`);
-        console.log(`Item ${index}: Dash NextWeekPlan - Cell(${r},4) style: ${JSON.stringify(ws.getCell(r, 4).style)}`);
-      }
       ws.getCell(r, 4).style = {
-        font: { bold: isRomanLevel, size: 10, name: 'Arial' },
+        font: { bold: isRomanLevel, size: isRomanLevel ? 11 : 10, name: 'Arial' },
         alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
         border: {
           top: { style: 'hair' },
@@ -2030,7 +1973,6 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 // SHEET 8: 4. QAQC
 async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('4. QAQC');
-  const styles = createStyles(workbook);
 
   ws.properties.tabColor = { argb: 'FF0070C0' };
 
@@ -2082,14 +2024,27 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       ]
     };
     ws.getCell(r, 2).style = {
-      alignment: { horizontal: 'center', vertical: 'middle' }
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFDCE6F1' } },
+      alignment: { horizontal: 'left' as const, vertical: 'middle' as const },
+      border: {
+        top: { style: 'thin' as const }, bottom: { style: 'thin' as const },
+        left: { style: 'thin' as const }, right: { style: 'thin' as const }
+      }
     };
     ws.mergeCells(r, 2, r, 5);
     ws.getRow(r).height = 22.5;
-    r++; // Space between sections
+    r++;
 
-    // Match section by sectionTitle which is the key like "4.1", "4.2", etc.
-    const sectionData = d.qaqcSections?.find(s => s.sectionTitle === section.id);
+    // Match section by sectionTitle (supports both '4.1' keys and short keys like 'ncr')
+    const KEY_TO_ID: Record<string, string> = {
+      ncr: '4.1', car: '4.2', scar: '4.3', pmsi: '4.4', csi: '4.5',
+      ir: '4.6', mfa: '4.7', rfi: '4.8', rfa: '4.9', fcr: '4.10',
+      vo: '4.11', tr: '4.12', mir: '4.13'
+    };
+    const sectionData = d.qaqcSections?.find(s =>
+      s.sectionTitle === section.id ||
+      (s.sectionTitle !== undefined && KEY_TO_ID[s.sectionTitle] === section.id)
+    );
 
     // Table headers - special case for Client Site Instruction and Inspection Request
     if (section.id === '4.5') {
@@ -2103,24 +2058,27 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       ws.getCell(r, 4).value = 'Received Date';
       ws.getCell(r, 5).value = 'Inspection Date';
     } else {
-      // Standard order: Code, Description, Status, Date Responded
       ws.getCell(r, 2).value = 'Code';
       ws.getCell(r, 3).value = 'Description';
       ws.getCell(r, 4).value = 'Status';
       ws.getCell(r, 5).value = 'Date Responded';
     }
 
-    // Style headers as bold with background color
-    const headerStyle = {
+    // Style headers with background color and borders
+    const headerStyle: Partial<ExcelJS.Style> = {
       font: { bold: true, size: 11, name: 'Arial' },
-      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } }
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } },
+      alignment: { horizontal: 'center' as const, vertical: 'middle' as const },
+      border: {
+        top: { style: 'thin' as const }, bottom: { style: 'thin' as const },
+        left: { style: 'thin' as const }, right: { style: 'thin' as const }
+      }
     };
 
     ws.getCell(r, 2).style = headerStyle;
     ws.getCell(r, 3).style = headerStyle;
     ws.getCell(r, 4).style = headerStyle;
     ws.getCell(r, 5).style = headerStyle;
-    ws.getCell(r, 6).style = headerStyle;
     ws.getRow(r).height = 30;
 
     r += 1;
@@ -2151,8 +2109,9 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       }
 
       // Style data cells with borders
-      const dataStyleWithBorder = {
-        ...styles.data,
+      const dataStyleWithBorder: Partial<ExcelJS.Style> = {
+        font: { size: 11, name: 'Arial' },
+        alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true },
         border: {
           top: { style: 'thin' as const },
           bottom: { style: 'thin' as const },
@@ -2163,10 +2122,7 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 
       ws.getCell(r, 2).style = dataStyleWithBorder;
       ws.getCell(r, 3).style = dataStyleWithBorder;
-      ws.getCell(r, 4).style = {
-        ...dataStyleWithBorder,
-        alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
-      };
+      ws.getCell(r, 4).style = dataStyleWithBorder;
       ws.getCell(r, 5).style = dataStyleWithBorder;
       ws.getRow(r).height = 22;
 
@@ -2221,7 +2177,7 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   ws.properties.tabColor = { argb: 'FF00B050' };
 
   // ── Column widths (A–K) exactly as template ──────────────────────────────
-  const widths = [5.71, 30.71, 5.71, 8.43, 8.43, 8.43, 8.43, 8.43, 10.57, 15.71, 20];
+  const widths = [5.71, 30.71, 5.71, 5.71, 5.71, 5.71, 5.71, 5.71, 10.57, 15.71, 15.71];
   widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
   // ── Reusable style helpers ───────────────────────────────────────────────

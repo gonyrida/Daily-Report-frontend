@@ -22,6 +22,7 @@ export const useReportForm = () => {
   
   // Project Info
   const [projectName, setProjectName] = useState("");
+  const [projectId, setProjectId] = useState<string | undefined>(undefined);
   const [location, setLocation] = useState("");
   const [createdBy, setCreatedBy] = useState("");
   const [reportDate, setReportDate] = useState<Date | undefined>(undefined);
@@ -68,6 +69,7 @@ export const useReportForm = () => {
   const getReportData = useCallback(
     (): ReportData => ({
       projectName,
+      projectId,
       location,
       createdBy,
       // Fixed logic: ensures we return a string or null as per your Interface
@@ -110,6 +112,7 @@ export const useReportForm = () => {
   // Helper to fill all fields at once
   const fillForm = useCallback((data: Partial<ReportData>) => {
     setProjectName(data.projectName || "");
+    setProjectId(data.projectId);
     setLocation(data.location || "");
     setCreatedBy(data.createdBy || "");
     setReportDate(data.reportDate ? new Date(data.reportDate) : new Date());
@@ -177,15 +180,16 @@ export const useReportForm = () => {
   }, []);
 
   // Google Docs-style: Create blank report immediately
-  const createNewBlankReport = useCallback(async (projectName?: string) => {
+  const createNewBlankReport = useCallback(async (projectName?: string, projectId?: string) => {
     try {
       setIsSaving(true);
-      
-      const result = await createBlankReport(projectName);
+
+      const result = await createBlankReport(projectName, projectId);
       
       if (result.success && result.data) {
         setReportId(result.data._id);
         setProjectName(result.data.projectName);
+        setProjectId(result.data.projectId);
         setReportDate(new Date(result.data.reportDate));
         setLastSavedAt(new Date(result.data.updatedAt));
         
@@ -880,6 +884,8 @@ export const useReportForm = () => {
     // Data State
     projectName,
     setProjectName,
+    projectId,
+    setProjectId,
     location,
     setLocation,
     createdBy,
