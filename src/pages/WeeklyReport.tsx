@@ -529,7 +529,10 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                 ],
                 firstAidAccident: "",
                 otherActivities: "",
-                hsePhotoReferences: hsesData?.hsePhotoReferences || []
+                hsePhotoReferences: {
+                  hseToolboxMeeting: [],
+                  hseActivityPhotos: []
+                }
               });
             }
 
@@ -898,7 +901,10 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             ],
             firstAidAccident: '',
             otherActivities: '',
-            hsePhotoReferences: hsesData?.hsePhotoReferences || []
+            hsePhotoReferences: {
+              hseToolboxMeeting: [],
+              hseActivityPhotos: []
+            }
           },
           photos: {
             title: 'Site Activities Photos',
@@ -1100,7 +1106,10 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             ],
             firstAidAccident: '',
             otherActivities: '',
-            hsePhotoReferences: hsesData?.hsePhotoReferences || []
+            hsePhotoReferences: {
+              hseToolboxMeeting: [],
+              hseActivityPhotos: []
+            }
           },
           photos: {
             title: 'Site Activities Photos',
@@ -1335,7 +1344,10 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         ],
         firstAidAccident: "",
         otherActivities: "",
-        hsePhotoReferences: hsesData?.hsePhotoReferences || []
+        hsePhotoReferences: hsesData?.hsePhotoReferences || {
+          hseToolboxMeeting: [],
+          hseActivityPhotos: []
+        }
       };
 
       // Convert Photos images to base64 before saving
@@ -1530,11 +1542,21 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       };
 
       // Convert HSES photo references to Supabase URLs before saving (submit handler)
-      if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
-        hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
-          hsesDataForSave.hsePhotoReferences,
-          currentReportId || 'temp-report-id'
-        );
+      if (hsesDataForSave.hsePhotoReferences) {
+        // Upload hseToolboxMeeting photos
+        if (hsesDataForSave.hsePhotoReferences.hseToolboxMeeting?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseToolboxMeeting = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseToolboxMeeting,
+            currentReportId || 'temp-report-id'
+          );
+        }
+        // Upload hseActivityPhotos photos
+        if (hsesDataForSave.hsePhotoReferences.hseActivityPhotos?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseActivityPhotos = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseActivityPhotos,
+            currentReportId || 'temp-report-id'
+          );
+        }
       }
 
       let response;
@@ -1736,7 +1758,10 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         ],
         firstAidAccident: "",
         otherActivities: "",
-        hsePhotoReferences: hsesData?.hsePhotoReferences || []
+        hsePhotoReferences: hsesData?.hsePhotoReferences || {
+          hseToolboxMeeting: [],
+          hseActivityPhotos: []
+        }
       };
 
       // Convert Photos images to base64 before saving
@@ -1939,11 +1964,21 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       };
 
       // Convert HSES photo references to Supabase URLs before saving (draft handler)
-      if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
-        hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
-          hsesDataForSave.hsePhotoReferences,
-          currentReportId || 'temp-report-id'
-        );
+      if (hsesDataForSave.hsePhotoReferences) {
+        // Upload hseToolboxMeeting photos
+        if (hsesDataForSave.hsePhotoReferences.hseToolboxMeeting?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseToolboxMeeting = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseToolboxMeeting,
+            currentReportId || 'temp-report-id'
+          );
+        }
+        // Upload hseActivityPhotos photos
+        if (hsesDataForSave.hsePhotoReferences.hseActivityPhotos?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseActivityPhotos = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseActivityPhotos,
+            currentReportId || 'temp-report-id'
+          );
+        }
       }
 
 

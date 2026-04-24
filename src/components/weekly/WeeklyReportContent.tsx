@@ -306,7 +306,10 @@ useEffect(() => {
 
     // Preserve existing hsePhotoReferences or initialize with proper structure
     const currentPhotoReferences = currentHsesData?.hsePhotoReferences;
-    exampleData.hsePhotoReferences = currentPhotoReferences && currentPhotoReferences.length > 0 ? currentPhotoReferences : createHSESections();
+    exampleData.hsePhotoReferences = currentPhotoReferences?.hseToolboxMeeting ? currentPhotoReferences : {
+      hseToolboxMeeting: createHSESections(),
+      hseActivityPhotos: []
+    };
 
     // Set parent state directly
     setHsesData(exampleData);
@@ -320,7 +323,7 @@ useEffect(() => {
   }, [hsesData]); // Add hsesData dependency to sync when parent changes
 
   // Ensure hook data is always available for the Hses component
-  const currentHsesData = (hsesData?.hsePhotoReferences && hsesData.hsePhotoReferences.length > 0) ? hsesData : hsesDataHook.data;
+  const currentHsesData = (hsesData?.hsePhotoReferences?.hseToolboxMeeting) ? hsesData : hsesDataHook.data;
   
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {

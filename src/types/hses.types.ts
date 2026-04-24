@@ -26,7 +26,10 @@ export interface HsesData {
   }>;
   firstAidAccident: string;
   otherActivities: string;
-  hsePhotoReferences: any[];
+  hsePhotoReferences: {
+    hseToolboxMeeting: any[];
+    hseActivityPhotos: any[];
+  };
 }
 
 export interface HsesProps {

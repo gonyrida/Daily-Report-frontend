@@ -76,7 +76,10 @@ export interface WeeklyReportExportData {
   hsePermits?: HSEPermitRow[];
   hseFirstAid?: string;
   hseOtherConcerns?: string;
-  hsePhotos?: HSEPhotoEntry[];
+  hsePhotoReferences?: {
+    hseToolboxMeeting?: HSEPhotoEntry[];
+    hseActivityPhotos?: HSEPhotoEntry[];
+  };
 
   // ── 6. Resources ─────────────────────────────────────────────────────────────
   weekDates?: string[];           // 7 day-date strings e.g. ["13","14","15","16","17","18","19"]
@@ -2540,7 +2543,7 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   };
 
   // Process HSE photo entries
-  const hsePhotoEntries = d.hsePhotos ?? [];
+  const hsePhotoEntries = d.hsePhotoReferences?.hseToolboxMeeting ?? [];
   let lastSection: string | undefined = undefined;
   let entriesOnCurrentPage = 0;
 
@@ -2673,6 +2676,131 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
     ws.getCell(r, 6).value = 'N/A';
     safeStyle(ws.getCell(r, 6), naStyle, 'hse56.na');
     for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse56.na.span');
+    safeMerge(ws, r, 6, r, 9);
+
+    r++;
+  }
+
+  // Process HSE Activity Photos (5.7)
+  const hseActivityPhotoEntries = d.hsePhotoReferences?.hseActivityPhotos ?? [];
+  let activityLastSection: string | undefined = undefined;
+  let activityEntriesOnCurrentPage = 0;
+
+  for (const entry of hseActivityPhotoEntries) {
+    const currentSection = entry.sectionTitle;
+    const sectionChanged = currentSection && currentSection !== activityLastSection;
+
+    // Page break after 4 entries
+    if (activityEntriesOnCurrentPage >= 4) {
+      ws.getRow(r).addPageBreak();
+      activityEntriesOnCurrentPage = 0;
+
+      if (!sectionChanged && activityLastSection) {
+        ws.getRow(r).height = 20.1;
+        ws.getCell(r, 2).value = `${activityLastSection} (Continued)`;
+        safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.hdr');
+        for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.hdr.span');
+        safeMerge(ws, r, 2, r, 9);
+        r++;
+      }
+    }
+
+    // Handle new section header
+    if (sectionChanged) {
+      ws.getRow(r).height = 20.1;
+      ws.getCell(r, 2).value = currentSection ?? '';
+      safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.hdr');
+      for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.hdr.span');
+      safeMerge(ws, r, 2, r, 9);
+      r++;
+      activityLastSection = currentSection;
+    }
+
+    // Render photo entry block
+    ws.getRow(r).height = 6.95;
+    r++;
+
+    const photoRow = r;
+    ws.getRow(r).height = 170.1;
+
+    // Left photo box (B-E merged)
+    safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse57.photoL');
+    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoL.span');
+    safeMerge(ws, r, 2, r, 5);
+
+    // Right photo box (F-I merged)
+    safeStyle(ws.getCell(r, 6), photoBoxStyle, 'hse57.photoR');
+    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoR.span');
+    safeMerge(ws, r, 6, r, 9);
+
+    // Handle images
+    const images = entry.images ?? [];
+    const footers = entry.footers ?? [];
+    const maxImages = 2;
+
+    for (let idx = 0; idx < maxImages; idx++) {
+      const imgSource = images[idx];
+      const startCol = idx === 0 ? 2 : 6;
+      const endCol = idx === 0 ? 5 : 9;
+
+      if (imgSource) {
+        addImageToWorksheet(workbook, ws, imgSource, {
+          tl: { col: startCol - 1, row: photoRow - 1 },
+          br: { col: endCol - 1, row: photoRow - 1 },
+          ext: { width: 200, height: 170 },
+          editAs: 'oneCell'
+        } as any).catch(() => {});
+      } else {
+        ws.getCell(photoRow, startCol).value = 'N/A';
+        safeStyle(ws.getCell(photoRow, startCol), naStyle, 'hse57.na');
+        safeStyle(ws.getCell(photoRow, startCol + 1), naStyle, 'hse57.na.span');
+        safeStyle(ws.getCell(photoRow, startCol + 2), naStyle, 'hse57.na.span');
+        if (idx === 0) {
+          safeStyle(ws.getCell(photoRow, startCol + 3), naStyle, 'hse57.na.span');
+        }
+      }
+    }
+
+    r++;
+
+    // Spacer row
+    ws.getRow(r).height = 6.95;
+    r++;
+
+    // Footer/caption row
+    ws.getRow(r).height = 15;
+
+    // Left footer
+    ws.getCell(r, 3).value = footers[0] ?? '';
+    safeStyle(ws.getCell(r, 3), footerStyle, 'hse57.footerL');
+    safeStyle(ws.getCell(r, 4), footerStyle, 'hse57.footerL.span');
+    safeMerge(ws, r, 3, r, 4);
+
+    // Right footer
+    ws.getCell(r, 7).value = footers[1] ?? '';
+    safeStyle(ws.getCell(r, 7), footerStyle, 'hse57.footerR');
+    safeStyle(ws.getCell(r, 8), footerStyle, 'hse57.footerR.span');
+    safeMerge(ws, r, 7, r, 8);
+
+    r++;
+    activityEntriesOnCurrentPage++;
+  }
+
+  // If no activity photo entries, render empty placeholder
+  if (hseActivityPhotoEntries.length === 0) {
+    ws.getRow(r).height = 6.95;
+    r++;
+
+    ws.getRow(r).height = 170.1;
+
+    ws.getCell(r, 2).value = 'N/A';
+    safeStyle(ws.getCell(r, 2), naStyle, 'hse57.na');
+    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse57.na.span');
+    safeMerge(ws, r, 2, r, 5);
+
+    ws.getCell(r, 6).value = 'N/A';
+    safeStyle(ws.getCell(r, 6), naStyle, 'hse57.na');
+    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse57.na.span');
     safeMerge(ws, r, 6, r, 9);
 
     r++;
