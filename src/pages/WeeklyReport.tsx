@@ -278,6 +278,9 @@ const WeeklyReport = () => {
   const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
   const [reportStatus, setReportStatus] = useState<string>("draft");
 
+// NEW: Overall progress remark state
+const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
+
   // NEW: Add QAQC state to WeeklyReport page (like other sections)
   const [qaqcData, setQaqcData] = useState<any>(null);
 
@@ -440,6 +443,12 @@ const WeeklyReport = () => {
             if (report.sections?.overallProgress?.rows) {
               overallProgressHook.setRows(report.sections.overallProgress.rows);
             }
+            // ADD THIS:
+            if (report.sections?.overallProgress?.remark !== undefined) {
+              setOverallProgressRemark(report.sections.overallProgress.remark || "");
+            } else {
+              setOverallProgressRemark("");
+            }
 
             // Load activities data
             if (report.sections?.activities) {
@@ -520,7 +529,10 @@ const WeeklyReport = () => {
                 ],
                 firstAidAccident: "",
                 otherActivities: "",
-                hsePhotoReferences: hsesData?.hsePhotoReferences || []
+                hsePhotoReferences: {
+                  hseToolboxMeeting: [],
+                  hseActivityPhotos: []
+                }
               });
             }
 
@@ -889,7 +901,10 @@ const WeeklyReport = () => {
             ],
             firstAidAccident: '',
             otherActivities: '',
-            hsePhotoReferences: hsesData?.hsePhotoReferences || []
+            hsePhotoReferences: {
+              hseToolboxMeeting: [],
+              hseActivityPhotos: []
+            }
           },
           photos: {
             title: 'Site Activities Photos',
@@ -1091,7 +1106,10 @@ const WeeklyReport = () => {
             ],
             firstAidAccident: '',
             otherActivities: '',
-            hsePhotoReferences: hsesData?.hsePhotoReferences || []
+            hsePhotoReferences: {
+              hseToolboxMeeting: [],
+              hseActivityPhotos: []
+            }
           },
           photos: {
             title: 'Site Activities Photos',
@@ -1326,7 +1344,10 @@ const WeeklyReport = () => {
         ],
         firstAidAccident: "",
         otherActivities: "",
-        hsePhotoReferences: hsesData?.hsePhotoReferences || []
+        hsePhotoReferences: hsesData?.hsePhotoReferences || {
+          hseToolboxMeeting: [],
+          hseActivityPhotos: []
+        }
       };
 
       // Convert Photos images to base64 before saving
@@ -1466,7 +1487,8 @@ const WeeklyReport = () => {
             employer: sharedData.employer || 'Client Name'
           },
           overallProgress: {
-            rows: formatRowsWithDisplayIndex(overallProgressHook.rows)
+            rows: formatRowsWithDisplayIndex(overallProgressHook.rows),
+            remark: overallProgressRemark,   // ← ADD THIS
           },
           // NEW: Add activities section to save payload
           activities: {
@@ -1520,11 +1542,21 @@ const WeeklyReport = () => {
       };
 
       // Convert HSES photo references to Supabase URLs before saving (submit handler)
-      if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
-        hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
-          hsesDataForSave.hsePhotoReferences,
-          currentReportId || 'temp-report-id'
-        );
+      if (hsesDataForSave.hsePhotoReferences) {
+        // Upload hseToolboxMeeting photos
+        if (hsesDataForSave.hsePhotoReferences.hseToolboxMeeting?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseToolboxMeeting = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseToolboxMeeting,
+            currentReportId || 'temp-report-id'
+          );
+        }
+        // Upload hseActivityPhotos photos
+        if (hsesDataForSave.hsePhotoReferences.hseActivityPhotos?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseActivityPhotos = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseActivityPhotos,
+            currentReportId || 'temp-report-id'
+          );
+        }
       }
 
       let response;
@@ -1726,7 +1758,10 @@ const WeeklyReport = () => {
         ],
         firstAidAccident: "",
         otherActivities: "",
-        hsePhotoReferences: hsesData?.hsePhotoReferences || []
+        hsePhotoReferences: hsesData?.hsePhotoReferences || {
+          hseToolboxMeeting: [],
+          hseActivityPhotos: []
+        }
       };
 
       // Convert Photos images to base64 before saving
@@ -1867,7 +1902,8 @@ const WeeklyReport = () => {
             coverImage: sharedData.coverImage || ""
           },
           overallProgress: {
-            rows: formatRowsWithDisplayIndex(overallProgressHook.rows)
+            rows: formatRowsWithDisplayIndex(overallProgressHook.rows),
+            remark: overallProgressRemark,   // ← ADD THIS
           },
           // NEW: Add activities section to save payload
           activities: {
@@ -1928,11 +1964,21 @@ const WeeklyReport = () => {
       };
 
       // Convert HSES photo references to Supabase URLs before saving (draft handler)
-      if (hsesDataForSave.hsePhotoReferences && hsesDataForSave.hsePhotoReferences.length > 0) {
-        hsesDataForSave.hsePhotoReferences = await uploadHSEPhotoReferencesToSupabase(
-          hsesDataForSave.hsePhotoReferences,
-          currentReportId || 'temp-report-id'
-        );
+      if (hsesDataForSave.hsePhotoReferences) {
+        // Upload hseToolboxMeeting photos
+        if (hsesDataForSave.hsePhotoReferences.hseToolboxMeeting?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseToolboxMeeting = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseToolboxMeeting,
+            currentReportId || 'temp-report-id'
+          );
+        }
+        // Upload hseActivityPhotos photos
+        if (hsesDataForSave.hsePhotoReferences.hseActivityPhotos?.length > 0) {
+          hsesDataForSave.hsePhotoReferences.hseActivityPhotos = await uploadHSEPhotoReferencesToSupabase(
+            hsesDataForSave.hsePhotoReferences.hseActivityPhotos,
+            currentReportId || 'temp-report-id'
+          );
+        }
       }
 
 
@@ -2264,60 +2310,54 @@ const WeeklyReport = () => {
         },
         // Add missing overall progress data
         overallProgress: formatRowsWithDisplayIndex(overallProgressHook.rows),
-        overallProgressRemark: '', // Using empty string since property doesn't exist on sharedData
+        overallProgressRemark: overallProgressRemark,   // ← use the state
         // Add construction progress data - cast to any to bypass type mismatch
         constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
         conProgressProject: sharedData.projectName,
         conProgressDate: dateParts[0],
         // Add activities data - properly transform to match expected structure
         nwdpItems: (() => {
-          // Create array to hold all individual rows
-          const allItems = [];
+          const allItems: any[] = [];
 
-          // First, add all weekly activities as individual items
           (weeklyActivities || []).forEach(a => {
             allItems.push({
-              sourceId: a.sourceId || '',
+              rowId: a.id || '',
+              sourceId: a.displayId || a.sourceId || '',
               workDoneLabel: a.description,
               workDonePct: a.percent,
               nextWeekLabel: undefined,
-              nextWeekPct: undefined
+              nextWeekPct: undefined,
             });
           });
 
-          // Then, try to match next week plan items with existing weekly activities
-          // or add them as new items if no match found
           (nextWeekPlan || []).forEach(a => {
-            const id = a.sourceId || '';
+            const sourceId = a.displayId || a.sourceId || '';
+            const rowId = a.id || '';
 
-            // Try to find matching weekly activity by sourceId
             let matched = false;
-            if (id) {
-              // Only try to match if there's a non-empty ID
-              for (let i = 0; i < allItems.length; i++) {
-                if (allItems[i].sourceId === id && allItems[i].nextWeekLabel === undefined) {
-                  // Found match, add next week data to this item
-                  allItems[i].nextWeekLabel = a.description;
-                  allItems[i].nextWeekPct = a.percent;
-                  matched = true;
-                  break;
-                }
+            for (let i = 0; i < allItems.length; i++) {
+              const byRowId = rowId && allItems[i].rowId === rowId;
+              const bySourceId = sourceId && allItems[i].sourceId === sourceId;
+              if ((byRowId || bySourceId) && allItems[i].nextWeekLabel === undefined) {
+                allItems[i].nextWeekLabel = a.description;
+                allItems[i].nextWeekPct = a.percent;
+                matched = true;
+                break;
               }
             }
 
-            // If no match found (or ID is empty), add as separate item
             if (!matched) {
               allItems.push({
-                sourceId: id,
+                rowId,
+                sourceId,
                 workDoneLabel: undefined,
                 workDonePct: undefined,
                 nextWeekLabel: a.description,
-                nextWeekPct: a.percent
+                nextWeekPct: a.percent,
               });
             }
           });
 
-          // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
           return allItems.filter(item =>
             item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
           );
@@ -2503,84 +2543,39 @@ const WeeklyReport = () => {
   // Pre-compute overallProgress data to prevent race condition
   const formatRowsWithDisplayIndex = (rows: any[] | null) => {
     if (!rows || rows.length === 0) return [];
+
+    // Filter out soft-deleted rows AND the alpha-only filter
+    const filtered = rows.filter((row) => {
+      if (row.isDeleted) return false;              // ← ADD: drop tombstones
+      if (!row.sourceId) return true;               // keep user-added rows
+      const trimmed = row.sourceId.trim();
+      const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
+      const isRomanIorV = /^(I|V)$/i.test(trimmed);
+      return !(isSingleAlpha && !isRomanIorV);
+    });
+
     let titleCount = 0;
-    return (rows || []).map((row, index) => {
+    let detailCount = 0;
+    let subDetailCount = 0;
+
+    return filtered.map((row) => {
       if (row.rowType === "title") {
-        titleCount++;
-        return {
-          ...row,
-          displayIndex: `${toRoman(titleCount)}.`,
-        };
+        titleCount += 1;
+        detailCount = 0;
+        subDetailCount = 0;
+        return { ...row, displayIndex: `${toRoman(titleCount)}.` };
       }
       if (row.rowType === "detail") {
-        let detailCount = 0;
-        for (let i = 0; i <= index; i++) {
-          if (rows[i].rowType === "title") {
-            detailCount = 0;
-          } else if (rows[i].rowType === "detail") {
-            detailCount++;
-          }
-        }
-        return {
-          ...row,
-          displayIndex: `${detailCount}.`,
-        };
+        detailCount += 1;
+        subDetailCount = 0;
+        return { ...row, displayIndex: `${detailCount}.` };
       }
       if (row.rowType === "subDetail") {
-        // Find parent detail number for this sub-detail
-        let parentDetailNumber = 0;
-        for (let i = index; i >= 0; i--) {
-          if (rows[i].rowType === "detail") {
-            let detailCount = 0;
-            for (let j = 0; j <= i; j++) {
-              if (rows[j].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            parentDetailNumber = detailCount;
-            break;
-          }
-        }
-
-        // Count sub-details under the same parent
-        let subDetailCount = 0;
-        for (let i = 0; i <= index; i++) {
-          if (rows[i].rowType === "detail") {
-            let detailCount = 0;
-            for (let j = 0; j <= i; j++) {
-              if (rows[j].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            if (detailCount === parentDetailNumber) {
-              subDetailCount = 0;
-            }
-          } else if (rows[i].rowType === "subDetail") {
-            let currentParentDetail = 0;
-            for (let k = i; k >= 0; k--) {
-              if (rows[k].rowType === "detail") {
-                let detailCount = 0;
-                for (let j = 0; j <= k; j++) {
-                  if (rows[j].rowType === "detail") {
-                    detailCount++;
-                  }
-                }
-                currentParentDetail = detailCount;
-                break;
-              }
-            }
-            if (currentParentDetail === parentDetailNumber) {
-              subDetailCount++;
-            }
-          }
-        }
-
-        return {
-          ...row,
-          displayIndex: `${parentDetailNumber}.${subDetailCount}`,
-        };
+        subDetailCount += 1;
+        const parent = detailCount > 0 ? detailCount : 0;
+        return { ...row, displayIndex: `${parent}.${subDetailCount}` };
       }
-      return row;
+      return { ...row, displayIndex: row.displayIndex ?? "" };
     });
   };
 
@@ -2622,54 +2617,49 @@ const WeeklyReport = () => {
     conProgressDate: constructionProgressHook.constructionData?.projectInfo?.date || sharedData.dateRange?.split(' - ')[0],
     conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
     overallProgress: computedOverallProgress,
+    overallProgressRemark: overallProgressRemark,   // ← ADD THIS
     nwdpItems: (() => {
-      // Create array to hold all individual rows
-      const allItems = [];
+      const allItems: any[] = [];
 
-      // First, add all weekly activities as individual items
       weeklyActivities.forEach(a => {
         allItems.push({
-          sourceId: a.sourceId || '',
+          rowId: a.id || '',
+          sourceId: a.displayId || a.sourceId || '',
           workDoneLabel: a.description,
           workDonePct: a.percent,
           nextWeekLabel: undefined,
-          nextWeekPct: undefined
+          nextWeekPct: undefined,
         });
       });
 
-      // Then, try to match next week plan items with existing weekly activities
-      // or add them as new items if no match found
       nextWeekPlan.forEach(a => {
-        const id = a.sourceId || '';
+        const sourceId = a.displayId || a.sourceId || '';
+        const rowId = a.id || '';
 
-        // Try to find matching weekly activity by sourceId
         let matched = false;
-        if (id) {
-          // Only try to match if there's a non-empty ID
-          for (let i = 0; i < allItems.length; i++) {
-            if (allItems[i].sourceId === id && allItems[i].nextWeekLabel === undefined) {
-              // Found match, add next week data to this item
-              allItems[i].nextWeekLabel = a.description;
-              allItems[i].nextWeekPct = a.percent;
-              matched = true;
-              break;
-            }
+        for (let i = 0; i < allItems.length; i++) {
+          const byRowId = rowId && allItems[i].rowId === rowId;
+          const bySourceId = sourceId && allItems[i].sourceId === sourceId;
+          if ((byRowId || bySourceId) && allItems[i].nextWeekLabel === undefined) {
+            allItems[i].nextWeekLabel = a.description;
+            allItems[i].nextWeekPct = a.percent;
+            matched = true;
+            break;
           }
         }
 
-        // If no match found (or ID is empty), add as separate item
         if (!matched) {
           allItems.push({
-            sourceId: id,
+            rowId,
+            sourceId,
             workDoneLabel: undefined,
             workDonePct: undefined,
             nextWeekLabel: a.description,
-            nextWeekPct: a.percent
+            nextWeekPct: a.percent,
           });
         }
       });
 
-      // Filter out items that have both workDoneLabel and nextWeekLabel as undefined
       return allItems.filter(item =>
         item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
       );
@@ -3143,6 +3133,8 @@ const WeeklyReport = () => {
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={overallProgressHook.setRows}
+                    overallProgressRemark={overallProgressRemark}          // ← ADD
+                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
                     reportId={currentReportId}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}
@@ -3197,6 +3189,8 @@ const WeeklyReport = () => {
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
+                    overallProgressRemark={overallProgressRemark}          // ← ADD
+                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}

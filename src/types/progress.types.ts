@@ -22,6 +22,9 @@ export interface OverallProgressRow {
   sourceId?: string;
   searchTerm?: string;
   isCustomInput?: boolean;
+  isNewlyAdded?: boolean;
 }
 
-export interface ProgressRow extends OverallProgressRow {}
+export interface ProgressRow extends OverallProgressRow {
+  isDeleted?: boolean;
+}

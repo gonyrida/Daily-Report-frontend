@@ -3,7 +3,7 @@ import HsesTableComponent from "./HsesTableComponent";
 import ReferenceSection from "../../ReferenceSection";
 import { createReferenceSection } from "@/utils/referenceHelpers";
 import { HsesData, HsesProps } from "@/types/hses.types";
-import { createHSESections } from "@/utils/hseSectionUtils";
+import { createHSESections, createHSEActivityPhotoSections } from "@/utils/hseSectionUtils";
 import { defaultHsesData } from "@/hooks/useHsesData";
 
 const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
@@ -162,18 +162,27 @@ const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
       </div>
 
       {/* 5.6 HSES Photo Reference */}
-      <div className="section-card p-4 sm:p-6">
+      <div className="section-card p-4 sm:p-6 space-y-6">
         <h4 className="text-sm sm:text-md font-medium text-foreground mb-3 flex flex-col items-start gap-1">
           <span className="flex items-center gap-2">
             <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">5.6</span> HSES Photo Reference
           </span>
         </h4>
         <ReferenceSection
-          sections={hsesData.hsePhotoReferences?.length > 0 ? hsesData.hsePhotoReferences : createHSESections()}
-          setSections={(sections) => updateData("hsePhotoReferences", sections)}
+          sections={hsesData.hsePhotoReferences?.hseToolboxMeeting?.length > 0 ? hsesData.hsePhotoReferences.hseToolboxMeeting : createHSESections()}
+          setSections={(sections) => updateData("hsePhotoReferences", { ...hsesData.hsePhotoReferences, hseToolboxMeeting: sections })}
           hideTitle={false}
           hideShadow={true}
         />
+        <div className="border-t border-border pt-6">
+          
+          <ReferenceSection
+            sections={hsesData.hsePhotoReferences?.hseActivityPhotos?.length > 0 ? hsesData.hsePhotoReferences.hseActivityPhotos : createHSEActivityPhotoSections()}
+            setSections={(sections) => updateData("hsePhotoReferences", { ...hsesData.hsePhotoReferences, hseActivityPhotos: sections })}
+            hideTitle={false}
+            hideShadow={true}
+          />
+        </div>
       </div>
     </div>
   );

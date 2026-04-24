@@ -20,7 +20,10 @@ export const defaultHsesData: HsesData = {
   ],
   firstAidAccident: "",
   otherActivities: "",
-  hsePhotoReferences: [],
+  hsePhotoReferences: {
+    hseToolboxMeeting: [],
+    hseActivityPhotos: [],
+  },
 };
 
 export const useHsesData = (reportId: string) => {
