@@ -20,6 +20,7 @@ const SiteWorkingTeamGroup = ({
       useDropdown={true}
       dropdownOptions={INTERIOR_TEAM_OPTIONS}
       inputNumberOnly={true}
+      enableDragDrop={true}
     />
   );
 };

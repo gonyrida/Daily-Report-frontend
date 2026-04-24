@@ -22,11 +22,6 @@ export const apiFetch = async (url: string, options: ApiFetchOptions = {}): Prom
     timeout = 300000, // 5 minutes for large file generation
   } = options;
 
-  console.log(`🔒 API FETCH: ${method} ${url}`, { 
-    hasBody: !!body, 
-    headers: Object.keys(headers) 
-  });
-
   // // SECURITY: NEVER allow Authorization headers
   // if (headers.authorization || headers.Authorization) {
   //   console.error('🚨 SECURITY: Authorization header detected - removing for cookie-based auth');
@@ -72,18 +67,14 @@ export const apiFetch = async (url: string, options: ApiFetchOptions = {}): Prom
 
     clearTimeout(timeoutId);
 
-    console.log(`🔒 API FETCH: ${method} ${url} → ${response.status}`);
-
     // Global 401 handling
     if (response.status === 401) {
-      console.error('🚨 AUTHENTICATION FAILED: User not authenticated');
       // Could trigger global logout here if needed
     }
 
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error(`🚨 API FETCH ERROR: ${method} ${url} →`, error);
     throw error;
   }
 };

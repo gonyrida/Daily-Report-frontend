@@ -85,8 +85,8 @@ export default function MaterialDialog({
 
 		if (!formData.description) {
 			newErrors.description = 'Description is required';
-		} else if (formData.description.length < 10) {
-			newErrors.description = 'Description must be at least 10 characters';
+		} else if (formData.description.length < 5) {
+			newErrors.description = 'Description must be at least 5 characters';
 		} else if (formData.description.length > 500) {
 			newErrors.description = 'Description cannot exceed 500 characters';
 		}
@@ -340,11 +340,11 @@ export default function MaterialDialog({
 									Reference
 								</label>
 								{formData.reference && formData.reference.startsWith('data:') ? (
-									<div className="relative flex items-center justify-center p-2 w-32">
+									<div className="relative flex items-center justify-center p-2 w-full">
 										<img 
 											src={formData.reference} 
 											alt="Reference" 
-											className="w-20 h-20 object-contain rounded border"
+											className="w-full h-20 object-contain rounded border"
 										/>
 										<button
 											type="button"

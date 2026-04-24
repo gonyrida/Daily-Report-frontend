@@ -4,28 +4,23 @@
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "../config/api";
 import { apiGet, apiPost, apiDelete, apiPatch } from "../lib/apiFetch";
 import { pythonApiPost } from "../lib/pythonApiFetch";
+import { transformFrontendToBackend, transformBackendToFrontend, transformLegacyToFrontend } from "../utils/activityTransform";
 
 const API_BASE_URL = API_ENDPOINTS.DAILY_REPORTS.BASE;
 
 // SECURITY: NO token handling, NO localStorage, NO Authorization headers
 
 export const saveReportToDB = async (reportData: any) => {
-  console.log("🔒 SAVE REPORT: Attempting to save report");
-
   const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.SAVE, reportData);
-
-  console.log(`🔒 SAVE REPORT: Response ${response.status}`);
 
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to save report" }));
-    console.error("🔒 SAVE REPORT: Failed:", error);
     throw new Error(error.message || "Failed to save report");
   }
 
   const result = await response.json();
-  console.log("🔒 SAVE REPORT: Success:", result);
   return result;
 };
 
@@ -38,55 +33,42 @@ export const submitReportToDB = async (
   const day = String(reportDate.getDate()).padStart(2, "0");
   const dateStr = `${year}-${month}-${day}`;
 
-  console.log("🔒 SUBMIT REPORT: Submitting for", { projectName, dateStr });
-
   const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.SUBMIT, { projectName, date: dateStr });
 
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to submit report" }));
-    console.error("🔒 SUBMIT REPORT: Failed:", error);
     throw new Error(error.message || "Failed to submit report");
   }
 
   const result = await response.json();
-  console.log("🔒 SUBMIT REPORT: Success:", result);
   return result;
 };
 
 export const loadReportFromDB = async (reportDate: Date) => {
-  console.log("🐛 DEBUG API: loadReportFromDB called with:", reportDate);
   try {
     const year = reportDate.getFullYear();
     const month = String(reportDate.getMonth() + 1).padStart(2, "0");
     const day = String(reportDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
 
-    console.log("🔒 LOAD REPORT: Loading for date:", dateStr);
-
     const url = API_ENDPOINTS.DAILY_REPORTS.GET_BY_DATE(dateStr);
     const response = await apiGet(url);
 
-    console.log(`🔒 LOAD REPORT: Response ${response.status}`);
-
     // 404 means "no report exists" - this is expected behavior
     if (response.status === 404) {
-      console.log("🔒 LOAD REPORT: No report found (expected 404)");
       return null;
     }
-    
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("🔒 LOAD REPORT: Error:", response.status, errorText);
       throw new Error(`Failed to load report: ${response.statusText}`);
     }
 
     const result = await response.json();
-    console.log("🐛 DEBUG API: loadReportFromDB result:", result);
     return result;
   } catch (err) {
-    console.error("🔒 LOAD REPORT: Exception:", err);
     throw err;
   }
 };
@@ -102,7 +84,7 @@ export const generatePythonExcel = async (
     if (mode === "report" || mode === "combined") {
       const cacpmLogo = localStorage.getItem("customCacpmLogo");
       const koicaLogo = localStorage.getItem("customKoicaLogo");
-      
+
       enhancedPayload = {
         ...payload,
         cacpm_logo: cacpmLogo,
@@ -110,8 +92,6 @@ export const generatePythonExcel = async (
         // userId will be extracted from JWT cookie by Python backend
       };
     }
-
-    console.log("🔑 PYTHON EXCEL: Sending payload - userId will be validated by backend");
 
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-report`, {
       mode,
@@ -139,16 +119,13 @@ export const generatePythonExcel = async (
     const filename = fileName
       ? `${fileName}.xlsx`
       : mode === "report"
-      ? `report-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
+        ? `report-${payload.projectName || "export"}-${new Date().toISOString().split("T")[0]
         }.xlsx`
-      : mode === "reference"
-      ? `reference-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`
-      : `combined-${payload.projectName || "export"}-${
-          new Date().toISOString().split("T")[0]
-        }.xlsx`;
+        : mode === "reference"
+          ? `reference-${payload.projectName || "export"}-${new Date().toISOString().split("T")[0]
+          }.xlsx`
+          : `combined-${payload.projectName || "export"}-${new Date().toISOString().split("T")[0]
+          }.xlsx`;
 
     link.download = filename;
     document.body.appendChild(link);
@@ -160,7 +137,6 @@ export const generatePythonExcel = async (
 
     return { success: true };
   } catch (error) {
-    console.error("Python Excel generation error:", error);
     throw error;
   }
 };
@@ -193,8 +169,6 @@ export const generateReferenceExcel = async (
       hse_title: tableTitle,
       hse: referenceEntries,
     };
-
-    console.log("🔑 REFERENCE EXCEL: Sending payload - userId will be validated by backend");
 
     const response = await pythonApiPost(`${PYTHON_API_BASE_URL}/generate-reference`, payload);
 
@@ -409,9 +383,9 @@ export const getAllUserReports = async () => {
 export const createNewReport = async (projectName?: string, date?: string) => {
   console.log("🔒 CREATE NEW REPORT: Creating new report", { projectName, date });
 
-  const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.BASE, { 
-    projectName: projectName || "Default Project", 
-    date: date || new Date().toISOString().split('T')[0] 
+  const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.BASE, {
+    projectName: projectName,
+    date: date || new Date().toISOString().split('T')[0]
   });
 
   console.log(`🔒 CREATE NEW REPORT: Response ${response.status}`);
@@ -440,7 +414,7 @@ export const loadReportById = async (reportId: string) => {
     console.log("🔒 LOAD REPORT BY ID: Report not found (404)");
     return null;
   }
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error("🔒 LOAD REPORT BY ID: Error:", response.status, errorText);
@@ -463,7 +437,7 @@ export const deleteReport = async (reportId: string) => {
     console.log("🔒 DELETE REPORT: Report not found (404)");
     throw new Error("Report not found");
   }
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error("🔒 DELETE REPORT: Error:", response.status, errorText);
@@ -479,8 +453,8 @@ export const deleteReport = async (reportId: string) => {
 export const createBlankReport = async (projectName?: string) => {
   console.log("🔒 CREATE BLANK REPORT: Creating blank report", { projectName });
 
-  const response = await apiPost(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/blank`, { 
-    projectName: projectName || "Untitled Report" 
+  const response = await apiPost(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/blank`, {
+    projectName: projectName || "Untitled Report"
   });
 
   console.log(`🔒 CREATE BLANK REPORT: Response ${response.status}`);
@@ -518,16 +492,15 @@ export const autoSaveReport = async (reportId: string, partialData: any) => {
   return result;
 };
 
-export const getRecentReports = async (limit: number = 20, status?: string) => {
-  console.log("🔒 GET RECENT REPORTS: Fetching recent reports", { limit, status });
+export const getRecentReports = async (limit: number = 20, status?: string, projectId?: string) => {
 
   const params = new URLSearchParams();
   if (limit) params.append('limit', limit.toString());
   if (status) params.append('status', status);
+  if (projectId) params.append('projectId', projectId);
 
   const response = await apiGet(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/recent?${params.toString()}`);
 
-  console.log(`🔒 GET RECENT REPORTS: Response ${response.status}`);
 
   if (!response.ok) {
     const error = await response
@@ -538,7 +511,6 @@ export const getRecentReports = async (limit: number = 20, status?: string) => {
   }
 
   const result = await response.json();
-  console.log("🔒 GET RECENT REPORTS: Success:", result);
   return result;
 };
 
@@ -649,11 +621,33 @@ export const generateCombinedPDF = async (
   return { success: true };
 };
 
+export const getReportsByLocation = async (location?: string) => {
+  try {
+    const queryParams = location ? `?location=${encodeURIComponent(location)}` : '';
+    const response = await apiGet(`/daily-reports/by-location${queryParams}`);
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to fetch reports by location" }));
+      throw new Error(error.message || "Failed to fetch reports by location");
+    }
+
+    const result = await response.json();
+    console.log("🔒 GET REPORTS BY LOCATION: Success:", result);
+    return result;
+  } catch (error) {
+    console.error("Error fetching reports by location:", error);
+    throw error;
+  }
+};
+
 export const getCompanyReports = async (
   page: number = 1,
   limit: number = 20,
   search: string = "",
-  projectFilter?: string
+  projectFilter?: string,
+  projectId?: string
 ) => {
   try {
     // const token = localStorage.getItem("authToken");
@@ -665,10 +659,12 @@ export const getCompanyReports = async (
       page: page.toString(),
       limit: limit.toString(),
       ...(search && { search }),
-      ...(projectFilter && { project: projectFilter }), // ← ADD PROJECT FILTER
+      ...(projectFilter && { project: projectFilter }), // Legacy project name filter
+      ...(projectId && { projectId }), // New project ID filter (more reliable)
     });
 
-    const response = await apiGet(`/daily-reports/company?${queryParams}`);
+    const url = `/daily-reports/company?${queryParams}`;
+    const response = await apiGet(url);
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -676,8 +672,9 @@ export const getCompanyReports = async (
     }
 
     const data = await response.json();
+
     return {
-      reports: data.reports || [],
+      reports: data.reports || [],  
       pagination: data.pagination || {
         page: 1,
         limit: 20,
@@ -709,7 +706,7 @@ export const getCompanyProjects = async () => {
     //     },
     //   }
     // );
-    
+
     // Cookie-based authentication - use apiGet instead of manual fetch
     const response = await apiGet(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/projects`);
 
@@ -726,3 +723,85 @@ export const getCompanyProjects = async () => {
     throw error;
   }
 };
+
+// NEW: Bulk import API functions
+export const bulkImportActivities = async (reportId: string, activitiesData: any) => {
+  console.log("🔒 BULK IMPORT: Importing activities to report", reportId);
+
+  // Transform activities to backend format
+  const transformedData = {
+    weeklyActivities: transformFrontendToBackend(activitiesData.weeklyActivities || []),
+    nextWeekPlan: transformFrontendToBackend(activitiesData.nextWeekPlan || [])
+  };
+
+  const response = await apiPost(API_ENDPOINTS.DAILY_REPORTS.BULK_IMPORT(reportId), transformedData);
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to bulk import activities" }));
+    console.error("🔒 BULK IMPORT: Failed:", error);
+    throw new Error(error.message || "Failed to bulk import activities");
+  }
+
+  const result = await response.json();
+  console.log("🔒 BULK IMPORT: Success:", result);
+  return result;
+};
+
+export const getActivitiesByBulkImportId = async (bulkImportId: string) => {
+  console.log("🔒 GET BY BULK ID: Fetching activities for bulk import", bulkImportId);
+
+  const response = await apiGet(API_ENDPOINTS.DAILY_REPORTS.GET_BY_BULK_ID(bulkImportId));
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to get bulk import activities" }));
+    console.error("🔒 GET BY BULK ID: Failed:", error);
+    throw new Error(error.message || "Failed to get bulk import activities");
+  }
+
+  const result = await response.json();
+  console.log("🔒 GET BY BULK ID: Success:", result);
+  return transformBackendToFrontend(result.activities);
+};
+
+export const getBulkImportStats = async () => {
+  console.log("🔒 BULK STATS: Getting bulk import statistics");
+
+  const response = await apiGet(API_ENDPOINTS.DAILY_REPORTS.BULK_STATS);
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Failed to get bulk import statistics" }));
+    console.error("🔒 BULK STATS: Failed:", error);
+    throw new Error(error.message || "Failed to get bulk import statistics");
+  }
+
+  const result = await response.json();
+  return result;
+};
+
+// QAQC API functions
+export const updateQaqcStatus = async (reportId: string, qaqcData: any) => {
+  try {
+    const response = await apiPatch(`/weekly-reports/${reportId}/qaqc-status`, qaqcData);
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to update QAQC status" }));
+      throw new Error(error.message || "Failed to update QAQC status");
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// REMOVED: getQaqcStatus API call - no longer needed
+// QAQC data is now bundled with main report load and transformed using transformQaqcData()

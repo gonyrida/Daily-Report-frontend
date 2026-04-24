@@ -20,6 +20,14 @@ const SelectTrigger = React.forwardRef<
       "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className,
     )}
+    onFocus={(e) => {
+      // Prevent focus errors when element is null
+      try {
+        props.onFocus?.(e);
+      } catch (error) {
+        console.warn('Select focus error prevented:', error);
+      }
+    }}
     {...props}
   >
     {children}
@@ -72,6 +80,20 @@ const SelectContent = React.forwardRef<
         className,
       )}
       position={position}
+      onEscapeKeyDown={(e) => {
+        try {
+          props.onEscapeKeyDown?.(e);
+        } catch (error) {
+          console.warn('Select escape key error prevented:', error);
+        }
+      }}
+      onPointerDownOutside={(e) => {
+        try {
+          props.onPointerDownOutside?.(e);
+        } catch (error) {
+          console.warn('Select pointer down outside error prevented:', error);
+        }
+      }}
       {...props}
     >
       <SelectScrollUpButton />

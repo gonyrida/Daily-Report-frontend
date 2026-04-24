@@ -6,9 +6,16 @@ interface ReportHeaderProps {
   lastSavedAt?: Date | null;
   projectLogo?: string;
   setProjectLogo?: (logo: string) => void;
+  title?: string;
 }
 
-const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null, projectLogo, setProjectLogo }: ReportHeaderProps) => {
+const ReportHeader = ({
+  isAutoSaving = false,
+  lastSavedAt = null,
+  projectLogo,
+  setProjectLogo,
+  title = "DAILY REPORT",
+}: ReportHeaderProps) => {
   const projectLogoInputRef = useRef<HTMLInputElement>(null);
   const [cacpmLogo, setCacpmLogo] = useState<string>("/cacpm_logo.png");
   const [koicaLogo, setKoicaLogo] = useState<string>("/koica_logo.png");
@@ -32,20 +39,20 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null, projectLogo, s
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
       // Force fixed dimensions: 252x94
-      canvas.width = 252;  // Fixed width
-      canvas.height = 94;  // Fixed height
-      
+      canvas.width = 252; // Fixed width
+      canvas.height = 94; // Fixed height
+
       // Draw image with fixed dimensions
       ctx.drawImage(img, 0, 0, 252, 94);
-      
+
       // Save to localStorage
-      const resizedDataUrl = canvas.toDataURL('image/png');
+      const resizedDataUrl = canvas.toDataURL("image/png");
       setProjectLogo(resizedDataUrl);
-      
+
       // if (logoType === "cacpm") {
       //   setCacpmLogo(resizedDataUrl);
       //   localStorage.setItem("customCacpmLogo", resizedDataUrl);
@@ -59,15 +66,15 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null, projectLogo, s
 
   const handleLogoClick = (logoType: "cacpm" | "koica") => {
     if (logoType === "koica") {
-    //   cacpmInputRef.current?.click();
-    // } else {
+      //   cacpmInputRef.current?.click();
+      // } else {
       koicaInputRef.current?.click();
     }
   };
 
   const handleFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
-    logoType: "cacpm" | "koica"
+    logoType: "cacpm" | "koica",
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -124,7 +131,7 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null, projectLogo, s
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center">
-          <h1 className="text-2xl font-bold tracking-tight">DAILY REPORT</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {/* Auto-save status indicator */}
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             {isAutoSaving && (
@@ -195,7 +202,7 @@ const ReportHeader = ({ isAutoSaving = false, lastSavedAt = null, projectLogo, s
             reader.onload = (e) => {
               const result = e.target?.result as string;
               // Use the resize function
-              resizeImageWithFixedHeight(result, 94);  // ← CHANGE THIS
+              resizeImageWithFixedHeight(result, 94); // ← CHANGE THIS
             };
             reader.readAsDataURL(file);
           }

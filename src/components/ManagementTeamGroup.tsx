@@ -1,6 +1,7 @@
-import { Users, Wrench,Trash2 } from "lucide-react";
+import { Users, Wrench,Trash2, GripVertical } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
+import { useState } from "react";
 
 interface ManagementTeamGroupProps {
   managementTeam: ResourceRow[];
@@ -15,6 +16,39 @@ const ManagementTeamGroup = ({
   mepTeam,
   setMepTeam,
 }: ManagementTeamGroupProps) => {
+
+  // This tracks which row is currently showing the text input
+  const [editingId, setEditingId] = useState(null);
+  const [draggedRow, setDraggedRow] = useState<{type: 'management' | 'mep', row: ResourceRow, index: number} | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, row: ResourceRow, index: number, type: 'management' | 'mep') => {
+    setDraggedRow({ type, row, index });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number, type: 'management' | 'mep') => {
+    e.preventDefault();
+    if (draggedRow && draggedRow.index !== dropIndex && draggedRow.type === type) {
+      const rows = type === 'management' ? managementTeam : mepTeam;
+      const setRows = type === 'management' ? setManagementTeam : setMepTeam;
+      const newRows = [...rows];
+      newRows.splice(draggedRow.index, 1);
+      newRows.splice(dropIndex, 0, draggedRow.row);
+      setRows(newRows);
+    }
+    setDraggedRow(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRow(null);
+  };
+
   return (
     <div className="section-card overflow-hidden animate-fade-in">
       {/* Parent Header */}
@@ -51,7 +85,10 @@ const ManagementTeamGroup = ({
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
+                  <th className="text-center px-2 py-2.5 text-sm font-medium text-muted-foreground w-[8%]">
+                    
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[32%]">
                     Description
                   </th>
                   <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
@@ -64,12 +101,13 @@ const ManagementTeamGroup = ({
                     Accum
                   </th>
                   <th className="w-[8%]"></th>
+                  <th className="w-[8%]"></th>
                 </tr>
               </thead>
               <tbody>
                 {managementTeam.length === 0 ? (
                   <tr key="empty-management">
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       No entries yet. Click "Add Row" to begin.
                     </td>
                   </tr>
@@ -78,23 +116,38 @@ const ManagementTeamGroup = ({
                     {managementTeam.map((row) => (
                       <tr
                         key={`management-${row.id}`}
-                        className="border-t border-table-border hover:bg-muted/30 transition-colors"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, row, managementTeam.indexOf(row), 'management')}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, managementTeam.indexOf(row), 'management')}
+                        onDragEnd={handleDragEnd}
+                        className="border-t border-table-border hover:bg-muted/30 transition-colors cursor-move"
                       >
+                        <td className="px-2 py-2 text-center">
+                          <div className="flex justify-center">
+                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
-                          {MANAGEMENT_OPTIONS.length > 0 ? (
-                            (row.description === "" || MANAGEMENT_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
+                          {MANAGEMENT_OPTIONS.length > 0 ? (() => {
+                            // 1. Create a temporary list that includes the current custom value
+                            // This ensures that even after typing, the "Dropdown" view can show it.
+                            const isInOptions = MANAGEMENT_OPTIONS.includes(row.description);
+
+                            // Check if THIS specific row is being edited
+                            const isEditing = editingId === row.id;
+
+                            return !isEditing ? (
                               <select
                                 value={row.description}
                                 onChange={(e) => {
                                   const value = e.target.value;
                                   if (value === "__custom__") {
-                                    setManagementTeam(
-                                      managementTeam.map((r) =>
-                                        r.id === row.id
-                                          ? { ...r, description: "__custom_input__" }
-                                          : r
-                                      )
-                                    );
+                                    setEditingId(row.id); // Trigger Edit Mode
+                                    // Clear the field for a fresh start
+                                    setManagementTeam(managementTeam.map((r) =>
+                                      r.id === row.id ? { ...r, description: "" } : r
+                                    ));
                                   } else {
                                     setManagementTeam(
                                       managementTeam.map((r) =>
@@ -103,9 +156,17 @@ const ManagementTeamGroup = ({
                                     );
                                   }
                                 }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1"
+                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                title={row.description}
                               >
                                 <option value="">Select position...</option>
+
+                                {/* 3. If the current value is custom, we must render it as an option 
+                                so the <select> has something to display! */}
+                                {!isInOptions && row.description !== "" && (
+                                  <option value={row.description}>{row.description}</option>
+                                )}
+
                                 {MANAGEMENT_OPTIONS.map((option) => (
                                   <option key={option} value={option}>
                                     {option}
@@ -125,6 +186,12 @@ const ManagementTeamGroup = ({
                                       )
                                     )
                                   }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      setEditingId(null); // SNAP BACK TO DROPDOWN
+                                    }
+                                  }}
+                                  onBlur={() => setEditingId(null)} // SNAP BACK IF CLICKED OUTSIDE
                                   placeholder="Enter custom position..."
                                   className="flex-1 border-0 bg-transparent focus-visible:ring-1 rounded px-2 py-1"
                                   autoFocus
@@ -145,7 +212,7 @@ const ManagementTeamGroup = ({
                                 </button>
                               </div>
                             )
-                          ) : (
+                          })() : (
                             <input
                               type="text"
                               value={row.description}
@@ -246,7 +313,10 @@ const ManagementTeamGroup = ({
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[40%]">
+                  <th className="text-center px-2 py-2.5 text-sm font-medium text-muted-foreground w-[8%]">
+                    
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-sm font-medium text-muted-foreground w-[32%]">
                     Description
                   </th>
                   <th className="text-center px-4 py-2.5 text-sm font-medium text-muted-foreground w-[20%]">
@@ -259,12 +329,13 @@ const ManagementTeamGroup = ({
                     Accum
                   </th>
                   <th className="w-[8%]"></th>
+                  <th className="w-[8%]"></th>
                 </tr>
               </thead>
               <tbody>
                 {mepTeam.length === 0 ? (
                   <tr key="empty-mep">
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       No entries yet. Click "Add Row" to begin.
                     </td>
                   </tr>
@@ -273,23 +344,33 @@ const ManagementTeamGroup = ({
                     {mepTeam.map((row) => (
                       <tr
                         key={`mep-${row.id}`}
-                        className="border-t border-table-border hover:bg-muted/30 transition-colors"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, row, mepTeam.indexOf(row), 'mep')}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, mepTeam.indexOf(row), 'mep')}
+                        onDragEnd={handleDragEnd}
+                        className="border-t border-table-border hover:bg-muted/30 transition-colors cursor-move"
                       >
+                        <td className="px-2 py-2 text-center">
+                          <div className="flex justify-center">
+                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
-                          {MEP_TEAM_OPTIONS.length > 0 ? (
-                            (row.description === "" || MEP_TEAM_OPTIONS.includes(row.description)) && row.description !== "__custom_input__" ? (
+                          {MEP_TEAM_OPTIONS.length > 0 ? (() => {
+                            const isInOptions = MEP_TEAM_OPTIONS.includes(row.description);
+                            const isEditing = editingId === row.id;
+                            return !isEditing ? (
                               <select
                                 value={row.description}
                                 onChange={(e) => {
                                   const value = e.target.value;
                                   if (value === "__custom__") {
-                                    setMepTeam(
-                                      mepTeam.map((r) =>
-                                        r.id === row.id
-                                          ? { ...r, description: "__custom_input__" }
-                                          : r
-                                      )
-                                    );
+                                    setEditingId(row.id); // Trigger Edit Mode
+                                    // Clear the field for a fresh start
+                                    setMepTeam(mepTeam.map((r) =>
+                                      r.id === row.id ? { ...r, description: "" } : r
+                                    ));
                                   } else {
                                     setMepTeam(
                                       mepTeam.map((r) =>
@@ -298,9 +379,17 @@ const ManagementTeamGroup = ({
                                     );
                                   }
                                 }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1"
+                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                title={row.description}
                               >
                                 <option value="">Select position...</option>
+
+                                {/* 3. If the current value is custom, we must render it as an option 
+                                so the <select> has something to display! */}
+                                {!isInOptions && row.description !== "" && (
+                                  <option value={row.description}>{row.description}</option>
+                                )}
+
                                 {MEP_TEAM_OPTIONS.map((option) => (
                                   <option key={option} value={option}>
                                     {option}
@@ -320,6 +409,12 @@ const ManagementTeamGroup = ({
                                       )
                                     )
                                   }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      setEditingId(null); // SNAP BACK TO DROPDOWN
+                                    }
+                                  }}
+                                  onBlur={() => setEditingId(null)} // SNAP BACK IF CLICKED OUTSIDE
                                   placeholder="Enter custom position..."
                                   className="flex-1 border-0 bg-transparent focus-visible:ring-1 rounded px-2 py-1"
                                   autoFocus
@@ -340,7 +435,7 @@ const ManagementTeamGroup = ({
                                 </button>
                               </div>
                             )
-                          ) : (
+                          })() : (
                             <input
                               type="text"
                               value={row.description}

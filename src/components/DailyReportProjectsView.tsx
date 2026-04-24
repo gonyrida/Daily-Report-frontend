@@ -4,28 +4,34 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, 
-  Calendar, 
-  FileText, 
+import {
+  Plus,
+  Calendar,
+  FileText,
   RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  getAllUserReports, 
+import {
+  getAllUserReports,
   createNewReport,
   getCompanyReports,
+  getReportsByLocation,
 } from "@/integrations/reportsApi";
+import LocationFilter from "./LocationFilter";
 
 interface Report {
   projectName: string;
   reportDate: string;
+  location?: string;
+  projectId?: string;
 }
 
 interface Project {
+  _id?: string;
   name: string;
   reportCount: number;
   lastReportDate?: string;
+  locations?: string[];
 }
 
 interface DailyReportProjectsViewProps {
@@ -36,14 +42,15 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  
+
   // View state - always show projects
   const viewMode = 'projects';
-  
+
   // Data state
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+
   // UI state
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -51,46 +58,49 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      console.log("🔍 DEBUG: Fetching company reports...");
-      const response = await getCompanyReports();
-      console.log("🔍 DEBUG: Company reports response:", response);
-      
-      const allReports = response.reports || [];
-      console.log("🔍 DEBUG: All reports count:", allReports.length);
-      console.log("🔍 DEBUG: All reports:", allReports.map(r => ({
-        projectName: r.projectName,
-        userId: r.userId,
-        userName: r.userId?.firstName ? `${r.userId.firstName} ${r.userId.lastName}` : 'Unknown'
-      })));
-      
+
+      let response;
+
+      if (selectedLocation) {
+        // Use location-specific endpoint
+        response = await getReportsByLocation(selectedLocation);
+      } else {
+        // Use regular company reports endpoint
+        response = await getCompanyReports();
+      }
+      const allReports = response.reports || response || [];
       // Group reports by project
       const projectMap = new Map<string, Project>();
-      
-      allReports.forEach((report: Report) => {
+
+      allReports.forEach((report: Report & { projectId?: string }) => {
         const projectName = report.projectName || 'Untitled Project';
-        console.log("🔍 DEBUG: Processing report for project:", projectName);
-        
+
         if (!projectMap.has(projectName)) {
           projectMap.set(projectName, {
+            _id: report.projectId,   // grab it
             name: projectName,
             reportCount: 0,
-            lastReportDate: report.reportDate
+            lastReportDate: report.reportDate,
+            locations: []
           });
         }
-        
+
         const project = projectMap.get(projectName)!;
         project.reportCount++;
-        
+
+        // Add location to project's locations array if not already present
+        if (report.location && !project.locations!.includes(report.location)) {
+          project.locations!.push(report.location);
+        }
+
         // Update last report date if this one is more recent
         if (!project.lastReportDate || report.reportDate > project.lastReportDate) {
           project.lastReportDate = report.reportDate;
         }
       });
-      
+
       const projects = Array.from(projectMap.values());
-      console.log("🔍 DEBUG: Final projects:", projects);
-      
+
       setProjects(projects);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -102,15 +112,15 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
   // Check URL params on mount and when they change
   useEffect(() => {
     const reportIdParam = searchParams.get('reportId');
-    
+
     if (reportIdParam) {
       // If there's a reportId, don't show this view - let the main component handle it
       return;
     }
-    
+
     // Always refresh data when URL params change
     fetchData();
-  }, [searchParams]);
+  }, [searchParams, selectedLocation]);
 
   // Also refresh when window gains focus
   useEffect(() => {
@@ -142,19 +152,19 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
     try {
       // Create a blank report for the new project to establish it
       await createNewReport(newProjectName.trim());
-      
+
       toast({
         title: "Success",
         description: `Project "${newProjectName.trim()}" created successfully.`,
       });
-      
+
       setNewProjectName('');
       setShowCreateProject(false);
-      
+
       // Refresh the projects list
       const response = await getCompanyReports();
       const allReports = response.reports || [];
-      
+
       const projectMap = new Map<string, Project>();
       allReports.forEach((report: Report) => {
         const projectName = report.projectName || 'Untitled Project';
@@ -168,7 +178,7 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
         const project = projectMap.get(projectName)!;
         project.reportCount++;
       });
-      
+
       setProjects(Array.from(projectMap.values()));
     } catch (error) {
       console.error('Failed to create project:', error);
@@ -184,12 +194,12 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
     // Create a new report and navigate to it
     try {
       const result = await createNewReport("New Project");
-      
+
       toast({
         title: "Success",
         description: "New report created successfully.",
       });
-      
+
       // Navigate to the newly created report
       navigate(`/daily-report?reportId=${result.data._id}`);
     } catch (error) {
@@ -202,16 +212,21 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
     }
   };
 
-  const handleProjectClick = (projectName: string) => {
-    navigate(`/daily-report?project=${encodeURIComponent(projectName)}`);
+  const handleProjectClick = (project: Project) => {
+    if (project._id) {
+      navigate(`/dashboard?projectId=${encodeURIComponent(project._id)}`);
+    } else {
+      // Fallback for legacy reports with no projectId
+      navigate(`/daily-report?project=${encodeURIComponent(project.name)}`);
+    }
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
@@ -233,8 +248,13 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
             Manage your daily report projects
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
+          <LocationFilter
+            selectedLocation={selectedLocation}
+            onLocationChange={setSelectedLocation}
+            onClearFilter={() => setSelectedLocation("")}
+          />
           <Button
             onClick={() => setShowCreateProject(true)}
             className="flex items-center gap-2"
@@ -242,7 +262,7 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
             <Plus className="h-4 w-4" />
             Create New Project
           </Button>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -291,48 +311,65 @@ const DailyReportProjectsView: React.FC<DailyReportProjectsViewProps> = ({ class
 
       {/* Projects View */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.length === 0 ? (
-            <Card className="col-span-full">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Projects Yet</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Create your first project to start managing daily reports.
-                </p>
-                <Button onClick={() => setShowCreateProject(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Project
-                </Button>
+        {projects.length === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Projects Yet</h3>
+              <p className="text-muted-foreground text-center mb-4">
+                Create your first project to start managing daily reports.
+              </p>
+              <Button onClick={() => setShowCreateProject(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Project
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          projects.map((project) => (
+            <Card
+              key={project.name}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => handleProjectClick(project)}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">{project.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Reports</span>
+                    <Badge variant="secondary">{project.reportCount}</Badge>
+                  </div>
+                  {project.lastReportDate && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Last Report</span>
+                      <span className="text-sm">{formatDate(project.lastReportDate)}</span>
+                    </div>
+                  )}
+                  {project.locations && project.locations.length > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Locations</span>
+                      <div className="flex flex-wrap gap-1">
+                        {project.locations.slice(0, 2).map((loc, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {loc}
+                          </Badge>
+                        ))}
+                        {project.locations.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{project.locations.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          ) : (
-            projects.map((project) => (
-              <Card 
-                key={project.name}
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => handleProjectClick(project.name)}
-              >
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">{project.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Reports</span>
-                      <Badge variant="secondary">{project.reportCount}</Badge>
-                    </div>
-                    {project.lastReportDate && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Last Report</span>
-                        <span className="text-sm">{formatDate(project.lastReportDate)}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };

@@ -14,9 +14,10 @@ interface Props {
   tableTitle?: string;
   setTableTitle?: (title: string) => void;
   hideTitle?: boolean;
+  hideShadow?: boolean;
 }
 
-export default function ReferenceSection({ sections, setSections, onExportReference, isExporting = false, tableTitle, setTableTitle, hideTitle }: Props) {
+export default function ReferenceSection({ sections, setSections, onExportReference, isExporting = false, tableTitle, setTableTitle, hideTitle, hideShadow }: Props) {
   const updateSection = (updated: any) => setSections(sections.map((s) => (s.id === updated.id ? updated : s)));
 
   const deleteSection = (id: string) => setSections(sections.filter((s) => s.id !== id));
@@ -45,7 +46,7 @@ export default function ReferenceSection({ sections, setSections, onExportRefere
           <div className="border-t border-muted-foreground/20 mb-4" />
         )}
 
-        <SectionList sections={sections} onUpdate={updateSection} onDelete={deleteSection} hideTitle={hideTitle} />
+        <SectionList sections={sections} onUpdate={updateSection} onDelete={deleteSection} hideTitle={hideTitle} hideShadow={hideShadow} />
       </div>
     </div>
   );

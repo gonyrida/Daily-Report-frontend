@@ -45,12 +45,15 @@ import {
   Copy,
   Settings,
   Users,
+  FolderInput,
+  FolderPlus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import { getRecentReports, getCompanyProjects } from "@/integrations/reportsApi";
-import { getProjects, createProject, updateProject, deleteProject, Project } from "@/integrations/projectsApi"; // ← ADD THIS
-import { projectEvents } from '@/utils/eventEmitter';
+import { getProjects, createProject, updateProject, deleteProject, moveProjectToFolder, Project } from "@/integrations/projectsApi";
+import { getFoldersWithProjects, createFolder, updateFolder, deleteFolder, Folder } from "@/integrations/foldersApi";
+import { projectEvents, folderEvents } from '@/utils/eventEmitter';
 import { apiFetch, apiGet } from '@/lib/apiFetch';
 import {
   AlertDialog,
@@ -77,7 +80,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   // State for expand/collapse
   const [reportSectionOpen, setReportSectionOpen] = useState(true);
   const [dailyReportOpen, setDailyReportOpen] = useState(true);
-  const [weeklyReportOpen, setWeeklyReportOpen] = useState(false);
+  const [weeklyReportOpen, setWeeklyReportOpen] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -95,16 +98,58 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editProjectName, setEditProjectName] = useState("");
 
+  // State for folders (new structure: folders contain projects)
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [rootProjects, setRootProjects] = useState<Project[]>([]);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [weeklyExpandedFolders, setWeeklyExpandedFolders] = useState<Record<string, boolean>>({});
+  const [showAddFolderInput, setShowAddFolderInput] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [editingFolder, setEditingFolder] = useState<string | null>(null);
+  const [editFolderName, setEditFolderName] = useState("");
+  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  const [deleteFolderConfirmOpen, setDeleteFolderConfirmOpen] = useState(false);
+  const [renameFolderConfirmOpen, setRenameFolderConfirmOpen] = useState(false);
+  const [renameFolderData, setRenameFolderData] = useState<{ folderId: string; oldName: string; newName: string } | null>(null);
+  // Project under folder
+  const [showAddProjectInFolder, setShowAddProjectInFolder] = useState<Record<string, boolean>>({});
+  const [newProjectInFolderName, setNewProjectInFolderName] = useState<Record<string, string>>({});
+  // Move project to folder
+  const [projectToMove, setProjectToMove] = useState<Project | null>(null);
+  const [moveProjectDialogOpen, setMoveProjectDialogOpen] = useState(false);
+  const [selectedTargetFolder, setSelectedTargetFolder] = useState<string>('');
+
+  // Load all folders with their projects
+  const loadFoldersWithProjects = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      const response = await getFoldersWithProjects();
+      
+      if (response.success) {
+        setFolders(response.data as Folder[]);
+        setRootProjects(response.rootProjects || []);
+      } else {
+        console.error("Failed to load folders:", response.error);
+      }
+    } catch (error) {
+      console.error("Failed to load folders:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Legacy: Load root projects (without folder)
   const loadProjects = useCallback(async () => {
     try {
       setIsLoading(true);
       
-      // Fetch projects from API
-      const response = await getProjects();
+      // Fetch root projects (without folder)
+      const response = await getProjects('null');
       
       if (response.success) {
         const projectList = (response.data as Project[]);
-        setProjects(projectList);
+        setRootProjects(projectList);
       } else {
         console.error("Failed to load projects:", response.error);
       }
@@ -115,17 +160,229 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     }
   }, []);
 
+  // Toggle folder expansion for Daily Report
+  const toggleFolderExpand = (folderId: string) => {
+    setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
+  };
+
+  // Toggle folder expansion for Weekly Report (separate state)
+  const toggleWeeklyFolderExpand = (folderId: string) => {
+    setWeeklyExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
+  };
+
+  // Add folder handler
+  const handleAddFolder = async () => {
+    const folderName = newFolderName.trim();
+    if (!folderName) return;
+
+    try {
+      const response = await createFolder(folderName);
+      if (response.success) {
+        await loadFoldersWithProjects();
+        setShowAddFolderInput(false);
+        setNewFolderName('');
+        
+        // Emit event for other components
+        folderEvents.emit('folderCreated', { folderName });
+        
+        toast({
+          title: "Folder Created",
+          description: `"${folderName}" folder created successfully.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to create folder",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create folder",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditFolder = (folder: Folder) => {
+    setEditingFolder(folder._id);
+    setEditFolderName(folder.name);
+  };
+
+  const handleSaveFolderEdit = () => {
+    if (editFolderName.trim() && editingFolder) {
+      const folder = folders.find(f => f._id === editingFolder);
+      if (folder && editFolderName.trim() !== folder.name) {
+        setRenameFolderData({
+          folderId: editingFolder,
+          oldName: folder.name,
+          newName: editFolderName.trim()
+        });
+        setRenameFolderConfirmOpen(true);
+      } else {
+        setEditingFolder(null);
+        setEditFolderName("");
+      }
+    }
+  };
+
+  const confirmFolderRename = async () => {
+    if (!renameFolderData) return;
+
+    try {
+      const response = await updateFolder(renameFolderData.folderId, renameFolderData.newName);
+      if (response.success) {
+        await loadFoldersWithProjects();
+        
+        // Emit event for other components
+        folderEvents.emit('folderUpdated', { folderId: renameFolderData.folderId });
+        
+        toast({
+          title: "Folder Updated",
+          description: `Folder renamed to "${renameFolderData.newName}".`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to update folder",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update folder",
+        variant: "destructive",
+      });
+    }
+
+    setRenameFolderConfirmOpen(false);
+    setRenameFolderData(null);
+    setEditingFolder(null);
+    setEditFolderName("");
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    try {
+      const response = await deleteFolder(folderId);
+      if (response.success) {
+        await loadFoldersWithProjects();
+        
+        // Emit event for other components
+        folderEvents.emit('folderDeleted', { folderId });
+        
+        toast({
+          title: "Folder Deleted",
+          description: "Folder deleted successfully. Projects moved to root.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to delete folder",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete folder",
+        variant: "destructive",
+      });
+    }
+    setDeleteFolderConfirmOpen(false);
+    setFolderToDelete(null);
+  };
+
+  // Open move project dialog
+  const openMoveProjectDialog = (project: Project) => {
+    setProjectToMove(project);
+    setSelectedTargetFolder(project.folderId || '');
+    setMoveProjectDialogOpen(true);
+  };
+
+  // Handle move project to folder
+  const handleMoveProject = async () => {
+    if (!projectToMove) return;
+
+    try {
+      const response = await moveProjectToFolder(
+        projectToMove._id, 
+        selectedTargetFolder || null
+      );
+      
+      if (response.success) {
+        await loadFoldersWithProjects();
+        toast({
+          title: "Project Moved",
+          description: selectedTargetFolder 
+            ? `"${projectToMove.name}" moved to folder.`
+            : `"${projectToMove.name}" moved to root.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to move project",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to move project",
+        variant: "destructive",
+      });
+    }
+    
+    setMoveProjectDialogOpen(false);
+    setProjectToMove(null);
+    setSelectedTargetFolder('');
+  };
+
+  // Add project inside a folder
+  const handleAddProjectInFolder = async (folderId: string) => {
+    const projectName = newProjectInFolderName[folderId]?.trim();
+    if (!projectName) return;
+
+    try {
+      const response = await createProject(projectName, folderId);
+      if (response.success) {
+        await loadFoldersWithProjects();
+        setShowAddProjectInFolder(prev => ({ ...prev, [folderId]: false }));
+        setNewProjectInFolderName(prev => ({ ...prev, [folderId]: '' }));
+        
+        const createdProject = response.data as Project;
+        
+        toast({
+          title: "Project Created",
+          description: `"${createdProject.name}" created in folder.`,
+        });
+        // Navigate to the new project using projectId
+        navigate(`/dashboard?projectId=${encodeURIComponent(createdProject._id)}`);
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to create project",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create project",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Get current user info on mount
   useEffect(() => {
     const getUserInfo = async () => {
       try {
         const response = await apiGet('/auth/profile');
-        const data = await response.json();  // ← ADD THIS LINE
-
-        console.log("DEBUG: Full user response:", data);  // ← ADD THIS
+        const data = await response.json();
 
         if (data.success && data.user?._id) {
-          console.log("DEBUG: Setting currentUserId to:", data.user._id);
           setCurrentUserId(data.user._id);  // ← Use _id instead of userId
           setUserRole(data.user.role); // ← Get user's role
         }
@@ -137,10 +394,51 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     getUserInfo();
   }, []);
 
-  // Load projects from existing reports
+  // Helper functions
+  const isActive = useCallback((path: string) => {
+    return location.pathname === path || location.pathname.startsWith(path + "?");
+  }, [location.pathname]);
+
+  const isProjectActive = (projectId: string, reportType: 'daily' | 'weekly') => {
+    const searchParams = new URLSearchParams(location.search);
+    const currentProjectId = searchParams.get('projectId');
+    
+    if (reportType === 'daily') {
+      return isActive('/dashboard') && currentProjectId === projectId;
+    } else {
+      return isActive('/weekly-reports') && currentProjectId === projectId;
+    }
+  };
+
+  // Load folders with projects on mount
   useEffect(() => {
-    loadProjects();
+    loadFoldersWithProjects();
   }, []); // Change from [loadProjects] to []
+
+  // Auto-expand folders containing active projects
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const currentProjectId = searchParams.get('projectId');
+    
+    if (currentProjectId && folders.length > 0) {
+      // Find which folder contains the current project
+      const containingFolder = folders.find(folder => 
+        folder.projects?.some(project => project._id === currentProjectId)
+      );
+      
+      if (containingFolder) {
+        // Expand the appropriate folder based on current page
+        const isDashboard = location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard?');
+        const isWeeklyReports = location.pathname === '/weekly-reports' || location.pathname.startsWith('/weekly-reports?');
+        
+        if (isDashboard) {
+          setExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+        } else if (isWeeklyReports) {
+          setWeeklyExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+        }
+      }
+    }
+  }, [location.search, folders, location.pathname]);
 
   // // Merge database projects with any locally added projects
   // useEffect(() => {
@@ -176,18 +474,29 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
       description: `Project renamed from ${oldName} to ${newName}.`,
     });
   }, []);
+  // Handle folder changes from other components
+  const handleFolderChanged = useCallback(() => {
+    loadFoldersWithProjects();
+  }, [loadFoldersWithProjects]);
+
   useEffect(() => {
     // Subscribe to events
     projectEvents.on('projectDeleted', handleProjectDeleted);
     projectEvents.on('projectAdded', handleProjectAdded);
     projectEvents.on('projectUpdated', handleProjectUpdated);
+    folderEvents.on('folderCreated', handleFolderChanged);
+    folderEvents.on('folderUpdated', handleFolderChanged);
+    folderEvents.on('folderDeleted', handleFolderChanged);
     // Cleanup on unmount
     return () => {
       projectEvents.off('projectDeleted', handleProjectDeleted);
       projectEvents.off('projectAdded', handleProjectAdded);
       projectEvents.off('projectUpdated', handleProjectUpdated);
+      folderEvents.off('folderCreated', handleFolderChanged);
+      folderEvents.off('folderUpdated', handleFolderChanged);
+      folderEvents.off('folderDeleted', handleFolderChanged);
     };
-  }, [handleProjectDeleted, handleProjectAdded, handleProjectUpdated]);
+  }, [handleProjectDeleted, handleProjectAdded, handleProjectUpdated, handleFolderChanged]);
 
   const handleAddProject = async () => {
     if (newProjectName.trim()) {
@@ -196,25 +505,27 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
         
         if (response.success) {
           // Refresh projects list
-          await loadProjects();
+          await loadFoldersWithProjects();
           
           setNewProjectName("");
           setShowAddProject(false);
           
+          const createdProject = response.data as Project;
+          
           toast({
             title: "Project Added",
-            description: `${newProjectName.trim()} has been added to your project list.`,
+            description: `${createdProject.name} has been added to your project list.`,
           });
 
           // Emit event to other components
           projectEvents.emit('projectAdded', { 
-            projectName: (response.data as Project).name,
-            createdBy: (response.data as Project).createdBy,
-            createdByName: (response.data as Project).createdByName
+            projectName: createdProject.name,
+            createdBy: createdProject.createdBy,
+            createdByName: createdProject.createdByName
           });
           
-          // Navigate to daily report with the new project
-          navigate(`/dashboard?project=${encodeURIComponent(newProjectName.trim())}&tab=company`);
+          // Navigate to dashboard with the new project using projectId
+          navigate(`/dashboard?projectId=${encodeURIComponent(createdProject._id)}`);
         } else {
           toast({
             title: "Error",
@@ -255,40 +566,33 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
   // 🚀 NEW: confirmRename function for dialog
   const confirmRename = async () => {
-    if (!renameData) return; // 🚀 Remove editProjectName check
+    if (!renameData) return;
     
     try {
-      // Find the project to get its ID
-      const project = projects.find(p => p.name === renameData.oldName);
+      // Search everywhere, not just projects array
+      let project: Project | undefined = rootProjects.find(p => p.name === renameData.oldName);
       if (!project) {
-        toast({
-          title: "Error",
-          description: "Project not found",
-          variant: "destructive",
-        });
+        for (const folder of folders) {
+          project = folder.projects?.find(p => p.name === renameData.oldName);
+          if (project) break;
+        }
+      }
+      
+      if (!project) {
+        toast({ title: "Error", description: "Project not found", variant: "destructive" });
         return;
       }
 
-      // 🚀 Use renameData.newName instead of editProjectName
       const response = await updateProject(project._id, renameData.newName);
       
       if (response.success) {
-        // Refresh projects list
-        await loadProjects();
+        await loadFoldersWithProjects();
         
-        // Emit event to other components
         projectEvents.emit('projectUpdated', { 
           oldName: renameData.oldName, 
-          newName: renameData.newName 
+          newName: renameData.newName,
+          projectId: project._id  // also emit projectId so Dashboard knows which one changed
         });
-        
-        // 🚀 Update URL if currently viewing this project
-        const searchParams = new URLSearchParams(window.location.search);
-        if (searchParams.get('project') === renameData.oldName) {
-          searchParams.set('project', renameData.newName);
-          window.location.href = `${window.location.pathname}?${searchParams.toString()}`;
-          return; // Page will reload with new project
-        }
         
         toast({
           title: "Project Updated",
@@ -303,14 +607,9 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
       }
     } catch (error) {
       console.error('Error updating project:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update project",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to update project", variant: "destructive" });
     }
     
-    // Close dialog and reset state
     setRenameConfirmOpen(false);
     setRenameData(null);
     setEditingProject(null);
@@ -324,13 +623,30 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
   const handleDeleteProject = async (projectName: string) => {
     try {
-      const project = projects.find(p => p.name === projectName);
-      if (!project) return;
+      // Search in folders first
+      let project = null;
+      for (const folder of folders) {
+        project = folder.projects?.find(p => p.name === projectName);
+        if (project) break;
+      }
+      // If not found in folders, search in rootProjects
+      if (!project) {
+        project = rootProjects.find(p => p.name === projectName);
+      }
+      // Legacy: also check projects array (for backwards compatibility)
+      if (!project) {
+        project = projects.find(p => p.name === projectName);
+      }
+      
+      if (!project) {
+        console.log("🔥 SIDEBAR: Project not found, returning");
+        return;
+      }
 
       const response = await deleteProject(project._id);
       
       if (response.success) {
-        await loadProjects();
+        await loadFoldersWithProjects();
         projectEvents.emit('projectDeleted', { projectName });
         
         toast({
@@ -367,20 +683,26 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
     }
   };
 
-  const handleProjectClick = (projectName: string, reportType: 'daily' | 'weekly') => {
-    if (reportType === 'daily') {
-      navigate(`/dashboard?project=${encodeURIComponent(projectName)}`);
-    } else {
-      // For weekly report, we'll navigate to a weekly report page (to be implemented)
-      toast({
-        title: "Weekly Report",
-        description: `Weekly report for ${projectName} will be available soon.`,
-      });
+  const handleProjectClick = (projectName: string, projectId: string, reportType: 'daily' | 'weekly') => {
+    // Find which folder contains this project and keep it expanded
+    const containingFolder = folders.find(folder => 
+      folder.projects?.some(project => project._id === projectId)
+    );
+    
+    if (containingFolder) {
+      if (reportType === 'daily') {
+        setExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+      } else {
+        setWeeklyExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
+      }
     }
-  };
-
-  const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + "?");
+    
+    if (reportType === 'daily') {
+      navigate(`/dashboard?projectId=${encodeURIComponent(projectId)}`);
+    } else {
+      // For weekly report, navigate to weekly reports dashboard with projectId only
+      navigate(`/weekly-reports?projectId=${encodeURIComponent(projectId)}`);
+    }
   };
 
   return (
@@ -568,11 +890,348 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                   </div>
                                 </SidebarMenuSubItem>
                               )}
-                              
-                              {/* Project List */}
-                              {projects.map((project) => (
-                                <SidebarMenuSubItem key={project._id}>
-                                  <div className="flex items-center justify-between w-full px-2 py-1 group">
+                          
+                              {/* Add Folder Button */}
+                              <SidebarMenuSubItem>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start pl-2 text-xs text-muted-foreground hover:text-foreground"
+                                  onClick={() => setShowAddFolderInput(true)}
+                                >
+                                  <Plus className="h-3 w-3 mr-2" />
+                                  Create Folder
+                                </Button>
+                              </SidebarMenuSubItem>
+
+                              {/* Add Folder Input */}
+                              {showAddFolderInput && (
+                                <SidebarMenuSubItem>
+                                  <div className="flex items-center gap-1 pl-2 py-1">
+                                    <FolderPlus className="h-3 w-3" />
+                                    <Input
+                                      placeholder="Folder name..."
+                                      value={newFolderName}
+                                      onChange={(e) => setNewFolderName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleAddFolder();
+                                        } else if (e.key === 'Escape') {
+                                          setShowAddFolderInput(false);
+                                          setNewFolderName('');
+                                        }
+                                      }}
+                                      className="h-6 text-xs flex-1"
+                                      autoFocus
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 w-5 p-0"
+                                      onClick={handleAddFolder}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 w-5 p-0"
+                                      onClick={() => {
+                                        setShowAddFolderInput(false);
+                                        setNewFolderName('');
+                                      }}
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                </SidebarMenuSubItem>
+                              )}
+                          
+                              {/* Folder List */}
+                              {folders.map((folder) => (
+                                <React.Fragment key={folder._id}>
+                                  {/* Folder Item with Expand/Collapse */}
+                                  <SidebarMenuSubItem>
+                                    <div className="flex items-center justify-between w-full px-2 py-1 group">
+                                      {editingFolder === folder._id ? (
+                                        <div className="flex items-center gap-1 flex-1">
+                                          <FolderPlus className="h-3 w-3" />
+                                          <Input
+                                            value={editFolderName}
+                                            onChange={(e) => setEditFolderName(e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleSaveFolderEdit();
+                                              } else if (e.key === 'Escape') {
+                                                setEditingFolder(null);
+                                                setEditFolderName('');
+                                              }
+                                            }}
+                                            className="h-6 text-xs flex-1"
+                                            autoFocus
+                                          />
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-5 w-5 p-0"
+                                            onClick={() => {
+                                              setEditingFolder(null);
+                                              setEditFolderName('');
+                                            }}
+                                          >
+                                            ×
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <div className="flex items-center gap-1 flex-1">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-5 w-5 p-0"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleFolderExpand(folder._id);
+                                              }}
+                                            >
+                                              {expandedFolders[folder._id] ? (
+                                                <ChevronDown className="h-3 w-3" />
+                                              ) : (
+                                                <ChevronRight className="h-3 w-3" />
+                                              )}
+                                            </Button>
+                                            <FolderPlus className="h-3 w-3" />
+                                            <span className="text-xs font-medium">{folder.name}</span>
+                                          </div>
+                                          {folder.createdBy === currentUserId && (
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                  <MoreVertical className="h-3 w-3" />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end" className="w-32">
+                                                <DropdownMenuItem onClick={() => {
+                                                  setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: true }));
+                                                  setExpandedFolders(prev => ({ ...prev, [folder._id]: true }));
+                                                }}>
+                                                  <Plus className="h-3 w-3 mr-2" />
+                                                  Add Project
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleEditFolder(folder)}>
+                                                  <Edit className="h-3 w-3 mr-2" />
+                                                  Rename
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <AlertDialog>
+                                                  <AlertDialogTrigger asChild>
+                                                    <DropdownMenuItem 
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setFolderToDelete(folder._id);
+                                                      }}
+                                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                      onSelect={(e) => {
+                                                        e.preventDefault();
+                                                        setDeleteFolderConfirmOpen(true);
+                                                      }}
+                                                    >
+                                                      <Trash2 className="h-3 w-3 mr-2" />
+                                                      Delete
+                                                    </DropdownMenuItem>
+                                                  </AlertDialogTrigger>
+                                                  <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                      <AlertDialogTitle>
+                                                        Delete Folder?
+                                                      </AlertDialogTitle>
+                                                      <AlertDialogDescription>
+                                                        This will delete "{folder.name}". Projects will be moved to root.
+                                                      </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                      <AlertDialogCancel onClick={() => setDeleteFolderConfirmOpen(false)}>
+                                                        Cancel
+                                                      </AlertDialogCancel>
+                                                      <AlertDialogAction 
+                                                        onClick={() => handleDeleteFolder(folder._id)}
+                                                        className="bg-red-600 hover:bg-red-700"
+                                                      >
+                                                        Delete
+                                                      </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                  </AlertDialogContent>
+                                                </AlertDialog>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </SidebarMenuSubItem>
+
+                                  {/* Projects under Folder */}
+                                  {expandedFolders[folder._id] && (
+                                    <>
+                                      {/* Add Project Input inside Folder */}
+                                      {showAddProjectInFolder[folder._id] && (
+                                        <SidebarMenuSubItem>
+                                          <div className="flex items-center gap-1 pl-8 py-1">
+                                            <Input
+                                              placeholder="Project name..."
+                                              value={newProjectInFolderName[folder._id] || ''}
+                                              onChange={(e) => setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: e.target.value }))}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  handleAddProjectInFolder(folder._id);
+                                                } else if (e.key === 'Escape') {
+                                                  setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: false }));
+                                                  setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: '' }));
+                                                }
+                                              }}
+                                              className="h-6 text-xs flex-1"
+                                              autoFocus
+                                            />
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-5 w-5 p-0"
+                                              onClick={() => handleAddProjectInFolder(folder._id)}
+                                            >
+                                              <Plus className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-5 w-5 p-0"
+                                              onClick={() => {
+                                                setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: false }));
+                                                setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: '' }));
+                                              }}
+                                            >
+                                              ×
+                                            </Button>
+                                          </div>
+                                        </SidebarMenuSubItem>
+                                      )}
+
+                                      {/* Project List inside Folder */}
+                                      {folder.projects?.map((project) => (
+                                        <SidebarMenuSubItem key={project._id}>
+                                          <div className="flex items-center justify-between w-full pl-8 pr-2 py-1 group">
+                                            <SidebarMenuSubButton
+                                              onClick={() => handleProjectClick(project.name, project._id, 'daily')}
+                                              isActive={isProjectActive(project._id, 'daily')}
+                                              className={`flex-1 text-xs cursor-pointer ${
+                                                isProjectActive(project._id, 'daily') 
+                                                  ? 'bg-blue-100 text-blue-900 font-medium' 
+                                                  : ''
+                                              }`}
+                                            >
+                                              {project.name}
+                                            </SidebarMenuSubButton>
+                                            {project.createdBy === currentUserId && (
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                  >
+                                                    <MoreVertical className="h-3 w-3" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-32">
+                                                  <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
+                                                    <Edit className="h-3 w-3 mr-2" />
+                                                    Rename
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
+                                                    <Copy className="h-3 w-3 mr-2" />
+                                                    Duplicate
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem onClick={() => openMoveProjectDialog(project)}>
+                                                    <FolderInput className="h-3 w-3 mr-2" />
+                                                    Move to Folder
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuSeparator />
+                                                  <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                      <DropdownMenuItem 
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setProjectToDelete(project.name);
+                                                        }}
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        onSelect={(e) => {
+                                                          e.preventDefault();
+                                                          setDeleteConfirmOpen(true);
+                                                        }}
+                                                      >
+                                                        <Trash2 className="h-3 w-3 mr-2" />
+                                                        Delete
+                                                      </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                      <AlertDialogHeader>
+                                                        <AlertDialogTitle>
+                                                          Delete Project?
+                                                        </AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                          This will delete "{project.name}" and ALL its reports.
+                                                        </AlertDialogDescription>
+                                                      </AlertDialogHeader>
+                                                      <AlertDialogFooter>
+                                                        <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>
+                                                          Cancel
+                                                        </AlertDialogCancel>
+                                                        <AlertDialogAction 
+                                                          onClick={() => {
+                                                            console.log("🔥 SIDEBAR ALERT: Delete clicked for project:", project.name);
+                                                            handleDeleteProject(project.name);
+                                                          }}
+                                                          className="bg-red-600 hover:bg-red-700"
+                                                        >
+                                                          Delete
+                                                        </AlertDialogAction>
+                                                      </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                  </AlertDialog>
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            )}
+                                          </div>
+                                        </SidebarMenuSubItem>
+                                      ))}
+
+                                      {(!folder.projects || folder.projects.length === 0) && !showAddProjectInFolder[folder._id] && (
+                                        <SidebarMenuSubItem>
+                                          <div className="px-8 py-1 text-xs text-muted-foreground italic">
+                                            No projects in this folder
+                                          </div>
+                                        </SidebarMenuSubItem>
+                                      )}
+                                    </>
+                                  )}
+                                </React.Fragment>
+                              ))}
+
+                          {/* Root Projects (without folder) */}
+                          {rootProjects.length > 0 && (
+                            <>
+                              <SidebarMenuSubItem>
+                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                                  (No Folder)
+                                </div>
+                              </SidebarMenuSubItem>
+                              {rootProjects.map((project) => (
+                                <SidebarMenuSubItem key={`root-${project._id}`}>
+                                  <div className="flex items-center justify-between w-full pl-4 pr-2 py-1 group">
                                     {editingProject === project.name ? (
                                       <div className="flex items-center gap-1 flex-1">
                                         <Input
@@ -581,7 +1240,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                               e.preventDefault();
-                                              handleSaveEdit(); // Show dialog - user still needs to click Confirm
+                                              handleSaveEdit();
                                             } else if (e.key === 'Escape') {
                                               handleCancelEdit();
                                             }
@@ -601,145 +1260,208 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                     ) : (
                                       <>
                                         <SidebarMenuSubButton
-                                          onClick={() => handleProjectClick(project.name, 'daily')}
-                                          isActive={isActive('/daily-report') && new URLSearchParams(location.search).get('project') === project.name}
-                                          className="flex-1 text-xs cursor-pointer"
+                                          onClick={() => handleProjectClick(project.name, project._id, 'daily')}
+                                          isActive={isProjectActive(project._id, 'daily')}
+                                          className={`flex-1 text-xs cursor-pointer ${
+                                            isProjectActive(project._id, 'daily') 
+                                              ? 'bg-blue-100 text-blue-900 font-medium' 
+                                              : ''
+                                          }`}
                                         >
                                           {project.name}
                                         </SidebarMenuSubButton>
-                                        {/* DEBUG: Add this logging */}
-                                        {/* {console.log(`DEBUG: Project ${project.name} - createdBy: ${project.createdBy}, currentUserId: ${currentUserId}, match: ${project.createdBy === currentUserId}`)} */}
-                                          {project.createdBy === currentUserId && (
-                                            <DropdownMenu>
-                                              <DropdownMenuTrigger asChild>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                  <MoreVertical className="h-3 w-3" />
-                                                </Button>
-                                              </DropdownMenuTrigger>
-                                              <DropdownMenuContent align="end" className="w-32">
-                                                <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
-                                                  <Edit className="h-3 w-3 mr-2" />
-                                                  Rename
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
-                                                  <Copy className="h-3 w-3 mr-2" />
-                                                  Duplicate
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <AlertDialog>
-                                                  <AlertDialogTrigger asChild>
-                                                    <DropdownMenuItem 
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setProjectToDelete(project.name);
-                                                      }}
-                                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                      onSelect={(e) => {
-                                                        e.preventDefault();
-                                                        setDeleteConfirmOpen(true);
-                                                      }}
+                                        {project.createdBy === currentUserId && (
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              >
+                                                <MoreVertical className="h-3 w-3" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-32">
+                                              <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
+                                                <Edit className="h-3 w-3 mr-2" />
+                                                Rename
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
+                                                <Copy className="h-3 w-3 mr-2" />
+                                                Duplicate
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => openMoveProjectDialog(project)}>
+                                                <FolderInput className="h-3 w-3 mr-2" />
+                                                Move to Folder
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                  <DropdownMenuItem 
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setProjectToDelete(project.name);
+                                                    }}
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    onSelect={(e) => {
+                                                      e.preventDefault();
+                                                      setDeleteConfirmOpen(true);
+                                                    }}
+                                                  >
+                                                    <Trash2 className="h-3 w-3 mr-2" />
+                                                    Delete
+                                                  </DropdownMenuItem>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                  <AlertDialogHeader>
+                                                    <AlertDialogTitle>
+                                                      Are you sure you want to delete this project?
+                                                    </AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                      This action will permanently delete "{project.name}" and <strong>ALL its reports.</strong> This cannot be undone.
+                                                    </AlertDialogDescription>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                    <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>
+                                                      Cancel
+                                                    </AlertDialogCancel>
+                                                    <AlertDialogAction 
+                                                      onClick={() => handleDeleteProject(project.name)}
+                                                      className="bg-red-600 hover:bg-red-700"
                                                     >
-                                                      <Trash2 className="h-3 w-3 mr-2" />
                                                       Delete
-                                                    </DropdownMenuItem>
-                                                  </AlertDialogTrigger>
-                                                  <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                      <AlertDialogTitle>
-                                                        Are you sure you want to delete this project?
-                                                      </AlertDialogTitle>
-                                                      <AlertDialogDescription>
-                                                        This action will permanently delete "{project.name}" and <strong>ALL its reports.</strong> This cannot be undone.
-                                                      </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                      <AlertDialogCancel onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setDeleteConfirmOpen(false);
-                                                      }}>
-                                                        Cancel
-                                                      </AlertDialogCancel>
-                                                      <AlertDialogAction 
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          handleDeleteProject(project.name);
-                                                          setDeleteConfirmOpen(false);
-                                                        }}
-                                                        className="bg-red-600 hover:bg-red-700"
-                                                      >
-                                                        Delete
-                                                      </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                  </AlertDialogContent>
-                                                </AlertDialog>
-                                              </DropdownMenuContent>
-                                            </DropdownMenu>
-                                          )}
+                                                    </AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                              </AlertDialog>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        )}
                                       </>
                                     )}
                                   </div>
                                 </SidebarMenuSubItem>
                               ))}
-                              
-                              {projects.length === 0 && !showAddProject && (
-                                <SidebarMenuSubItem>
-                                  <div className="px-3 py-1 text-xs text-muted-foreground italic">
-                                    No projects yet. Click + to add one.
-                                  </div>
-                                </SidebarMenuSubItem>
-                              )}
-                            </SidebarMenuSub>
-                          </CollapsibleContent>
-                        </Collapsible>
+                            </>
+                          )}
+                          
+                          {folders.length === 0 && rootProjects.length === 0 && !showAddFolderInput && (
+                            <SidebarMenuSubItem>
+                              <div className="px-3 py-1 text-xs text-muted-foreground italic">
+                                No projects yet. Click + to add one.
+                              </div>
+                            </SidebarMenuSubItem>
+                          )}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </Collapsible>
 
-                        {/* Weekly Report Subsection */}
-                        <Collapsible open={weeklyReportOpen} onOpenChange={setWeeklyReportOpen}>
-                          <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
-                              <span className="flex items-center gap-2">
-                                <Calendar className="h-3 w-3" />
-                                Weekly Report
-                              </span>
-                              {weeklyReportOpen ? (
-                                <ChevronDown className="h-3 w-3" />
-                              ) : (
-                                <ChevronRight className="h-3 w-3" />
-                              )}
-                            </SidebarMenuButton>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <SidebarMenuSub>
-                              {/* Same project list as Daily Report (read-only) */}
-                              {projects.map((project) => (
-                                <SidebarMenuSubItem key={`weekly-${project}`}>
+                    {/* Weekly Report Subsection */}
+                    <Collapsible open={weeklyReportOpen} onOpenChange={setWeeklyReportOpen}>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
+                          <span 
+                            className="flex items-center gap-2 flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate('/weekly-report-projects');
+                            }}
+                          >
+                            <Calendar className="h-3 w-3" />
+                            Weekly Report
+                          </span>
+                          {weeklyReportOpen ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {/* Same folder/project structure as Daily Report (read-only) */}
+                          
+                          {/* Folder List */}
+                          {folders.map((folder) => (
+                            <React.Fragment key={`weekly-folder-${folder._id}`}>
+                              {/* Folder with Expand/Collapse */}
+                              <SidebarMenuSubItem>
+                                <div 
+                                  className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-accent/50 rounded"
+                                  onClick={() => toggleWeeklyFolderExpand(folder._id)}
+                                >
+                                  <div className="h-5 w-5 flex items-center justify-center">
+                                    {weeklyExpandedFolders[folder._id] ? (
+                                      <ChevronDown className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronRight className="h-3 w-3" />
+                                    )}
+                                  </div>
+                                  <FolderPlus className="h-3 w-3" />
+                                  <span className="text-xs font-medium text-muted-foreground">{folder.name}</span>
+                                </div>
+                              </SidebarMenuSubItem>
+                              
+                              {/* Projects under Folder - only show when expanded */}
+                              {weeklyExpandedFolders[folder._id] && folder.projects?.map((project) => (
+                                <SidebarMenuSubItem key={`weekly-proj-${project._id}`}>
                                   <SidebarMenuSubButton
-                                    onClick={() => handleProjectClick(project.name, 'weekly')}
-                                    className="text-muted-foreground"
+                                    onClick={() => handleProjectClick(project.name, project._id, 'weekly')}
+                                    isActive={isProjectActive(project._id, 'weekly')}
+                                    className={`text-muted-foreground pl-8 ${
+                                      isProjectActive(project._id, 'weekly') 
+                                        ? 'bg-blue-100 text-blue-900 font-medium' 
+                                        : ''
+                                    }`}
                                   >
                                     <span className="text-xs">{project.name}</span>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               ))}
-                              
-                              {projects.length === 0 && (
-                                <SidebarMenuSubItem>
-                                  <div className="px-3 py-1 text-xs text-muted-foreground italic">
-                                    No projects available
-                                  </div>
+                            </React.Fragment>
+                          ))}
+
+                          {/* Root Projects (without folder) */}
+                          {rootProjects.length > 0 && (
+                            <>
+                              <SidebarMenuSubItem>
+                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                                  (No Folder)
+                                </div>
+                              </SidebarMenuSubItem>
+                              {rootProjects.map((project) => (
+                                <SidebarMenuSubItem key={`weekly-root-${project._id}`}>
+                                  <SidebarMenuSubButton
+                                    onClick={() => handleProjectClick(project.name, project._id, 'weekly')}
+                                    isActive={isProjectActive(project._id, 'weekly')}
+                                    className={`text-muted-foreground ${
+                                      isProjectActive(project._id, 'weekly') 
+                                        ? 'bg-blue-100 text-blue-900 font-medium' 
+                                        : ''
+                                    }`}
+                                  >
+                                    <span className="text-xs">{project.name}</span>
+                                  </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                              )}
-                            </SidebarMenuSub>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </CollapsibleContent>
-                </Collapsible>
-              </SidebarGroup>
+                              ))}
+                            </>
+                          )}
+                          
+                          {folders.length === 0 && rootProjects.length === 0 && (
+                            <SidebarMenuSubItem>
+                              <div className="px-3 py-1 text-xs text-muted-foreground italic">
+                                No projects available
+                              </div>
+                            </SidebarMenuSubItem>
+                          )}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </SidebarGroup>
 
               <SidebarSeparator />
             </>
@@ -808,6 +1530,68 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
             </AlertDialogCancel>
             <AlertDialogAction onClick={confirmRename}>
               Confirm Rename
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={renameFolderConfirmOpen} onOpenChange={setRenameFolderConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rename Folder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to rename "{renameFolderData?.oldName}" to "{renameFolderData?.newName}"? This action <strong>will update all reports</strong> in this folder.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setRenameFolderConfirmOpen(false);
+              setRenameFolderData(null);
+              setEditingFolder(null);
+              setEditFolderName("");
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmFolderRename}>
+              Confirm Rename
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Move Project to Folder Dialog */}
+      <AlertDialog open={moveProjectDialogOpen} onOpenChange={setMoveProjectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move Project to Folder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select a folder for "{projectToMove?.name}":
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <select
+              value={selectedTargetFolder}
+              onChange={(e) => setSelectedTargetFolder(e.target.value)}
+              className="w-full p-2 border rounded-md text-sm"
+            >
+              <option value="">(No Folder - Root)</option>
+              {folders.map((folder) => (
+                <option key={folder._id} value={folder._id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setMoveProjectDialogOpen(false);
+              setProjectToMove(null);
+              setSelectedTargetFolder('');
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleMoveProject}>
+              Move Project
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

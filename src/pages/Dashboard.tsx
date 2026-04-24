@@ -42,10 +42,15 @@ import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport, getCompanyReports } from "@/integrations/reportsApi";
+import { getProjectById } from "@/integrations/projectsApi";
+import { projectEvents } from '@/utils/eventEmitter';
 
 interface Report {
   _id: string;
+  projectId?: string;
   projectName: string;
+  folderId?: string;
+  folderName?: string;
   reportDate: string;
   status: "draft" | "submitted";
   submittedAt?: string;
@@ -66,7 +71,9 @@ const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const projectFilter = searchParams.get('project');
+  const projectId = searchParams.get('projectId');
+  const folderId = searchParams.get('folder');
+  const folderName = searchParams.get('folderName');
   const [companyReports, setCompanyReports] = useState([]);
   const [filteredCompanyReports, setFilteredCompanyReports] = useState([]); // ← ADD THIS
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
@@ -76,16 +83,69 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
+  const [currentProjectName, setCurrentProjectName] = useState<string>("");
+
+  // Helper function for unified project matching
+  const matchesProject = (report: Report, projectId: string | null, projectName: string) => {
+    if (!projectId && !projectName) return true; // No filter, show all
+    
+    // Match by projectId (most reliable, for new reports)
+    if (projectId && report.projectId === projectId) return true;
+    
+    // Match by projectName (fallback for old reports OR reports where projectId wasn't saved)
+    if (projectName && report.projectName === projectName) return true;
+    
+    return false;
+  };
+
+  // Fetch current project name when projectId changes (to handle renamed projects)
+  useEffect(() => {
+    const fetchProjectName = async () => {
+      if (projectId) {
+        const response = await getProjectById(projectId);
+        if (response.success && response.data && !Array.isArray(response.data)) {
+          setCurrentProjectName(response.data.name);
+        } else {
+          setCurrentProjectName("");
+        }
+      } else {
+        setCurrentProjectName("");
+      }
+    };
+
+    fetchProjectName();
+  }, [projectId]);
+
+  useEffect(() => {
+    const handleProjectUpdated = async ({ projectId: updatedId, newName }: any) => {
+      if (updatedId === projectId) {
+        setCurrentProjectName(newName);
+        // Also refresh reports since their projectName may have been updated server-side
+        const userReports = await getRecentReports(50, undefined, projectId || undefined);
+        setReports(userReports.data || []);
+      }
+    };
+    
+    projectEvents.on('projectUpdated', handleProjectUpdated);
+    return () => {
+      projectEvents.off('projectUpdated', handleProjectUpdated);
+    };
+  }, [projectId]);
 
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        // Use new getRecentReports API - fetch ALL reports without status filter
-        const userReports = await getRecentReports(50);
+       
+        
+        // Use new getRecentReports API - fetch reports with projectId filter if available
+        const userReports = await getRecentReports(50, undefined, projectId || undefined);
+        
+        
+        
         setReports(userReports.data || []);
         setFilteredReports(userReports.data || []);
       } catch (error) {
-        console.error("Failed to fetch reports:", error);
+        console.error("❌ DEBUG DASHBOARD: Failed to fetch reports:", error);
         toast({
           title: "Error",
           description: "Failed to load your reports",
@@ -97,15 +157,20 @@ const Dashboard = () => {
     };
 
     fetchReports();
-  }, [toast]);
+  }, [toast, projectId]);
 
   // Filter reports based on search query and status
   useEffect(() => {
     let filtered = reports;
 
-    // Filter by project (NEW!)
-    if (projectFilter) {
-      filtered = filtered.filter(report => report.projectName === projectFilter);
+    // Filter by project - unified logic
+    if (projectId || currentProjectName) {
+      filtered = filtered.filter(report => matchesProject(report, projectId, currentProjectName));
+    }
+
+    // Filter by folder if specified
+    if (folderId) {
+      filtered = filtered.filter(report => report.folderId === folderId);
     }
 
     // Filter by status (case-insensitive)
@@ -124,21 +189,31 @@ const Dashboard = () => {
     }
 
     setFilteredReports(filtered);
-  }, [reports, searchQuery, filterStatus, projectFilter]);
+  }, [reports, searchQuery, filterStatus, projectId, currentProjectName, folderId]);
 
   useEffect(() => {
-    // Always fetch company reports when there's a project filter
-    if (projectFilter) {
+    // Always fetch company reports when there's a projectId
+    if (projectId) {
       fetchCompanyReports();
     } else if (activeTab === 'company') {
-      // Also fetch when switching to company tab without project filter
+      // Also fetch when switching to company tab without projectId
       fetchCompanyReports();
     }
-  }, [activeTab, projectFilter]);
+  }, [activeTab, projectId]);
 
-  // Filter company reports based on search query and status
+  // Filter company reports based on search query, status, and folder
   useEffect(() => {
     let filtered = companyReports;
+
+    // Filter by project - unified logic
+    if (projectId || currentProjectName) {
+      filtered = filtered.filter(report => matchesProject(report, projectId, currentProjectName));
+    }
+
+    // Filter by folder if specified
+    if (folderId) {
+      filtered = filtered.filter(report => report.folderId === folderId);
+    }
 
     // Filter by status (case-insensitive)
     if (filterStatus !== "all") {
@@ -150,13 +225,14 @@ const Dashboard = () => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(report => 
         report.projectName.toLowerCase().includes(query) ||
+        report.folderName?.toLowerCase().includes(query) ||
         new Date(report.reportDate).toLocaleDateString().toLowerCase().includes(query) ||
         report.status.toLowerCase().includes(query)
       );
     }
 
     setFilteredCompanyReports(filtered);
-  }, [companyReports, searchQuery, filterStatus]);
+  }, [companyReports, searchQuery, filterStatus, projectId, currentProjectName, folderId]);
 
   // Helper function to get current user ID from user context
   // No localStorage needed - user info comes from authentication context
@@ -185,9 +261,9 @@ const Dashboard = () => {
   ) => {
     try {
       setIsLoadingCompany(true);
-      // ADD PROJECT FILTER!
-      const response = await getCompanyReports(page, 20, search, projectFilter);
-      setCompanyReports(response.reports);
+      // ADD PROJECT FILTER - Pass both project name (for display) and projectId (for reliable lookup)
+      const response = await getCompanyReports(page, 20, search, currentProjectName, projectId || undefined);
+      setCompanyReports(response.reports || []);
     } catch (error) {
       console.error("Failed to fetch company reports:", error);
       toast({
@@ -202,16 +278,19 @@ const Dashboard = () => {
 
   const handleCreateReport = async () => {
     try {
-      if (projectFilter) {
-        // Navigate to daily report with project context
-        navigate(`/daily-report?project=${encodeURIComponent(projectFilter)}`);
+      if (projectId) {
+        // Navigate to daily report with projectId only
+        let url = `/daily-report?projectId=${encodeURIComponent(projectId)}`;
+        if (folderId) {
+          url += `&folder=${encodeURIComponent(folderId)}&folderName=${encodeURIComponent(folderName || '')}`;
+        }
+        navigate(url);
       } else {
         // Navigate to projects overview to select/create a project
         navigate('/daily-report-projects');
       }
     } catch (error: any) {
-      console.error("🚀 DASHBOARD: Error navigating to report:", error);
-      toast({
+      console.error("🚀 DASHBOARD: Error navigating to report:", error);      toast({
         title: "Error",
         description: "Failed to navigate to report creation",
         variant: "destructive",
@@ -220,15 +299,20 @@ const Dashboard = () => {
   };
 
   const handleOpenReport = (reportId: string) => {
-    const projectParam = projectFilter ? `&project=${encodeURIComponent(projectFilter)}` : '';
-    navigate(`/daily-report?reportId=${reportId}${projectParam}`);
+    const projectIdParam = projectId ? `&projectId=${encodeURIComponent(projectId)}` : '';
+    const folderParam = folderId ? `&folder=${encodeURIComponent(folderId)}&folderName=${encodeURIComponent(folderName || '')}` : '';
+    navigate(`/daily-report?reportId=${reportId}${projectIdParam}${folderParam}`);
   };
 
   const handleDeleteReport = async (reportId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent row click
     
+    console.log("🔥 DASHBOARD: handleDeleteReport called with reportId:", reportId);
+    
     try {
+      console.log("🔥 DASHBOARD: Calling deleteReport API...");
       await deleteReport(reportId);
+      console.log("🔥 DASHBOARD: deleteReport API success!");
       
       toast({
         title: "Report Deleted",
@@ -236,13 +320,15 @@ const Dashboard = () => {
       });
       
       // Refresh the reports list
-      const userReports = await getRecentReports(50);
+      console.log("🔥 DASHBOARD: Refreshing reports list...");
+      const userReports = await getRecentReports(50, undefined, projectId || undefined);
       setReports(userReports.data || []);
       setFilteredReports(userReports.data || []);
       // Always refresh company reports to keep counts in sync
       await fetchCompanyReports();
+      console.log("🔥 DASHBOARD: Reports list refreshed");
     } catch (error) {
-      console.error("Delete error:", error);
+      console.error("🔥 DASHBOARD: Delete error:", error);
       toast({
         title: "Deletion Failed",
         description: error instanceof Error ? error.message : "Failed to delete report",
@@ -258,12 +344,11 @@ const Dashboard = () => {
     
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
     
-    return reportsToCheck.filter(report => {
-      const matchesProject = !projectFilter || report.projectName === projectFilter;
-      return matchesProject &&
-            new Date(report.reportDate) >= oneWeekAgo &&
-            report.status === "submitted";
-    }).length;
+    return reportsToCheck.filter(report => 
+      matchesProject(report, projectId, currentProjectName) &&
+      new Date(report.reportDate) >= oneWeekAgo &&
+      report.status === "submitted"
+    ).length;
   };
 
   // 🚀 NEW: Get today's report status
@@ -271,10 +356,10 @@ const Dashboard = () => {
     const today = new Date().toDateString();
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
       
-    const todayReport = reportsToCheck.find(report => {
-      const matchesProject = !projectFilter || report.projectName === projectFilter;
-      return matchesProject && new Date(report.reportDate).toDateString() === today;
-    });
+    const todayReport = reportsToCheck.find(report => 
+      matchesProject(report, projectId, currentProjectName) && 
+      new Date(report.reportDate).toDateString() === today
+    );
       
     return todayReport?.status || null;
   };
@@ -283,10 +368,10 @@ const Dashboard = () => {
   const getLastSubmitted = () => {
     const reportsToCheck = activeTab === 'personal' ? reports : companyReports;
     
-    const submittedReports = reportsToCheck.filter(report => {
-      const matchesProject = !projectFilter || report.projectName === projectFilter;
-      return matchesProject && report.status === "submitted";
-    });
+    const submittedReports = reportsToCheck.filter(report => 
+      matchesProject(report, projectId, currentProjectName) && 
+      report.status === "submitted"
+    );
     
     if (submittedReports.length === 0) return null;
     return submittedReports.reduce((latest, report) => 
@@ -375,12 +460,20 @@ const Dashboard = () => {
             {/* Welcome Section */}
             <div className="space-y-2">
               <h2 className="text-2xl font-bold tracking-tight">
-                {projectFilter ? `${projectFilter} Reports` : 'Welcome back!'}
+                {currentProjectName || currentProjectName 
+                  ? folderName
+                    ? <span className="flex items-center gap-2">📁 {folderName} / {currentProjectName || currentProjectName}</span>
+                    : `${currentProjectName || currentProjectName} Reports`
+                  : 'Welcome back!'}
               </h2>
               <p className="text-muted-foreground">
-                {projectFilter 
-                  ? `Here's an overview of reports for ${projectFilter}.`
-                  : 'Here\'s an overview of your daily reports.'
+                {(currentProjectName || currentProjectName)
+                  ? folderName
+                    ? `Reports for "${currentProjectName || currentProjectName}" project in "${folderName}" folder.`
+                    : `Here's an overview of reports for ${currentProjectName || currentProjectName}.`
+                  : folderName
+                    ? `Reports in "${folderName}" folder.`
+                    : 'Here\'s an overview of your daily reports.'
                 }
               </p>
             </div>
@@ -396,7 +489,7 @@ const Dashboard = () => {
             )}
 
             {/* Breadcrumb Navigation */}
-            {projectFilter && (
+            {currentProjectName && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                 <button 
                   onClick={() => navigate('/dashboard')}
@@ -404,8 +497,20 @@ const Dashboard = () => {
                 >
                   Dashboard
                 </button>
+                {folderName && (
+                  <>
+                    <span>/</span>
+                    <button
+                      onClick={() => navigate(`/dashboard?folder=${encodeURIComponent(folderId || '')}&folderName=${encodeURIComponent(folderName)}`)}
+                      className="hover:text-foreground transition-colors flex items-center gap-1"
+                    >
+                      <span>📁</span>
+                      {folderName}
+                    </button>
+                  </>
+                )}
                 <span>/</span>
-                <span className="text-foreground">{projectFilter}</span>
+                <span className="text-foreground">{currentProjectName || currentProjectName}</span>
               </div>
             )}
 
@@ -555,7 +660,13 @@ const Dashboard = () => {
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{report.projectName}</h4>
+                            <h4 className="font-medium">{currentProjectName || report.projectName}</h4>
+                            {report.folderName && !folderId && (
+                              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                <span>📁</span>
+                                {report.folderName}
+                              </Badge>
+                            )}
                             {getStatusBadge(report.status)}
                             {new Date(report.updatedAt).getTime() > Date.now() - 5 * 60 * 1000 && (
                               <Badge variant="outline" className="text-blue-600 border-blue-600">
@@ -638,7 +749,10 @@ const Dashboard = () => {
                                       <AlertDialogFooter>
                                         <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
                                         <AlertDialogAction 
-                                          onClick={(e) => handleDeleteReport(report._id, e)}
+                                          onClick={(e) => {
+                                            console.log("🔥 ALERT ACTION: Clicked! report._id:", report._id);
+                                            handleDeleteReport(report._id, e);
+                                          }}
                                           className="bg-red-600 hover:bg-red-700"
                                         >
                                           Delete Report
@@ -673,14 +787,14 @@ const Dashboard = () => {
                   <div className="flex flex-col items-center justify-center py-12">
                     <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">
-                      {projectFilter 
-                        ? `No Reports for ${projectFilter}` 
+                      {currentProjectName 
+                        ? `No Reports for ${currentProjectName}` 
                         : 'No Reports Found'
                       }
                     </h3>
                     <p className="text-muted-foreground text-center mb-4">
-                      {projectFilter 
-                        ? `No reports found for ${projectFilter}. Create your first report for this project.`
+                      {currentProjectName 
+                        ? `No reports found for ${currentProjectName}. Create your first report for this project.`
                         : 'Create your first report to get started.'
                       }
                     </p>

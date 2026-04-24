@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Trash2, Check, X, ImagePlus, Image, UploadCloud } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export default function Section({ section, onUpdate, onDelete, hideTitle = false }: any) {
+export default function Section({ section, onUpdate, onDelete, hideTitle = false, hideShadow = false ,}: any) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Add a new entry (with slots format)
@@ -130,7 +130,7 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
   };
 
   return (
-    <div className="rounded-lg shadow-sm overflow-hidden transition-shadow text-foreground">
+    <div className={`rounded-lg ${hideShadow ? '' : 'shadow-sm'} overflow-hidden transition-shadow text-foreground ${hideShadow ? '' : 'section-card'} `}>
       {/* Section Header */}
       <div className="px-6 py-4 text-foreground">
         <div className="flex flex-col gap-4">

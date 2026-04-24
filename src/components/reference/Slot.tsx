@@ -10,9 +10,10 @@ interface Props {
   onUpdateSlot: (s: any) => void;
   onDeleteSlot: (slotId: string) => void;
   onBulkUpload?: (files: FileList | File[], entryId?: string, slotId?: string) => void;
+  showCaption?: boolean;
 }
 
-export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteSlot, onBulkUpload }: Props) {
+export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteSlot, onBulkUpload, showCaption = true }: Props) {
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     
@@ -48,13 +49,22 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
         aria-label={`Upload photo ${slotIndex + 1}`}
       >
         {logic.imageUrl ? (
-          <div className="relative w-full h-full group/image">
+          <div className="relative w-full h-full group">
             <img src={logic.imageUrl} alt={`Preview`} className="w-full h-full object-cover rounded-2xl" />
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center gap-3">
-              <button type="button" onClick={(e) => logic.removeImage(e)} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors" title="Remove Image" aria-label={`Remove image ${slotIndex + 1}`}>
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Remove button clicked for slot:', slot.id);
+                logic.removeImage(e);
+              }}
+              className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600 z-30"
+              title="Remove Image"
+              aria-label={`Remove image ${slotIndex + 1}`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         ) : (
           <div className="absolute inset-0 flex flex-col justify-center items-center">
@@ -69,9 +79,11 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
         <input id={`slot-file-${entryId}-${slot.id}`} ref={logic.fileInputRef} type="file" accept="image/*" multiple onChange={(e) => logic.handleImageChange(e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label={`Upload image ${slotIndex + 1}`} />
       </div>
 
-      <div className="mt-3">
-        <input id={`caption-${entryId}-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-700 rounded-xl text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" aria-label={`Caption for image ${slotIndex + 1}`} />
-      </div>
+      {showCaption && (
+        <div className="mt-3">
+          <input id={`caption-${entryId}-${slot.id}`} type="text" placeholder="Enter caption..." value={slot.caption || ""} onChange={logic.handleCaptionChange} className="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-700 rounded-xl text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" aria-label={`Caption for image ${slotIndex + 1}`} />
+        </div>
+      )}
     </div>
   );
 }

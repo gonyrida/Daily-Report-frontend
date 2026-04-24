@@ -17,12 +17,15 @@ import DailyReport from "./pages/DailyReport";
 import DailyReportProjects from "./pages/DailyReportProjects";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import WeeklyReport from "./pages/WeeklyReport";
+import WeeklyReportDashboard from "./pages/WeeklyReportDashboard";
+import WeeklyReportProjects from "./pages/WeeklyReportProjects";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
 import PurchaseRequest from "./pages/PurchaseRequest";
 import UserManagement from "./components/admin_dashboard/UserManagement";
 import ProtectedRoute from "./components/ProtectedRoute";
-import FloatingScrollButton from './components/FloatingScrollButton';
+import FloatingScrollButton from "./components/FloatingScrollButton";
 // import SecureTokenInitializer from "./components/SecureTokenInitializer";
 
 const queryClient = new QueryClient();
@@ -35,7 +38,7 @@ const App = () => (
           {/* <SecureTokenInitializer /> */}
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -128,6 +131,31 @@ const App = () => (
                 element={
                   <ProtectedRoute>  
                     <PurchaseRequest />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/weekly-report-projects"
+                element={
+                  <ProtectedRoute>
+                    <WeeklyReportProjects />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/weekly-reports"
+                element={
+                  <ProtectedRoute>
+                    <WeeklyReportDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/weekly-report"
+                element={
+                  <ProtectedRoute>
+                    <WeeklyReport />
+                    <FloatingScrollButton />
                   </ProtectedRoute>
                 }
               />

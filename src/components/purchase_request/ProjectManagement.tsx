@@ -184,6 +184,7 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
                   <th className="text-left p-3 text-sm font-medium">Project Code</th>
                   <th className="text-left p-3 text-sm font-medium">Project Name</th>
                   <th className="text-left p-3 text-sm font-medium">Creator</th>
+                  <th className="text-left p-3 text-sm font-medium">Visibility</th>
                   <th className="text-left p-3 text-sm font-medium">Status</th>
                   <th className="text-left p-3 text-sm font-medium">Created At</th>
                 </tr>
@@ -229,6 +230,7 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
                           : 'Unknown'
                         }
                       </td>
+                      <td className="p-3 text-sm font-medium">{project.visibility || 'N/A'}</td>
                       <td className="p-3 text-sm">
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs ${
                           project.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :

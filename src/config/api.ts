@@ -22,7 +22,7 @@ const getApiBaseUrl = (): string => {
     import.meta.env.VITE_FORCE_PRODUCTION === "true";
 
   if (isProduction) {
-    return "https://daily-report-backend.officemuckup.com/api";
+    return "https://api.cambodiacpm.com/api";
   }
 
   return "http://localhost:5000/api";
@@ -52,7 +52,7 @@ const getStaticBaseUrl = (): string => {
 
   if (isProduction) {
     // Fallback - update this to your actual service URL
-    return "https://daily-report-backend.officemuckup.com";
+    return "https://api.cambodiacpm.com"
   }
 
   return "http://localhost:5000";
@@ -67,7 +67,7 @@ const getPythonApiBaseUrl = (): string => {
 
   // If not defined, use production URL in production mode, localhost in development
   if (import.meta.env.MODE === "production") {
-    return "https://daily-report-python.officemuckup.com";
+    return "https://doc.cambodiacpm.com"
   }
 
   return "http://localhost:5001";
@@ -97,6 +97,10 @@ export const API_ENDPOINTS = {
     SAVE: `/daily-reports/upsert`,
     SUBMIT: `/daily-reports/submit`,
     GET_BY_DATE: (date: string) => `/daily-reports/date/${date}`,
+    // NEW: Bulk import endpoints
+    BULK_IMPORT: (reportId: string) => `/daily-reports/${reportId}/bulk-import`,
+    GET_BY_BULK_ID: (bulkId: string) => `/daily-reports/bulk-import/${bulkId}`,
+    BULK_STATS: `/daily-reports/bulk-import/stats`,
   },
   PROJECTS: {
     BASE: `/projects`,
@@ -104,5 +108,14 @@ export const API_ENDPOINTS = {
     GET_ALL: `/projects`,
     UPDATE: (id: string) => `/projects/${id}`,
     DELETE: (id: string) => `/projects/${id}`,
+  },
+  FOLDERS: {
+    BASE: `/folders`,
+    CREATE: `/folders`,
+    GET_ALL: `/folders`,
+    GET_BY_PROJECT: (projectId: string) => `/folders/project/${projectId}`,
+    GET_PROJECTS: (folderId: string) => `/folders/${folderId}/projects`,
+    UPDATE: (id: string) => `/folders/${id}`,
+    DELETE: (id: string) => `/folders/${id}`,
   },
 };

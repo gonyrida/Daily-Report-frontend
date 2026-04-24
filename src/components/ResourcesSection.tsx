@@ -54,45 +54,76 @@ export const MEP_TEAM_OPTIONS = [
 ];
 
 const MACHINERY_OPTIONS = [
-  "Air compressor",
+  "Air Compressor",
+  "Angle Grinder",
   "Auto Level Machine",
-  "Bar bending machine",
+  "Bar Bending Machine",
   "Bulldozer",
   "Cargo Crane",
   "Concrete Cutting Machine",
   "Concrete Finished",
-  "Concrete mixer",
+  "Concrete Mixer",
   "Concrete Mixer Car",
-  "Concrete pump",
-  "Concrete vibrator",
+  "Concrete Pump",
+  "Concrete Vibrator",
   "Container",
+  "Electric Drill",
+  "Electric Hammer",
   "Excavator",
   "Generator",
   "Jackhammer",
-  "Material hoist",
-  "Mobile crane",
-  "Plate compactor",
-  "Power trowel",
+  "Material Hoist",
+  "Mobile Crane",
+  "Plate Compactor",
+  "Power Cable",
+  "Power Trowel",
   "Pump Car",
   "Rammer",
-  "Rebar cutting machine",
+  "Rebar Cutting Machine",
   "Roller",
-  "Total level",
-  "Total station",
+  "Scaffolding",
+  "Total Level",
+  "Total Station",
   "Truck",
-  "Water pump",
-  "Welding machine",
+  "Water Pump",
+  "Welding Machine"
 ];
 
 const MATERIAL_OPTIONS = [
+  "1 Gang 1 Way Switch",
+  "2 Gang 2 Way Switch",
+  "3 Gang 2 Way Switch",
   "Aggregates",
+  "Air Conditioner Wall Mount 2.5HP",
+  "Audio Cable",
   "Brick",
   "Cement",
+  "Copper Pipe",
+  "Double Data Socket",
+  "Double Socket",
+  "Electrical Conduit 20mm",
+  "Electrical Conduit 25mm",
+  "Electrical Wire",
+  "Electrical Wire 1Cx1.5mm²",
+  "Electrical Wire 1Cx2.5mm²",
   "Electricity Tape",
-  "Electrical wire",
-  "HDPE pipe",
+  "Fiber Optic HDMI",
+  "Flexible Conduit 20mm",
+  "Flexible Conduit 25mm",
+  "Floor Tile F6608",
+  "HDMI Socket",
+  "HDPE Pipe",
+  "Insulation Copper Pipe",
+  "LED Panel Light 300x600mm 40W 6500K",
+  "MCB 1P 10A 6kA",
+  "MCB 1P 20A 6kA",
+  "MCB 2P 50A 6kA",
+  "MCB 2P 63A 6kA",
+  "Outdoor Unit Support",
   "Paint",
-  "PVC pipe",
+  "PVC Drain Pipe Class 8.5",
+  "PVC Pipe",
+  "RCBO 1P+N 20A 30mA 4.5kA",
   "Rebar D14",
   "Rebar DB10",
   "Rebar DB16",
@@ -100,10 +131,97 @@ const MATERIAL_OPTIONS = [
   "Rebar R8",
   "Sand",
   "Scaffolding",
+  "Skim Coat",
+  "Surface Electrical Box",
   "Tile",
+  "UTP CAT6 Cable (DATA)"
 ];
 
-const Units = ["Pack", "PCS", "EA", "Box", "m", "m2", "m3", "kg", "ton"];
+const Units = ["Pack", "PCS", "EA", "Box", "m", "m2", "m3", "kg", "ton", "length", "set", "roll"];
+
+export const MATERIAL_UNIT_MAP: Record<string, string> = {
+  "1 Gang 1 Way Switch": "PCS",
+  "2 Gang 2 Way Switch": "PCS",
+  "3 Gang 2 Way Switch": "PCS",
+  "Aggregates": "m3",
+  "Air Conditioner Wall Mount 2.5HP": "set",
+  "Audio Cable": "roll",
+  "Brick": "PCS",
+  "Cement": "Pack",
+  "Copper Pipe": "roll",
+  "Double Data Socket": "PCS",
+  "Double Socket": "PCS",
+  "Electrical Conduit 20mm": "PCS",
+  "Electrical Conduit 25mm": "PCS",
+  "Electrical Wire": "roll",
+  "Electrical Wire 1Cx1.5mm²": "roll",
+  "Electrical Wire 1Cx2.5mm²": "roll",
+  "Electricity Tape": "roll",
+  "Fiber Optic HDMI": "roll",
+  "Flexible Conduit 20mm": "roll",
+  "Flexible Conduit 25mm": "roll",
+  "Floor Tile F6608": "Pack",
+  "HDMI Socket": "PCS",
+  "HDPE Pipe": "m",
+  "Insulation Copper Pipe": "PCS",
+  "LED Panel Light 300x600mm 40W 6500K": "PCS",
+  "MCB 1P 10A 6kA": "PCS",
+  "MCB 1P 20A 6kA": "PCS",
+  "MCB 2P 50A 6kA": "PCS",
+  "MCB 2P 63A 6kA": "PCS",
+  "Outdoor Unit Support": "set",
+  "Paint": "kg",
+  "PVC Drain Pipe Class 8.5": "m",
+  "PVC Pipe": "m",
+  "RCBO 1P+N 20A 30mA 4.5kA": "PCS",
+  "Rebar D14": "kg",
+  "Rebar DB10": "kg",
+  "Rebar DB16": "kg",
+  "Rebar R6": "kg",
+  "Rebar R8": "kg",
+  "Sand": "m3",
+  "Scaffolding": "set",
+  "Skim Coat": "Pack",
+  "Surface Electrical Box": "PCS",
+  "Tile": "m2",
+  "UTP CAT6 Cable (DATA)": "roll",
+};
+
+export const MACHINERY_UNIT_MAP: Record<string, string> = {
+  "Air Compressor": "EA",
+  "Angle Grinder": "EA",
+  "Auto Level Machine": "EA",
+  "Bar Bending Machine": "EA",
+  "Bulldozer": "EA",
+  "Cargo Crane": "EA",
+  "Concrete Cutting Machine": "EA",
+  "Concrete Finished": "EA",
+  "Concrete Mixer": "EA",
+  "Concrete Mixer Car": "EA",
+  "Concrete Pump": "EA",
+  "Concrete Vibrator": "EA",
+  "Container": "EA",
+  "Electric Drill": "EA",
+  "Electric Hammer": "EA",
+  "Excavator": "EA",
+  "Generator": "EA",
+  "Jackhammer": "EA",
+  "Material Hoist": "EA",
+  "Mobile Crane": "EA",
+  "Plate Compactor": "EA",
+  "Power Cable": "roll",
+  "Power Trowel": "EA",
+  "Pump Car": "EA",
+  "Rammer": "EA",
+  "Rebar Cutting Machine": "EA",
+  "Roller": "EA",
+  "Scaffolding": "set",
+  "Total Level": "EA",
+  "Total Station": "EA",
+  "Truck": "EA",
+  "Water Pump": "EA",
+  "Welding Machine": "EA",
+};
 
 const ResourcesSection = ({
   managementTeam,
@@ -124,7 +242,7 @@ const ResourcesSection = ({
         Man Power
       </h2>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-1 gap-4">
         <ManagementTeamGroup
           managementTeam={managementTeam}
           setManagementTeam={setManagementTeam}
@@ -147,6 +265,8 @@ const ResourcesSection = ({
           showUnit
           unitOptions={Units}
           inputNumberOnly={true}
+          descriptionUnitMap={MATERIAL_UNIT_MAP}
+          enableDragDrop={true}
         />
 
         <ResourceTable
@@ -158,7 +278,9 @@ const ResourcesSection = ({
           dropdownOptions={MACHINERY_OPTIONS}
           showUnit
           unitOptions={Units}
+          descriptionUnitMap={MACHINERY_UNIT_MAP}
           inputNumberOnly={true}
+          enableDragDrop={true}
         />
       </div>
     </div>

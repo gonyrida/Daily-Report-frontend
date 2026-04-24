@@ -160,4 +160,18 @@
       transform: translateY(0);
     }
   }
+
+  .drag-over {
+    background-color: hsl(var(--primary) / 0.1) !important;
+    border-top: 2px solid hsl(var(--primary)) !important;
+  }
+
+  .dragging {
+    opacity: 0.5 !important;
+    transform: rotate(2deg);
+  }
+
+  .cursor-move {
+    cursor: move !important;
+  }
 }

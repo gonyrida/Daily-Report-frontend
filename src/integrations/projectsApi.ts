@@ -7,6 +7,8 @@ import { apiGet, apiPost, apiPut, apiDelete } from "../lib/apiFetch";
 export interface Project {
   _id: string;
   name: string;
+  folderId?: string;
+  folderName?: string;
   createdBy: string;
   createdByName: string;
   reportCount: number;
@@ -24,16 +26,42 @@ export interface ProjectResponse {
   error?: string;
 }
 
-// Get all projects for current user
-export const getProjects = async (): Promise<ProjectResponse> => {
+// Get a single project by ID
+export const getProjectById = async (projectId: string): Promise<ProjectResponse> => {
   try {
-    console.log("DEBUG FRONTEND: Fetching projects");
-    
-    const response = await apiGet(API_ENDPOINTS.PROJECTS.GET_ALL);
+    const response = await apiGet(`${API_ENDPOINTS.PROJECTS.BASE}/${projectId}`);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("DEBUG FRONTEND: Projects fetch error:", errorData);
+      return { 
+        success: false, 
+        data: null, 
+        error: errorData.error || 'Failed to fetch project' 
+      };
+    }
+    
+    const data = await response.json();
+    
+    return { success: true, data: data.data };
+  } catch (error) {
+    return { 
+      success: false, 
+      data: null, 
+      error: 'Network error while fetching project' 
+    };
+  }
+};
+
+// Get all projects for current user (optionally filtered by folder)
+export const getProjects = async (folderId?: string): Promise<ProjectResponse> => {
+  try {
+    const url = folderId 
+      ? `${API_ENDPOINTS.PROJECTS.GET_ALL}?folderId=${folderId}`
+      : API_ENDPOINTS.PROJECTS.GET_ALL;
+    const response = await apiGet(url);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
       return { 
         success: false, 
         data: [], 
@@ -42,11 +70,9 @@ export const getProjects = async (): Promise<ProjectResponse> => {
     }
     
     const data = await response.json();
-    console.log("DEBUG FRONTEND: Projects fetched successfully:", data);
     
     return { success: true, data: data.data || data, count: data.count };
   } catch (error) {
-    console.error("DEBUG FRONTEND: Projects fetch error:", error);
     return { 
       success: false, 
       data: [], 
@@ -56,15 +82,17 @@ export const getProjects = async (): Promise<ProjectResponse> => {
 };
 
 // Create new project
-export const createProject = async (projectName: string): Promise<ProjectResponse> => {
+export const createProject = async (projectName: string, folderId?: string): Promise<ProjectResponse> => {
   try {
-    console.log("DEBUG FRONTEND: Creating project:", projectName);
+    const payload: { name: string; folderId?: string } = { name: projectName };
+    if (folderId) {
+      payload.folderId = folderId;
+    }
     
-    const response = await apiPost(API_ENDPOINTS.PROJECTS.CREATE, { name: projectName });
+    const response = await apiPost(API_ENDPOINTS.PROJECTS.CREATE, payload);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("DEBUG FRONTEND: Project creation error:", errorData);
       return { 
         success: false, 
         data: null, 
@@ -73,11 +101,9 @@ export const createProject = async (projectName: string): Promise<ProjectRespons
     }
     
     const data = await response.json();
-    console.log("DEBUG FRONTEND: Project created successfully:", data);
     
     return { success: true, data: data.data };
   } catch (error) {
-    console.error("DEBUG FRONTEND: Project creation error:", error);
     return { 
       success: false, 
       data: null, 
@@ -89,13 +115,10 @@ export const createProject = async (projectName: string): Promise<ProjectRespons
 // Update project
 export const updateProject = async (projectId: string, projectName: string): Promise<ProjectResponse> => {
   try {
-    console.log("DEBUG FRONTEND: Updating project:", projectId, projectName);
-    
     const response = await apiPut(API_ENDPOINTS.PROJECTS.UPDATE(projectId), { name: projectName });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("DEBUG FRONTEND: Project update error:", errorData);
       return { 
         success: false, 
         data: null, 
@@ -104,11 +127,9 @@ export const updateProject = async (projectId: string, projectName: string): Pro
     }
     
     const data = await response.json();
-    console.log("DEBUG FRONTEND: Project updated successfully:", data);
     
     return { success: true, data: data.data };
   } catch (error) {
-    console.error("DEBUG FRONTEND: Project update error:", error);
     return { 
       success: false, 
       data: null, 
@@ -120,13 +141,10 @@ export const updateProject = async (projectId: string, projectName: string): Pro
 // Delete project (soft delete)
 export const deleteProject = async (projectId: string): Promise<ProjectResponse> => {
   try {
-    console.log("DEBUG FRONTEND: Deleting project:", projectId);
-    
     const response = await apiDelete(API_ENDPOINTS.PROJECTS.DELETE(projectId));
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("DEBUG FRONTEND: Project deletion error:", errorData);
       return { 
         success: false, 
         data: null, 
@@ -135,15 +153,42 @@ export const deleteProject = async (projectId: string): Promise<ProjectResponse>
     }
     
     const data = await response.json();
-    console.log("DEBUG FRONTEND: Project deleted successfully:", data);
     
     return { success: true, data: data.data };
   } catch (error) {
-    console.error("DEBUG FRONTEND: Project deletion error:", error);
     return { 
       success: false, 
       data: null, 
       error: 'Network error while deleting project' 
+    };
+  }
+};
+
+// Move project to folder
+export const moveProjectToFolder = async (projectId: string, folderId: string | null): Promise<ProjectResponse> => {
+  try {
+    const response = await apiPut(
+      `${API_ENDPOINTS.PROJECTS.BASE}/${projectId}/move-to-folder`, 
+      { folderId }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { 
+        success: false, 
+        data: null, 
+        error: errorData.error || 'Failed to move project' 
+      };
+    }
+    
+    const data = await response.json();
+    
+    return { success: true, data: data.data };
+  } catch (error) {
+    return { 
+      success: false, 
+      data: null, 
+      error: 'Network error while moving project' 
     };
   }
 };

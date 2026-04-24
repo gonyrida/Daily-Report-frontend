@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import { useProfileContext } from "@/contexts/ProfileContext";
 import ReportHeader from "@/components/ReportHeader";
 import ProjectInfo from "@/components/ProjectInfo";
@@ -23,7 +23,6 @@ import {
   createDefaultSiteActivitiesSections,
 } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
-import DailyReportProjectsView from "@/components/DailyReportProjectsView";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -73,6 +72,7 @@ import {
 import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { getProjectById } from "@/integrations/projectsApi";
 import {
   Tooltip,
   TooltipContent,
@@ -122,6 +122,7 @@ interface Section {
 }
 
 interface ReportData {
+  projectId?: string;
   projectName: string;
   reportDate: string | null;
   location: string;
@@ -195,29 +196,29 @@ const validateAndSetProjectContext = (
   return loadedProjectName;
 };
 
-// UPDATED: Enhanced detection logic with project history awareness
+// UPDATED: Use projectId as source of truth
 const isNewReportCreation = async (
   reportIdFromUrl: string | null,
-  projectFromUrl: string | null,
+  projectIdFromUrl: string | null,
   dbReport: any
 ): Promise<boolean> => {
-  // If no reportId and has project context → Always treat as new report
-  if (!reportIdFromUrl && projectFromUrl) {
+  // If no reportId and has projectId → Always treat as new report
+  if (!reportIdFromUrl && projectIdFromUrl) {
     return true; // Always new report creation for smart loading
   }
 
-  // If reportId exists but project context doesn't match → New report for different project
+  // If reportId exists but projectId doesn't match → New report for different project
   if (
     reportIdFromUrl &&
-    projectFromUrl &&
+    projectIdFromUrl &&
     dbReport &&
-    dbReport.projectName !== projectFromUrl
+    dbReport.projectId !== projectIdFromUrl
   ) {
-    return true;
+    return true; // Different project - treat as new report
   }
 
-  // If no reportId and no project context → Main dashboard new report
-  if (!reportIdFromUrl && !projectFromUrl) {
+  // If no reportId and no projectId → Main dashboard new report
+  if (!reportIdFromUrl && !projectIdFromUrl) {
     return true;
   }
 
@@ -227,17 +228,18 @@ const isNewReportCreation = async (
 
 // NEW: Initialize clean state for new reports
 const initializeCleanReportState = (
-  projectName: string,
-  setProjectName: (name: string) => void,
+  projectId: string | null,
+  setProjectId: (id: string | null) => void,
   setLocation: (location: string) => void,
   setReportStatus: (status: string) => void
 ) => {
   console.log(
-    `🔧 CLEAN STATE: Initializing new report with project "${projectName}"`
+    `🔧 CLEAN STATE: Initializing new report (ID: ${projectId})`
   );
 
-  // Set project name from URL context
-  setProjectName(projectName);
+  // Set project info from URL context
+  setProjectId(projectId);
+  // Note: setProjectName is handled by Effect 2 to avoid race conditions
   setLocation(""); // Reset location for new reports
   // ADD THIS: Reset status to draft for new reports
   setReportStatus("draft");
@@ -290,25 +292,26 @@ const initializeCleanReportState = (
 //   }
 // };
 
-// FIXED: Use existing API endpoint instead of non-existent APIs
+// FIXED: Use projectId to fetch reports
 const loadMostRecentReportForProject = async (
-  projectName: string
+  projectId: string
 ): Promise<any> => {
   try {
     console.log(
-      "🔍 DEBUG: Loading most recent report for project:",
-      projectName
+      "🔍 DEBUG: Loading most recent report for projectId:",
+      projectId
     );
 
-    // 🚀 PERFORMANCE FIX: Use existing project filter instead of downloading all reports
-    const response = await apiGet(`/daily-reports/company?project=${encodeURIComponent(projectName)}&limit=10`);
+    // 🚀 PERFORMANCE FIX: Use projectId filter instead of project name
+    const response = await apiGet(`/daily-reports/company?projectId=${encodeURIComponent(projectId)}&limit=10`);
     if (!response.ok) return null;
 
     const apiResponse = await response.json();
     console.log("🔍 DEBUG: API response:", apiResponse);
 
     // 🚀 PERFORMANCE FIX: No client-side filtering needed - backend already filtered!
-    const projectReports = apiResponse.reports || [];
+    // FIX: Backend returns 'data', not 'reports'
+    const projectReports = apiResponse.data || apiResponse.reports || [];
     console.log("🔍 DEBUG: Project reports count:", projectReports.length);
     console.log(
       "🔍 DEBUG: Project reports:",
@@ -316,6 +319,7 @@ const loadMostRecentReportForProject = async (
         id: r._id,
         projectName: r.projectName,
         reportDate: r.reportDate,
+        location: r.location,
         createdAt: r.createdAt,
         userId: r.userId,
         userName: r.userId?.firstName
@@ -340,6 +344,7 @@ const loadMostRecentReportForProject = async (
       mostRecent
         ? {
             id: mostRecent._id,
+            location: mostRecent.location,
             userName: mostRecent.userId?.firstName
               ? `${mostRecent.userId.firstName} ${mostRecent.userId.lastName}`
               : "Unknown",
@@ -354,16 +359,92 @@ const loadMostRecentReportForProject = async (
   }
 };
 
+// NEW: Load most recent report for specific project AND location
+const loadMostRecentReportForProjectAndLocation = async (
+  projectId: string,
+  location: string
+): Promise<any> => {
+  try {
+    console.log(
+      "🔍 DEBUG: Loading most recent report for projectId:",
+      projectId,
+      "location:",
+      location
+    );
+
+    // Use the location-specific endpoint to get reports for this location
+    const response = await apiGet(`/daily-reports/by-location?location=${encodeURIComponent(location)}&projectId=${encodeURIComponent(projectId)}`);
+    if (!response.ok) return null;
+
+    const apiResponse = await response.json();
+    console.log("🔍 DEBUG: Location-specific API response:", apiResponse);
+
+    const locationReports = apiResponse || [];
+    console.log("🔍 DEBUG: Location reports count:", locationReports.length);
+    console.log(
+      "🔍 DEBUG: Location reports:",
+      locationReports.map((r) => ({
+        id: r._id,
+        projectName: r.projectName,
+        reportDate: r.reportDate,
+        location: r.location,
+        createdAt: r.createdAt,
+        userId: r.userId,
+        userName: r.userId?.firstName
+          ? `${r.userId.firstName} ${r.userId.lastName}`
+          : "Unknown",
+      }))
+    );
+
+    // Filter by projectId as well (since location endpoint returns all reports for that location)
+    const projectLocationReports = locationReports.filter(
+      (report) => report.projectId === projectId
+    );
+
+    const sortedReports = projectLocationReports.sort((a, b) => {
+      const dateA = new Date(a.reportDate || a.createdAt || 0);
+      const dateB = new Date(b.reportDate || b.createdAt || 0);
+
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+
+      return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+
+    const mostRecent = sortedReports.length > 0 ? sortedReports[0] : null;
+    console.log(
+      "🔍 DEBUG: Most recent report for project+location:",
+      mostRecent
+        ? {
+            id: mostRecent._id,
+            projectName: mostRecent.projectName,
+            location: mostRecent.location,
+            reportDate: mostRecent.reportDate,
+            userName: mostRecent.userId?.firstName
+              ? `${mostRecent.userId.firstName} ${mostRecent.userId.lastName}`
+              : "Unknown",
+          }
+        : "None"
+    );
+
+    return mostRecent;
+  } catch (error) {
+    console.error("Failed to load project's most recent report for location:", error);
+    return null;
+  }
+};
+
 const DailyReport = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { profile } = useProfileContext();
   const [searchParams] = useSearchParams();
   const reportIdFromUrl = searchParams.get("reportId");
-  const projectFromUrl = searchParams.get("project");
+  const projectIdFromUrl = searchParams.get("projectId");
 
   // Project Info
   const [projectLogo, setProjectLogo] = useState<string>("");
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [location, setLocation] = useState("");
   const [createdBy, setCreatedBy] = useState("");
@@ -382,6 +463,30 @@ const DailyReport = () => {
       setCreatedBy(profile.email.split('@')[0]);
     }
   }, [profile]);
+
+  // Fetch project name when projectId changes
+  useEffect(() => {
+  const fetchProjectName = async () => {
+    if (!projectIdFromUrl) return;
+
+    setProjectId(projectIdFromUrl);
+
+    // Get name from most recent report (user-edited value)
+    const recentReport = await loadMostRecentReportForProject(projectIdFromUrl);
+
+    if (recentReport?.projectName) {
+      setProjectName(recentReport.projectName);
+    } else {
+      // Fallback to projects collection name (first-ever report for this project)
+      const response = await getProjectById(projectIdFromUrl);
+      if (response.success && response.data && !Array.isArray(response.data)) {
+        setProjectName(response.data.name);
+      }
+    }
+  };
+
+  fetchProjectName();
+}, [projectIdFromUrl]);
 
   // Activities
   const [activityToday, setActivityToday] = useState("");
@@ -511,6 +616,7 @@ const DailyReport = () => {
   // Helper to get current report data
   const getReportData = useCallback(
     (): ReportData => ({
+      projectId: projectId || undefined,
       projectName,
       location,
       createdBy,
@@ -535,6 +641,7 @@ const DailyReport = () => {
       projectLogo,
     }),
     [
+      projectId,
       projectName,
       location,
       createdBy,
@@ -566,7 +673,7 @@ const DailyReport = () => {
     // 🔥 FIX: Clear prev and accumulated when date changes
     // This ensures backend recalculates rolling totals from scratch
 
-    console.log("📅 Date changed - clearing rolling totals for new date");
+    console.log(" Date changed - clearing rolling totals for new date");
 
     // Clear managementTeam rolling totals
     setManagementTeam((prev) =>
@@ -623,7 +730,187 @@ const DailyReport = () => {
       }))
     );
 
-    console.log("✅ Rolling totals cleared - backend will recalculate on save");
+    console.log(" Rolling totals cleared - backend will recalculate on save");
+  };
+
+  const handleLocationChange = async (newLocation: string) => {
+    setLocation(newLocation);
+
+    console.log("🔄 Location changed - loading rolling totals for new location:", newLocation);
+
+    // Load rolling totals for the new location
+    if (newLocation && projectName) {
+      try {
+        console.log("🔍 Loading most recent report for location:", newLocation);
+        
+        // Load most recent report for this specific project AND location
+        const locationRecentReport = await loadMostRecentReportForProjectAndLocation(
+          projectName,
+          newLocation
+        );
+
+        if (locationRecentReport) {
+          console.log("✅ Found location-specific report, loading rolling totals");
+          
+          setWeatherAM(locationRecentReport.weatherAM || "");
+          setWeatherPM(locationRecentReport.weatherPM || "");
+          setTempAM(locationRecentReport.tempAM || "");
+          setTempPM(locationRecentReport.tempPM || "");
+          setCurrentPeriod(locationRecentReport.currentPeriod || "AM");
+          setActivityToday(locationRecentReport.activityToday || "");
+          setWorkPlanNextDay(locationRecentReport.workPlanNextDay || "");
+
+          // Load rolling totals from the most recent report for this location
+          setManagementTeam(
+            ensureRowIds(locationRecentReport.managementTeam || []).map((item) => ({
+              ...item,
+              prev: item.accumulated, // ← Carry over accumulated to prev
+              today: 0,               // ← Reset today to 0
+              accumulated: item.accumulated, // ← Keep accumulated same
+            }))
+          );
+
+          // Handle interior and MEP teams
+          if (locationRecentReport.workingTeamInterior && locationRecentReport.workingTeamMEP) {
+            setInteriorTeam(
+              ensureRowIds(locationRecentReport.workingTeamInterior).map((item) => ({
+                ...item,
+                prev: item.accumulated,
+                today: 0,
+                accumulated: item.accumulated,
+              }))
+            );
+            setMepTeam(
+              ensureRowIds(locationRecentReport.workingTeamMEP).map((item) => ({
+                ...item,
+                prev: item.accumulated,
+                today: 0,
+                accumulated: item.accumulated,
+              }))
+            );
+          } else {
+            const { interior, mep } = splitWorkingTeam(
+              ensureRowIds(locationRecentReport.workingTeam || [])
+            );
+            setInteriorTeam(interior);
+            setMepTeam(mep);
+          }
+
+          setMaterials(
+            ensureRowIds(locationRecentReport.materials || []).map((item) => ({
+              ...item,
+              prev: item.accumulated,
+              today: 0,
+              accumulated: item.accumulated,
+            }))
+          );
+
+          setMachinery(
+            ensureRowIds(locationRecentReport.machinery || []).map((item) => ({
+              ...item,
+              prev: item.accumulated,
+              today: 0,
+              accumulated: item.accumulated,
+            }))
+          );
+
+          if (locationRecentReport.hse_ref && locationRecentReport.hse_ref.length > 0) {
+            // Convert from DB format (hse_ref) to frontend format (referenceSections)
+            setReferenceSections(locationRecentReport.hse_ref);
+          } else {
+            setReferenceSections(
+              locationRecentReport.referenceSections &&
+                locationRecentReport.referenceSections.length > 0
+                ? locationRecentReport.referenceSections
+                : createDefaultHSESections()
+            );
+          }
+          // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
+          if (locationRecentReport.site_ref && locationRecentReport.site_ref.length > 0) {
+            // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+            const convertedSiteActivities = convertFromSiteRefFormat(
+              locationRecentReport.site_ref
+            );
+            setSiteActivitiesSections(convertedSiteActivities);
+          } else {
+            setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+          }
+          setSiteActivitiesTitle(
+            locationRecentReport.site_title || "Site Activities Photos"
+          );
+          setCarSheet(locationRecentReport.carSheet || createEmptyCarSheet());
+          
+          setProjectLogo(locationRecentReport.projectLogo || null);
+
+          console.log("✅ Rolling totals loaded for location:", newLocation);
+        } else {
+          console.log("⚠️ No previous report found for location:", newLocation, "- resetting totals");
+          
+          // Reset all totals to 0 if no reports exist for this location
+          resetAllRollingTotals();
+        }
+      } catch (error) {
+        console.error("❌ Error loading location-specific totals:", error);
+        // Fallback: reset totals to 0
+        resetAllRollingTotals();
+      }
+    } else {
+      // If no location or project name, reset totals
+      resetAllRollingTotals();
+    }
+  };
+
+  // Helper function to reset all rolling totals
+  const resetAllRollingTotals = () => {
+    console.log("🔄 Resetting all rolling totals to 0");
+    
+    setManagementTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    setWorkingTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    setInteriorTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    setMepTeam((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    setMaterials((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
+
+    setMachinery((prev) =>
+      prev.map((item) => ({
+        ...item,
+        prev: 0,
+        accumulated: 0,
+      }))
+    );
   };
 
   // Helper function to get current user ID from user context
@@ -680,19 +967,19 @@ const DailyReport = () => {
         if (dbReport) {
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
-            projectFromUrl,
+            projectIdFromUrl,
             dbReport
           );
 
           if (isNewReport) {
             // SMART: Check if we should load project's most recent report
-            if (!reportIdFromUrl && projectFromUrl) {
+            if (!reportIdFromUrl && projectIdFromUrl) {
               console.log(
-                "🔧 SMART LOAD: Creating new report for project:",
-                projectFromUrl
+                "🔧 SMART LOAD: Creating new report for projectId:",
+                projectIdFromUrl
               );
               const projectRecentReport = await loadMostRecentReportForProject(
-                projectFromUrl
+                projectIdFromUrl
               );
 
               if (projectRecentReport) {
@@ -701,18 +988,19 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: Found project report, using as template"
                 );
                 setReportId(""); // Keep as new report
-                setProjectName(projectFromUrl);
+                // Note: setProjectName handled by Effect 2
                 setReportDate(new Date());
                 setReportStatus("draft");
+                setLocation(projectRecentReport.location || ""); // Set location from report or URL
 
                 // Load data from project's most recent report
-                // setWeatherAM(projectRecentReport.weatherAM || "");
-                // setWeatherPM(projectRecentReport.weatherPM || "");
-                // setTempAM(projectRecentReport.tempAM || "");
-                // setTempPM(projectRecentReport.tempPM || "");
-                // setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
-                // setActivityToday(projectRecentReport.activityToday || "");
-                // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                setWeatherAM(projectRecentReport.weatherAM || "");
+                setWeatherPM(projectRecentReport.weatherPM || "");
+                setTempAM(projectRecentReport.tempAM || "");
+                setTempPM(projectRecentReport.tempPM || "");
+                setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
+                setActivityToday(projectRecentReport.activityToday || "");
+                setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
                   ensureRowIds(projectRecentReport.managementTeam || []).map(
                     (item) => ({
@@ -781,36 +1069,36 @@ const DailyReport = () => {
                     })
                   )
                 );
-                // setReferenceSections(
-                //   projectRecentReport.referenceSections &&
-                //     projectRecentReport.referenceSections.length > 0
-                //     ? projectRecentReport.referenceSections
-                //     : createDefaultHSESections()
-                // );
+                setReferenceSections(
+                  projectRecentReport.referenceSections &&
+                    projectRecentReport.referenceSections.length > 0
+                    ? projectRecentReport.referenceSections
+                    : createDefaultHSESections()
+                );
 
                 // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-                // if (
-                //   projectRecentReport.site_ref &&
-                //   projectRecentReport.site_ref.length > 0
-                // ) {
-                //   // Convert DB format back to frontend format (splits images into entries of 2 slots each)
-                //   const convertedSiteActivities = convertFromSiteRefFormat(
-                //     projectRecentReport.site_ref
-                //   );
-                //   setSiteActivitiesSections(convertedSiteActivities);
-                // } else {
-                //   setSiteActivitiesSections(
-                //     projectRecentReport.siteActivitiesSections &&
-                //       projectRecentReport.siteActivitiesSections.length > 0
-                //       ? projectRecentReport.siteActivitiesSections
-                //       : createDefaultSiteActivitiesSections()
-                //   );
-                // }
+                if (
+                  projectRecentReport.site_ref &&
+                  projectRecentReport.site_ref.length > 0
+                ) {
+                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                  const convertedSiteActivities = convertFromSiteRefFormat(
+                    projectRecentReport.site_ref
+                  );
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  setSiteActivitiesSections(
+                    projectRecentReport.siteActivitiesSections &&
+                      projectRecentReport.siteActivitiesSections.length > 0
+                      ? projectRecentReport.siteActivitiesSections
+                      : createDefaultSiteActivitiesSections()
+                  );
+                }
                 setSiteActivitiesTitle(
                   projectRecentReport.siteActivitiesTitle ||
                     "Site Activities Photos"
                 );
-                // setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
+                setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
                 setProjectLogo(projectRecentReport.projectLogo || null);
 
                 // Set ownership for new reports (always editable for the creator)
@@ -829,8 +1117,9 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: No project report found, using clean state"
                 );
                 const cleanState = initializeCleanReportState(
-                  projectFromUrl || "",
-                  setProjectName,
+                  projectIdFromUrl,
+                  setProjectId,
+                  setLocation,
                   setReportStatus
                 );
 
@@ -861,8 +1150,9 @@ const DailyReport = () => {
                 "🔧 SMART LOAD: No project context, using clean state"
               );
               const cleanState = initializeCleanReportState(
-                projectFromUrl || "",
-                setProjectName,
+                projectIdFromUrl,
+                setProjectId,
+                setLocation,
                 setReportStatus
               );
 
@@ -904,11 +1194,10 @@ const DailyReport = () => {
             });
 
             setReportId(dbReport._id || reportIdFromUrl);
-            validateAndSetProjectContext(
-              dbReport.projectName || "",
-              projectFromUrl,
-              setProjectName
-            );
+            setProjectId(dbReport.projectId || null);
+            // For existing reports, always use the saved project name from the database
+            // This ensures edited project names are preserved when reopening the report
+            setProjectName(dbReport.projectName || projectName || "");
             setLocation(dbReport.location || ""); // Load location from DB
             // Load createdBy from the report, fallback to current user for new reports
             setCreatedBy(dbReport.createdBy || 
@@ -1015,42 +1304,91 @@ const DailyReport = () => {
 
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
-            projectFromUrl,
+            projectIdFromUrl,
             null
           );
           console.log("🔍 DEBUG: isNewReport result:", isNewReport);
 
           if (isNewReport) {
             // SMART: Check if we should load project's most recent report
-            if (!reportIdFromUrl && projectFromUrl) {
+            if (!reportIdFromUrl && projectIdFromUrl) {
               // Always try smart loading for new reports with project context
               console.log(
-                "🔧 SMART LOAD: Creating new report for project:",
-                projectFromUrl
+                "🔧 SMART LOAD: Creating new report for projectId:",
+                projectIdFromUrl
               );
-              const projectRecentReport = await loadMostRecentReportForProject(
-                projectFromUrl
-              );
+              
+              // Get current location from URL or state
+              const urlLocation = searchParams.get("location");
+              const currentLocation = urlLocation || "";
+              
+              let projectRecentReport;
+              
+              if (currentLocation) {
+                // Load most recent report for specific project AND location
+                console.log(
+                  "🔧 SMART LOAD: Loading for specific location:",
+                  currentLocation
+                );
+                projectRecentReport = await loadMostRecentReportForProjectAndLocation(
+                  projectIdFromUrl,
+                  currentLocation
+                );
+                
+                // If no location-specific report found, try loading most recent report for project (any location)
+                if (!projectRecentReport) {
+                  console.log(
+                    "🔧 SMART LOAD: No location-specific report found, trying any location"
+                  );
+                  projectRecentReport = await loadMostRecentReportForProject(
+                    projectIdFromUrl
+                  );
+                }
+              } else {
+                // Load most recent report for project (any location)
+                console.log(
+                  "🔧 SMART LOAD: Loading for any location"
+                );
+                projectRecentReport = await loadMostRecentReportForProject(
+                  projectIdFromUrl
+                );
+              }
 
               if (projectRecentReport) {
-                // Load project's most recent report as template
-                console.log(
-                  "🔧 SMART LOAD: Found project report, using as template"
-                );
+                // Check if the found report's location matches current location
+                const locationMatches = !currentLocation || projectRecentReport.location === currentLocation;
+                
+                if (locationMatches) {
+                  // Perfect match - use this report as template
+                  console.log(
+                    "🔧 SMART LOAD: Found project report with matching location, using as template"
+                  );
+                } else {
+                  // Location mismatch - use this report but update location
+                  console.log(
+                    "🔧 SMART LOAD: Found project report but location mismatch, updating location",
+                    {
+                      reportLocation: projectRecentReport.location,
+                      currentLocation: currentLocation,
+                      willUse: projectRecentReport.location || currentLocation
+                    }
+                  );
+                }
+                
                 setReportId(""); // Keep as new report
-                setProjectName(projectFromUrl);
+                // Note: setProjectName handled by Effect 2
                 setReportDate(new Date());
                 setReportStatus("draft");
-                setLocation(projectRecentReport.location); // Keep location for smart loaded report
+                setLocation(projectRecentReport.location || currentLocation); // Set location from report or URL
 
                 // Load data from project's most recent report
-                // setWeatherAM(projectRecentReport.weatherAM || "");
-                // setWeatherPM(projectRecentReport.weatherPM || "");
-                // setTempAM(projectRecentReport.tempAM || "");
-                // setTempPM(projectRecentReport.tempPM || "");
-                // setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
-                // setActivityToday(projectRecentReport.activityToday || "");
-                // setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                setWeatherAM(projectRecentReport.weatherAM || "");
+                setWeatherPM(projectRecentReport.weatherPM || "");
+                setTempAM(projectRecentReport.tempAM || "");
+                setTempPM(projectRecentReport.tempPM || "");
+                setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
+                setActivityToday(projectRecentReport.activityToday || "");
+                setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
                 setManagementTeam(
                   ensureRowIds(projectRecentReport.managementTeam || []).map(
                     (item) => ({
@@ -1119,39 +1457,33 @@ const DailyReport = () => {
                     })
                   )
                 );
-                // setReferenceSections(
-                //   projectRecentReport.referenceSections &&
-                //     projectRecentReport.referenceSections.length > 0
-                //     ? projectRecentReport.referenceSections
-                //     : createDefaultHSESections()
-                // );
 
+                if (projectRecentReport.hse_ref && projectRecentReport.hse_ref.length > 0) {
+                  // Convert from DB format (hse_ref) to frontend format (referenceSections)
+                  setReferenceSections(projectRecentReport.hse_ref);
+                } else {
+                  setReferenceSections(
+                    projectRecentReport.referenceSections &&
+                      projectRecentReport.referenceSections.length > 0
+                      ? projectRecentReport.referenceSections
+                      : createDefaultHSESections()
+                  );
+                }
                 // Handle site activities - convert from DB format (site_ref) to frontend format (siteActivitiesSections)
-                // if (
-                //   projectRecentReport.site_ref &&
-                //   projectRecentReport.site_ref.length > 0
-                // ) {
-                //   // Convert DB format back to frontend format (splits images into entries of 2 slots each)
-                //   const convertedSiteActivities = convertFromSiteRefFormat(
-                //     projectRecentReport.site_ref
-                //   );
-                //   setSiteActivitiesSections(convertedSiteActivities);
-                // } else {
-                //   setSiteActivitiesSections(
-                //     projectRecentReport.siteActivitiesSections &&
-                //       projectRecentReport.siteActivitiesSections.length > 0
-                //       ? projectRecentReport.siteActivitiesSections
-                //       : createDefaultSiteActivitiesSections()
-                //   );
-                // }
+                if (projectRecentReport.site_ref && projectRecentReport.site_ref.length > 0) {
+                  // Convert DB format back to frontend format (splits images into entries of 2 slots each)
+                  const convertedSiteActivities = convertFromSiteRefFormat(
+                    projectRecentReport.site_ref
+                  );
+                  setSiteActivitiesSections(convertedSiteActivities);
+                } else {
+                  setSiteActivitiesSections(createDefaultSiteActivitiesSections());
+                }
                 setSiteActivitiesTitle(
                   projectRecentReport.site_title || "Site Activities Photos"
                 );
                 setCarSheet(projectRecentReport.carSheet || createEmptyCarSheet());
-                // console.log(
-                //   "🔍 DEBUG: CAR loaded from projectRecentReport:",
-                //   projectRecentReport.carSheet?.description
-                // );
+                
                 setProjectLogo(projectRecentReport.projectLogo || null);
 
                 // Set ownership for new reports (always editable for the creator)
@@ -1166,8 +1498,9 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: No project report found, using clean state"
                 );
                 const cleanState = initializeCleanReportState(
-                  projectFromUrl || "",
-                  setProjectName,
+                  projectIdFromUrl,
+                  setProjectId,
+                  setLocation,
                   setReportStatus
                 );
 
@@ -1198,8 +1531,9 @@ const DailyReport = () => {
                 "🔧 SMART LOAD: No project context, using clean state"
               );
               const cleanState = initializeCleanReportState(
-                projectFromUrl || "",
-                setProjectName,
+                projectIdFromUrl,
+                setProjectId,
+                setLocation,
                 setReportStatus
               );
 
@@ -1238,7 +1572,7 @@ const DailyReport = () => {
         if (localDraft) {
           const isNewReport = await isNewReportCreation(
             reportIdFromUrl,
-            projectFromUrl,
+            projectIdFromUrl,
             null
           );
 
@@ -1248,8 +1582,8 @@ const DailyReport = () => {
               "🔧 ERROR FALLBACK: Project has no history, using clean state"
             );
             const cleanState = initializeCleanReportState(
-              projectFromUrl || "",
-              setProjectName,
+              projectIdFromUrl,
+              setProjectId,
               setLocation,
               setReportStatus
             );
@@ -1276,14 +1610,14 @@ const DailyReport = () => {
             setProjectLogo(cleanState.projectLogo);
           } else {
             // SMART: Check if we should load project's most recent report
-            if (!reportIdFromUrl && projectFromUrl) {
+            if (!reportIdFromUrl && projectName) {
               // Always try smart loading for new reports with project context
               console.log(
                 "🔧 SMART LOAD: Creating new report for project:",
-                projectFromUrl
+                projectName
               );
               const projectRecentReport = await loadMostRecentReportForProject(
-                projectFromUrl
+                projectName
               );
 
               if (projectRecentReport) {
@@ -1292,7 +1626,7 @@ const DailyReport = () => {
                   "🔧 SMART LOAD: Found project report, using as template"
                 );
                 setReportId(""); // Keep as new report
-                setProjectName(projectFromUrl);
+                // Note: setProjectName handled by Effect 2
                 setLocation(""); // Reset location for new reports
                 setReportDate(new Date());
 
@@ -1361,8 +1695,8 @@ const DailyReport = () => {
                   "🔧 CLEAN STATE: No project history found, using clean state"
                 );
                 const cleanState = initializeCleanReportState(
-                  projectFromUrl,
-                  setProjectName,
+                  projectIdFromUrl,
+                  setProjectId,
                   setLocation,
                   setReportStatus
                 );
@@ -1404,7 +1738,7 @@ const DailyReport = () => {
               setReportId("");
               validateAndSetProjectContext(
                 localDraft.projectName || "",
-                projectFromUrl,
+                projectName,
                 setProjectName
               );
               setLocation(localDraft.location || ""); // Load location from localStorage
@@ -1511,409 +1845,14 @@ const DailyReport = () => {
             }
           }
         } else {
-          // NEW: Set project name from URL context for new reports (error fallback)
-          if (projectFromUrl) {
-            setProjectName(projectFromUrl);
-            setLocation(""); // Reset location for new reports
-          }
+          // Note: setProjectName handled by Effect 2
+          setLocation(""); // Reset location for new reports
         }
       }
     };
 
     loadInitialReport();
   }, [reportIdFromUrl]); // ← Only run when reportId changes, not reportDate
-
-  // // Load report on mount - Try ID first, then DB by date, fallback to localStorage (only on first mount)
-  // useEffect(() => {
-  //   const loadInitialReport = async () => {
-  //     if (initialLoadDoneRef.current) return; // Only load on first mount
-
-  //     initialLoadDoneRef.current = true;
-
-  //     try {
-  //       let dbReport = null;
-
-  //       // First, try to load by reportId if provided in URL
-  //       if (reportIdFromUrl) {
-  //         // console.log("🔍 DAILY REPORT: Loading report by ID:", reportIdFromUrl);
-  //         dbReport = await loadReportById(reportIdFromUrl);
-  //         // console.log("🔍 DAILY REPORT: Report by ID result:", dbReport ? "FOUND" : "NOT FOUND");
-  //         originalReportDataRef.current = dbReport;
-  //       }
-
-  //       // If no report by ID, try loading by date
-  //       if (!dbReport && reportDate) {
-  //         console.log("Loading report by date:", reportDate);
-  //         dbReport = await loadReportFromDB(reportDate);
-  //       }
-
-  //       if (dbReport) {
-  //         // Load from database
-  //         setReportId(dbReport._id || reportIdFromUrl);
-  //         setProjectName(dbReport.projectName || "");
-  //         setReportDate(
-  //           dbReport.reportDate ? new Date(dbReport.reportDate) : new Date()
-  //         );
-  //         // Handle backward compatibility: convert old format to new
-  //         if (dbReport.weatherAM !== undefined) {
-  //           setWeatherAM(dbReport.weatherAM || "");
-  //           setWeatherPM(dbReport.weatherPM || "");
-  //           setTempAM(dbReport.tempAM || "");
-  //           setTempPM(dbReport.tempPM || "");
-  //           setCurrentPeriod(dbReport.currentPeriod || "AM");
-  //         } else {
-  //           // Old format: migrate to new format
-  //           const oldWeather = dbReport.weather || "Sunny";
-  //           const oldPeriod = dbReport.weatherPeriod || "AM";
-  //           const oldTemp = dbReport.temperature || "";
-  //           if (oldPeriod === "AM") {
-  //             setWeatherAM(oldWeather);
-  //             setWeatherPM("");
-  //             setTempAM(oldTemp);
-  //             setTempPM("");
-  //           } else {
-  //             setWeatherAM("");
-  //             setWeatherPM(oldWeather);
-  //             setTempAM("");
-  //             setTempPM(oldTemp);
-  //           }
-  //           setCurrentPeriod("AM");
-  //         }
-  //         setActivityToday(dbReport.activityToday || "");
-  //         setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-  //         setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //         setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
-  //         setMaterials(ensureRowIds(dbReport.materials || []));
-  //         setMachinery(ensureRowIds(dbReport.machinery || []));
-  //       } else {
-  //         // Fallback to localStorage
-  //         const localDraft = loadDraftLocally(reportDate);
-  //         if (localDraft) {
-  //           setProjectName(localDraft.projectName || "");
-  //           setReportDate(
-  //             localDraft.reportDate
-  //               ? new Date(localDraft.reportDate)
-  //               : new Date()
-  //           );
-  //           // Handle backward compatibility
-  //           if (localDraft.weatherAM !== undefined) {
-  //             setWeatherAM(localDraft.weatherAM || "");
-  //             setWeatherPM(localDraft.weatherPM || "");
-  //             setTempAM(localDraft.tempAM || "");
-  //             setTempPM(localDraft.tempPM || "");
-  //             setCurrentPeriod(localDraft.currentPeriod || "AM");
-  //           } else {
-  //             const oldWeather = localDraft.weather || "Sunny";
-  //             const oldPeriod = localDraft.weatherPeriod || "AM";
-  //             const oldTemp = localDraft.temperature || "";
-  //             if (oldPeriod === "AM") {
-  //               setWeatherAM(oldWeather);
-  //               setWeatherPM("");
-  //               setTempAM(oldTemp);
-  //               setTempPM("");
-  //             } else {
-  //               setWeatherAM("");
-  //               setWeatherPM(oldWeather);
-  //               setTempAM("");
-  //               setTempPM(oldTemp);
-  //             }
-  //             setCurrentPeriod("AM");
-  //           }
-  //           setActivityToday(localDraft.activityToday || "");
-  //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
-  //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
-  //           setMaterials(ensureRowIds(localDraft.materials || []));
-  //           setMachinery(ensureRowIds(localDraft.machinery || []));
-  //         }
-  //       }
-  //     } catch (e) {
-  //       console.error("Failed to load report:", e);
-  //       // Fallback to localStorage if DB fails
-  //       const localDraft = loadDraftLocally(reportDate);
-  //       if (localDraft) {
-  //         setProjectName(localDraft.projectName || "");
-  //         setReportDate(
-  //           localDraft.reportDate ? new Date(localDraft.reportDate) : new Date()
-  //         );
-  //         // Handle backward compatibility
-  //         if (localDraft.weatherAM !== undefined) {
-  //           setWeatherAM(localDraft.weatherAM || "");
-  //           setWeatherPM(localDraft.weatherPM || "");
-  //           setTempAM(localDraft.tempAM || "");
-  //           setTempPM(localDraft.tempPM || "");
-  //           setCurrentPeriod(localDraft.currentPeriod || "AM");
-  //         } else {
-  //           const oldWeather = localDraft.weather || "Sunny";
-  //           const oldPeriod = localDraft.weatherPeriod || "AM";
-  //           const oldTemp = localDraft.temperature || "";
-  //           if (oldPeriod === "AM") {
-  //             setWeatherAM(oldWeather);
-  //             setWeatherPM("");
-  //             setTempAM(oldTemp);
-  //             setTempPM("");
-  //           } else {
-  //             setWeatherAM("");
-  //             setWeatherPM(oldWeather);
-  //             setTempAM("");
-  //             setTempPM(oldTemp);
-  //           }
-  //           setCurrentPeriod("AM");
-  //         }
-  //         setActivityToday(localDraft.activityToday || "");
-  //         setWorkPlanNextDay(localDraft.workPlanNextDay || "");
-  //         setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //         setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
-  //         setMaterials(ensureRowIds(localDraft.materials || []));
-  //         setMachinery(ensureRowIds(localDraft.machinery || []));
-  //       }
-  //     }
-  //   };
-
-  //   loadInitialReport();
-  // }, [reportDate, reportIdFromUrl]); // Include reportDate and reportIdFromUrl to satisfy ESLint
-
-  // Handle date change: save current, carry forward between dates, load or clear on first selection
-  // useEffect(() => {
-  //   const newDateStr = reportDate?.toISOString().slice(0, 10) || null;
-  //   const prevDateStr = lastDateRef.current;
-
-  //   if (!reportIdFromUrl && reportDate && prevDateStr && newDateStr && prevDateStr !== newDateStr) {
-  //     // Date changed: save current date draft locally and carry forward
-  //     saveDraftLocally(new Date(prevDateStr), getReportData());
-
-  //     // Load the target date
-  //     const loadTargetDate = async () => {
-  //       try {
-  //         // Try database first
-  //         const dbReport = await loadReportFromDB(reportDate!);
-
-  //         if (dbReport) {
-  //           // Found report in database
-  //           setProjectName(dbReport.projectName || "");
-  //           // Handle backward compatibility: convert old format to new
-  //           if (dbReport.weatherAM !== undefined) {
-  //             setWeatherAM(dbReport.weatherAM || "");
-  //             setWeatherPM(dbReport.weatherPM || "");
-  //             setTempAM(dbReport.tempAM || "");
-  //             setTempPM(dbReport.tempPM || "");
-  //             setCurrentPeriod(dbReport.currentPeriod || "AM");
-  //           } else {
-  //             // Old format: migrate to new format
-  //             const oldWeather = dbReport.weather || "Sunny";
-  //             const oldPeriod = dbReport.weatherPeriod || "AM";
-  //             const oldTemp = dbReport.temperature || "";
-  //             if (oldPeriod === "AM") {
-  //               setWeatherAM(oldWeather);
-  //               setWeatherPM("");
-  //               setTempAM(oldTemp);
-  //               setTempPM("");
-  //             } else {
-  //               setWeatherAM("");
-  //               setWeatherPM(oldWeather);
-  //               setTempAM("");
-  //               setTempPM(oldTemp);
-  //             }
-  //             setCurrentPeriod("AM");
-  //           }
-  //           setActivityToday(dbReport.activityToday || "");
-  //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-  //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
-  //           setMaterials(ensureRowIds(dbReport.materials || []));
-  //           setMachinery(ensureRowIds(dbReport.machinery || []));
-  //         } else {
-  //           // No DB report, try localStorage
-  //           const localDraft = loadDraftLocally(reportDate);
-
-  //           if (localDraft) {
-  //             // Found local draft
-  //             setProjectName(localDraft.projectName || "");
-  //             // Handle backward compatibility
-  //             if (localDraft.weatherAM !== undefined) {
-  //               setWeatherAM(localDraft.weatherAM || "");
-  //               setWeatherPM(localDraft.weatherPM || "");
-  //               setTempAM(localDraft.tempAM || "");
-  //               setTempPM(localDraft.tempPM || "");
-  //               setCurrentPeriod(localDraft.currentPeriod || "AM");
-  //             } else {
-  //               const oldWeather = localDraft.weather || "Sunny";
-  //               const oldPeriod = localDraft.weatherPeriod || "AM";
-  //               const oldTemp = localDraft.temperature || "";
-  //               if (oldPeriod === "AM") {
-  //                 setWeatherAM(oldWeather);
-  //                 setWeatherPM("");
-  //                 setTempAM(oldTemp);
-  //                 setTempPM("");
-  //               } else {
-  //                 setWeatherAM("");
-  //                 setWeatherPM(oldWeather);
-  //                 setTempAM("");
-  //                 setTempPM(oldTemp);
-  //               }
-  //               setCurrentPeriod("AM");
-  //             }
-  //             setActivityToday(localDraft.activityToday || "");
-  //             setWorkPlanNextDay(localDraft.workPlanNextDay || "");
-  //             setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //             setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
-  //             setMaterials(ensureRowIds(localDraft.materials || []));
-  //             setMachinery(ensureRowIds(localDraft.machinery || []));
-  //           } else {
-  //             // No saved report: prefill from yesterday
-  //             const yesterday = new Date(reportDate!.getTime() - 86400000);
-  //             const prevData = loadDraftLocally(yesterday);
-
-  //             if (prevData) {
-  //               // Copy prev-day accumulated -> today's prev
-  //               const mapPrevFromAccum = (rows: ResourceRow[]) =>
-  //                 ensureRowIds(rows).map((r) => ({
-  //                   ...r,
-  //                   prev: r.accumulated,
-  //                   today: 0,
-  //                   accumulated: r.accumulated,
-  //                 }));
-
-  //               setManagementTeam(
-  //                 mapPrevFromAccum(prevData.managementTeam || [])
-  //               );
-  //               setWorkingTeam(mapPrevFromAccum(prevData.workingTeamInterior || []));
-  //               setMaterials(mapPrevFromAccum(prevData.materials || []));
-  //               setMachinery(mapPrevFromAccum(prevData.machinery || []));
-
-  //               // Reset other fields for new day
-  //               setProjectName("");
-  //               setWeatherAM("");
-  //               setWeatherPM("");
-  //               setTempAM("");
-  //               setTempPM("");
-  //               setCurrentPeriod("AM");
-  //               setActivityToday("");
-  //               setWorkPlanNextDay("");
-  //             }
-  //           }
-  //         }
-  //       } catch (e) {
-  //         console.error("Failed to load report for new date:", e);
-  //       }
-  //     };
-
-  //     loadTargetDate();
-  //   } else if (newDateStr && !prevDateStr) {
-  //     console.log("🐛 DEBUG: First date selection");
-  //     console.log("🐛 DEBUG: newDateStr:", newDateStr);
-  //     console.log("🐛 DEBUG: prevDateStr:", prevDateStr);
-  //     console.log("🐛 DEBUG: reportIdFromUrl:", reportIdFromUrl);
-  //     // First date selection: try to load existing data for this date, otherwise clear
-  //     const loadDataForDate = async () => {
-  //       console.log("🐛 DEBUG: loadDataForDate called");
-  //       console.log("🐛 DEBUG: reportDate object:", reportDate);
-  //       console.log("🐛 DEBUG: reportDate type:", typeof reportDate);
-  //       console.log("🐛 DEBUG: reportDate toISOString:", reportDate?.toISOString());
-  //       try {
-  //         // Try to load from database first
-  //         const dbReport = await loadReportFromDB(reportDate!);
-  //         console.log("🐛 DEBUG: dbReport from loadReportFromDB:", dbReport);
-  //         if (dbReport) {
-  //           setProjectName(dbReport.projectName || "");
-  //           // Handle backward compatibility: convert old format to new
-  //           if (dbReport.weatherAM !== undefined) {
-  //             setWeatherAM(dbReport.weatherAM || "");
-  //             setWeatherPM(dbReport.weatherPM || "");
-  //             setTempAM(dbReport.tempAM || "");
-  //             setTempPM(dbReport.tempPM || "");
-  //             setCurrentPeriod(dbReport.currentPeriod || "AM");
-  //           } else {
-  //             // Old format: migrate to new format
-  //             const oldWeather = dbReport.weather || "Sunny";
-  //             const oldPeriod = dbReport.weatherPeriod || "AM";
-  //             const oldTemp = dbReport.temperature || "";
-  //             if (oldPeriod === "AM") {
-  //               setWeatherAM(oldWeather);
-  //               setWeatherPM("");
-  //               setTempAM(oldTemp);
-  //               setTempPM("");
-  //             } else {
-  //               setWeatherAM("");
-  //               setWeatherPM(oldWeather);
-  //               setTempAM("");
-  //               setTempPM(oldTemp);
-  //             }
-  //             setCurrentPeriod("AM");
-  //           }
-  //           setActivityToday(dbReport.activityToday || "");
-  //           setWorkPlanNextDay(dbReport.workPlanNextDay || "");
-  //           setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(dbReport.workingTeamInterior || []));
-  //           setMaterials(ensureRowIds(dbReport.materials || []));
-  //           setMachinery(ensureRowIds(dbReport.machinery || []));
-  //           setReferenceSections(dbReport.referenceSections || []);
-  //           setTableTitle(dbReport.tableTitle || "HSE Toolbox Meeting");
-  //           setCarSheet(dbReport.carSheet || { description: "", photo_groups: [] });
-  //           setProjectLogo(dbReport.projectLogo || "");
-  //           return;
-  //         }
-
-  //         // Fallback to localStorage
-  //         const localDraft = loadDraftLocally(reportDate);
-  //         if (localDraft) {
-  //           setProjectName(localDraft.projectName || "");
-  //           // Handle backward compatibility
-  //           if (localDraft.weatherAM !== undefined) {
-  //             setWeatherAM(localDraft.weatherAM || "");
-  //             setWeatherPM(localDraft.weatherPM || "");
-  //             setTempAM(localDraft.tempAM || "");
-  //             setTempPM(localDraft.tempPM || "");
-  //             setCurrentPeriod(localDraft.currentPeriod || "AM");
-  //           } else {
-  //             const oldWeather = localDraft.weather || "Sunny";
-  //             const oldPeriod = localDraft.weatherPeriod || "AM";
-  //             const oldTemp = localDraft.temperature || "";
-  //             if (oldPeriod === "AM") {
-  //               setWeatherAM(oldWeather);
-  //               setWeatherPM("");
-  //               setTempAM(oldTemp);
-  //               setTempPM("");
-  //             } else {
-  //               setWeatherAM("");
-  //               setWeatherPM(oldWeather);
-  //               setTempAM("");
-  //               setTempPM(oldTemp);
-  //             }
-  //             setCurrentPeriod("AM");
-  //           }
-  //           setActivityToday(localDraft.activityToday || "");
-  //           setWorkPlanNextDay(localDraft.workPlanNextDay || "");
-  //           setManagementTeam(ensureRowIds(localDraft.managementTeam || []));
-  //           setWorkingTeam(ensureRowIds(localDraft.workingTeamInterior || []));
-  //           setMaterials(ensureRowIds(localDraft.materials || []));
-  //           setMachinery(ensureRowIds(localDraft.machinery || []));
-  //           return;
-  //         }
-  //       } catch (e) {
-  //         console.error("Failed to load report for date:", e);
-  //       }
-
-  //       // No existing data: clear form to defaults
-  //       setProjectName("");
-  //       setWeatherAM("");
-  //       setWeatherPM("");
-  //       setTempAM("");
-  //       setTempPM("");
-  //       setCurrentPeriod("AM");
-  //       setActivityToday("");
-  //       setWorkPlanNextDay("");
-  //       setManagementTeam([]);
-  //       setWorkingTeam([]);
-  //       setMaterials([]);
-  //       setMachinery([]);
-  //     };
-
-  //     loadDataForDate();
-  //   }
-
-  //   lastDateRef.current = newDateStr;
-  // }, [reportDate, getReportData]);
 
   // Save draft to localStorage (silent mode for auto-save)
   const saveDraft = useCallback(
@@ -1941,84 +1880,11 @@ const DailyReport = () => {
     [reportDate, getReportData, toast]
   );
 
-  // Auto-save every 30 seconds
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     saveDraft(true);
-  //   }, 30000);
-  //   return () => clearInterval(interval);
-  // }, [saveDraft]);
-
+ 
   // Google Docs-style: Auto-save with debounce
   const debouncedAutoSave = useRef<NodeJS.Timeout | null>(null);
 
-  // const triggerAutoSave = useCallback((partialData: Partial<ReportData>) => {
-  //   if (!reportId) {
-  //     console.log("🔒 AUTO-SAVE: No reportId, skipping auto-save");
-  //     return;
-  //   }
-
-  //   if (debouncedAutoSave.current) {
-  //     clearTimeout(debouncedAutoSave.current);
-  //   }
-
-  //   debouncedAutoSave.current = setTimeout(async () => {
-  //     try {
-  //       setIsAutoSaving(true);
-  //       console.log("🔒 AUTO-SAVE: Triggering auto-save for reportId:", reportId);
-
-  //       const result = await autoSaveReport(reportId, partialData);
-
-  //       if (result.success) {
-  //         setLastSavedAt(new Date());
-  //         console.log("🔒 AUTO-SAVE: Success");
-  //       }
-  //     } catch (error: any) {
-  //       console.error("🔒 AUTO-SAVE: Error:", error);
-  //       // Silent fail for auto-save to not interrupt user
-  //     } finally {
-  //       setIsAutoSaving(false);
-  //     }
-  //   }, 1000); // 1 second debounce
-  // }, [reportId]);
-
-  // Watch for changes and trigger auto-save
-  // useEffect(() => {
-  //   if (!reportId) return;
-
-  //   const currentData = {
-  //     projectName,
-  //     reportDate: reportDate?.toISOString(),
-  //     weatherAM,
-  //     weatherPM,
-  //     tempAM,
-  //     tempPM,
-  //     currentPeriod,
-  //     activityToday,
-  //     workPlanNextDay,
-  //     managementTeam,
-  //     workingTeamInterior,
-  //     materials,
-  //     machinery,
-  //   };
-
-  //   // triggerAutoSave(currentData);
-  // }, [
-  //   projectName,
-  //   reportDate,
-  //   weatherAM,
-  //   weatherPM,
-  //   tempAM,
-  //   tempPM,
-  //   currentPeriod,
-  //   activityToday,
-  //   workPlanNextDay,
-  //   managementTeam,
-  //   workingTeamInterior,
-  //   materials,
-  //   machinery,
-  //   // triggerAutoSave,
-  // ]);
+ 
 
   const validateReport = (): boolean => {
     if (!projectName.trim()) {
@@ -2223,35 +2089,59 @@ const DailyReport = () => {
   const handleExportReferenceWithFilename = async (fileName: string) => {
     setIsExportingReference(true);
     try {
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        // Case 1: already a string (Supabase URL, blob URL, http URL, etc.)
         if (typeof img === "string") {
-          if (!img.startsWith("blob:")) return img;
-
-          const resp = await fetch(img);
-          const blob = await resp.blob();
-
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
+          return img;
         }
 
-        // Case 2: File object (common)
+        // Case 2: File object - upload to Supabase first
         if (img instanceof File) {
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(img);
-          });
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `export-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase(img, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
         }
 
-        // Case 3: unknown object shape (skip it safely)
+        // Case 3: Object with supabaseUrl
+        if (typeof img === "object" && img && typeof img === 'object' && 'supabaseUrl' in img) {
+          return (img as any).supabaseUrl;
+        }
+
+        // Case 4: Object with file property
+        if (typeof img === "object" && img && 'file' in img && (img as any).file instanceof File) {
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `export-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase((img as any).file, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
+        }
+
         return null;
       };
 
@@ -2263,7 +2153,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2303,7 +2193,7 @@ const DailyReport = () => {
       // Get current report data
       const rawData = getReportData();
 
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2343,7 +2233,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2361,7 +2251,7 @@ const DailyReport = () => {
         (carSheet.photo_groups || []).map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2372,7 +2262,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Save basic data to database (without large image data)
       const basicCleanedData = {
@@ -2458,7 +2348,7 @@ const DailyReport = () => {
       );
 
       // ADD THIS right after line 2031 (before the CAR processing):
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2486,9 +2376,9 @@ const DailyReport = () => {
           images: await Promise.all(
             (g.images || []).map(async (img: any) => {
               if (img && typeof img === "object" && img instanceof File) {
-                return await toBase64DataUrl(img);
+                return await toImageUrl(img);
               }
-              return img; // Already base64 or null
+              return img; // Already Supabase URL or null
             })
           ),
         }))
@@ -2501,7 +2391,7 @@ const DailyReport = () => {
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP), // ✅ correct
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
-        // Override with processed sections (images now base64)
+        // Override with processed sections (images now Supabase URLs)
         referenceSections: processedReferenceSections,
         site_ref: siteRefData,
         carSheet: {
@@ -2562,7 +2452,7 @@ const DailyReport = () => {
       // Step 1: Save report to database first (same logic as submit)
       const rawData = getReportData();
 
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2602,7 +2492,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2628,7 +2518,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2639,7 +2529,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Save basic data to database (without large image data)
       const basicCleanedData = {
@@ -2768,7 +2658,7 @@ const DailyReport = () => {
       // Step 1: Save report to database first (same logic as combined Excel)
       const rawData = getReportData();
 
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         // Case 1: already a string (blob URL, data URL, http URL, etc.)
@@ -2808,7 +2698,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2834,7 +2724,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2845,7 +2735,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Save basic data to database (without large image data)
       const basicCleanedData = {
@@ -2917,37 +2807,58 @@ const DailyReport = () => {
     if (!validateReport()) return;
     setIsPreviewingCombined(true); // Start loading
     try {
-      // Process images to base64 data URLs (same as export)
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      // Process images to Supabase URLs (no base64 conversion)
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
-        // Case 1: already a string (blob URL, data URL, http URL, etc.)
+        // Case 1: already a string (Supabase URL, blob URL, http URL, etc.)
         if (typeof img === "string") {
-          if (img.startsWith("data:")) return img; // Already a data URL
-          if (img.startsWith("blob:")) {
-            // Convert blob URL to data URL
-            try {
-              const response = await fetch(img);
-              const blob = await response.blob();
-              return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-              });
-            } catch {
-              return null;
-            }
-          }
-          return img; // Return as-is for http URLs etc.
+          return img; // Return URLs directly
         }
 
-        // Case 2: File object
+        // Case 2: File object - upload to Supabase first
         if (img instanceof File) {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(img);
-          });
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `preview-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase(img, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
+        }
+
+        // Case 3: Object with supabaseUrl
+        if (typeof img === "object" && img && typeof img === 'object' && 'supabaseUrl' in img) {
+          return (img as any).supabaseUrl;
+        }
+
+        // Case 4: Object with file property
+        if (typeof img === "object" && img && 'file' in img && (img as any).file instanceof File) {
+          const { uploadImageToSupabase } = await import('@/utils/supabaseStorage');
+          const userId = localStorage.getItem('userId') || 'unknown';
+          const fileName = `preview-${Date.now()}.jpg`;
+          const supabasePath = `temp-uploads/${userId}/${fileName}`;
+          
+          try {
+            const uploadResult = await uploadImageToSupabase((img as any).file, 'daily-reports', supabasePath);
+            if (uploadResult.error) {
+              console.error('Upload failed:', uploadResult.error);
+              return null;
+            }
+            return uploadResult.publicUrl;
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            return null;
+          }
         }
 
         return null;
@@ -2961,7 +2872,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -2987,7 +2898,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -2998,7 +2909,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Use same payload as export
       const payload = {
@@ -3116,7 +3027,7 @@ const DailyReport = () => {
       // Save to database
       // await saveReportToDB(basicCleanedData);
       // Process images for both exports
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         if (typeof img === "string") {
@@ -3156,7 +3067,7 @@ const DailyReport = () => {
                 const newSlots = await Promise.all(
                   (entry.slots ?? []).map(async (slot: Slot) => ({
                     ...slot,
-                    image: await toBase64DataUrl(slot.image),
+                    image: await toImageUrl(slot.image),
                   }))
                 );
                 return { ...entry, slots: newSlots };
@@ -3182,7 +3093,7 @@ const DailyReport = () => {
         visibleCarGroups.map(async (g: any) => {
           const imgs = await Promise.all(
             (g.images || []).map(
-              async (img: any) => (await toBase64DataUrl(img)) || ""
+              async (img: any) => (await toImageUrl(img)) || ""
             )
           );
           return {
@@ -3193,7 +3104,7 @@ const DailyReport = () => {
         })
       );
 
-      const processedLogo = await toBase64DataUrl(projectLogo);
+      const processedLogo = await toImageUrl(projectLogo);
 
       // Generate both files
       const reportPayload = {
@@ -3456,8 +3367,8 @@ const DailyReport = () => {
         processedSiteActivitiesSections
       );
 
-      // ADD toBase64DataUrl function:
-      const toBase64DataUrl = async (img: unknown): Promise<string | null> => {
+      // ADD toImageUrl function:
+      const toImageUrl = async (img: unknown): Promise<string | null> => {
         if (!img) return null;
 
         if (typeof img === "string") {
@@ -3489,7 +3400,7 @@ const DailyReport = () => {
             images: await Promise.all(
               (g.images || []).map(async (img: any) => {
                 if (img && typeof img === "object" && img instanceof File) {
-                  return await toBase64DataUrl(img);
+                  return await toImageUrl(img);
                 }
                 return img;
               })
@@ -3668,10 +3579,10 @@ const DailyReport = () => {
               </div>
             )}
 
-            {/* Show Projects View when no specific report is selected */}
-            {!reportIdFromUrl && !projectFromUrl ? (
+            {/* Redirect to dashboard when no specific report is selected */}
+            {!reportIdFromUrl && !projectIdFromUrl ? (
               <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-                <DailyReportProjectsView />
+                <Navigate to="/dashboard" replace />
               </div>
             ) : (
               <>
@@ -3683,11 +3594,9 @@ const DailyReport = () => {
                       <Button
                         variant="ghost"
                         onClick={() => {
-                          if (projectFromUrl) {
+                          if (projectId) {
                             navigate(
-                              `/dashboard?project=${encodeURIComponent(
-                                projectFromUrl
-                              )}`
+                              `/dashboard?projectId=${encodeURIComponent(projectId)}`
                             );
                           } else {
                             navigate("/dashboard");
@@ -3759,6 +3668,7 @@ const DailyReport = () => {
                         setProjectName={setProjectName}
                         location={location}
                         setLocation={setLocation}
+                        onLocationChange={handleLocationChange}
                         createdBy={createdBy}
                         setCreatedBy={setCreatedBy}
                         reportDate={reportDate}

@@ -596,10 +596,10 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    {/* Request Date */}
+                    {/* Created Date */}
                     <div className="space-y-2">
                       <Label htmlFor="requestDate" className="text-sm font-medium">
-                        Request Date <span className="text-red-500">*</span>
+                        Created at <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         type="date"
@@ -673,7 +673,10 @@ const PRProjectForm: React.FC<PRProjectFormProps> = ({
                         >
                           Add Sub-Project
                         </Button>
-                        {formData.subProjects.length > 0 && <span>Total Sub-Projects: {formData.subProjects.length}</span>}
+                        {formData.subProjects.length > 0 && 
+                          <p className="text-sm">
+                            Total Sub-Projects: {formData.subProjects.length}
+                          </p>}
                       </div>
                     )}
                   </div>

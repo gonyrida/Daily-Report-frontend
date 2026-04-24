@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,7 +24,7 @@ import { useProfileContext } from "@/contexts/ProfileContext";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
+  // password: z.string().min(1, "Password is required"),
   rememberMe: z.boolean().optional(),
 });
 
@@ -53,12 +53,52 @@ const Login = () => {
 
   const rememberMe = watch("rememberMe");
 
+  // Check for remembered email and auto-redirect if authenticated
+  useEffect(() => {
+    const checkRememberedSession = async () => {
+      try {
+        // Check if user chose "remember me" previously
+        const rememberMeFlag = localStorage.getItem("rememberMe");
+        const rememberedEmail = localStorage.getItem("rememberedEmail");
+        
+        if (rememberMeFlag === "true" && rememberedEmail) {
+          // Auto-populate email field
+          setValue("email", rememberedEmail);
+          setValue("rememberMe", true);
+          
+          // Verify if still authenticated
+          const { verifyAuth } = await import("@/integrations/authApi");
+          const result = await verifyAuth();
+          
+          if (result.success) {
+            // User is still authenticated, redirect to dashboard
+            navigate("/reports");
+            return;
+          } else {
+            // Clear remember me data if no longer authenticated
+            localStorage.removeItem("rememberMe");
+            localStorage.removeItem("rememberedEmail");
+            localStorage.removeItem("user");
+          }
+        } else if (rememberedEmail) {
+          // Just populate the email even if remember me wasn't checked
+          setValue("email", rememberedEmail);
+        }
+      } catch (error) {
+        console.error("Error checking remembered session:", error);
+      }
+    };
+
+    checkRememberedSession();
+  }, [setValue, navigate]);
+
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const result = await loginUser(data.email, data.password);
+      // const result = await loginUser(data.email, data.password);
+      const result = await loginUser(data.email);
 
       if (!result.success) {
         throw new Error(result.message || "Login failed");
@@ -66,15 +106,15 @@ const Login = () => {
 
       // Token is now stored in HTTP-only cookie by backend
       // Only store user info for frontend display
-      // if (result.token) {
-      //   localStorage.setItem("authToken", result.token);
-      //   console.log("🔑 Stored auth token in localStorage");
-      // }
-
-      // Store user info for Python API authentication (token is now in HTTP-only cookie)
       localStorage.setItem("user", JSON.stringify(result.user));
+      
       if (data.rememberMe) {
         localStorage.setItem("rememberMe", "true");
+        localStorage.setItem("rememberedEmail", data.email);
+      } else {
+        // Clear remember me data if user didn't check it
+        localStorage.removeItem("rememberMe");
+        localStorage.removeItem("rememberedEmail");
       }
 
       // 🔧 ADD THIS: Force profile refresh and cache
@@ -135,7 +175,8 @@ const Login = () => {
               )}
             </div>
 
-            <div className="space-y-2">
+            {/* Password field - commented out for email-only authentication */}
+            {/* <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
@@ -168,7 +209,7 @@ const Login = () => {
                   {errors.password.message}
                 </p>
               )}
-            </div>
+            </div> */}
 
             <div className="flex items-center space-x-2">
               <Checkbox

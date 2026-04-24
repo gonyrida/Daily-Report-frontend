@@ -652,17 +652,27 @@ export const exportToExcel = async (data: ReportData) => {
   const cacpmLogo = localStorage.getItem("customCacpmLogo");
   const koicaLogo = localStorage.getItem("customKoicaLogo");
 
-  // Add logos to the worksheet if available
+  // Add logos to worksheet if available
   if (cacpmLogo) {
     try {
-      // Convert base64 data URL to buffer
-      const base64Data = cacpmLogo.split(",")[1];
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      // Handle Supabase URL or fetch the image
+      let imageBuffer: ArrayBuffer;
+      
+      if (cacpmLogo.startsWith('http')) {
+        // It's a URL, fetch it
+        const response = await fetch(cacpmLogo);
+        imageBuffer = await response.arrayBuffer();
+      } else {
+        // Legacy base64 - convert to buffer
+        const base64Data = cacpmLogo.split(",")[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        imageBuffer = bytes.buffer;
       }
-      const imageBuffer = bytes.buffer;
+      
       const imageId = workbook.addImage({
         buffer: imageBuffer,
         extension: "png",
@@ -676,14 +686,24 @@ export const exportToExcel = async (data: ReportData) => {
 
   if (koicaLogo) {
     try {
-      // Convert base64 data URL to buffer
-      const base64Data = koicaLogo.split(",")[1];
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      // Handle Supabase URL or fetch the image
+      let imageBuffer: ArrayBuffer;
+      
+      if (koicaLogo.startsWith('http')) {
+        // It's a URL, fetch it
+        const response = await fetch(koicaLogo);
+        imageBuffer = await response.arrayBuffer();
+      } else {
+        // Legacy base64 - convert to buffer
+        const base64Data = koicaLogo.split(",")[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        imageBuffer = bytes.buffer;
       }
-      const imageBuffer = bytes.buffer;
+      
       const imageId = workbook.addImage({
         buffer: imageBuffer,
         extension: "png",
