@@ -20,7 +20,8 @@ import {
 	Upload,
 	FileDown,
 	FileSpreadsheet,
-	FileText 
+	FileText,
+	Eye
 } from "lucide-react";
 import { 
 	apiPost,
@@ -38,6 +39,7 @@ import {
 	exportPurchaseRequestExcel,
 	exportPurchaseRequestPDF
 } from './services/exportServices';
+import PDFPreviewModal from "@/components/PDFPreviewModal";
 import { version } from 'os';
 
 const parseFileSize = (fileSize) => {
@@ -110,6 +112,15 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	const [customUnits, setCustomUnits] = useState<{ value: string; label: string }[]>([]);
 	const [isExporting, setIsExporting] = useState(false);
 	const [isPreviewing, setIsPreviewing] = useState(false);
+	const [showPreview, setShowPreview] = useState(false);
+	const [previewUrl, setPreviewUrl] = useState('');
+	const [purposeOptions, setPurposeOptions] = useState([]);
+
+	useEffect(() => {
+		if (projectData && projectData.length > 0) {
+			setPurposeOptions(projectData);
+		}
+	}, [projectData]);
 
 	useEffect(() => {
 		if (profile) {
@@ -224,6 +235,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			const response = await apiGet(`/purchase-requests/pr-summary/${projectId}/${requestId || 'none'}`);
 			const result = await response.json();
 			setPrSummaryData(result.data);
+			setPurposeOptions([result.data.summary.project])
 		} catch (error) {
 			console.error('Error fetching PR summary data:', error);
 			setPrSummaryData(null); // Reset to null on error
@@ -389,6 +401,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		setPrSummaryData(null); // Reset PR summary data
 		setActiveTab('purchase-request'); // Reset to first tab
 		setAttachments([]);
+		setPurposeOptions(projectData)
  	}
 
 	const handleSubmit = async (action, notes = '') => {
@@ -778,6 +791,30 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		}
 	}
 
+	const handlePreview = async () => {
+		setIsPreviewing(true);
+		const purposesList = structuredClone(prSummaryData.summary.materialsActual);
+		const currentPurposeIdx = purposesList.findIndex((item: any) => item.purpose === formData.purpose);
+		purposesList[currentPurposeIdx]["actualTotal"] += formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+		try {
+			const url = await exportPurchaseRequestPDF({
+				...formData,
+				requestDate: new Date(formData.requestDate).toISOString().split('T')[0],
+				...prSummaryData,
+				summary: {
+					...prSummaryData.summary,
+					materialsActual: purposesList
+				}
+			}, true);
+			setPreviewUrl(url);
+			setShowPreview(true);
+		} catch (error) {
+			console.error('Error previewing purchase request:', error);
+		} finally {
+			setIsPreviewing(false);
+		}
+	}
+
   return (
 		<>
 			<Dialog 
@@ -875,7 +912,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 											<div>
 												<CustomCombobox 
 													initialValue={formData.purpose || ''}
-													options={projectData}
+													options={purposeOptions}
 													optionsFrom='purposes'
 													onChange={(value) => {
 														const project = projectData.find((project) => project.purposes?.some((purpose) => purpose._id === value));
@@ -1303,17 +1340,26 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 												</DropdownMenuItem>
 											</DropdownMenuContent>
 										</DropdownMenu>
-										<Button 
-											type="button" 
+										<Button
 											variant="outline"
-											disabled={isPreviewing}
-											onClick={() => {
-												// Preview logic here
-												console.log("Preview clicked");
-											}}
+											className="min-w-[140px]"
+											onClick={handlePreview}
+											disabled={isPreviewing || !formData.projectName || !formData.purpose}
 										>
-											Preview
+											<Eye className="w-4 h-4 mr-2" />
+											{isPreviewing ? "Previewing ..." : "Preview"}
 										</Button>
+
+										<PDFPreviewModal
+											open={showPreview}
+											onClose={() => {
+												setShowPreview(false);
+												if (previewUrl) {
+													URL.revokeObjectURL(previewUrl);
+												}
+											}}
+											pdfUrl={previewUrl}
+										/>
 									</div>
 									
 									{/* Right side - Cancel and Next */}

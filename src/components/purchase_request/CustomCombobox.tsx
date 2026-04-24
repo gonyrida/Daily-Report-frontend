@@ -48,6 +48,10 @@ const CustomCombobox: React.FC<CreatableComboboxProps> = ({
   // Keep track of locally created options so they don't vanish on re-render
   const [localOptions, setLocalOptions] = useState<Option[]>(initialOptions)
   const [displayLabel, setDisplayLabel] = useState<string>(initialValue)
+  
+  useEffect(() => {
+    setLocalOptions(initialOptions)
+  }, [initialOptions])
 
   useEffect(() => {
     if (initialValue) {
@@ -70,10 +74,10 @@ const CustomCombobox: React.FC<CreatableComboboxProps> = ({
       })
     );
 
-  const [currentOptions, setCurrentOptions] = useState<any[]>(flattenedOptions)
+  const [userCreatedOptions, setUserCreatedOptions] = useState<any>([]);
 
   // Merge prop options with locally created ones
-  const allOptions = [...flattenedOptions, ...currentOptions]
+  const allOptions = [...flattenedOptions, ...userCreatedOptions]
 
   const handleCreate = (inputValue: string) => {
     const newValue = inputValue.toLowerCase().trim()
@@ -83,7 +87,7 @@ const CustomCombobox: React.FC<CreatableComboboxProps> = ({
     const newOption = { [defaultValue]: newValue, [defaultLabel]: inputValue }
     
     flattenedOptions.push(newOption)
-    setCurrentOptions((prev) => [...prev, newOption])
+    setUserCreatedOptions((prev) => [...prev, newOption])
     setDisplayLabel(inputValue)
     if (onCreate) onCreate(inputValue)
     setOpen(false)
@@ -122,7 +126,7 @@ const CustomCombobox: React.FC<CreatableComboboxProps> = ({
               </Button>
             </CommandEmpty>
             <CommandGroup>
-              {currentOptions.map((option) => (
+              {allOptions.map((option) => (
                 <CommandItem
                   key={option[defaultValue]}
                   value={option[defaultLabel]}
