@@ -142,20 +142,7 @@ const Resource: React.FC<{
         !hasAppliedInitialData.current &&
         !useAggregatedData
       ) {
-        console.log('🔄 Applying initialResourcesData (first time only)');
-        const transformedSections = transformBackendToFrontendFormat(initialResourcesData.manPower);
-        setSections(transformedSections);
-
-        // Also transform and set material sections if available
-        if (initialResourcesData.material) {
-          const transformedMaterials = transformMaterialsToFrontendFormat(initialResourcesData.material);
-          setMaterialSections([{
-            title: "",
-            subtitle: "",
-            subRows: transformedMaterials
-          }]);
-        }
-
+        
         // Also transform and set machinery sections if available
         if (initialResourcesData.machinery) {
           const transformedMachinery = transformMachineryToFrontendFormat(initialResourcesData.machinery);

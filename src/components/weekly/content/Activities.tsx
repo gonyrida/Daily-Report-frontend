@@ -11,6 +11,10 @@ const Activities = (props: ActivitiesProps) => {
   
   // Track deleted construction progress items (by unique row id) to prevent re-adding
   const [deletedRowIds, setDeletedRowIds] = useState<Set<string>>(new Set());
+  // Track if merge has been done to prevent duplicate runs
+  const mergeDoneRef = useRef(false);
+  // Track if initial sync has been done
+  const initialSyncDoneRef = useRef(false);
   
   // Drag and drop state
   const [draggedItem, setDraggedItem] = useState<{ type: "weekly" | "next"; index: number } | null>(null);
@@ -31,23 +35,24 @@ const Activities = (props: ActivitiesProps) => {
     }
   }, []);
   
-  // Sync with parent state
+  // Sync with parent state (only on initial load, not after merge)
   useEffect(() => {
-    if (props.weeklyActivities && props.weeklyActivities.length > 0) {
+    if (!initialSyncDoneRef.current && props.weeklyActivities && props.weeklyActivities.length > 0) {
       setWeeklyRows(props.weeklyActivities);
+      initialSyncDoneRef.current = true;
     }
   }, [props.weeklyActivities]);
-  
+
   useEffect(() => {
-    if (props.nextWeekPlan && props.nextWeekPlan.length > 0) {
+    if (!initialSyncDoneRef.current && props.nextWeekPlan && props.nextWeekPlan.length > 0) {
       setNextRows(props.nextWeekPlan);
+      initialSyncDoneRef.current = true;
     }
   }, [props.nextWeekPlan]);
   
   // Merge construction progress data when available
   useEffect(() => {
     if (props.constructionProgressItems && props.constructionProgressItems.length > 0) {
-      
       // Merge for weekly activities (work done) - using % up to this week
       const mergedWeekly = mergeConstructionIntoActivityRows(
         props.constructionProgressItems,
@@ -55,13 +60,13 @@ const Activities = (props: ActivitiesProps) => {
         'weekly',
         deletedRowIds
       );
-      
-      if (mergedWeekly.length !== weeklyRows.length || 
+
+      if (mergedWeekly.length !== weeklyRows.length ||
           JSON.stringify(mergedWeekly) !== JSON.stringify(weeklyRows)) {
         setWeeklyRows(mergedWeekly);
         props.setWeeklyActivities?.(mergedWeekly);
       }
-      
+
       // Merge for next week plan - using % next week plan
       const mergedNext = mergeConstructionIntoActivityRows(
         props.constructionProgressItems,
@@ -69,7 +74,7 @@ const Activities = (props: ActivitiesProps) => {
         'next',
         deletedRowIds
       );
-      
+
       if (mergedNext.length !== nextRows.length ||
           JSON.stringify(mergedNext) !== JSON.stringify(nextRows)) {
         setNextRows(mergedNext);
@@ -346,7 +351,7 @@ const Activities = (props: ActivitiesProps) => {
               const readOnly = construction;
               return (
                 <tr
-                  key={`weekly-${row.id || idx}`}
+                  key={`weekly-${row.id}-${idx}`}
                   ref={row.id === lastAddedId ? scrollToNewRow : null}
                   className={`border-b hover:bg-muted/30 transition-colors
                     ${draggedItem?.type === "weekly" && draggedItem?.index === idx ? "opacity-40" : ""}
@@ -506,7 +511,7 @@ const Activities = (props: ActivitiesProps) => {
               const readOnly = construction;
               return (
                 <tr
-                  key={`next-${row.id || idx}`}
+                  key={`next-${row.id}-${idx}`}
                   ref={row.id === lastAddedId ? scrollToNewRow : null}
                   className={`border-b hover:bg-muted/30 transition-colors
                     ${draggedItem?.type === "next" && draggedItem?.index === idx ? "opacity-40" : ""}

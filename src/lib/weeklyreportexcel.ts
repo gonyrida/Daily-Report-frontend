@@ -239,18 +239,40 @@ export interface HSEPhotoEntry {
   sectionTitle?: string;      // e.g., "5.6.1 HSES Training Photos"
   images?: string[];            // Array of image URLs or base64 data
   footers?: string[];           // Footer text for each image (caption)
+  descriptions?: string[];      // Description text for each photo box
 }
+
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Detect image format from buffer magic bytes (more reliable than URL extension parsing)
+function detectExtensionFromBuffer(buffer: ArrayBuffer): string | null {
+  const bytes = new Uint8Array(buffer, 0, 4);
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8) return 'jpeg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return 'png';
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'gif';
+  return null;
+}
+
 // Enhanced helper function to load image from public folder and add to worksheet
 // Range can be a string (e.g., 'C3:E5') or an object with tl/br/ext properties
+// Accepts a URL string, base64 data URL, or a File object
 async function addImageToWorksheet(
   workbook: ExcelJS.Workbook,
   worksheet: ExcelJS.Worksheet,
-  imagePath: string,
+  imagePath: string | File,
   range: string | { tl: { col: number; row: number }; br: { col: number; row: number }; ext?: { width: number; height: number }; editAs?: string }
 ) {
+  // Convert File object to base64 data URL so the rest of the function handles it uniformly
+  if (imagePath instanceof File) {
+    imagePath = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read File object'));
+      reader.readAsDataURL(imagePath as File);
+    });
+  }
+
   // Input validation
   if (!imagePath || typeof imagePath !== 'string') {
     throw new Error('Invalid image path: must be a non-empty string');
@@ -298,7 +320,8 @@ async function addImageToWorksheet(
       if (mimeType === 'image/svg+xml') {
         extension = 'svg';
       } else {
-        extension = mimeType.split('/')[1] || 'png';
+        const rawExt = mimeType.split('/')[1] || 'png';
+        extension = rawExt === 'jpg' ? 'jpeg' : rawExt;
       }
 
       try {
@@ -375,22 +398,12 @@ async function addImageToWorksheet(
         throw fetchError;
       }
 
-      // Determine extension from URL with validation
-      const urlParts = cleanImagePath.split('.');
-      if (urlParts.length > 1) {
-        const extWithQuery = urlParts[urlParts.length - 1].split('?')[0].toLowerCase();
-        const validExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
-        if (validExtensions.includes(extWithQuery)) {
-          extension = extWithQuery;
-        } else {
-          console.warn(`\u26a0\ufe0f Unknown extension: ${extWithQuery}, defaulting to png`);
-          extension = 'png';
-        }
-      } else {
-        console.warn('\u26a0\ufe0f No file extension found, defaulting to png');
-        extension = 'png';
-      }
+      // Detect extension from buffer magic bytes (handles Supabase paths without extensions)
+      extension = detectExtensionFromBuffer(imageBuffer) ?? 'png';
     }
+
+    // ExcelJS only accepts 'jpeg', not 'jpg'
+    if (extension === 'jpg') extension = 'jpeg';
 
     // Validate image buffer before adding to workbook
     if (!imageBuffer || imageBuffer.byteLength === 0) {
@@ -512,6 +525,34 @@ export async function exportWeeklyReportToExcel(data: WeeklyReportExportData, fi
       }
     }
 
+    // Apply page setup settings to every sheet
+    for (const ws of workbook.worksheets) {
+      // Construction Progress sheet uses landscape, all others use portrait
+      const isConProgress = ws.name === 'Con. Progress';
+
+      ws.pageSetup = {
+        orientation: isConProgress ? 'landscape' : 'portrait',
+        paperSize: 9, // A4
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: {
+          left: 0.5,
+          right: 0.5,
+          top: 0.5,
+          bottom: 0.5,
+          header: 0.3,
+          footer: 0.3
+        }
+      };
+
+      // Set print area to used range
+      const lastRow = ws.lastRow?.number ?? 1;
+      const lastCol = ws.lastColumn?.number ?? 1;
+      if (lastRow > 0 && lastCol > 0) {
+        ws.pageSetup.printArea = `A1:${ws.getColumn(lastCol).letter}${lastRow}`;
+      }
+    }
 
     // Generate filename if not provided
     const finalFilename = filename || `WeeklyReport_${data.projectTitle || 'Project'}_W${data.weekNumber || 'XX'}.xlsx`;
@@ -965,14 +1006,14 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
   //Client Logo 
   if (d.clientLogo) {
     try {
-      await addImageToWorksheet(workbook, ws, d.clientLogo, 'G3:I5');
+      await addImageToWorksheet(workbook, ws, d.clientLogo, 'K3:M5');
     } catch (error) {
       console.warn('❌ Failed to add client logo:', error);
     }
   }
 
-  // Merge cells 3-5, columns G-I for client logo area
-  ws.mergeCells(3, 7, 5, 9); // Merge rows 3-5, columns G-I 
+  // Merge cells 3-5, columns K-M for client logo area
+  ws.mergeCells(3, 11, 5, 13); // Merge rows 3-5, columns K-M 
 
 
   // "KINGDOM OF CAMBODIA" banner row 9
@@ -1828,55 +1869,30 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
     if (!id) return 0;
 
     const trimmed = id.trim();
+    const idType = detectIdType(trimmed);
 
-    // Debug: Log the ID being processed
-    console.log(`Processing ID: "${trimmed}"`);
-
-    // Roman numerals (I, II, III, IV, V, etc.) - level 0
-    if (/^[IVX]+$/.test(trimmed)) {
-      console.log(`Matched Roman numeral: ${trimmed}`);
-      return 0;
-    }
+    // Roman numerals (I, II, III, IV, V, etc.) and ambiguous single letters
+    // that function as roman numerals (e.g. "I" = section 1) — level 0
+    if (idType === 'roman' || idType === 'ambiguous') return 0;
 
     // Arabic numbers with dots (1., 2., 3., etc.) - level 1
-    if (/^\d+\.$/.test(trimmed)) {
-      console.log(`Matched Arabic number with dot: ${trimmed}`);
-      return 1;
-    }
-
-    // Decimal numbers (1.1, 1.2, 2.1, etc.) - level 2
-    if (/^\d+\.\d+$/.test(trimmed)) {
-      console.log(`Matched decimal number: ${trimmed}`);
-      return 2;
-    }
+    if (/^\d+\.$/.test(trimmed)) return 1;
 
     // Triple decimal (1.1.1, 1.2.1, etc.) - level 3
-    if (/^\d+\.\d+\.\d+$/.test(trimmed)) {
-      console.log(`Matched triple decimal: ${trimmed}`);
-      return 3;
-    }
+    if (/^\d+\.\d+\.\d+$/.test(trimmed)) return 3;
 
-    // Dash only (-, --, ---) - level 4 (treated as deepest level)
-    if (/^-+$/.test(trimmed)) {
-      console.log(`Matched dash: ${trimmed}`);
-      return 4;
-    }
+    // Decimal numbers (1.1, 1.2, 2.1, etc.) - level 2
+    if (/^\d+\.\d+$/.test(trimmed)) return 2;
 
-    // Handle other common patterns that might not match above
-    // Numbers without dots (1, 2, 3) - treat as level 1
-    if (/^\d+$/.test(trimmed)) {
-      console.log(`Matched plain number: ${trimmed}, treating as level 1`);
-      return 1;
-    }
+    // Dash only (-, --, ---) - level 4
+    if (/^-+$/.test(trimmed)) return 4;
 
-    // Letters (A, B, C) - treat as level 1
-    if (/^[A-Za-z]+$/.test(trimmed)) {
-      console.log(`Matched letters: ${trimmed}, treating as level 1`);
-      return 1;
-    }
+    // Numbers without dots (1, 2, 3) - level 1
+    if (/^\d+$/.test(trimmed)) return 1;
 
-    // Anything else - log and return level 1 as default
-    console.log(`Unmatched ID pattern: "${trimmed}", treating as level 1`);
+    // Alpha letters (A, B, C) treated as level-1 subsections
+    if (idType === 'alpha') return 1;
+
     return 1;
   };
 
@@ -1909,40 +1925,22 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 
   // Add data rows
   if (d.nwdpItems && d.nwdpItems.length > 0) {
-    // Debug: Log the full nwdpItems structure to diagnose data misalignment
-    console.log('Full nwdpItems:', JSON.stringify(d.nwdpItems, null, 2));
-
-    d.nwdpItems.forEach((item, index) => {
+    d.nwdpItems.forEach((item) => {
       // ID + Scope of work (combined in column B) with indentation
-      const itemId = item.id || '';
+      const itemId = (item as any).sourceId || item.id || '';
       const scopeText = item.workDoneLabel || '';
       const workDoneText = itemId && scopeText ? `${itemId}. ${scopeText}` : (itemId || scopeText);
       const workDoneIndentLevel = getIndentationLevel(itemId);
       const isRomanLevel = workDoneIndentLevel === 0;
       const formattedWorkDone = addIndentation(workDoneText, workDoneIndentLevel);
 
-      // Debug logging to help identify issues
-      console.log(`Item ${index}: ID="${itemId}", Level=${workDoneIndentLevel}, WorkDone="${workDoneText}"`);
-      console.log(`Item ${index}: Row=${r}, FormattedWorkDone="${formattedWorkDone}"`);
-
       ws.getCell(r, 2).value = formattedWorkDone;
-      console.log(`Item ${index}: Set cell(${r},2) value to: "${formattedWorkDone}"`);
-
-      // Verify the cell value was actually set
-      const verifyValue = ws.getCell(r, 2).value;
-      console.log(`Item ${index}: Verified cell(${r},2) value: "${verifyValue}"`);
 
       // Set explicit row height to ensure visibility
       ws.getRow(r).height = 20;
 
-      // Additional debugging for dash items
-      if (itemId === '-') {
-        console.log(`Item ${index}: Dash item - Row=${r}, Check if row is hidden: ${ws.getRow(r).hidden || false}`);
-        console.log(`Item ${index}: Dash item - Cell style: ${JSON.stringify(ws.getCell(r, 2).style)}`);
-      }
-
       ws.getCell(r, 2).style = {
-        font: { bold: isRomanLevel, size: 10, name: 'Arial' },
+        font: { bold: isRomanLevel, size: isRomanLevel ? 11 : 10, name: 'Arial' },
         alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
         border: {
           top: { style: 'hair' },
@@ -1969,25 +1967,11 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       const nextWeekWithId = itemId && nextWeekText
         ? `${itemId}. ${nextWeekText}`
         : (nextWeekText || (itemId ? `${itemId}.` : ''));
-      const displayText = nextWeekWithId || '';
-      const formattedNextWeek = addIndentation(displayText, workDoneIndentLevel);
-
-      // Debug logging specifically for Next Week Plan column
-      console.log(`Item ${index}: NextWeekPlan - Text="${nextWeekText}", Formatted="${formattedNextWeek}"`);
+      const formattedNextWeek = addIndentation(nextWeekWithId || '', workDoneIndentLevel);
 
       ws.getCell(r, 4).value = formattedNextWeek;
-
-      // Verify the Next Week Plan cell value was actually set
-      const verifyNextWeekValue = ws.getCell(r, 4).value;
-      console.log(`Item ${index}: Verified NextWeekPlan cell(${r},4) value: "${verifyNextWeekValue}"`);
-
-      // Additional debugging for dash items in Next Week Plan
-      if (itemId === '-') {
-        console.log(`Item ${index}: Dash NextWeekPlan - Row=${r}, Cell(${r},4) value: "${verifyNextWeekValue}"`);
-        console.log(`Item ${index}: Dash NextWeekPlan - Cell(${r},4) style: ${JSON.stringify(ws.getCell(r, 4).style)}`);
-      }
       ws.getCell(r, 4).style = {
-        font: { bold: isRomanLevel, size: 10, name: 'Arial' },
+        font: { bold: isRomanLevel, size: isRomanLevel ? 11 : 10, name: 'Arial' },
         alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
         border: {
           top: { style: 'hair' },
@@ -2030,7 +2014,6 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 // SHEET 8: 4. QAQC
 async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   const ws = workbook.addWorksheet('4. QAQC');
-  const styles = createStyles(workbook);
 
   ws.properties.tabColor = { argb: 'FF0070C0' };
 
@@ -2082,14 +2065,27 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       ]
     };
     ws.getCell(r, 2).style = {
-      alignment: { horizontal: 'center', vertical: 'middle' }
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFDCE6F1' } },
+      alignment: { horizontal: 'left' as const, vertical: 'middle' as const },
+      border: {
+        top: { style: 'thin' as const }, bottom: { style: 'thin' as const },
+        left: { style: 'thin' as const }, right: { style: 'thin' as const }
+      }
     };
     ws.mergeCells(r, 2, r, 5);
     ws.getRow(r).height = 22.5;
-    r++; // Space between sections
+    r++;
 
-    // Match section by sectionTitle which is the key like "4.1", "4.2", etc.
-    const sectionData = d.qaqcSections?.find(s => s.sectionTitle === section.id);
+    // Match section by sectionTitle (supports both '4.1' keys and short keys like 'ncr')
+    const KEY_TO_ID: Record<string, string> = {
+      ncr: '4.1', car: '4.2', scar: '4.3', pmsi: '4.4', csi: '4.5',
+      ir: '4.6', mfa: '4.7', rfi: '4.8', rfa: '4.9', fcr: '4.10',
+      vo: '4.11', tr: '4.12', mir: '4.13'
+    };
+    const sectionData = d.qaqcSections?.find(s =>
+      s.sectionTitle === section.id ||
+      (s.sectionTitle !== undefined && KEY_TO_ID[s.sectionTitle] === section.id)
+    );
 
     // Table headers - special case for Client Site Instruction and Inspection Request
     if (section.id === '4.5') {
@@ -2103,24 +2099,27 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       ws.getCell(r, 4).value = 'Received Date';
       ws.getCell(r, 5).value = 'Inspection Date';
     } else {
-      // Standard order: Code, Description, Status, Date Responded
       ws.getCell(r, 2).value = 'Code';
       ws.getCell(r, 3).value = 'Description';
       ws.getCell(r, 4).value = 'Status';
       ws.getCell(r, 5).value = 'Date Responded';
     }
 
-    // Style headers as bold with background color
-    const headerStyle = {
+    // Style headers with background color and borders
+    const headerStyle: Partial<ExcelJS.Style> = {
       font: { bold: true, size: 11, name: 'Arial' },
-      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } }
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9BC2E6' } },
+      alignment: { horizontal: 'center' as const, vertical: 'middle' as const },
+      border: {
+        top: { style: 'thin' as const }, bottom: { style: 'thin' as const },
+        left: { style: 'thin' as const }, right: { style: 'thin' as const }
+      }
     };
 
     ws.getCell(r, 2).style = headerStyle;
     ws.getCell(r, 3).style = headerStyle;
     ws.getCell(r, 4).style = headerStyle;
     ws.getCell(r, 5).style = headerStyle;
-    ws.getCell(r, 6).style = headerStyle;
     ws.getRow(r).height = 30;
 
     r += 1;
@@ -2151,8 +2150,9 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
       }
 
       // Style data cells with borders
-      const dataStyleWithBorder = {
-        ...styles.data,
+      const dataStyleWithBorder: Partial<ExcelJS.Style> = {
+        font: { size: 11, name: 'Arial' },
+        alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true },
         border: {
           top: { style: 'thin' as const },
           bottom: { style: 'thin' as const },
@@ -2163,10 +2163,7 @@ async function buildQAQC(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
 
       ws.getCell(r, 2).style = dataStyleWithBorder;
       ws.getCell(r, 3).style = dataStyleWithBorder;
-      ws.getCell(r, 4).style = {
-        ...dataStyleWithBorder,
-        alignment: { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
-      };
+      ws.getCell(r, 4).style = dataStyleWithBorder;
       ws.getCell(r, 5).style = dataStyleWithBorder;
       ws.getRow(r).height = 22;
 
@@ -2221,7 +2218,7 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   ws.properties.tabColor = { argb: 'FF00B050' };
 
   // ── Column widths (A–K) exactly as template ──────────────────────────────
-  const widths = [5.71, 30.71, 5.71, 8.43, 8.43, 8.43, 8.43, 8.43, 10.57, 15.71, 20];
+  const widths = [5.71, 30.71, 5.71, 5.71, 5.71, 5.71, 5.71, 5.71, 10.57, 15.71, 15.71];
   widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
   // ── Reusable style helpers ───────────────────────────────────────────────
@@ -2504,13 +2501,17 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   r++;
 
   // Photo reference layout - two columns (lanes) per row
-  // Layout: B-E = Left lane (merged), F-I = Right lane (merged)
+  // Layout: B-F = Left lane (merged), G-K = Right lane (merged)
   // Each entry block: header row + spacer + photo row + spacer + footer row
 
   const photoBoxStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
     border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } },
     },
   };
 
@@ -2542,281 +2543,143 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
     },
   };
 
-  // Process HSE photo entries
+  // ── HSE Toolbox Meeting ──────────────────────────────────────────────────
   const hsePhotoEntries = d.hsePhotoReferences?.hseToolboxMeeting ?? [];
-  let lastSection: string | undefined = undefined;
-  let entriesOnCurrentPage = 0;
 
-  for (const entry of hsePhotoEntries) {
-    const currentSection = entry.sectionTitle;
-    const sectionChanged = currentSection && currentSection !== lastSection;
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = 'HSE Toolbox Meeting';
+  safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.staticHdr');
+  for (let c = 3; c <= 11; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.staticHdr.span');
+  safeMerge(ws, r, 2, r, 11);
+  r++;
 
-    // Page break after 4 entries
-    if (entriesOnCurrentPage >= 4) {
-      // Add page break before new entry
-      ws.getRow(r).addPageBreak();
-      entriesOnCurrentPage = 0;
+  const totalRows = Math.max(4, hsePhotoEntries.length);
 
-      // If section didn't change but page broke, re-print header with "(Continued)"
-      if (!sectionChanged && lastSection) {
-        ws.getRow(r).height = 20.1;
-        ws.getCell(r, 2).value = `${lastSection} (Continued)`;
-        safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.hdr');
-        for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.hdr.span');
-        safeMerge(ws, r, 2, r, 9);
-        r++;
-      }
-    }
-
-    // Handle new section header
-    if (sectionChanged) {
-      ws.getRow(r).height = 20.1;
-      ws.getCell(r, 2).value = currentSection ?? '';
-      safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse56.hdr');
-      for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse56.hdr.span');
-      safeMerge(ws, r, 2, r, 9);
-      r++;
-      lastSection = currentSection;
-    }
-
-    // Render photo entry block
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    // Photo row - tall (170pt)
+  for (let rowIdx = 0; rowIdx < totalRows; rowIdx++) {
+    const entry = hsePhotoEntries[rowIdx];
     const photoRow = r;
-    ws.getRow(r).height = 170.1;
+    ws.getRow(r).height = 173;
 
-    // Left photo box (B-E merged)
     safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse56.photoL');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoL.span');
-    safeMerge(ws, r, 2, r, 5);
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Right photo box (F-I merged)
-    safeStyle(ws.getCell(r, 6), photoBoxStyle, 'hse56.photoR');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoR.span');
-    safeMerge(ws, r, 6, r, 9);
+    safeStyle(ws.getCell(r, 7), photoBoxStyle, 'hse56.photoR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse56.photoR.span');
+    safeMerge(ws, r, 7, r, 11);
 
-    // Handle images
-    const images = entry.images ?? [];
-    const footers = entry.footers ?? [];
-    const maxImages = 2; // Two lanes
+    const images = entry?.images ?? [];
 
-    // Add images or N/A
-    for (let idx = 0; idx < maxImages; idx++) {
+    for (let idx = 0; idx < 2; idx++) {
       const imgSource = images[idx];
-      const startCol = idx === 0 ? 2 : 6; // B for left, F for right
-      const endCol = idx === 0 ? 5 : 9;   // E for left, I for right
+      const startCol = idx === 0 ? 2 : 7;
+      const endCol = idx === 0 ? 6 : 11;
 
       if (imgSource) {
-        // Schedule image insertion after worksheet is set up
-        // Images will be added asynchronously
-        addImageToWorksheet(workbook, ws, imgSource, {
-          tl: { col: startCol - 1, row: photoRow - 1 },
-          br: { col: endCol - 1, row: photoRow - 1 },
-          ext: { width: 200, height: 170 },
-          editAs: 'oneCell'
-        } as any).catch(() => {
-          // If image fails, leave the cell empty (border already set)
-        });
+        try {
+          await addImageToWorksheet(workbook, ws, imgSource, {
+            tl: { col: startCol - 1, row: photoRow - 1 },
+            br: { col: endCol, row: photoRow },
+            editAs: 'twoCell',
+          } as any);
+        } catch {
+          ws.getCell(photoRow, startCol).value = 'N/A';
+          safeStyle(ws.getCell(photoRow, startCol), naStyle, 'hse56.na.err');
+        }
       } else {
-        // No image - show N/A
         ws.getCell(photoRow, startCol).value = 'N/A';
         safeStyle(ws.getCell(photoRow, startCol), naStyle, 'hse56.na');
         safeStyle(ws.getCell(photoRow, startCol + 1), naStyle, 'hse56.na.span');
         safeStyle(ws.getCell(photoRow, startCol + 2), naStyle, 'hse56.na.span');
-        if (idx === 0) {
-          safeStyle(ws.getCell(photoRow, startCol + 3), naStyle, 'hse56.na.span');
-        }
+        if (idx === 0) safeStyle(ws.getCell(photoRow, startCol + 3), naStyle, 'hse56.na.span');
       }
     }
 
     r++;
 
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    // Footer/caption row (C-D for left, G-H for right)
     ws.getRow(r).height = 15;
+    const descriptions = entry?.descriptions ?? [];
+    ws.getCell(r, 2).value = descriptions[0] ?? '';
+    safeStyle(ws.getCell(r, 2), footerStyle, 'hse56.descL');
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse56.descL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Left footer
-    ws.getCell(r, 3).value = footers[0] ?? '';
-    safeStyle(ws.getCell(r, 3), footerStyle, 'hse56.footerL');
-    safeStyle(ws.getCell(r, 4), footerStyle, 'hse56.footerL.span');
-    safeMerge(ws, r, 3, r, 4);
-
-    // Right footer
-    ws.getCell(r, 7).value = footers[1] ?? '';
-    safeStyle(ws.getCell(r, 7), footerStyle, 'hse56.footerR');
-    safeStyle(ws.getCell(r, 8), footerStyle, 'hse56.footerR.span');
-    safeMerge(ws, r, 7, r, 8);
-
-    r++;
-    entriesOnCurrentPage++;
-  }
-
-  // If no entries, render one empty placeholder
-  if (hsePhotoEntries.length === 0) {
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    // Photo row
-    ws.getRow(r).height = 170.1;
-
-    // Left photo box with N/A
-    ws.getCell(r, 2).value = 'N/A';
-    safeStyle(ws.getCell(r, 2), naStyle, 'hse56.na');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse56.na.span');
-    safeMerge(ws, r, 2, r, 5);
-
-    // Right photo box with N/A
-    ws.getCell(r, 6).value = 'N/A';
-    safeStyle(ws.getCell(r, 6), naStyle, 'hse56.na');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse56.na.span');
-    safeMerge(ws, r, 6, r, 9);
+    ws.getCell(r, 7).value = descriptions[1] ?? '';
+    safeStyle(ws.getCell(r, 7), footerStyle, 'hse56.descR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse56.descR.span');
+    safeMerge(ws, r, 7, r, 11);
 
     r++;
   }
 
-  // Process HSE Activity Photos (5.7)
+  // ── HSE Activity Photo ───────────────────────────────────────────────────
   const hseActivityPhotoEntries = d.hsePhotoReferences?.hseActivityPhotos ?? [];
-  let activityLastSection: string | undefined = undefined;
-  let activityEntriesOnCurrentPage = 0;
 
-  for (const entry of hseActivityPhotoEntries) {
-    const currentSection = entry.sectionTitle;
-    const sectionChanged = currentSection && currentSection !== activityLastSection;
+  ws.getRow(r).height = 20.1;
+  ws.getCell(r, 2).value = 'HSE Activity Photo';
+  safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.staticHdr');
+  for (let c = 3; c <= 11; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.staticHdr.span');
+  safeMerge(ws, r, 2, r, 11);
+  r++;
 
-    // Page break after 4 entries
-    if (activityEntriesOnCurrentPage >= 4) {
-      ws.getRow(r).addPageBreak();
-      activityEntriesOnCurrentPage = 0;
+  const activityTotalRows = Math.max(4, hseActivityPhotoEntries.length);
 
-      if (!sectionChanged && activityLastSection) {
-        ws.getRow(r).height = 20.1;
-        ws.getCell(r, 2).value = `${activityLastSection} (Continued)`;
-        safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.hdr');
-        for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.hdr.span');
-        safeMerge(ws, r, 2, r, 9);
-        r++;
-      }
-    }
-
-    // Handle new section header
-    if (sectionChanged) {
-      ws.getRow(r).height = 20.1;
-      ws.getCell(r, 2).value = currentSection ?? '';
-      safeStyle(ws.getCell(r, 2), sectionHeaderStyle, 'hse57.hdr');
-      for (let c = 3; c <= 9; c++) safeStyle(ws.getCell(r, c), sectionHeaderStyle, 'hse57.hdr.span');
-      safeMerge(ws, r, 2, r, 9);
-      r++;
-      activityLastSection = currentSection;
-    }
-
-    // Render photo entry block
-    ws.getRow(r).height = 6.95;
-    r++;
-
+  for (let rowIdx = 0; rowIdx < activityTotalRows; rowIdx++) {
+    const entry = hseActivityPhotoEntries[rowIdx];
     const photoRow = r;
-    ws.getRow(r).height = 170.1;
+    ws.getRow(r).height = 173;
 
-    // Left photo box (B-E merged)
     safeStyle(ws.getCell(r, 2), photoBoxStyle, 'hse57.photoL');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoL.span');
-    safeMerge(ws, r, 2, r, 5);
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Right photo box (F-I merged)
-    safeStyle(ws.getCell(r, 6), photoBoxStyle, 'hse57.photoR');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoR.span');
-    safeMerge(ws, r, 6, r, 9);
+    safeStyle(ws.getCell(r, 7), photoBoxStyle, 'hse57.photoR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), photoBoxStyle, 'hse57.photoR.span');
+    safeMerge(ws, r, 7, r, 11);
 
-    // Handle images
-    const images = entry.images ?? [];
-    const footers = entry.footers ?? [];
-    const maxImages = 2;
+    const actImages = entry?.images ?? [];
 
-    for (let idx = 0; idx < maxImages; idx++) {
-      const imgSource = images[idx];
-      const startCol = idx === 0 ? 2 : 6;
-      const endCol = idx === 0 ? 5 : 9;
+    for (let idx = 0; idx < 2; idx++) {
+      const imgSource = actImages[idx];
+      const startCol = idx === 0 ? 2 : 7;
+      const endCol = idx === 0 ? 6 : 11;
 
       if (imgSource) {
-        addImageToWorksheet(workbook, ws, imgSource, {
-          tl: { col: startCol - 1, row: photoRow - 1 },
-          br: { col: endCol - 1, row: photoRow - 1 },
-          ext: { width: 200, height: 170 },
-          editAs: 'oneCell'
-        } as any).catch(() => {});
+        try {
+          await addImageToWorksheet(workbook, ws, imgSource, {
+            tl: { col: startCol - 1, row: photoRow - 1 },
+            br: { col: endCol, row: photoRow },
+            editAs: 'twoCell',
+          } as any);
+        } catch {
+          ws.getCell(photoRow, startCol).value = 'N/A';
+          safeStyle(ws.getCell(photoRow, startCol), naStyle, 'hse57.na.err');
+        }
       } else {
         ws.getCell(photoRow, startCol).value = 'N/A';
         safeStyle(ws.getCell(photoRow, startCol), naStyle, 'hse57.na');
         safeStyle(ws.getCell(photoRow, startCol + 1), naStyle, 'hse57.na.span');
         safeStyle(ws.getCell(photoRow, startCol + 2), naStyle, 'hse57.na.span');
-        if (idx === 0) {
-          safeStyle(ws.getCell(photoRow, startCol + 3), naStyle, 'hse57.na.span');
-        }
+        if (idx === 0) safeStyle(ws.getCell(photoRow, startCol + 3), naStyle, 'hse57.na.span');
       }
     }
 
     r++;
 
-    // Spacer row
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    // Footer/caption row
     ws.getRow(r).height = 15;
+    const actDescriptions = entry?.descriptions ?? [];
+    ws.getCell(r, 2).value = actDescriptions[0] ?? '';
+    safeStyle(ws.getCell(r, 2), footerStyle, 'hse57.descL');
+    for (let c = 3; c <= 6; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse57.descL.span');
+    safeMerge(ws, r, 2, r, 6);
 
-    // Left footer
-    ws.getCell(r, 3).value = footers[0] ?? '';
-    safeStyle(ws.getCell(r, 3), footerStyle, 'hse57.footerL');
-    safeStyle(ws.getCell(r, 4), footerStyle, 'hse57.footerL.span');
-    safeMerge(ws, r, 3, r, 4);
-
-    // Right footer
-    ws.getCell(r, 7).value = footers[1] ?? '';
-    safeStyle(ws.getCell(r, 7), footerStyle, 'hse57.footerR');
-    safeStyle(ws.getCell(r, 8), footerStyle, 'hse57.footerR.span');
-    safeMerge(ws, r, 7, r, 8);
-
-    r++;
-    activityEntriesOnCurrentPage++;
-  }
-
-  // If no activity photo entries, render empty placeholder
-  if (hseActivityPhotoEntries.length === 0) {
-    ws.getRow(r).height = 6.95;
-    r++;
-
-    ws.getRow(r).height = 170.1;
-
-    ws.getCell(r, 2).value = 'N/A';
-    safeStyle(ws.getCell(r, 2), naStyle, 'hse57.na');
-    for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse57.na.span');
-    safeMerge(ws, r, 2, r, 5);
-
-    ws.getCell(r, 6).value = 'N/A';
-    safeStyle(ws.getCell(r, 6), naStyle, 'hse57.na');
-    for (let c = 7; c <= 9; c++) safeStyle(ws.getCell(r, c), naStyle, 'hse57.na.span');
-    safeMerge(ws, r, 6, r, 9);
+    ws.getCell(r, 7).value = actDescriptions[1] ?? '';
+    safeStyle(ws.getCell(r, 7), footerStyle, 'hse57.descR');
+    for (let c = 8; c <= 11; c++) safeStyle(ws.getCell(r, c), footerStyle, 'hse57.descR.span');
+    safeMerge(ws, r, 7, r, 11);
 
     r++;
   }
-}
-
-// Small helper: 1-based column index → Excel letter (A, B, ... Z, AA, AB, ...)
-function colLetter(col: number): string {
-  let s = '';
-  let n = col;
-  while (n > 0) {
-    const m = (n - 1) % 26;
-    s = String.fromCharCode(65 + m) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
 }
 
 // SHEET 10: 6. Resources
@@ -3372,17 +3235,21 @@ export async function buildSitePhotos(
   // No tab color — matches template
 
   // ── Column widths A..H exactly as template ───────────────────────────────
-  // A=5.71 | B=1.57 | C=50.71 | D=1.57 | E=default | F=50.71 | G=1.57 | H=4.71
+  // A=5.71 | B=1.57 | C=50.71 | D=1.57 | E=1.57 | F=50.71 | G=1.57 | H=4.71
+  // (E width is the divider; template leaves E unset/default but visually equiv to 1.57)
   ws.getColumn(1).width = 5.71;  // A margin
-  ws.getColumn(2).width = 1.57;  // B left-edge spacer
-  ws.getColumn(3).width = 50.71; // C left photo content
-  ws.getColumn(4).width = 1.57;  // D divider
-  // E is left at default (no explicit width, matches template)
-  ws.getColumn(6).width = 50.71; // F right photo content
-  ws.getColumn(7).width = 1.57;  // G right-edge spacer
+  ws.getColumn(2).width = 1.57;  // B left-edge spacer (carries left outer border)
+  ws.getColumn(3).width = 50.71; // C left photo content (NO borders — image lives here)
+  ws.getColumn(4).width = 1.57;  // D left-box right-edge spacer (carries right border of left box)
+  ws.getColumn(5).width = 1.57;  // E right-box left-edge spacer (carries left border of right box)
+  ws.getColumn(6).width = 50.71; // F right photo content (NO borders)
+  ws.getColumn(7).width = 1.57;  // G right-edge spacer (carries right outer border)
   ws.getColumn(8).width = 4.71;  // H right margin
 
-  // ── Styles ───────────────────────────────────────────────────────────────
+  // ── Reusable border pieces ──────────────────────────────────────────────
+  const thin = { style: 'thin' as const, color: { argb: 'FF000000' } };
+
+  // ── Styles ──────────────────────────────────────────────────────────────
   const titleStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
@@ -3392,35 +3259,18 @@ export async function buildSitePhotos(
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin, right: thin },
   };
   const locationStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 10, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6DCE4' } },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
-  };
-  const photoBoxStyle: Partial<ExcelJS.Style> = {
-    font: { size: 10, name: 'Arial' },
-    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin, right: thin },
   };
   const captionStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin, right: thin },
   };
 
   let r = 3;
@@ -3442,19 +3292,22 @@ export async function buildSitePhotos(
   safeMerge(ws, r, 2, r, 7);
   r++; // 6
 
-  // ── Photo entries — grouped in sections of up to 4 per location banner ──
+  // ── Photo entries — grouped by siteLocation (sections from UI) ──
   const entries = d.sitePhotoCaptions ?? [];
-  const PAIRS_PER_SECTION = 4;
 
-  // If nothing provided, render one empty section with one placeholder pair
-  const renderEntries: SitePhotoEntry[] = entries.length > 0
+  // Check if any images exist across all entries
+  const hasAnyImages = entries.some(e => e.image1 || e.image2);
+
+  // If no images provided, render one section with 4 empty placeholder pairs
+  const renderEntries: SitePhotoEntry[] = hasAnyImages
     ? entries
-    : [{ siteLocation: 'Site Location', caption1: '', caption2: '' }];
+    : Array(4).fill(null).map(() => ({ siteLocation: 'Site Location', caption1: '', caption2: '' }));
 
-  // Group consecutive entries into sections by siteLocation change, capped at 4 per section
+  // Group consecutive entries into sections by siteLocation change only
+  // Headers appear only when user clicks "Add Section" (location changes)
   let i = 0;
   while (i < renderEntries.length) {
-    // Emit section banner at row r
+    // Emit section banner at row r — merged B:G with location fill
     const sectionLocation = renderEntries[i].siteLocation ?? 'Site Location';
     ws.getRow(r).height = 20.1;
     ws.getCell(r, 2).value = sectionLocation;
@@ -3463,21 +3316,26 @@ export async function buildSitePhotos(
     safeMerge(ws, r, 2, r, 7);
     r++;
 
-    // Emit up to PAIRS_PER_SECTION entries under this banner, stopping if the
-    // siteLocation changes (a changed location starts a new banner).
-    let emitted = 0;
+    // Emit all entries with the same location (no limit)
     while (
       i < renderEntries.length &&
-      emitted < PAIRS_PER_SECTION &&
       (renderEntries[i].siteLocation ?? 'Site Location') === sectionLocation
     ) {
       r = await renderPhotoPair(workbook, ws, r, renderEntries[i]);
       i++;
-      emitted++;
     }
   }
 
-  // Inner helper: render one photo-pair entry (4 rows: spacer, photo, spacer, caption)
+  // ────────────────────────────────────────────────────────────────────────
+  // renderPhotoPair: emits exactly 4 rows that together draw two side-by-side
+  // photo boxes with captions, matching the template byte-for-byte:
+  //
+  //   topSpacer   (6.95h)  — top edge of both boxes (drawn on B,D,E,G)
+  //   photo       (170.1h) — left + right vertical edges only (B.left, D.right,
+  //                          E.left, G.right). C and F are clean for images.
+  //   botSpacer   (6.95h)  — bottom edge of both boxes
+  //   caption     (15h)    — fully bordered cell, merged B:D and E:G
+  // ────────────────────────────────────────────────────────────────────────
   async function renderPhotoPair(
     wb: ExcelJS.Workbook,
     ws: ExcelJS.Worksheet,
@@ -3486,75 +3344,97 @@ export async function buildSitePhotos(
   ): Promise<number> {
     let row = startRow;
 
-    // Spacer (6.95)
+    // ── Row A: top spacer (6.95) — draws top edge of both boxes ──────────
+    const topSpacerRow = row;
     ws.getRow(row).height = 6.95;
+    // Left box top edge: B7 has top+left, C7 has top, D7 has top+right
+    safeStyle(ws.getCell(row, 2), { border: { top: thin, left: thin } }, 'sp.topL.B');
+    safeStyle(ws.getCell(row, 3), { border: { top: thin } },              'sp.topL.C');
+    safeStyle(ws.getCell(row, 4), { border: { top: thin, right: thin } }, 'sp.topL.D');
+    // Right box top edge: E7 has top+left, F7 has top, G7 has top+right
+    safeStyle(ws.getCell(row, 5), { border: { top: thin, left: thin } }, 'sp.topR.E');
+    safeStyle(ws.getCell(row, 6), { border: { top: thin } },              'sp.topR.F');
+    safeStyle(ws.getCell(row, 7), { border: { top: thin, right: thin } }, 'sp.topR.G');
     row++;
 
-    // Photo row (170.1): LEFT = B:D merged, RIGHT = E:G merged
+    // ── Row B: photo (170.1) — vertical edges only, no top/bottom ────────
     const photoRow = row;
     ws.getRow(row).height = 170.1;
-    // Left photo box B:D
-    safeStyle(ws.getCell(row, 2), photoBoxStyle, 'sp.photoL');
-    safeStyle(ws.getCell(row, 3), photoBoxStyle, 'sp.photoL.span');
-    safeStyle(ws.getCell(row, 4), photoBoxStyle, 'sp.photoL.span');
-    safeMerge(ws, row, 2, row, 4);
-    // Right photo box E:G
-    safeStyle(ws.getCell(row, 5), photoBoxStyle, 'sp.photoR');
-    safeStyle(ws.getCell(row, 6), photoBoxStyle, 'sp.photoR.span');
-    safeStyle(ws.getCell(row, 7), photoBoxStyle, 'sp.photoR.span');
-    safeMerge(ws, row, 5, row, 7);
+    // Left box vertical edges: only B.left and D.right (C is clean)
+    safeStyle(ws.getCell(row, 2), { border: { left: thin } },  'sp.photoL.B');
+    safeStyle(ws.getCell(row, 3), {
+      font: { size: 10, name: 'Arial' },
+      alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    }, 'sp.photoL.C');
+    safeStyle(ws.getCell(row, 4), { border: { right: thin } }, 'sp.photoL.D');
+    // Right box vertical edges: only E.left and G.right (F is clean)
+    safeStyle(ws.getCell(row, 5), { border: { left: thin } },  'sp.photoR.E');
+    safeStyle(ws.getCell(row, 6), {
+      font: { size: 10, name: 'Arial' },
+      alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    }, 'sp.photoR.F');
+    safeStyle(ws.getCell(row, 7), { border: { right: thin } }, 'sp.photoR.G');
 
-    // Add images to the photo boxes
-    const naStyle: Partial<ExcelJS.Style> = {
-      font: { size: 10, name: 'Arial', italic: true },
-      alignment: { horizontal: 'center', vertical: 'middle' },
-    };
-
-    // Left image (B:D) - column index 2-4, ExcelJS is 0-based so 1-3
-    if (entry.image1) {
-      addImageToWorksheet(workbook, ws, entry.image1, {
-        tl: { col: 1, row: photoRow - 1 },  // B = col 1 (0-based)
-        br: { col: 3, row: photoRow - 1 },  // D = col 3 (0-based)
-        ext: { width: 200, height: 170 },
-        editAs: 'oneCell'
-      }).catch(() => {
-        // If image fails, show N/A
-        ws.getCell(photoRow, 2).value = 'N/A';
-        safeStyle(ws.getCell(photoRow, 2), naStyle, 'sp.na');
-      });
+    // Insert images — anchored inside C (left box) and F (right box).
+    // ExcelJS uses 0-based col/row for image anchors.
+    if (entry.image1 && typeof entry.image1 === 'string' && entry.image1.trim() !== '') {
+      try {
+        await addImageToWorksheet(workbook, ws, entry.image1, {
+          tl: { col: 2, row: photoRow - 1 },
+          br: { col: 3, row: photoRow },
+          editAs: 'twoCell',
+        } as any);
+      } catch {
+        ws.getCell(photoRow, 3).value = 'N/A';
+        safeStyle(ws.getCell(photoRow, 3),
+          { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+            alignment: { horizontal: 'center', vertical: 'middle' } },
+          'sp.na1');
+      }
     } else {
-      // No image - show N/A
-      ws.getCell(photoRow, 2).value = 'N/A';
-      safeStyle(ws.getCell(photoRow, 2), naStyle, 'sp.na');
-      safeStyle(ws.getCell(photoRow, 3), naStyle, 'sp.na.span');
-      safeStyle(ws.getCell(photoRow, 4), naStyle, 'sp.na.span');
+      ws.getCell(photoRow, 3).value = 'N/A';
+      safeStyle(ws.getCell(photoRow, 3),
+        { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'sp.na1');
     }
 
-    // Right image (E:G) - column index 5-7, ExcelJS is 0-based so 4-6
-    if (entry.image2) {
-      addImageToWorksheet(workbook, ws, entry.image2, {
-        tl: { col: 4, row: photoRow - 1 },  // E = col 4 (0-based)
-        br: { col: 6, row: photoRow - 1 },  // G = col 6 (0-based)
-        ext: { width: 200, height: 170 },
-        editAs: 'oneCell'
-      }).catch(() => {
-        // If image fails, show N/A
-        ws.getCell(photoRow, 5).value = 'N/A';
-        safeStyle(ws.getCell(photoRow, 5), naStyle, 'sp.na');
-      });
+    if (entry.image2 && typeof entry.image2 === 'string' && entry.image2.trim() !== '') {
+      try {
+        await addImageToWorksheet(workbook, ws, entry.image2, {
+          tl: { col: 5, row: photoRow - 1 },
+          br: { col: 6, row: photoRow },
+          editAs: 'twoCell',
+        } as any);
+      } catch {
+        ws.getCell(photoRow, 6).value = 'N/A';
+        safeStyle(ws.getCell(photoRow, 6),
+          { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+            alignment: { horizontal: 'center', vertical: 'middle' } },
+          'sp.na2');
+      }
     } else {
-      // No image - show N/A
-      ws.getCell(photoRow, 5).value = 'N/A';
-      safeStyle(ws.getCell(photoRow, 5), naStyle, 'sp.na');
-      safeStyle(ws.getCell(photoRow, 6), naStyle, 'sp.na.span');
-      safeStyle(ws.getCell(photoRow, 7), naStyle, 'sp.na.span');
+      ws.getCell(photoRow, 6).value = 'N/A';
+      safeStyle(ws.getCell(photoRow, 6),
+        { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'sp.na2');
     }
-
-    // Spacer (6.95)
-    ws.getRow(row).height = 6.95;
     row++;
 
-    // Caption row (15): LEFT = B:D merged, RIGHT = E:G merged
+    // ── Row C: bottom spacer (6.95) — bottom edge of both boxes ──────────
+    ws.getRow(row).height = 6.95;
+    // Left box bottom edge: B9 has bottom+left, C9 has bottom, D9 has bottom+right
+    safeStyle(ws.getCell(row, 2), { border: { bottom: thin, left: thin } },  'sp.botL.B');
+    safeStyle(ws.getCell(row, 3), { border: { bottom: thin } },               'sp.botL.C');
+    safeStyle(ws.getCell(row, 4), { border: { bottom: thin, right: thin } }, 'sp.botL.D');
+    // Right box bottom edge
+    safeStyle(ws.getCell(row, 5), { border: { bottom: thin, left: thin } },  'sp.botR.E');
+    safeStyle(ws.getCell(row, 6), { border: { bottom: thin } },               'sp.botR.F');
+    safeStyle(ws.getCell(row, 7), { border: { bottom: thin, right: thin } }, 'sp.botR.G');
+    row++;
+
+    // ── Row D: caption (15) — fully bordered, merged B:D and E:G ─────────
     ws.getRow(row).height = 15;
     ws.getCell(row, 2).value = entry.caption1 ?? '';
     safeStyle(ws.getCell(row, 2), captionStyle, 'sp.capL');
@@ -3582,14 +3462,17 @@ export async function buildConstructionIssues(
   // No tab color — matches template
 
   // ── Column widths A..E exactly as template ──────────────────────────────
-  // Template has ONLY 5 columns (A-E), NOT 19.
   ws.getColumn(1).width = 5.71;   // A margin
-  ws.getColumn(2).width = 51.71;  // B text side (labels + description body)
-  ws.getColumn(3).width = 1.14;   // C thin spacer framing left of photo
-  ws.getColumn(4).width = 48.71;  // D photo box
-  ws.getColumn(5).width = 1.28;   // E thin spacer framing right of photo
+  ws.getColumn(2).width = 51.71;  // B text side (label + description body + action)
+  ws.getColumn(3).width = 1.14;   // C thin spacer (left frame of photo column)
+  ws.getColumn(4).width = 48.71;  // D photo body
+  ws.getColumn(5).width = 1.28;   // E thin spacer (right frame of photo column)
 
-  // ── Styles ───────────────────────────────────────────────────────────────
+  // ── Reusable border pieces ──────────────────────────────────────────────
+  const thin = { style: 'thin' as const };
+  const allBorders = { top: thin, bottom: thin, left: thin, right: thin };
+
+  // ── Styles ──────────────────────────────────────────────────────────────
   const titleStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
@@ -3599,64 +3482,45 @@ export async function buildConstructionIssues(
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
+  // Issue number row — template has ONLY left border on the leading cell.
   const issueNumberStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 11, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
   const siteLocationStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin },
   };
   const photoRefHeaderStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, left: thin, right: thin, bottom: thin },
   };
   const descLabelStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
-    alignment: { horizontal: 'left', vertical: 'top' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+    border: allBorders,
   };
   const descBodyStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'top', wrapText: true },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
   const actionStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
-  const photoBoxStyle: Partial<ExcelJS.Style> = {
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+  // Photo frame column borders (C left edge, E right edge)
+  const photoFrameLeftStyle: Partial<ExcelJS.Style> = {
+    border: { left: thin },
+  };
+  const photoFrameRightStyle: Partial<ExcelJS.Style> = {
+    border: { right: thin },
   };
 
   let r = 2;
@@ -3667,7 +3531,7 @@ export async function buildConstructionIssues(
   safeStyle(ws.getCell(r, 2), titleStyle, 'ci.title');
   for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), titleStyle, 'ci.title.span');
   safeMerge(ws, r, 2, r, 5);
-  r++; // 3 — blank row
+  r++; // 3 — blank
   r++; // 4
 
   // ── Row 4: Banner "Construction Issue" — merged B:E ─────────────────────
@@ -3680,34 +3544,42 @@ export async function buildConstructionIssues(
 
   // ── Issue blocks ─────────────────────────────────────────────────────────
   const issues = d.constructionIssues ?? [];
+  const issuesToRender: ConstructionIssue[] = [];
 
-  // Always show exactly 4 issue boxes
-  const issuesToRender = [];
-  for (let i = 0; i < 4; i++) {
-    if (i < issues.length) {
-      // Use actual issue data
-      issuesToRender.push(issues[i]);
-    } else {
-      // Use empty issue box with just the number
+  if (issues.length > 0) {
+    // Render all actual issues
+    issuesToRender.push(...issues);
+  } else {
+    // If no issues, render 4 empty placeholder boxes
+    for (let i = 0; i < 4; i++) {
       issuesToRender.push({ number: i + 1 } as ConstructionIssue);
     }
   }
 
   for (let idx = 0; idx < issuesToRender.length; idx++) {
-    const issue = issuesToRender[idx];
-    r = await renderIssueBlock(workbook, ws, r, issue, idx);
+    r = await renderIssueBlock(workbook, ws, r, issuesToRender[idx], idx);
   }
 
-  // Inner helper — one issue block is 14 rows.
-  // Relative row offsets (0..13):
-  //   +0  (h=18)   : issue number       → B:E merged
-  //   +1  (h=18)   : "Site Location:"   → B single     | "Photo Reference" → C:E merged
-  //   +2  (h=5.25) : top of desc band   | photo frame opens (C, E span +2..+13)
-  //   +3  (h=18)   : desc body opens    | photo body D opens (D spans +3..+12)
-  //   +4..+10      : desc body continues
-  //   +11 (h=18)   : desc body ends     (B body spans +3..+10, i.e. 8 rows)
-  //   +12 (h=18)   : "Action by:"       → B spans +12..+13
-  //   +13 (h=5.25) : bottom of block    (photo frame closes)
+  // ────────────────────────────────────────────────────────────────────────
+  // renderIssueBlock: emits exactly 14 rows, matching template byte-for-byte.
+  //
+  // Relative offsets (r0 = first row of block):
+  //   r0+0   (h=18.0)   Issue number       [B:E merged, only L border]
+  //   r0+1   (h=18.0)   "Site Location:"   [B single]
+  //                     "Photo Reference"  [C:E merged]
+  //   r0+2   (h=5.25)   "Problems / Descriptions:" label opens [B(r0+2:r0+3)]
+  //                     Photo frame opens: C(r0+2:r0+13), E(r0+2:r0+13)
+  //   r0+3   (h=18.0)   Photo body opens   [D(r0+3:r0+12)]
+  //                     End of label B
+  //   r0+4   (h=18.0)   Description body opens [B(r0+4:r0+11)]
+  //   r0+5..r0+10       (inside desc body merge)
+  //   r0+11  (h=18.0)   End of description body
+  //   r0+12  (h=18.0)   "Action by:" opens [B(r0+12:r0+13)]
+  //                     End of photo body D
+  //   r0+13  (h=5.25)   Bottom spacer; end of all photo column merges
+  //
+  //   Block is 14 rows total. Returns r0 + 14.
+  // ────────────────────────────────────────────────────────────────────────
   async function renderIssueBlock(
     wb: ExcelJS.Workbook,
     ws: ExcelJS.Worksheet,
@@ -3717,24 +3589,32 @@ export async function buildConstructionIssues(
   ): Promise<number> {
     const r0 = startRow;
 
-    // Row heights
+    // Row heights — exactly 14 rows
     ws.getRow(r0 + 0).height = 18;     // issue number
     ws.getRow(r0 + 1).height = 18;     // site location / photo ref header
-    ws.getRow(r0 + 2).height = 5.25;   // top of desc band
-    for (let k = 3; k <= 11; k++) ws.getRow(r0 + k).height = 18;  // desc body (+ action top)
-    ws.getRow(r0 + 12).height = 18;    // action-by continuation row
+    ws.getRow(r0 + 2).height = 5.25;   // top spacer (opens label + photo frame)
+    for (let k = 3; k <= 12; k++) ws.getRow(r0 + k).height = 18;  // body rows
     ws.getRow(r0 + 13).height = 5.25;  // bottom spacer
 
-    // r+0 : Issue number (B:E merged)
+    // ── r0+0 : Issue number (B:E merged, only L border) ──────────────────
     {
       const row = r0 + 0;
       ws.getCell(row, 2).value = issue.number ?? (idx + 1);
       safeStyle(ws.getCell(row, 2), issueNumberStyle, 'ci.num');
-      for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(row, c), issueNumberStyle, 'ci.num.span');
+      // Spanning cells get no border styling (template has none on C5/D5)
+      // but we still need to apply font for the merge to render cleanly.
+      for (let c = 3; c <= 5; c++) {
+        safeStyle(ws.getCell(row, c),
+          { font: { size: 11, name: 'Arial' } }, 'ci.num.span');
+      }
+      // Right edge needs a closing border
+      safeStyle(ws.getCell(row, 5),
+        { border: { right: thin }, font: { size: 11, name: 'Arial' } },
+        'ci.num.right');
       safeMerge(ws, row, 2, row, 5);
     }
 
-    // r+1 : Site Location (B single) + Photo Reference header (C:E merged)
+    // ── r0+1 : Site Location (B) + Photo Reference header (C:E) ──────────
     {
       const row = r0 + 1;
       ws.getCell(row, 2).value = `Site Location: ${issue.siteLocation ?? ''}`;
@@ -3742,63 +3622,76 @@ export async function buildConstructionIssues(
 
       ws.getCell(row, 3).value = 'Photo Reference';
       safeStyle(ws.getCell(row, 3), photoRefHeaderStyle, 'ci.photoRef');
-      safeStyle(ws.getCell(row, 4), photoRefHeaderStyle, 'ci.photoRef.span');
-      safeStyle(ws.getCell(row, 5), photoRefHeaderStyle, 'ci.photoRef.span');
+      // Spanning cells in the C:E merge
+      safeStyle(ws.getCell(row, 4),
+        { border: allBorders,
+          font: { size: 10, name: 'Arial' },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'ci.photoRef.span');
+      safeStyle(ws.getCell(row, 5),
+        { border: allBorders,
+          font: { size: 10, name: 'Arial' },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'ci.photoRef.right');
       safeMerge(ws, row, 3, row, 5);
     }
 
-    // Photo frame — open verticals now: C and E span r+2..r+13 (12 rows)
+    // ── Photo frame: C and E vertical spacers span r0+2..r0+13 (12 rows) ─
     {
       const top = r0 + 2;
       const bot = r0 + 13;
-      // Left vertical spacer C
-      safeStyle(ws.getCell(top, 3), photoBoxStyle, 'ci.photoC');
-      for (let rr = top + 1; rr <= bot; rr++) {
-        safeStyle(ws.getCell(rr, 3), photoBoxStyle, 'ci.photoC.span');
+
+      // Column C: left frame edge
+      for (let rr = top; rr <= bot; rr++) {
+        safeStyle(ws.getCell(rr, 3), photoFrameLeftStyle, 'ci.photoC');
       }
+      // Bottom-left corner gets a bottom border too
+      safeStyle(ws.getCell(bot, 3),
+        { border: { left: thin, bottom: thin } }, 'ci.photoC.bot');
       safeMerge(ws, top, 3, bot, 3);
 
-      // Right vertical spacer E
-      safeStyle(ws.getCell(top, 5), photoBoxStyle, 'ci.photoE');
-      for (let rr = top + 1; rr <= bot; rr++) {
-        safeStyle(ws.getCell(rr, 5), photoBoxStyle, 'ci.photoE.span');
+      // Column E: right frame edge
+      for (let rr = top; rr <= bot; rr++) {
+        safeStyle(ws.getCell(rr, 5), photoFrameRightStyle, 'ci.photoE');
       }
+      safeStyle(ws.getCell(bot, 5),
+        { border: { right: thin, bottom: thin } }, 'ci.photoE.bot');
       safeMerge(ws, top, 5, bot, 5);
 
-      // Photo body D spans r+3..r+12 (10 rows)
+      // Column D: photo body merge spans r0+3..r0+12 (10 rows)
       const dTop = r0 + 3;
       const dBot = r0 + 12;
-      safeStyle(ws.getCell(dTop, 4), photoBoxStyle, 'ci.photoD');
-      for (let rr = dTop + 1; rr <= dBot; rr++) {
-        safeStyle(ws.getCell(rr, 4), photoBoxStyle, 'ci.photoD.span');
-      }
+      // Bottom of D needs a bottom border to close the frame between D12 and the spacer row
+      // (Template shows D18 has B=thin — the bottom spacer carries the bottom edge.)
+      // So we put bottom: thin on D at r0+13 (the spacer row) instead.
+      safeStyle(ws.getCell(r0 + 13, 4), { border: { bottom: thin } }, 'ci.photoD.bot');
       safeMerge(ws, dTop, 4, dBot, 4);
 
-      // ── Add issue photo if provided ──────────────────────────────────────
+      // ── Insert image, or N/A placeholder ───────────────────────────────
       if (issue.photo && typeof issue.photo === 'string' && issue.photo.trim() !== '') {
-        // ExcelJS uses 0-based indices for tl/br; column D = index 3
-        await addImageToWorksheet(wb, ws, issue.photo, {
-          tl: { col: 3, row: dTop - 1 },        // D, top row (0-based)
-          br: { col: 4, row: dBot },            // just past D, just past bottom row
-          ext: { width: 340, height: 180 },
-          editAs: 'oneCell',
-        } as any);
+        try {
+          await addImageToWorksheet(wb, ws, issue.photo, {
+            tl: { col: 3, row: dTop - 1 },
+            br: { col: 4, row: dBot },
+            editAs: 'twoCell',
+          } as any);
+        } catch {
+          ws.getCell(dTop, 4).value = 'N/A';
+          safeStyle(ws.getCell(dTop, 4),
+            { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+              alignment: { horizontal: 'center', vertical: 'middle' } },
+            'ci.na');
+        }
       } else {
-        // No photo — show N/A centered in the box
-        const naStyle: Partial<ExcelJS.Style> = {
-          font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
-          alignment: { horizontal: 'center', vertical: 'middle' },
-          border: {
-            top: { style: 'thin' }, bottom: { style: 'thin' },
-            left: { style: 'thin' }, right: { style: 'thin' },
-          },
-        };
         ws.getCell(dTop, 4).value = 'N/A';
-        safeStyle(ws.getCell(dTop, 4), naStyle, 'ci.na');
+        safeStyle(ws.getCell(dTop, 4),
+          { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+            alignment: { horizontal: 'center', vertical: 'middle' } },
+          'ci.na');
       }
     }
 
-    // r+2..r+3 : "Problems / Descriptions:" label — B spans 2 rows
+    // ── r0+2..r0+3 : "Problems / Descriptions:" label — B spans 2 rows ───
     {
       const top = r0 + 2;
       const bot = r0 + 3;
@@ -3808,7 +3701,7 @@ export async function buildConstructionIssues(
       safeMerge(ws, top, 2, bot, 2);
     }
 
-    // r+4..r+11 : description body — B spans 8 rows
+    // ── r0+4..r0+11 : description body — B spans 8 rows ──────────────────
     {
       const top = r0 + 4;
       const bot = r0 + 11;
@@ -3820,7 +3713,7 @@ export async function buildConstructionIssues(
       safeMerge(ws, top, 2, bot, 2);
     }
 
-    // r+12..r+13 : "Action by: …" — B spans 2 rows
+    // ── r0+12..r0+13 : "Action by:" — B spans 2 rows ─────────────────────
     {
       const top = r0 + 12;
       const bot = r0 + 13;
