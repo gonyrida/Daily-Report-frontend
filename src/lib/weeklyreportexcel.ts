@@ -525,6 +525,34 @@ export async function exportWeeklyReportToExcel(data: WeeklyReportExportData, fi
       }
     }
 
+    // Apply page setup settings to every sheet
+    for (const ws of workbook.worksheets) {
+      // Construction Progress sheet uses landscape, all others use portrait
+      const isConProgress = ws.name === 'Con. Progress';
+
+      ws.pageSetup = {
+        orientation: isConProgress ? 'landscape' : 'portrait',
+        paperSize: 9, // A4
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: {
+          left: 0.5,
+          right: 0.5,
+          top: 0.5,
+          bottom: 0.5,
+          header: 0.3,
+          footer: 0.3
+        }
+      };
+
+      // Set print area to used range
+      const lastRow = ws.lastRow?.number ?? 1;
+      const lastCol = ws.lastColumn?.number ?? 1;
+      if (lastRow > 0 && lastCol > 0) {
+        ws.pageSetup.printArea = `A1:${ws.getColumn(lastCol).letter}${lastRow}`;
+      }
+    }
 
     // Generate filename if not provided
     const finalFilename = filename || `WeeklyReport_${data.projectTitle || 'Project'}_W${data.weekNumber || 'XX'}.xlsx`;
