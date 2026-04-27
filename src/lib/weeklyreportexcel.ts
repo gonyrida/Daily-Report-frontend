@@ -978,14 +978,14 @@ async function buildCover(workbook: ExcelJS.Workbook, d: WeeklyReportExportData)
   //Client Logo 
   if (d.clientLogo) {
     try {
-      await addImageToWorksheet(workbook, ws, d.clientLogo, 'G3:I5');
+      await addImageToWorksheet(workbook, ws, d.clientLogo, 'K3:M5');
     } catch (error) {
       console.warn('❌ Failed to add client logo:', error);
     }
   }
 
-  // Merge cells 3-5, columns G-I for client logo area
-  ws.mergeCells(3, 7, 5, 9); // Merge rows 3-5, columns G-I 
+  // Merge cells 3-5, columns K-M for client logo area
+  ws.mergeCells(3, 11, 5, 13); // Merge rows 3-5, columns K-M 
 
 
   // "KINGDOM OF CAMBODIA" banner row 9
