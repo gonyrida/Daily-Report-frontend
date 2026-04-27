@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Introduction from "./content/Intoduction";
 import OverallProgress from "./content/OverallProgress";
 import Activities from "./content/Activities";
@@ -30,6 +30,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   setSharedData,
   overallProgressData,
   setOverallProgressData,
+  overallProgressRemark,
+  setOverallProgressRemark,
   reportId,
   weeklyActivities: externalWeeklyActivities,
   setWeeklyActivities: externalSetWeeklyActivities,
@@ -52,24 +54,104 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // Initialize activities state at parent level
   const [weeklyActivities, setWeeklyActivities] = useState<ActivityRow[]>([]);
   const [nextWeekPlan, setNextWeekPlan] = useState<ActivityRow[]>([]);
-  const [overallRows, setOverallRows] = useState<ProgressRow[]>([]);
+// ---------- state ----------
+const [overallRows, setOverallRows] = useState<ProgressRow[]>(() => {
+  try {
+    const stored = sessionStorage.getItem("overallRows");
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
+});
 
-  // Re-merge whenever construction progress changes, preserving user edits
-  useEffect(() => {
-    if (!constructionProgressItems?.length) return;
-    setOverallRows(prev => {
-      const merged = mergeConstructionIntoOverallRows(constructionProgressItems, prev);
-      return merged;
-    });
-  }, [constructionProgressItems]);
+// Persist every change to session storage.
+useEffect(() => {
+  try {
+    sessionStorage.setItem("overallRows", JSON.stringify(overallRows));
+  } catch {
+    /* ignore */
+  }
+}, [overallRows]);
 
-  // Sync overallRows to overallProgressData when provided (stable reference)
-  const setRowsRef = overallProgressData?.setRows;
-  useEffect(() => {
-    if (setRowsRef && overallRows.length > 0) {
-      setRowsRef(overallRows);
+// ---------- one-shot seed guard ----------
+// Use a ref so it survives remounts via sessionStorage, and so setting it
+// never triggers a re-render loop.
+const hasSeededRef = useRef<boolean>( 
+  (() => {
+    try {
+      return sessionStorage.getItem("overallRowsSeeded") === "true";
+    } catch {
+      return false;
     }
-  }, [overallRows, setRowsRef]);
+  })(),
+);
+
+const markSeeded = () => {
+  hasSeededRef.current = true;
+  try {
+    sessionStorage.setItem("overallRowsSeeded", "true");
+  } catch {
+    /* ignore */
+  }
+};
+
+// ---------- merge effect ----------
+useEffect(() => {
+  if (!constructionProgressItems || constructionProgressItems.length === 0) {
+    return;
+  }
+
+  setOverallRows((prev) => {
+    const merged = mergeConstructionIntoOverallRows(
+      constructionProgressItems,
+      prev,
+    );
+
+    // Avoid pointless state update if nothing changed.
+    if (
+      merged.length === prev.length &&
+      merged.every((r, i) => r.id === prev[i]?.id)
+    ) {
+      return prev;
+    }
+    return merged;
+  });
+}, [constructionProgressItems]);
+
+// ---------- user edit handler ----------
+const setOverallRowsFromTable = (
+  next: ProgressRow[] | ((prev: ProgressRow[]) => ProgressRow[]),
+) => {
+  setOverallRows((prev) => {
+    const resolved =
+      typeof next === "function"
+        ? (next as (p: ProgressRow[]) => ProgressRow[])(prev)
+        : next;
+    return resolved;
+  });
+};
+
+// ---------- visible rows (filter tombstones AND subDetail rows) ----------
+// Store ALL rows in session storage (including subDetail), but only display
+// title and detail rows in the table. subDetail rows like "1.1", "2.3" are
+// kept in storage for reference but not shown in Overall Progress table.
+const visibleOverallRows = useMemo(
+  () => overallRows.filter((r) => !r.isDeleted && r.rowType !== "subDetail"),
+  [overallRows],
+);
+
+// ---------- sync to parent (if a parent hook wants them) ----------
+const setRowsRef = overallProgressData?.setRows;
+useEffect(() => {
+  if (setRowsRef) {
+    // Send ONLY visible rows to the parent — tombstones and subDetail rows
+    // are kept in storage but not displayed in the table.
+    setRowsRef(visibleOverallRows);
+  }
+}, [visibleOverallRows, setRowsRef]);
 
   // Use external props if provided, otherwise use internal state
   const currentWeeklyActivities = externalWeeklyActivities || weeklyActivities;
@@ -90,8 +172,8 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // Use passed overallProgress data or create a simple fallback
   const overallProgressHook = overallProgressData || {
     rows: overallRows,
-    setRows: setOverallRows,
-    updateRows: setOverallRows,
+    setRows: setOverallRowsFromTable,
+    updateRows: setOverallRowsFromTable,
     addTitleRow: () => {},   // disabled — rows come from construction progress
     addDetailRow: () => {},
   };
@@ -224,7 +306,10 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
 
     // Preserve existing hsePhotoReferences or initialize with proper structure
     const currentPhotoReferences = currentHsesData?.hsePhotoReferences;
-    exampleData.hsePhotoReferences = currentPhotoReferences && currentPhotoReferences.length > 0 ? currentPhotoReferences : createHSESections();
+    exampleData.hsePhotoReferences = currentPhotoReferences?.hseToolboxMeeting ? currentPhotoReferences : {
+      hseToolboxMeeting: createHSESections(),
+      hseActivityPhotos: []
+    };
 
     // Set parent state directly
     setHsesData(exampleData);
@@ -238,7 +323,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   }, [hsesData]); // Add hsesData dependency to sync when parent changes
 
   // Ensure hook data is always available for the Hses component
-  const currentHsesData = (hsesData?.hsePhotoReferences && hsesData.hsePhotoReferences.length > 0) ? hsesData : hsesDataHook.data;
+  const currentHsesData = (hsesData?.hsePhotoReferences?.hseToolboxMeeting) ? hsesData : hsesDataHook.data;
   
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
@@ -492,20 +577,16 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
-        {(!overallRows || overallRows.length === 0) ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Loading construction progress data...
-          </div>
-        ) : (
-          <OverallProgress 
-            rows={overallRows}
-            setRows={setOverallRows}
-            updateRows={setOverallRows}
-            addTitleRow={() => {}}
-            addDetailRow={() => {}}
-            descriptionsReadOnly={true}
-          />
-        )}
+        <OverallProgress
+          rows={visibleOverallRows}
+          setRows={setOverallRowsFromTable}
+          updateRows={setOverallRowsFromTable}
+          addTitleRow={() => {}}
+          addDetailRow={() => {}}
+          descriptionsReadOnly={false}
+          remark={overallProgressRemark}
+          setRemark={setOverallProgressRemark}
+        />
       </div>
 
       {/* Table of Content Tab */}

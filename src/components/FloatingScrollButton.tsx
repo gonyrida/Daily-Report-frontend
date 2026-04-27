@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const FloatingScrollButton: React.FC = () => {
   const [isInLowerHalf, setIsInLowerHalf] = useState(false);
@@ -9,64 +9,80 @@ const FloatingScrollButton: React.FC = () => {
   const [hasDragged, setHasDragged] = useState(false);
   const [initialPosition, setInitialPosition] = useState({ x: 0, y: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // Tracks the actual element that scrolls (null = window)
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+
+  // Find the first scrollable container in the DOM (used on mount before any scroll fires)
+  const detectScrollContainer = useCallback((): HTMLElement | null => {
+    if (document.documentElement.scrollHeight > window.innerHeight + 2) {
+      return null; // window scrolls
+    }
+    // Walk the DOM looking for an element with overflow auto/scroll that has overflow content
+    const walk = (el: HTMLElement, depth: number): HTMLElement | null => {
+      if (depth > 8) return null;
+      const style = window.getComputedStyle(el);
+      if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 2) {
+        return el;
+      }
+      for (const child of Array.from(el.children)) {
+        const result = walk(child as HTMLElement, depth + 1);
+        if (result) return result;
+      }
+      return null;
+    };
+    return walk(document.body, 0);
+  }, []);
+
+  const updateScrollPosition = useCallback(() => {
+    const container = scrollContainerRef.current;
+    const scrollTop = container ? container.scrollTop : (window.pageYOffset || document.documentElement.scrollTop);
+    const scrollHeight = container ? container.scrollHeight : document.documentElement.scrollHeight;
+    const clientHeight = container ? container.clientHeight : window.innerHeight;
+    const halfwayPoint = (scrollHeight - clientHeight) / 2;
+    setIsInLowerHalf(scrollTop >= halfwayPoint);
+  }, []);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollHeight = document.documentElement.scrollHeight;
-      const clientHeight = document.documentElement.clientHeight;
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      
-      // Button is always visible when page has content
+    // Detect scroll container on mount
+    scrollContainerRef.current = detectScrollContainer();
+    setIsVisible(true);
+    updateScrollPosition();
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      // Update which element is scrolling
+      if (target && target !== document && target !== document.documentElement && target !== document.body) {
+        scrollContainerRef.current = target;
+      } else {
+        scrollContainerRef.current = null;
+      }
       setIsVisible(true);
-      
-      // Check if user is in lower half of the page
-      const halfwayPoint = (scrollHeight - clientHeight) / 2;
-      setIsInLowerHalf(scrollTop >= halfwayPoint);
+      updateScrollPosition();
     };
 
-    // Initial check
-    handleScroll();
-
-    // Add scroll event listener with passive for performance
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Cleanup
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    // capture:true catches scroll events from any element in the DOM
+    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    return () => document.removeEventListener('scroll', handleScroll, { capture: true });
+  }, [detectScrollContainer, updateScrollPosition]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-      
+
       const newX = e.clientX - dragStart.x;
       const newY = e.clientY - dragStart.y;
-      
-      // Check if mouse has moved more than 5px to consider it a drag
+
       const movedDistance = Math.sqrt(Math.pow(newX - initialPosition.x, 2) + Math.pow(newY - initialPosition.y, 2));
-      if (movedDistance > 5) {
-        setHasDragged(true);
-      }
-      
-      // Keep button within viewport bounds
+      if (movedDistance > 5) setHasDragged(true);
+
       const maxX = window.innerWidth - 40;
       const maxY = window.innerHeight - 40;
-      
-      const finalX = Math.max(0, Math.min(newX, maxX));
-      const finalY = Math.max(0, Math.min(newY, maxY));
-      
-      // Update position in real-time
-      setPosition({
-        x: finalX,
-        y: finalY
-      });
+      setPosition({ x: Math.max(0, Math.min(newX, maxX)), y: Math.max(0, Math.min(newY, maxY)) });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      // Reset drag state after a short delay to prevent click event
-      setTimeout(() => {
-        setHasDragged(false);
-      }, 100);
+      setTimeout(() => setHasDragged(false), 100);
     };
 
     if (isDragging) {
@@ -90,27 +106,24 @@ const FloatingScrollButton: React.FC = () => {
     if (rect) {
       const currentX = position.x || (window.innerWidth - rect.right);
       const currentY = position.y || (window.innerHeight - rect.bottom);
-      
-      setDragStart({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      });
+      setDragStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       setInitialPosition({ x: currentX, y: currentY });
       setHasDragged(false);
       setIsDragging(true);
     }
   };
 
-  const handleClick = (e: React.MouseEvent) => {
-    // Only scroll if the user hasn't dragged (clean click only)
-    if (!hasDragged) {
-      if (isInLowerHalf) {
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        // Scroll to bottom
-        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-      }
+  const handleClick = () => {
+    if (hasDragged) return;
+    const container = scrollContainerRef.current;
+    if (isInLowerHalf) {
+      container
+        ? container.scrollTo({ top: 0, behavior: 'smooth' })
+        : window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      container
+        ? container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+        : window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
     }
   };
 
@@ -157,69 +170,29 @@ const FloatingScrollButton: React.FC = () => {
     transform: isInLowerHalf ? 'rotate(0deg)' : 'rotate(180deg)',
   };
 
-  const mediaQueryStyles = `
-    @media (max-width: 768px) {
-      button {
-        bottom: 20px !important;
-        right: 20px !important;
-        width: 36px !important;
-        height: 36px !important;
-      }
-    }
-    
-    @media (max-width: 480px) {
-      button {
-        bottom: 16px !important;
-        right: 16px !important;
-        width: 32px !important;
-        height: 32px !important;
-      }
-    }
-  `;
-
   return (
-    <>
-      <style>{mediaQueryStyles}</style>
-      <button
-        ref={buttonRef}
-        style={buttonStyles}
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        aria-label={isInLowerHalf ? 'Scroll to top' : 'Scroll to bottom'}
-        title={isInLowerHalf ? 'Scroll to top (Drag to move)' : 'Scroll to bottom (Drag to move)'}
-        onMouseEnter={(e) => {
-          if (!isDragging) {
-            Object.assign(e.currentTarget.style, hoverStyles);
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isDragging) {
-            Object.assign(e.currentTarget.style, buttonStyles);
-          }
-        }}
-        onFocus={(e) => {
-          Object.assign(e.currentTarget.style, { ...buttonStyles, ...focusStyles });
-        }}
-        onBlur={(e) => {
-          Object.assign(e.currentTarget.style, buttonStyles);
-        }}
+    <button
+      ref={buttonRef}
+      style={buttonStyles}
+      onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      aria-label={isInLowerHalf ? 'Scroll to top' : 'Scroll to bottom'}
+      title={isInLowerHalf ? 'Scroll to top (Drag to move)' : 'Scroll to bottom (Drag to move)'}
+      onMouseEnter={(e) => { if (!isDragging) Object.assign(e.currentTarget.style, hoverStyles); }}
+      onMouseLeave={(e) => { if (!isDragging) Object.assign(e.currentTarget.style, buttonStyles); }}
+      onFocus={(e) => Object.assign(e.currentTarget.style, { ...buttonStyles, ...focusStyles })}
+      onBlur={(e) => Object.assign(e.currentTarget.style, buttonStyles)}
+    >
+      <svg
+        style={arrowStyles}
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
       >
-        <svg
-          style={arrowStyles}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2.5}
-            d="M5 10l7-7m0 0l7 7m-7-7v18"
-          />
-        </svg>
-      </button>
-    </>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+      </svg>
+    </button>
   );
 };
 

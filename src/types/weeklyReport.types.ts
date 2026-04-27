@@ -243,7 +243,10 @@ export interface HsesData {
   }>;
   firstAidAccident: string;
   otherActivities: string;
-  hsePhotoReferences: string[];
+  hsePhotoReferences: {
+    hseToolboxMeeting: any[];
+    hseActivityPhotos: any[];
+  };
 }
 
 /**

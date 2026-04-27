@@ -19,6 +19,8 @@ export interface WeeklyReportContentProps {
   setSharedData?: (data: any) => void;
   overallProgressData?: any;
   setOverallProgressData?: (data: any) => void;
+  overallProgressRemark?: string;
+  setOverallProgressRemark?: (remark: string) => void;
   reportId?: string; 
   weeklyActivities?: ActivityRow[];
   setWeeklyActivities?: (activities: ActivityRow[]) => void;

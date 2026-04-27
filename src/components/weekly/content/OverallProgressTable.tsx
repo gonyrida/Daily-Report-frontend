@@ -1,169 +1,99 @@
-import { useState, useMemo, useEffect } from "react";
-import { BarChart2, Plus, Trash2, X } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { BarChart2, Plus, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import PercentageCell from "@/components/ui/PercentageCell";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ProgressRow } from "@/types/progress.types";
-import { CAMBODIA_PROVINCES } from "@/constants/cambodiaProvinces";
 import { toRoman } from "@/lib/numberUtils";
 
 interface OverallProgressTableProps {
   rows?: ProgressRow[];
-  setRows?: (rows: ProgressRow[]) => void;
+  setRows?: (
+    rows: ProgressRow[] | ((prev: ProgressRow[]) => ProgressRow[])
+  ) => void;
   updateRows?: (newRows: ProgressRow[]) => void;
   addTitleRow?: () => void;
   addDetailRow?: () => void;
   descriptionsReadOnly?: boolean;
+  remark?: string;
+  setRemark?: (remark: string) => void;
 }
 
 export default function OverallProgressTable({
-  rows = [],
-  setRows = () => { },
-  updateRows = () => { },
-  addTitleRow = () => { },
-  addDetailRow = () => { },
-  descriptionsReadOnly = false
+  rows,
+  setRows,
+  updateRows,
+  addTitleRow,
+  addDetailRow,
+  descriptionsReadOnly = false,
+  remark = "",
+  setRemark,
 }: OverallProgressTableProps) {
-  const [localRows, setLocalRows] = useState<ProgressRow[]>(rows || []);
+  const displayRows = rows || [];
+  const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
+  const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
 
-  // Sync local state with props when they change, but don't overwrite local changes
-  useEffect(() => {
-    // Only sync if the props rows are different and we don't have local changes
-    if (rows && rows.length > 0) {
-      // Check if we have any local rows that aren't in the props
-      const hasLocalChanges = localRows.some(localRow =>
-        !rows.some(propRow => propRow.id === localRow.id)
-      );
 
-      if (!hasLocalChanges) {
-        setLocalRows(rows);
-      }
-    } else if (!rows || rows.length === 0) {
-      // Only clear if props are empty and we don't have local rows
-      if (localRows.length === 0) {
-        setLocalRows([]);
-      }
-    }
-  }, [rows]);
-
-  // 🔥 Correct numbering logic
+  // ---------- numbering ----------
+  //
+  // Rules:
+  //   title     → I, II, III, … (resets detail + subDetail counters)
+  //   detail    → 1, 2, 3, …    (resets subDetail counter)
+  //   subDetail → <parentDetail>.<subIndex>
+  //
+  // Single pass, left-to-right. Order of the array IS the order of the output.
+  // No lookups into the original unfiltered array, no index arithmetic — each
+  // row's displayIndex comes purely from the running counters at that position.
+  // Drag-and-drop just reorders the array; this function renumbers from scratch
+  // every render.
   const formattedRows = useMemo(() => {
-    let titleCount = 0;
-
-    // Filter out alpha level rows (single letters like A, B, C)
-    // but keep single-character Roman numerals (I, V)
-    const filteredRows = localRows.filter(row => {
+    // Step 1: filter out alpha-only source ids that aren't Roman I/V.
+    // (Kept from the previous implementation — these are headers like "A", "B"
+    // that we don't want in Overall Progress.)
+    const filtered = displayRows.filter((row) => {
       if (!row.sourceId) return true;
       const trimmed = row.sourceId.trim();
-      // Skip single alphabetic characters that are NOT Roman numerals I or V
       const isSingleAlpha = /^[a-zA-Z]$/i.test(trimmed);
-      const isRomanNumeralIorV = /^(I|V)$/i.test(trimmed);
-      const shouldKeep = !(isSingleAlpha && !isRomanNumeralIorV);
-      if (!shouldKeep) {
-      }
-      return shouldKeep;
+      const isRomanIorV = /^(I|V)$/i.test(trimmed);
+      return !(isSingleAlpha && !isRomanIorV);
     });
 
-    const result = filteredRows.map((row, index) => {
-      // Debug: log each row to see what's happening
+    // Step 2: single pass with running counters.
+    let titleCount = 0;
+    let detailCount = 0;
+    let subDetailCount = 0;
 
+    return filtered.map((row) => {
       if (row.rowType === "title") {
-        titleCount++;
-        return {
-          ...row,
-          displayIndex: `${toRoman(titleCount)}.`,
-        };
+        titleCount += 1;
+        // New title resets BOTH child counters — the rules call for this.
+        detailCount = 0;
+        subDetailCount = 0;
+        return { ...row, displayIndex: `${toRoman(titleCount)}.` };
       }
 
       if (row.rowType === "detail") {
-        // Count detail rows up to this point
-        let detailCount = 0;
-        for (let i = 0; i <= index; i++) {
-          if (localRows[i].rowType === "detail") {
-            detailCount++;
-          }
-        }
-        return {
-          ...row,
-          displayIndex: `${detailCount}.`,
-        };
+        detailCount += 1;
+        // New detail resets subDetail — sub-items belong to their nearest detail.
+        subDetailCount = 0;
+        return { ...row, displayIndex: `${detailCount}.` };
       }
 
       if (row.rowType === "subDetail") {
-        // Find the parent detail number for this sub-detail
-        let parentDetailNumber = 0;
-        for (let i = index; i >= 0; i--) {
-          if (localRows[i].rowType === "detail") {
-            // Count detail rows up to that point to get the parent number
-            let detailCount = 0;
-            for (let j = 0; j <= i; j++) {
-              if (localRows[j].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            parentDetailNumber = detailCount;
-            break;
-          }
-        }
-
-        // Count sub-details under the same parent
-        let subDetailCount = 0;
-        for (let i = 0; i <= index; i++) {
-          if (localRows[i].rowType === "detail") {
-            // Check if this is the parent detail
-            let detailCount = 0;
-            for (let j = 0; j <= i; j++) {
-              if (localRows[j].rowType === "detail") {
-                detailCount++;
-              }
-            }
-            if (detailCount === parentDetailNumber) {
-              subDetailCount = 0; // Reset for this parent
-            }
-          } else if (localRows[i].rowType === "subDetail") {
-            // Count sub-details under the same parent
-            let currentParentDetail = 0;
-            for (let k = i; k >= 0; k--) {
-              if (localRows[k].rowType === "detail") {
-                let detailCount = 0;
-                for (let j = 0; j <= k; j++) {
-                  if (localRows[j].rowType === "detail") {
-                    detailCount++;
-                  }
-                }
-                currentParentDetail = detailCount;
-                break;
-              }
-            }
-            if (currentParentDetail === parentDetailNumber) {
-              subDetailCount++;
-            }
-          }
-        }
-
-        return {
-          ...row,
-          displayIndex: `${parentDetailNumber}.${subDetailCount}`,
-        };
+        subDetailCount += 1;
+        // If a subDetail appears before any detail (edge case — user dragged
+        // one above everything), show it as "0.1", "0.2", … Clear signal that
+        // it needs a parent.
+        const parent = detailCount > 0 ? detailCount : 0;
+        return { ...row, displayIndex: `${parent}.${subDetailCount}` };
       }
 
-      return row;
+      // Unknown rowType — leave untouched.
+      return { ...row, displayIndex: row.displayIndex ?? "" };
     });
+  }, [displayRows]);
 
-    return result;
-  }, [localRows]);
-
-  const localUpdateRows = (newRows: ProgressRow[]) => {
-    setLocalRows(newRows);
-    setRows?.(newRows);
-  };
 
   // Custom formatter for percentage display
   const formatPercentageDisplay = (value: number | string | undefined): string => {
@@ -178,24 +108,11 @@ export default function OverallProgressTable({
     field: keyof ProgressRow,
     value: string | number | boolean
   ) => {
-    const newRows = localRows.map((row) => {
+    const newRows = displayRows.map((row) => {
       if (row.id === id) {
         let updatedRow = { ...row };
 
-        if (field === "description" && value === "__custom__") {
-          return { ...row, description: "", isCustomInput: true };
-        }
-        if (field === "scopeOfWorks" && value === "__custom_unit__") {
-          return { ...row, scopeOfWorks: "__custom_unit_input__" };
-        }
-        if (field === "isCustomInput" && value === false) {
-          return {
-            ...row,
-            isCustomInput: false,
-            description: CAMBODIA_PROVINCES[0] || "",
-          };
-        }
-
+        
         // Handle percentage formatting for percentage columns
         const percentageFields = ["pctUpToPrevWeek", "pctThisWeek", "pctNextWeekPlan", "pctUpNextWeekPlan"];
         let processedValue = value;
@@ -220,6 +137,9 @@ export default function OverallProgressTable({
           // Calculate Remaining as 100% - up to this week %
           const upToThisWeek = updatedRow.pctUpToThisWeek;
           updatedRow.pctRemaining = Math.max(0, 100 - upToThisWeek);
+          // Also calculate % Up Next Week Plan when % Up to This Week changes
+          const nextWeekPlan = typeof updatedRow.pctNextWeekPlan === "number" ? updatedRow.pctNextWeekPlan : Number(updatedRow.pctNextWeekPlan) || 0;
+          updatedRow.pctUpNextWeekPlan = upToThisWeek + nextWeekPlan;
         }
 
         // Recalculate Remaining when pctUpToThisWeek field changes directly
@@ -240,7 +160,6 @@ export default function OverallProgressTable({
       return row;
     });
 
-    setLocalRows(newRows);
     setRows?.(newRows);
   };
 
@@ -258,9 +177,10 @@ export default function OverallProgressTable({
       rowType: "title",
       searchTerm: "",
       isCustomInput: false,
+      isNewlyAdded: true,
     };
 
-    setLocalRows((prev) => [...prev, newRow]);
+    setRows?.((prev) => [...(prev || []), newRow]);
     addTitleRow?.();
   };
 
@@ -278,9 +198,10 @@ export default function OverallProgressTable({
       rowType: "detail",
       searchTerm: "",
       isCustomInput: false,
+      isNewlyAdded: true,
     };
 
-    setLocalRows((prev) => [...prev, newRow]);
+    setRows?.((prev) => [...(prev || []), newRow]);
     addDetailRow?.();
   };
 
@@ -298,18 +219,76 @@ export default function OverallProgressTable({
       rowType: "subDetail",
       searchTerm: "",
       isCustomInput: false,
+      isNewlyAdded: true,
     };
 
-    const newRows = [...localRows, newRow];
-    setLocalRows(newRows);
+    const newRows = [...(displayRows || []), newRow];
     setRows?.(newRows);
     updateRows?.(newRows);
   };
 
   const removeRow = (id: string) => {
-    const newRows = localRows.filter((row) => row.id !== id);
-    setLocalRows(newRows);
-    setRows?.(newRows);
+    setRows?.(prevRows => {
+      // Soft delete: mark row as deleted instead of removing it
+      const newRows = prevRows.map((row) => 
+        row.id === id ? { ...row, isDeleted: true } : row
+      );
+      return newRows;
+    });
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, rowId: string) => {
+    setDraggedRowId(rowId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", rowId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, rowId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (rowId !== draggedRowId) {
+      setDragOverRowId(rowId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverRowId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetRowId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedRowId || draggedRowId === targetRowId) {
+      handleDragEnd();
+      return;
+    }
+
+    setRows?.((prevAll) => {
+      // Split prev into visible + tombstones.
+      const visible = prevAll.filter((r) => !r.isDeleted);
+      const tombstones = prevAll.filter((r) => r.isDeleted);
+
+      const draggedIndex = visible.findIndex((r) => r.id === draggedRowId);
+      const targetIndex = visible.findIndex((r) => r.id === targetRowId);
+      if (draggedIndex === -1 || targetIndex === -1) return prevAll;
+
+      const reordered = [...visible];
+      const [dragged] = reordered.splice(draggedIndex, 1);
+      reordered.splice(targetIndex, 0, dragged);
+
+      // Put tombstones back at the end — they're invisible, order doesn't matter.
+      return [...reordered, ...tombstones];
+    });
+
+    setDraggedRowId(null);
+    setDragOverRowId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRowId(null);
+    setDragOverRowId(null);
   };
 
   return (
@@ -346,62 +325,45 @@ export default function OverallProgressTable({
                 <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[12%]">
                   % Up Next Week Plan
                 </th>
+                <th className="text-center px-4 py-2.5 text-sm font-medium text-base w-[8%]">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {formattedRows.map((row) => (
-                <tr key={row.id} className={`border-b ${row.rowType === "title" ? "bg-slate-200 dark:bg-slate-800/50" : row.rowType === "subDetail" ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-muted/30"}`}>
+                <tr
+                  key={row.id}
+                  onDragOver={(e) => handleDragOver(e, row.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, row.id)}
+                  className={`border-b transition-colors ${
+                    row.rowType === "title"
+                      ? "bg-slate-200 dark:bg-slate-800/50"
+                      : row.rowType === "subDetail"
+                        ? "bg-blue-50 dark:bg-blue-900/20"
+                        : "hover:bg-muted/30"
+                  } ${dragOverRowId === row.id ? "border-t-2 border-t-primary" : ""} ${draggedRowId === row.id ? "opacity-50" : ""}`}
+                >
                   <td className={`px-4 py-2 text-sm ${row.rowType === "title" ? "font-semibold text-muted-foreground" : "text-muted-foreground"}`}>
-                    {row.sourceId || row.displayIndex || ""}
+                    {row.displayIndex || ""}
                   </td>
 
                   {/* Description */}
                   <td className="px-3 py-2">
-                    {descriptionsReadOnly ? (
+                    {descriptionsReadOnly || !row.isNewlyAdded ? (
                       <span className={`text-sm px-2 ${row.rowType === 'title' ? 'font-semibold' : ''}`}>
                         {row.description || <span className="text-muted-foreground italic">—</span>}
                       </span>
                     ) : (
-                      <>
-                        {row.isCustomInput ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              value={row.description}
-                              onChange={(e) =>
-                                customUpdateRow(row.id, "description", e.target.value)
-                              }
-                              placeholder="Enter custom..."
-                              className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
-                            />
-                            <Button
-                              onClick={() => customUpdateRow(row.id, "description", "")}
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                              variant="ghost"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Select
-                            value={row.description}
-                            onValueChange={(value) =>
-                              customUpdateRow(row.id, "description", value)
-                            }
-                          >
-                            <SelectTrigger className={`border-0 bg-transparent focus:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}>
-                              <SelectValue placeholder="Select description" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {CAMBODIA_PROVINCES.map((province) => (
-                                <SelectItem key={province} value={province}>
-                                  {province}
-                                </SelectItem>
-                              ))}
-                              <SelectItem value="__custom__">+ Custom Input</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </>
+                      <Input
+                        value={row.description}
+                        onChange={(e) =>
+                          customUpdateRow(row.id, "description", e.target.value)
+                        }
+                        placeholder="Enter scope of work..."
+                        className={`border-0 bg-transparent focus-visible:ring-1 ${row.rowType === "title" ? "font-semibold" : ""}`}
+                      />
                     )}
                   </td>
 
@@ -410,7 +372,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctUpToPrevWeek}
                       onChange={(value) => customUpdateRow(row.id, "pctUpToPrevWeek", value)}
-                      readOnly={descriptionsReadOnly}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -419,7 +381,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctThisWeek}
                       onChange={(value) => customUpdateRow(row.id, "pctThisWeek", value)}
-                      readOnly={descriptionsReadOnly}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -428,7 +390,8 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctUpToThisWeek}
                       onChange={(value) => customUpdateRow(row.id, "pctUpToThisWeek", value)}
-                      readOnly={descriptionsReadOnly}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
+                      backgroundType="blue"
                     />
                   </td>
 
@@ -437,7 +400,8 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctRemaining}
                       onChange={(value) => customUpdateRow(row.id, "pctRemaining", value)}
-                      readOnly={descriptionsReadOnly}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
+                      backgroundType="orange"
                     />
                   </td>
 
@@ -446,7 +410,7 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctNextWeekPlan}
                       onChange={(value) => customUpdateRow(row.id, "pctNextWeekPlan", value)}
-                      readOnly={descriptionsReadOnly}
+                      readOnly={descriptionsReadOnly || row.isNewlyAdded === false}
                     />
                   </td>
 
@@ -455,20 +419,33 @@ export default function OverallProgressTable({
                     <PercentageCell
                       value={row.pctUpNextWeekPlan}
                       onChange={(value) => customUpdateRow(row.id, "pctUpNextWeekPlan", value)}
-                      readOnly={descriptionsReadOnly}
+                      readOnly={true}
+                      backgroundType="green"
                     />
                   </td>
 
                   {/* Actions */}
                   <td className="px-2 py-2">
-                    {!descriptionsReadOnly && (
+                    <div className="flex items-center justify-center gap-1">
+                      <div
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, row.id)}
+                        onDragEnd={handleDragEnd}
+                        className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                        title="Drag to reorder"
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </div>
                       <Button
                         onClick={() => removeRow(row.id)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 cursor-pointer text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        title="Delete row"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -479,37 +456,46 @@ export default function OverallProgressTable({
 
       {/* Add Buttons */}
       <div className="flex gap-2">
-        {!descriptionsReadOnly && (
-          <div className="flex gap-2">
-            <Button
-              onClick={localAddTitleRow}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Title Row
-            </Button>
-            <Button
-              onClick={localAddDetailRow}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Detail Row
-            </Button>
-            <Button
-              onClick={localAddSubDetailRow}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Sub Detail
-            </Button>
-          </div>
-        )}
+        <Button
+          onClick={localAddTitleRow}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Title Row
+        </Button>
+        <Button
+          onClick={localAddDetailRow}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Detail Row
+        </Button>
+        <Button
+          onClick={localAddSubDetailRow}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Sub Detail
+        </Button>
+      </div>
+
+      {/* Remarks */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">
+          Remarks
+        </label>
+        <Textarea
+          placeholder="Enter any additional remarks or notes..."
+          className="min-h-[100px] resize-y"
+          value={remark}
+          onChange={(e) => setRemark?.(e.target.value)}
+        />
       </div>
     </div>
   );

@@ -8,8 +8,10 @@ interface OverallProgressProps {
   addTitleRow?: () => void;
   addDetailRow?: () => void;
   descriptionsReadOnly?: boolean;
+  remark?: string;
+  setRemark?: (remark: string) => void;
 }
 
-export default function OverallProgress({ descriptionsReadOnly = false, ...props }: OverallProgressProps) {
-  return <OverallProgressTable {...props} descriptionsReadOnly={descriptionsReadOnly} />;
+export default function OverallProgress({ descriptionsReadOnly = false, remark, setRemark, ...props }: OverallProgressProps) {
+  return <OverallProgressTable {...props} descriptionsReadOnly={descriptionsReadOnly} remark={remark} setRemark={setRemark} />;
 }

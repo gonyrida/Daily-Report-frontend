@@ -5,3 +5,9 @@ export function createHSESections() {
     createReferenceSection("HSE Toolbox Meeting")
   ];
 }
+
+export function createHSEActivityPhotoSections() {
+  return [
+    createReferenceSection("HSE Activity Photo")
+  ];
+}

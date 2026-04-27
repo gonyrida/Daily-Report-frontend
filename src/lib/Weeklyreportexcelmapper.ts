@@ -383,7 +383,7 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
         })
         .map((p, i) => ({
           no:               p.no ?? p.displayIndex ?? String(i + 1),
-          scopeOfWorks:     p.scopeOfWorks ?? p.description,
+          scopeOfWorks:     p.description ?? p.scopeOfWorks,
           pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
           pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
           pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
