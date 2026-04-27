@@ -513,7 +513,9 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
     // ── Resources ────────────────────────────────────────────────────────────
     weekDates: input.weekDates,
     manpowerRows: (input.manpowerRows ?? []).map(row => ({
-      // ... (rest of the code remains the same)
+      description: row.description ?? row.label,
+      dailyCounts: row.dailyCounts ?? row.counts ?? [0, 0, 0, 0, 0, 0, 0],
+      previousWeek: row.previousWeek ?? row.prev,
       thisWeek: row.thisWeek ?? row.current,
       upToThisWeek: row.upToThisWeek ?? row.cumulative,
     })),

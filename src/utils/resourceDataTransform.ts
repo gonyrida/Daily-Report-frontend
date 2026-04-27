@@ -174,7 +174,7 @@ export const transformMachineryToFrontendFormat = (machinery: MachineryEntry[]):
  */
 export const transformNewPayloadToUIData = (resources: Resources): Section[] => {
   const { manPower } = resources;
-  
+
   return [
     {
       title: "I. Site Management Team",
@@ -234,4 +234,130 @@ export const transformNewPayloadToUIData = (resources: Resources): Section[] => 
       }))
     }
   ];
+};
+
+/**
+ * Transform resources data to Excel export format
+ * Converts backend Resources format to the format expected by Weeklyreportexcelmapper
+ */
+export const transformResourcesToExcelFormat = (resources: Resources | null | undefined) => {
+  if (!resources) {
+    return {
+      manpowerRows: [],
+      materialRows: [],
+      equipmentRows: [],
+      weekDates: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu']
+    };
+  }
+
+  // Transform manpower data - flatten teams with group headers
+  const manpowerRows: any[] = [];
+
+  // Add group header and rows for Management Team
+  if (resources.manPower?.managementTeam?.length > 0) {
+    manpowerRows.push({ description: 'I. Site Management Team', isGroupHeader: true });
+    resources.manPower.managementTeam.forEach(entry => {
+      manpowerRows.push({
+        description: entry.description,
+        dailyCounts: [
+          entry.date?.fri ?? 0,
+          entry.date?.sat ?? 0,
+          entry.date?.sun ?? 0,
+          entry.date?.mon ?? 0,
+          entry.date?.tue ?? 0,
+          entry.date?.wed ?? 0,
+          entry.date?.thu ?? 0
+        ],
+        previousWeek: entry.prevWeek ?? 0,
+        thisWeek: entry.thisWeek ?? 0,
+        upToThisWeek: entry.accumulated ?? 0
+      });
+    });
+  }
+
+  // Add group header and rows for Working Team Interior
+  if (resources.manPower?.workingTeamInterior?.length > 0) {
+    manpowerRows.push({ description: 'II. Site Working Team Interior', isGroupHeader: true });
+    resources.manPower.workingTeamInterior.forEach(entry => {
+      manpowerRows.push({
+        description: entry.description,
+        dailyCounts: [
+          entry.date?.fri ?? 0,
+          entry.date?.sat ?? 0,
+          entry.date?.sun ?? 0,
+          entry.date?.mon ?? 0,
+          entry.date?.tue ?? 0,
+          entry.date?.wed ?? 0,
+          entry.date?.thu ?? 0
+        ],
+        previousWeek: entry.prevWeek ?? 0,
+        thisWeek: entry.thisWeek ?? 0,
+        upToThisWeek: entry.accumulated ?? 0
+      });
+    });
+  }
+
+  // Add group header and rows for Working Team MEP
+  if (resources.manPower?.workingTeamMEP?.length > 0) {
+    manpowerRows.push({ description: 'III. Site Working Team MEP', isGroupHeader: true });
+    resources.manPower.workingTeamMEP.forEach(entry => {
+      manpowerRows.push({
+        description: entry.description,
+        dailyCounts: [
+          entry.date?.fri ?? 0,
+          entry.date?.sat ?? 0,
+          entry.date?.sun ?? 0,
+          entry.date?.mon ?? 0,
+          entry.date?.tue ?? 0,
+          entry.date?.wed ?? 0,
+          entry.date?.thu ?? 0
+        ],
+        previousWeek: entry.prevWeek ?? 0,
+        thisWeek: entry.thisWeek ?? 0,
+        upToThisWeek: entry.accumulated ?? 0
+      });
+    });
+  }
+
+  // Transform material data
+  const materialRows = (resources.material || []).map(entry => ({
+    description: entry.description,
+    unit: entry.unit,
+    dailyData: [
+      entry.date?.fri ?? 0,
+      entry.date?.sat ?? 0,
+      entry.date?.sun ?? 0,
+      entry.date?.mon ?? 0,
+      entry.date?.tue ?? 0,
+      entry.date?.wed ?? 0,
+      entry.date?.thu ?? 0
+    ],
+    previous: entry.prevWeek ?? 0,
+    thisPeriod: entry.thisWeek ?? 0,
+    accumulate: entry.accumulated ?? 0
+  }));
+
+  // Transform machinery data (equipment)
+  const equipmentRows = (resources.machinery || []).map(entry => ({
+    description: entry.description,
+    dailyData: [
+      entry.date?.fri ?? 0,
+      entry.date?.sat ?? 0,
+      entry.date?.sun ?? 0,
+      entry.date?.mon ?? 0,
+      entry.date?.tue ?? 0,
+      entry.date?.wed ?? 0,
+      entry.date?.thu ?? 0
+    ],
+    previous: entry.prevWeek ?? 0,
+    thisPeriod: entry.thisWeek ?? 0,
+    accumulate: entry.accumulated ?? 0
+  }));
+
+  return {
+    manpowerRows,
+    materialRows,
+    equipmentRows,
+    weekDates: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu']
+  };
 };

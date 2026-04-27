@@ -28,6 +28,7 @@ import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } 
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
+import { transformResourcesToExcelFormat } from "@/utils/resourceDataTransform";
 import { exportWeeklyReportToExcel } from "@/lib/weeklyreportexcel";
 import { exportWeeklyReportToPdf } from "@/lib/weeklyreportpdf";
 import {
@@ -2376,10 +2377,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         projectOverview: sharedData.projectOverview || 'Project overview will be added here.',
         designConstruction: sharedData.designNConstruction || 'Design and construction details will be added here.',
         // Add resources data if available
-        weekDates: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
-        manpowerRows: [],
-        materialRows: [],
-        equipmentRows: [],
+        ...transformResourcesToExcelFormat(resourcesData),
         // Add site photos if available - transform ReferenceSection format to SitePhotoEntry format
         sitePhotoCaptions: (() => {
           if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];

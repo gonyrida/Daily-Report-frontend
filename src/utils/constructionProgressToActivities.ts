@@ -49,13 +49,28 @@ export function mergeConstructionIntoActivityRows(
     itemsByKey.set(stableKey, { item, percent, level, displayId });
   });
 
+  // ── Step 1b: build reverse lookup description → stableKey ────────────────
+  const descriptionToKey = new Map<string, string>();
+  for (const [key, data] of itemsByKey) {
+    const descKey = (data.item.scopeOfWorks || data.item.id).trim().toLowerCase();
+    if (!descriptionToKey.has(descKey)) {
+      descriptionToKey.set(descKey, key);
+    }
+  }
+
   // ── Step 2: walk existingRows in their current order ─────────────────────
   // This preserves any reordering the user did via drag-and-drop.
   const output: ActivityRow[] = [];
   const usedKeys = new Set<string>();
+  const seenDescriptions = new Set<string>(); // Track descriptions to deduplicate manual rows
 
   for (const row of existingRows) {
-    const rowKey = row.id || '';
+    let rowKey = row.id || '';
+
+    // Assign unique ID to rows with empty IDs to prevent duplicates
+    if (!rowKey) {
+      rowKey = `manual-${crypto.randomUUID()}`;
+    }
 
     // Drop rows the user explicitly deleted
     if (deletedRowIds?.has(rowKey)) continue;
@@ -67,6 +82,7 @@ export function mergeConstructionIntoActivityRows(
       usedKeys.add(rowKey);
       output.push({
         ...row,
+        id: rowKey,
         description: data.item.scopeOfWorks || data.item.id,
         percent: data.percent,
         percentage: data.percent.toString(),
@@ -74,8 +90,35 @@ export function mergeConstructionIntoActivityRows(
         displayId: data.displayId,
       });
     } else {
-      // Manual row: keep as-is
-      output.push(row);
+      // Manual row: keep as-is, but deduplicate by description
+      const descKey = row.description.trim().toLowerCase();
+      if (seenDescriptions.has(descKey)) {
+        continue;
+      }
+      seenDescriptions.add(descKey);
+
+      // If this manual row's description matches a construction progress item,
+      // upgrade it so it won't be appended again in Step 3 (prevents duplicates).
+      const matchingKey = descriptionToKey.get(descKey);
+      if (matchingKey && !deletedRowIds?.has(matchingKey)) {
+        const data = itemsByKey.get(matchingKey)!;
+        usedKeys.add(matchingKey);
+        output.push({
+          ...row,
+          id: matchingKey,
+          sourceId: data.item.id.trim(),
+          displayId: data.displayId,
+          description: data.item.scopeOfWorks || data.item.id,
+          percent: data.percent,
+          percentage: data.percent.toString(),
+          indentLevel: data.level,
+        });
+      } else {
+        output.push({
+          ...row,
+          id: rowKey,
+        });
+      }
     }
   }
 
@@ -91,7 +134,7 @@ export function mergeConstructionIntoActivityRows(
       description: data.item.scopeOfWorks || data.item.id,
       percent: data.percent,
       percentage: data.percent.toString(),
-      source: 'manual',
+      source: 'construction-progress',
       indentLevel: level,
       addedAt: new Date(),
     });
