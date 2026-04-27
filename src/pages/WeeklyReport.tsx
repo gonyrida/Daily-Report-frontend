@@ -2194,7 +2194,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Create export data with converted photos - include coverData and override constructionIssues
       const dateParts = sharedData.dateRange?.split(' ~ ') || [];
-      const exportData = buildWeeklyReportExportData({
+      const exportData = await buildWeeklyReportExportData({
         coverData: {
           weekNumber: sharedData.weekNumber,
           reportDateFrom: dateParts[0],
@@ -2282,7 +2282,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Create export data with converted photos - include all required data
       const dateParts = sharedData.dateRange?.split(' ~ ') || [];
-      const exportData = buildWeeklyReportExportData({
+      const exportData = await buildWeeklyReportExportData({
         coverData: {
           weekNumber: sharedData.weekNumber,
           reportDateFrom: dateParts[0],
@@ -2380,8 +2380,32 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         manpowerRows: [],
         materialRows: [],
         equipmentRows: [],
-        // Add site photos if available
-        sitePhotoCaptions: [],
+        // Add site photos if available - transform ReferenceSection format to SitePhotoEntry format
+        sitePhotoCaptions: (() => {
+          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          const result: any[] = [];
+          siteActivitiesSections.forEach(section => {
+            if (section.entries && section.entries.length > 0) {
+              section.entries.forEach((entry: any) => {
+                if (entry.slots && entry.slots.length > 0) {
+                  // Group slots into pairs (2 photos per entry)
+                  for (let i = 0; i < entry.slots.length; i += 2) {
+                    const slot1 = entry.slots[i];
+                    const slot2 = entry.slots[i + 1];
+                    result.push({
+                      siteLocation: section.title || 'Site Location',
+                      caption1: slot1?.caption || '',
+                      caption2: slot2?.caption || '',
+                      image1: slot1?.image,
+                      image2: slot2?.image,
+                    });
+                  }
+                }
+              });
+            }
+          });
+          return result;
+        })(),
         // Add HSE data if available
         hseTraining: [],
         hseInspection: [],
@@ -2596,257 +2620,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
   // Debug: Check what data we have
   const computedOverallProgress = formatRowsWithDisplayIndex(overallProgressHook.rows);
-
-  // Build excel export data from all available hook states
-  // Fix date parsing - handle the actual format '20-Mar-26 ~ 26-Mar-26'
-  const dateParts = sharedData.dateRange?.split(' ~ ') || [];
-  const excelData = buildWeeklyReportExportData({
-    coverData: {
-      weekNumber: sharedData.weekNumber,
-      reportDateFrom: dateParts[0],
-      reportDateTo: dateParts[1],
-      projectTitle: sharedData.projectName,
-      employer: sharedData.employer || 'Client Name',
-      contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
-      coverImage: sharedData.coverImage,  // Add cover image
-      clientLogo: sharedData.clientLogo,  // Add client logo
-      refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
-      letterDate: sharedData.reportDate,
-      toName: sharedData.recipientName,
-      attName: sharedData.recipientName,
-      ccLines: sharedData.ccList,
-      projectManager: sharedData.signatoryName,
-      signatureImage: sharedData.signatureImage,  // Add signature image
-      constructorName: sharedData.constructorName,
-      companyLocation: sharedData.companyLocation,
-      companyPhone1: sharedData.companyPhone1,
-      companyPhone2: sharedData.companyPhone2,
-      companyEmail1: sharedData.companyEmail1,
-      companyEmail2: sharedData.companyEmail2,
-      recipientCompany: sharedData.recipientCompany,
-      recipientLocation: sharedData.recipientLocation,
-    },
-    constructionProgress: constructionProgressHook.constructionData?.items as any[],
-    conProgressProject: sharedData.projectName,
-    conProgressSubtitle: constructionProgressHook.constructionData?.projectInfo?.subtitle || '',
-    conProgressDate: constructionProgressHook.constructionData?.projectInfo?.date || sharedData.dateRange?.split(' - ')[0],
-    conProgressRevision: constructionProgressHook.constructionData?.projectInfo?.revision || '',
-    overallProgress: computedOverallProgress,
-    overallProgressRemark: overallProgressRemark,   // ← ADD THIS
-    nwdpItems: (() => {
-      const allItems: any[] = [];
-
-      weeklyActivities.forEach(a => {
-        allItems.push({
-          rowId: a.id || '',
-          sourceId: a.displayId || a.sourceId || '',
-          workDoneLabel: a.description,
-          workDonePct: a.percent,
-          nextWeekLabel: undefined,
-          nextWeekPct: undefined,
-        });
-      });
-
-      nextWeekPlan.forEach(a => {
-        const sourceId = a.displayId || a.sourceId || '';
-        const rowId = a.id || '';
-
-        let matched = false;
-        for (let i = 0; i < allItems.length; i++) {
-          const byRowId = rowId && allItems[i].rowId === rowId;
-          const bySourceId = sourceId && allItems[i].sourceId === sourceId;
-          if ((byRowId || bySourceId) && allItems[i].nextWeekLabel === undefined) {
-            allItems[i].nextWeekLabel = a.description;
-            allItems[i].nextWeekPct = a.percent;
-            matched = true;
-            break;
-          }
-        }
-
-        if (!matched) {
-          allItems.push({
-            rowId,
-            sourceId,
-            workDoneLabel: undefined,
-            workDonePct: undefined,
-            nextWeekLabel: a.description,
-            nextWeekPct: a.percent,
-          });
-        }
-      });
-
-      return allItems.filter(item =>
-        item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
-      );
-    })(),
-    qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => {
-      const isBackendFormat = value && typeof value === 'object' && !Array.isArray(value) && 'items' in value;
-      const rawItems = isBackendFormat ? (value.items || []) : (Array.isArray(value) ? value : []);
-      const items = rawItems.map((item: any) => ({
-        ...item,
-        dateResponse: item.dateResponse || item.dateResponded || '',
-      }));
-      const comments = isBackendFormat
-        ? (value.comments || '')
-        : (Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '');
-      return {
-        sectionTitle: key,
-        codeHeader: "Code",
-        statusHeader: "Status",
-        dateHeader: "Date Responded",
-        items,
-        comments,
-      };
-    }) : [],
-    hseTraining: hsesData?.training || [],
-    hseInspection: hsesData?.inspection || [],
-    hsePermits: hsesData?.permit || [],
-    hseFirstAid: hsesData?.firstAidAccident,
-    hseOtherConcerns: hsesData?.otherActivities,
-    hsePhotoReferences: (() => {
-      console.log(`🔍 HSE Data being passed to mapper:`, {
-        hsesData,
-        hsePhotoReferences: hsesData?.hsePhotoReferences,
-        hasHseData: !!hsesData,
-        hasPhotoReferences: !!hsesData?.hsePhotoReferences,
-        hseToolboxMeetingLength: hsesData?.hsePhotoReferences?.hseToolboxMeeting?.length || 0,
-        hseActivityPhotosLength: hsesData?.hsePhotoReferences?.hseActivityPhotos?.length || 0
-      });
-      return hsesData?.hsePhotoReferences;
-    })(),
-    weekDates: (() => {
-      // Parse "06-Mar-26 ~ 12-Mar-26" format from sharedData.dateRange
-      if (!sharedData.dateRange) return ['', '', '', '', '', '', ''];
-      const cleaned = sharedData.dateRange.trim().replace(/\s*~\s*/, '~');
-      const [startStr] = cleaned.split('~');
-      if (!startStr) return ['', '', '', '', '', '', ''];
-      const monthMap: { [k: string]: number } = {
-        Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-        Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
-      };
-      const [dayStr, monStr, yrStr] = startStr.trim().split('-');
-      const start = new Date(2000 + parseInt(yrStr, 10), monthMap[monStr] ?? 0, parseInt(dayStr, 10));
-      if (isNaN(start.getTime())) return ['', '', '', '', '', '', ''];
-      return Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(start);
-        d.setDate(start.getDate() + i);
-        return d.getDate().toString();
-      });
-    })(),
-    // Manpower: team-based groups with group header rows for Excel export
-    manpowerRows: (() => {
-      const mp = resourcesData?.manPower;
-      if (!mp) return [];
-
-      const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
-      const mapMember = (m: any) => {
-        const daily = m.date
-          ? dk.map(k => m.date?.[k] ?? 0)
-          : Array.isArray(m.dailyData)
-            ? m.dailyData
-            : Array(7).fill(0);
-        return {
-          description: m.description ?? '',
-          dailyCounts: daily,
-          previousWeek: m.prevWeek ?? m.previousWeek ?? 0,
-          thisWeek: m.thisWeek ?? 0,
-          upToThisWeek: m.accumulated ?? m.upToThisWeek ?? 0,
-          isGroupHeader: false,  // marker for renderer
-        };
-      };
-
-      const groups: Array<{ title: string; members: any[] }> = [
-        { title: 'I. Site Management Team',     members: mp.managementTeam ?? [] },
-        { title: 'II. Site Working Team Interior', members: mp.workingTeamInterior ?? [] },
-        { title: 'III. Site Working Team MEP',  members: mp.workingTeamMEP ?? [] },
-      ];
-
-      const out: any[] = [];
-      for (const g of groups) {
-        const realMembers = g.members.filter((m: any) => (m?.description ?? '').trim() !== '');
-        if (realMembers.length === 0) continue;  // skip empty teams
-
-        // Insert group header row
-        out.push({
-          description: g.title,
-          dailyCounts: ['', '', '', '', '', '', ''],
-          previousWeek: '',
-          thisWeek: '',
-          upToThisWeek: '',
-          isGroupHeader: true,  // ← marker
-        });
-
-        // Then members
-        realMembers.forEach(m => out.push(mapMember(m)));
-      }
-      return out;
-    })(),
-    materialRows: (resourcesData?.material ?? [])
-      .filter((m: any) => (m?.description ?? m?.name ?? '').trim() !== '')
-      .map((m: any) => {
-        const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
-        const daily = m.date
-          ? dk.map(k => m.date?.[k] ?? 0)
-          : Array.isArray(m.dailyData)
-            ? m.dailyData
-            : Array(7).fill(0);
-        return {
-          description: m.description ?? m.name ?? '',
-          unit: m.unit ?? '',
-          dailyData: daily,
-          previous: m.prevWeek ?? m.previous ?? 0,
-          thisPeriod: m.thisWeek ?? m.thisPeriod ?? 0,
-          accumulate: m.accumulated ?? m.accumulate ?? 0,
-        };
-      }),
-    equipmentRows: (resourcesData?.machinery ?? [])
-      .filter((m: any) => (m?.description ?? m?.name ?? '').trim() !== '')
-      .map((m: any) => {
-        const dk = ['fri', 'sat', 'sun', 'mon', 'tue', 'wed', 'thu'] as const;
-        const daily = m.date
-          ? dk.map(k => m.date?.[k] ?? 0)
-          : Array.isArray(m.dailyData)
-            ? m.dailyData
-            : Array(7).fill(0);
-        return {
-          description: m.description ?? m.name ?? '',
-          unit: m.unit ?? '',
-          dailyData: daily,
-          previous: m.prevWeek ?? m.previous ?? 0,
-          thisPeriod: m.thisWeek ?? m.thisPeriod ?? 0,
-          accumulate: m.accumulated ?? m.accumulate ?? 0,
-        };
-      }),
-    sitePhotoCaptions: siteActivitiesSections.flatMap((section: any) =>
-      (section.entries || []).flatMap((entry: any) =>
-        (entry.slots || []).reduce((acc: any[], slot: any, idx: number) => {
-          // Group slots in pairs (2 slots per row)
-          if (idx % 2 === 0) {
-            const nextSlot = entry.slots[idx + 1];
-            acc.push({
-              siteLocation: section.title,
-              caption1: slot?.caption || '',
-              caption2: nextSlot?.caption || '',
-              image1: slot?.image || '',
-              image2: nextSlot?.image || '',
-            });
-          }
-          return acc;
-        }, [])
-      )
-    ),
-    constructionIssues: issuesHook.issuesData.map((issue, i) => ({
-      number: i + 1,
-      siteLocation: issue.location,
-      problemDescription: issue.problem,
-      actionBy: issue.actionBy,
-      photo: issue.photo,
-    })),
-    // Introduction fields
-    projectOverview: sharedData.projectOverview,
-    designConstruction: sharedData.designNConstruction,
-    designList: [], // Design list not available in current data structure
-  });
 
   return (
     <SidebarProvider>

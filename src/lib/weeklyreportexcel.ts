@@ -2477,9 +2477,13 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
   // Each entry block: header row + spacer + photo row + spacer + footer row
 
   const photoBoxStyle: Partial<ExcelJS.Style> = {
+    font: { size: 10, name: 'Arial' },
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
     border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } },
     },
   };
 
@@ -2541,7 +2545,7 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
     for (let idx = 0; idx < 2; idx++) {
       const imgSource = images[idx];
       const startCol = idx === 0 ? 2 : 7;
-      const endCol   = idx === 0 ? 6 : 11;
+      const endCol = idx === 0 ? 6 : 11;
 
       if (imgSource) {
         try {
@@ -2610,7 +2614,7 @@ async function buildHSE(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) {
     for (let idx = 0; idx < 2; idx++) {
       const imgSource = actImages[idx];
       const startCol = idx === 0 ? 2 : 7;
-      const endCol   = idx === 0 ? 6 : 11;
+      const endCol = idx === 0 ? 6 : 11;
 
       if (imgSource) {
         try {
@@ -3203,17 +3207,21 @@ export async function buildSitePhotos(
   // No tab color — matches template
 
   // ── Column widths A..H exactly as template ───────────────────────────────
-  // A=5.71 | B=1.57 | C=50.71 | D=1.57 | E=default | F=50.71 | G=1.57 | H=4.71
+  // A=5.71 | B=1.57 | C=50.71 | D=1.57 | E=1.57 | F=50.71 | G=1.57 | H=4.71
+  // (E width is the divider; template leaves E unset/default but visually equiv to 1.57)
   ws.getColumn(1).width = 5.71;  // A margin
-  ws.getColumn(2).width = 1.57;  // B left-edge spacer
-  ws.getColumn(3).width = 50.71; // C left photo content
-  ws.getColumn(4).width = 1.57;  // D divider
-  // E is left at default (no explicit width, matches template)
-  ws.getColumn(6).width = 50.71; // F right photo content
-  ws.getColumn(7).width = 1.57;  // G right-edge spacer
+  ws.getColumn(2).width = 1.57;  // B left-edge spacer (carries left outer border)
+  ws.getColumn(3).width = 50.71; // C left photo content (NO borders — image lives here)
+  ws.getColumn(4).width = 1.57;  // D left-box right-edge spacer (carries right border of left box)
+  ws.getColumn(5).width = 1.57;  // E right-box left-edge spacer (carries left border of right box)
+  ws.getColumn(6).width = 50.71; // F right photo content (NO borders)
+  ws.getColumn(7).width = 1.57;  // G right-edge spacer (carries right outer border)
   ws.getColumn(8).width = 4.71;  // H right margin
 
-  // ── Styles ───────────────────────────────────────────────────────────────
+  // ── Reusable border pieces ──────────────────────────────────────────────
+  const thin = { style: 'thin' as const, color: { argb: 'FF000000' } };
+
+  // ── Styles ──────────────────────────────────────────────────────────────
   const titleStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
@@ -3223,35 +3231,18 @@ export async function buildSitePhotos(
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin, right: thin },
   };
   const locationStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 10, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6DCE4' } },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
-  };
-  const photoBoxStyle: Partial<ExcelJS.Style> = {
-    font: { size: 10, name: 'Arial' },
-    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin, right: thin },
   };
   const captionStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin, right: thin },
   };
 
   let r = 3;
@@ -3273,19 +3264,22 @@ export async function buildSitePhotos(
   safeMerge(ws, r, 2, r, 7);
   r++; // 6
 
-  // ── Photo entries — grouped in sections of up to 4 per location banner ──
+  // ── Photo entries — grouped by siteLocation (sections from UI) ──
   const entries = d.sitePhotoCaptions ?? [];
-  const PAIRS_PER_SECTION = 4;
 
-  // If nothing provided, render one section with 4 empty placeholder pairs (8 boxes)
-  const renderEntries: SitePhotoEntry[] = entries.length > 0
+  // Check if any images exist across all entries
+  const hasAnyImages = entries.some(e => e.image1 || e.image2);
+
+  // If no images provided, render one section with 4 empty placeholder pairs
+  const renderEntries: SitePhotoEntry[] = hasAnyImages
     ? entries
     : Array(4).fill(null).map(() => ({ siteLocation: 'Site Location', caption1: '', caption2: '' }));
 
-  // Group consecutive entries into sections by siteLocation change, capped at 4 per section
+  // Group consecutive entries into sections by siteLocation change only
+  // Headers appear only when user clicks "Add Section" (location changes)
   let i = 0;
   while (i < renderEntries.length) {
-    // Emit section banner at row r
+    // Emit section banner at row r — merged B:G with location fill
     const sectionLocation = renderEntries[i].siteLocation ?? 'Site Location';
     ws.getRow(r).height = 20.1;
     ws.getCell(r, 2).value = sectionLocation;
@@ -3294,21 +3288,26 @@ export async function buildSitePhotos(
     safeMerge(ws, r, 2, r, 7);
     r++;
 
-    // Emit up to PAIRS_PER_SECTION entries under this banner, stopping if the
-    // siteLocation changes (a changed location starts a new banner).
-    let emitted = 0;
+    // Emit all entries with the same location (no limit)
     while (
       i < renderEntries.length &&
-      emitted < PAIRS_PER_SECTION &&
       (renderEntries[i].siteLocation ?? 'Site Location') === sectionLocation
     ) {
       r = await renderPhotoPair(workbook, ws, r, renderEntries[i]);
       i++;
-      emitted++;
     }
   }
 
-  // Inner helper: render one photo-pair entry (4 rows: spacer, photo, spacer, caption)
+  // ────────────────────────────────────────────────────────────────────────
+  // renderPhotoPair: emits exactly 4 rows that together draw two side-by-side
+  // photo boxes with captions, matching the template byte-for-byte:
+  //
+  //   topSpacer   (6.95h)  — top edge of both boxes (drawn on B,D,E,G)
+  //   photo       (170.1h) — left + right vertical edges only (B.left, D.right,
+  //                          E.left, G.right). C and F are clean for images.
+  //   botSpacer   (6.95h)  — bottom edge of both boxes
+  //   caption     (15h)    — fully bordered cell, merged B:D and E:G
+  // ────────────────────────────────────────────────────────────────────────
   async function renderPhotoPair(
     wb: ExcelJS.Workbook,
     ws: ExcelJS.Worksheet,
@@ -3317,74 +3316,101 @@ export async function buildSitePhotos(
   ): Promise<number> {
     let row = startRow;
 
-    const naStyle: Partial<ExcelJS.Style> = {
-      font: { size: 10, name: 'Arial', italic: true },
-      alignment: { horizontal: 'center', vertical: 'middle' },
-    };
-
-    // Row 1 — spacer (6.95)
+    // ── Row A: top spacer (6.95) — draws top edge of both boxes ──────────
+    const topSpacerRow = row;
     ws.getRow(row).height = 6.95;
+    // Left box top edge: B7 has top+left, C7 has top, D7 has top+right
+    safeStyle(ws.getCell(row, 2), { border: { top: thin, left: thin } }, 'sp.topL.B');
+    safeStyle(ws.getCell(row, 3), { border: { top: thin } },              'sp.topL.C');
+    safeStyle(ws.getCell(row, 4), { border: { top: thin, right: thin } }, 'sp.topL.D');
+    // Right box top edge: E7 has top+left, F7 has top, G7 has top+right
+    safeStyle(ws.getCell(row, 5), { border: { top: thin, left: thin } }, 'sp.topR.E');
+    safeStyle(ws.getCell(row, 6), { border: { top: thin } },              'sp.topR.F');
+    safeStyle(ws.getCell(row, 7), { border: { top: thin, right: thin } }, 'sp.topR.G');
     row++;
 
-    // Row 2 — photo (170.1): LEFT = B:D merged, RIGHT = E:G merged
+    // ── Row B: photo (170.1) — vertical edges only, no top/bottom ────────
     const photoRow = row;
     ws.getRow(row).height = 170.1;
+    // Left box vertical edges: only B.left and D.right (C is clean)
+    safeStyle(ws.getCell(row, 2), { border: { left: thin } },  'sp.photoL.B');
+    safeStyle(ws.getCell(row, 3), {
+      font: { size: 10, name: 'Arial' },
+      alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    }, 'sp.photoL.C');
+    safeStyle(ws.getCell(row, 4), { border: { right: thin } }, 'sp.photoL.D');
+    // Right box vertical edges: only E.left and G.right (F is clean)
+    safeStyle(ws.getCell(row, 5), { border: { left: thin } },  'sp.photoR.E');
+    safeStyle(ws.getCell(row, 6), {
+      font: { size: 10, name: 'Arial' },
+      alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+    }, 'sp.photoR.F');
+    safeStyle(ws.getCell(row, 7), { border: { right: thin } }, 'sp.photoR.G');
 
-    safeStyle(ws.getCell(row, 2), photoBoxStyle, 'sp.photoL');
-    safeStyle(ws.getCell(row, 3), photoBoxStyle, 'sp.photoL.span');
-    safeStyle(ws.getCell(row, 4), photoBoxStyle, 'sp.photoL.span');
-    safeMerge(ws, row, 2, row, 4);
+    // Insert images — anchored inside C (col index 2) and F (col index 5) only
+    // Using ext (width/height) for proper single-cell positioning
+    // ExcelJS uses 0-based col/row for image anchors.
+    console.log(`📸 Attempting to add images for row ${photoRow}:`, {
+      hasImage1: !!entry.image1,
+      hasImage2: !!entry.image2,
+      image1Type: typeof entry.image1,
+      image1Length: typeof entry.image1 === 'string' ? entry.image1.length : 'N/A',
+      image1Prefix: typeof entry.image1 === 'string' ? entry.image1.substring(0, 50) : 'N/A',
+      image2Type: typeof entry.image2,
+      image2Length: typeof entry.image2 === 'string' ? entry.image2.length : 'N/A',
+      image2Prefix: typeof entry.image2 === 'string' ? entry.image2.substring(0, 50) : 'N/A',
+    });
 
-    safeStyle(ws.getCell(row, 5), photoBoxStyle, 'sp.photoR');
-    safeStyle(ws.getCell(row, 6), photoBoxStyle, 'sp.photoR.span');
-    safeStyle(ws.getCell(row, 7), photoBoxStyle, 'sp.photoR.span');
-    safeMerge(ws, row, 5, row, 7);
-
-    // Left image — tl at B (col 1, 0-based), br at right of D spanning full photo row
     if (entry.image1) {
       try {
+        console.log(`📸 Adding image1 to column C (col 2), row ${photoRow - 1}`);
         await addImageToWorksheet(workbook, ws, entry.image1, {
-          tl: { col: 1, row: photoRow - 1 },
-          br: { col: 4, row: photoRow },
-          editAs: 'twoCell'
+          tl: { col: 2, row: photoRow - 1 },
+          ext: { width: 354.24, height: 225 },
+          editAs: 'oneCell',
         } as any);
-      } catch {
-        ws.getCell(photoRow, 2).value = 'N/A';
-        safeStyle(ws.getCell(photoRow, 2), naStyle, 'sp.na');
+        console.log(`✅ image1 added successfully`);
+      } catch (err) {
+        console.error('❌ Failed to add image1:', err);
+        ws.getCell(photoRow, 3).value = 'N/A';
       }
     } else {
-      ws.getCell(photoRow, 2).value = 'N/A';
-      safeStyle(ws.getCell(photoRow, 2), naStyle, 'sp.na');
-      safeStyle(ws.getCell(photoRow, 3), naStyle, 'sp.na.span');
-      safeStyle(ws.getCell(photoRow, 4), naStyle, 'sp.na.span');
+      console.log(`⚠️ No image1, setting N/A`);
+      ws.getCell(photoRow, 3).value = 'N/A';
     }
 
-    // Right image — tl at E (col 4, 0-based), br at right of G
     if (entry.image2) {
       try {
+        console.log(`📸 Adding image2 to column F (col 5), row ${photoRow - 1}`);
         await addImageToWorksheet(workbook, ws, entry.image2, {
-          tl: { col: 4, row: photoRow - 1 },
-          br: { col: 7, row: photoRow },
-          editAs: 'twoCell'
+          tl: { col: 5, row: photoRow - 1 },
+          ext: { width: 354.24, height: 225 },
+          editAs: 'oneCell',
         } as any);
-      } catch {
-        ws.getCell(photoRow, 5).value = 'N/A';
-        safeStyle(ws.getCell(photoRow, 5), naStyle, 'sp.na');
+        console.log(`✅ image2 added successfully`);
+      } catch (err) {
+        console.error('❌ Failed to add image2:', err);
+        ws.getCell(photoRow, 6).value = 'N/A';
       }
     } else {
-      ws.getCell(photoRow, 5).value = 'N/A';
-      safeStyle(ws.getCell(photoRow, 5), naStyle, 'sp.na');
-      safeStyle(ws.getCell(photoRow, 6), naStyle, 'sp.na.span');
-      safeStyle(ws.getCell(photoRow, 7), naStyle, 'sp.na.span');
+      console.log(`⚠️ No image2, setting N/A`);
+      ws.getCell(photoRow, 6).value = 'N/A';
     }
-
-    row++; // advance past photo row
-
-    // Row 3 — spacer (6.95)
-    ws.getRow(row).height = 6.95;
     row++;
 
-    // Row 4 — caption (15): LEFT = B:D merged, RIGHT = E:G merged
+    // ── Row C: bottom spacer (6.95) — bottom edge of both boxes ──────────
+    ws.getRow(row).height = 6.95;
+    // Left box bottom edge: B9 has bottom+left, C9 has bottom, D9 has bottom+right
+    safeStyle(ws.getCell(row, 2), { border: { bottom: thin, left: thin } },  'sp.botL.B');
+    safeStyle(ws.getCell(row, 3), { border: { bottom: thin } },               'sp.botL.C');
+    safeStyle(ws.getCell(row, 4), { border: { bottom: thin, right: thin } }, 'sp.botL.D');
+    // Right box bottom edge
+    safeStyle(ws.getCell(row, 5), { border: { bottom: thin, left: thin } },  'sp.botR.E');
+    safeStyle(ws.getCell(row, 6), { border: { bottom: thin } },               'sp.botR.F');
+    safeStyle(ws.getCell(row, 7), { border: { bottom: thin, right: thin } }, 'sp.botR.G');
+    row++;
+
+    // ── Row D: caption (15) — fully bordered, merged B:D and E:G ─────────
     ws.getRow(row).height = 15;
     ws.getCell(row, 2).value = entry.caption1 ?? '';
     safeStyle(ws.getCell(row, 2), captionStyle, 'sp.capL');

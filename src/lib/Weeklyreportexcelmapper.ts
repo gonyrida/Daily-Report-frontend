@@ -8,6 +8,42 @@
 
 import type { WeeklyReportExportData, QAQCSection } from "./weeklyreportexcel";
 
+// Helper: Convert File object to base64 data URL
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Helper: Process image - if it's a File, convert to base64; if string, return as-is
+async function processImage(img: unknown): Promise<string | undefined> {
+  if (!img) return undefined;
+
+  // If it's already a string (base64 or URL), return it
+  if (typeof img === 'string') {
+    return img;
+  }
+
+  // If it's a File object, convert to base64
+  if (img instanceof File || (typeof img === 'object' && img !== null && 'size' in img && 'type' in img)) {
+    try {
+      const file = img as File;
+      console.log(`Converting File to base64: ${file.name}, size: ${file.size}`);
+      const base64 = await fileToBase64(file);
+      console.log(`File converted successfully, base64 length: ${base64.length}`);
+      return base64;
+    } catch (err) {
+      console.error('Failed to convert File to base64:', err);
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 export interface MapperInput {
   // from useCoverData()
   coverData?: {
@@ -286,45 +322,10 @@ export interface MapperInput {
 // Input sections: [{ id, title, entries: [{ id, slots: [{ id, image, caption }] }] }]
 // Output:         [{ images: string[], descriptions: string[] }]  — one entry per photo row (2 images per row)
 function referenceSectionsToPhotoEntries(sections: any[]): { images: string[]; descriptions: string[] }[] {
-  console.log(` Converting HSE photo sections to entries:`, {
-    sectionsCount: sections?.length || 0,
-    sections: sections?.map(s => ({
-      title: s.title,
-      entriesCount: s.entries?.length || 0,
-      slots: s.entries?.map(e => e.slots?.map(slot => ({
-        hasImage: !!slot.image,
-        imageType: typeof slot.image,
-        imagePreview: slot.image?.substring?.(0, 50) + '...',
-        caption: slot.caption
-      })))
-    }))
-  });
-
   const result = sections.flatMap((section: any) =>
     (section.entries ?? []).map((entry: any) => {
       const images = (entry.slots ?? []).map((s: any) => s.image || '').filter(Boolean);
       const descriptions = (entry.slots ?? []).map((s: any) => s.caption || '');
-
-      console.log(`📸 Processed entry:`, {
-        imagesCount: images.length,
-        images: images.map(img => {
-          const imgStr = typeof img === 'string' ? img : String(img);
-          return {
-            type: typeof img,
-            isBase64: imgStr?.startsWith('data:'),
-            isUrl: imgStr?.startsWith('http') || imgStr?.startsWith('/'),
-            isBlob: imgStr?.startsWith('blob:'),
-            preview: imgStr?.substring?.(0, 50) + '...'
-          };
-        }),
-        descriptions,
-        rawSlots: (entry.slots ?? []).map((s: any) => ({
-          image: !!s.image,
-          caption: s.caption,
-          captionType: typeof s.caption,
-          captionLength: s.caption?.length || 0
-        }))
-      });
 
       return {
         images,
@@ -332,16 +333,6 @@ function referenceSectionsToPhotoEntries(sections: any[]): { images: string[]; d
       };
     })
   );
-
-  console.log(` Final converted entries:`, {
-    entriesCount: result.length,
-    result: result.map((entry, i) => ({
-      index: i,
-      imagesCount: entry.images.length,
-      hasImages: entry.images.length > 0,
-      descriptionsCount: entry.descriptions.length
-    }))
-  });
 
   return result;
 }
@@ -352,7 +343,7 @@ let cachedConProgressItems: any[] = [];
 // Cache for valid HSE photo data to prevent overwriting with empty data
 let cachedHSEPhotoReferences: any = null;
 
-export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
+export async function buildWeeklyReportExportData(input: MapperInput): Promise<WeeklyReportExportData> {
   // Debug: Add stack trace to identify caller
   const stack = new Error().stack;
   const caller = stack?.split('\n')[2]?.trim() || 'unknown';
@@ -508,17 +499,10 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
       // Update cache when we have valid data
       if (hasValidData) {
         cachedHSEPhotoReferences = currentHsePhotoRefs;
-        console.log(`Updated HSE photo cache with new data`);
       }
 
       // Use cached data if current data is empty and we have cached data
       const dataToUse = (!hasValidData && cachedHSEPhotoReferences) ? cachedHSEPhotoReferences : currentHsePhotoRefs;
-
-      console.log(`HSE Photo Data Selection:`, {
-        currentHasValidData: hasValidData,
-        hasCachedData: !!cachedHSEPhotoReferences,
-        usingCached: !hasValidData && !!cachedHSEPhotoReferences
-      });
 
       return {
         hseToolboxMeeting: referenceSectionsToPhotoEntries(dataToUse?.hseToolboxMeeting ?? []),
@@ -551,13 +535,27 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     })),
 
     // ── Site Photos ───────────────────────────────────────────────────────────
-    sitePhotoCaptions: (input.sitePhotoCaptions ?? []).map(e => ({
-      siteLocation: e.siteLocation ?? e.location,
-      caption1: e.caption1,
-      caption2: e.caption2,
-      image1: e.image1,
-      image2: e.image2,
-    })),
+    sitePhotoCaptions: await (async () => {
+      const mapped = await Promise.all((input.sitePhotoCaptions ?? []).map(async (e, i) => {
+        // Process images - convert File objects to base64
+        const processedImg1 = await processImage(e.image1);
+        const processedImg2 = await processImage(e.image2);
+
+        console.log(`SitePhoto ${i} processed:`, {
+          hasImage1: !!processedImg1,
+          hasImage2: !!processedImg2,
+        });
+
+        return {
+          siteLocation: e.siteLocation ?? e.location,
+          caption1: e.caption1,
+          caption2: e.caption2,
+          image1: processedImg1,
+          image2: processedImg2,
+        };
+      }));
+      return mapped;
+    })(),
 
     // ── Construction Issues ───────────────────────────────────────────────────
     constructionIssues: (input.constructionIssues ?? []).map((issue, i) => ({
