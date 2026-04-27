@@ -44,6 +44,7 @@ import {
   Trash2,
   Copy,
   Settings,
+  Users,
   FolderInput,
   FolderPlus,
 } from "lucide-react";
@@ -65,6 +66,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 
 interface HierarchicalSidebarProps {
   className?: string;
@@ -80,10 +82,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   const [dailyReportOpen, setDailyReportOpen] = useState(true);
   const [weeklyReportOpen, setWeeklyReportOpen] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [renameConfirmOpen, setRenameConfirmOpen] = useState(false);
   const [renameData, setRenameData] = useState<{ oldName: string; newName: string } | null>(null);
+  const [viewMode, setViewMode] = useState<'admin' | 'all'>('all');
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   
   // State for project list
   const [projects, setProjects] = useState<Project[]>([]);
@@ -378,7 +383,8 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
         const data = await response.json();
 
         if (data.success && data.user?._id) {
-          setCurrentUserId(data.user._id);
+          setCurrentUserId(data.user._id);  // ← Use _id instead of userId
+          setUserRole(data.user.role); // ← Get user's role
         }
       } catch (error) {
         console.error('Failed to get user info:', error);
@@ -718,426 +724,502 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
           </div>
         </SidebarHeader>
 
-        <SidebarContent className="flex-1">
-          {/* Report Section */}
-          <SidebarGroup>
-            <Collapsible open={reportSectionOpen} onOpenChange={setReportSectionOpen}>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton 
-                  className="w-full justify-between px-4 py-2 font-medium"
-                  onClick={() => navigate('/reports')}
-                >
-                  <span className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Report
-                  </span>
-                  {reportSectionOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu className="px-2">
-                    {/* Daily Report Subsection */}
-                    <Collapsible open={dailyReportOpen} onOpenChange={setDailyReportOpen}>
+        {/* View Mode Toggle - Admin Only */}
+        {userRole === 'admin' && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <div className="flex items-center justify-between w-full px-2 py-2">
+                      <span className="text-sm font-medium">View Mode</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">All</span>
+                        <Switch
+                          checked={viewMode === 'admin'}
+                          onCheckedChange={(checked) => setViewMode(checked ? 'admin' : 'all')}
+                          className="scale-75"
+                        />
+                        <span className="text-xs text-muted-foreground">Admin Only</span>
+                      </div>
+                    </div>
+                  </SidebarMenuItem>
+
+                  <SidebarMenu>
+                    <Collapsible open={adminMenuOpen} onOpenChange={setAdminMenuOpen}>
                       <CollapsibleTrigger asChild>
-                        <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
+                        <SidebarMenuButton 
+                          className="w-full justify-between px-4 py-2 font-medium"
+                          onClick={() => navigate('/admin')}
+                        >
                           <span 
                             className="flex items-center gap-2 flex-1"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate('/daily-report-projects');
+                              navigate('/admin');
                             }}
                           >
-                            <Calendar className="h-3 w-3" />
-                            Daily Report
+                            <UserCheck className="h-4 w-4" />
+                            <span>Admin Dashboard</span>
                           </span>
-                          <div className="flex items-center gap-1">
-                            <div
-                              className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary rounded flex items-center justify-center cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!dailyReportOpen) {
-                                  setDailyReportOpen(true); // Auto-expand if collapsed
-                                }
-                                setShowAddProject(true);   // Always show input
-                              }}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </div>
-                            {dailyReportOpen ? (
-                              <ChevronDown className="h-3 w-3" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3" />
-                            )}
-                          </div>
+                          {adminMenuOpen ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {/* Add Project Input */}
-                          {showAddProject && (
-                            <SidebarMenuSubItem>
-                              <div className="flex items-center gap-1 px-1 py-1">
-                                <Input
-                                  placeholder="Project name..."
-                                  value={newProjectName}
-                                  onChange={(e) => setNewProjectName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleAddProject();
-                                    } else if (e.key === 'Escape') {
-                                      setShowAddProject(false);
-                                      setNewProjectName("");
-                                    }
-                                  }}
-                                  className="h-7 text-xs"
-                                  autoFocus
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-5 w-5 p-0"
-                                  onClick={handleAddProject}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </SidebarMenuSubItem>
-                          )}
-                          
-                          {/* Add Folder Button */}
-                          <SidebarMenuSubItem>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full justify-start pl-2 text-xs text-muted-foreground hover:text-foreground"
-                              onClick={() => setShowAddFolderInput(true)}
-                            >
-                              <Plus className="h-3 w-3 mr-2" />
-                              Create Folder
-                            </Button>
-                          </SidebarMenuSubItem>
-
-                          {/* Add Folder Input */}
-                          {showAddFolderInput && (
-                            <SidebarMenuSubItem>
-                              <div className="flex items-center gap-1 pl-2 py-1">
-                                <FolderPlus className="h-3 w-3" />
-                                <Input
-                                  placeholder="Folder name..."
-                                  value={newFolderName}
-                                  onChange={(e) => setNewFolderName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleAddFolder();
-                                    } else if (e.key === 'Escape') {
-                                      setShowAddFolderInput(false);
-                                      setNewFolderName('');
-                                    }
-                                  }}
-                                  className="h-6 text-xs flex-1"
-                                  autoFocus
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-5 w-5 p-0"
-                                  onClick={handleAddFolder}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-5 w-5 p-0"
-                                  onClick={() => {
-                                    setShowAddFolderInput(false);
-                                    setNewFolderName('');
-                                  }}
-                                >
-                                  ×
-                                </Button>
-                              </div>
-                            </SidebarMenuSubItem>
-                          )}
-                          
-                          {/* Folder List */}
-                          {folders.map((folder) => (
-                            <React.Fragment key={folder._id}>
-                              {/* Folder Item with Expand/Collapse */}
+                        <SidebarGroupContent>
+                          <SidebarMenu className="px-2">
+                            <SidebarMenuSub>
                               <SidebarMenuSubItem>
-                                <div className="flex items-center justify-between w-full px-2 py-1 group">
-                                  {editingFolder === folder._id ? (
-                                    <div className="flex items-center gap-1 flex-1">
-                                      <FolderPlus className="h-3 w-3" />
-                                      <Input
-                                        value={editFolderName}
-                                        onChange={(e) => setEditFolderName(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            handleSaveFolderEdit();
-                                          } else if (e.key === 'Escape') {
-                                            setEditingFolder(null);
-                                            setEditFolderName('');
-                                          }
-                                        }}
-                                        className="h-6 text-xs flex-1"
-                                        autoFocus
-                                      />
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-5 w-5 p-0"
-                                        onClick={() => {
-                                          setEditingFolder(null);
-                                          setEditFolderName('');
-                                        }}
-                                      >
-                                        ×
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center gap-1 flex-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-5 w-5 p-0"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleFolderExpand(folder._id);
-                                          }}
-                                        >
-                                          {expandedFolders[folder._id] ? (
-                                            <ChevronDown className="h-3 w-3" />
-                                          ) : (
-                                            <ChevronRight className="h-3 w-3" />
-                                          )}
-                                        </Button>
-                                        <FolderPlus className="h-3 w-3" />
-                                        <span className="text-xs font-medium">{folder.name}</span>
-                                      </div>
-                                      {folder.createdBy === currentUserId && (
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
+                                <SidebarMenuSubButton asChild>
+                                  <Link to="/admin/user-management" className="flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    <span>User Management</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            </SidebarMenuSub>
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </SidebarMenu>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarSeparator />
+          </>
+        )}
+
+
+        <SidebarContent className="flex-1">
+          {(userRole !== 'admin' || viewMode === 'all') && (
+            <>
+              {/* Report Section */}
+              <SidebarGroup>
+                <Collapsible open={reportSectionOpen} onOpenChange={setReportSectionOpen}>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton 
+                      className="w-full justify-between px-4 py-2 font-medium"
+                      onClick={() => navigate('/reports')}
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Report
+                      </span>
+                      {reportSectionOpen ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarGroupContent>
+                      <SidebarMenu className="px-2">
+                        {/* Daily Report Subsection */}
+                        <Collapsible open={dailyReportOpen} onOpenChange={setDailyReportOpen}>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton className="w-full justify-between pl-6 text-sm">
+                              <span 
+                                className="flex items-center gap-2 flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/daily-report-projects');
+                                }}
+                              >
+                                <Calendar className="h-3 w-3" />
+                                Daily Report
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!dailyReportOpen) {
+                                      setDailyReportOpen(true); // Auto-expand if collapsed
+                                    }
+                                    setShowAddProject(true);   // Always show input
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                                {dailyReportOpen ? (
+                                  <ChevronDown className="h-3 w-3" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3" />
+                                )}
+                              </div>
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {/* Add Project Input */}
+                              {showAddProject && (
+                                <SidebarMenuSubItem>
+                                  <div className="flex items-center gap-1 px-1 py-1">
+                                    <Input
+                                      placeholder="Project name..."
+                                      value={newProjectName}
+                                      onChange={(e) => setNewProjectName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleAddProject();
+                                        } else if (e.key === 'Escape') {
+                                          setShowAddProject(false);
+                                          setNewProjectName("");
+                                        }
+                                      }}
+                                      className="h-7 text-xs"
+                                      autoFocus
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 w-5 p-0"
+                                      onClick={handleAddProject}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </SidebarMenuSubItem>
+                              )}
+                          
+                              {/* Add Folder Button */}
+                              <SidebarMenuSubItem>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start pl-2 text-xs text-muted-foreground hover:text-foreground"
+                                  onClick={() => setShowAddFolderInput(true)}
+                                >
+                                  <Plus className="h-3 w-3 mr-2" />
+                                  Create Folder
+                                </Button>
+                              </SidebarMenuSubItem>
+
+                              {/* Add Folder Input */}
+                              {showAddFolderInput && (
+                                <SidebarMenuSubItem>
+                                  <div className="flex items-center gap-1 pl-2 py-1">
+                                    <FolderPlus className="h-3 w-3" />
+                                    <Input
+                                      placeholder="Folder name..."
+                                      value={newFolderName}
+                                      onChange={(e) => setNewFolderName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleAddFolder();
+                                        } else if (e.key === 'Escape') {
+                                          setShowAddFolderInput(false);
+                                          setNewFolderName('');
+                                        }
+                                      }}
+                                      className="h-6 text-xs flex-1"
+                                      autoFocus
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 w-5 p-0"
+                                      onClick={handleAddFolder}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 w-5 p-0"
+                                      onClick={() => {
+                                        setShowAddFolderInput(false);
+                                        setNewFolderName('');
+                                      }}
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                </SidebarMenuSubItem>
+                              )}
+                          
+                              {/* Folder List */}
+                              {folders.map((folder) => (
+                                <React.Fragment key={folder._id}>
+                                  {/* Folder Item with Expand/Collapse */}
+                                  <SidebarMenuSubItem>
+                                    <div className="flex items-center justify-between w-full px-2 py-1 group">
+                                      {editingFolder === folder._id ? (
+                                        <div className="flex items-center gap-1 flex-1">
+                                          <FolderPlus className="h-3 w-3" />
+                                          <Input
+                                            value={editFolderName}
+                                            onChange={(e) => setEditFolderName(e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleSaveFolderEdit();
+                                              } else if (e.key === 'Escape') {
+                                                setEditingFolder(null);
+                                                setEditFolderName('');
+                                              }
+                                            }}
+                                            className="h-6 text-xs flex-1"
+                                            autoFocus
+                                          />
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-5 w-5 p-0"
+                                            onClick={() => {
+                                              setEditingFolder(null);
+                                              setEditFolderName('');
+                                            }}
+                                          >
+                                            ×
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <div className="flex items-center gap-1 flex-1">
                                             <Button
                                               variant="ghost"
                                               size="sm"
-                                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              className="h-5 w-5 p-0"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleFolderExpand(folder._id);
+                                              }}
                                             >
-                                              <MoreVertical className="h-3 w-3" />
+                                              {expandedFolders[folder._id] ? (
+                                                <ChevronDown className="h-3 w-3" />
+                                              ) : (
+                                                <ChevronRight className="h-3 w-3" />
+                                              )}
                                             </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end" className="w-32">
-                                            <DropdownMenuItem onClick={() => {
-                                              setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: true }));
-                                              setExpandedFolders(prev => ({ ...prev, [folder._id]: true }));
-                                            }}>
-                                              <Plus className="h-3 w-3 mr-2" />
-                                              Add Project
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleEditFolder(folder)}>
-                                              <Edit className="h-3 w-3 mr-2" />
-                                              Rename
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <AlertDialog>
-                                              <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem 
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setFolderToDelete(folder._id);
-                                                  }}
-                                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                  onSelect={(e) => {
-                                                    e.preventDefault();
-                                                    setDeleteFolderConfirmOpen(true);
-                                                  }}
+                                            <FolderPlus className="h-3 w-3" />
+                                            <span className="text-xs font-medium">{folder.name}</span>
+                                          </div>
+                                          {folder.createdBy === currentUserId && (
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
-                                                  <Trash2 className="h-3 w-3 mr-2" />
-                                                  Delete
+                                                  <MoreVertical className="h-3 w-3" />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end" className="w-32">
+                                                <DropdownMenuItem onClick={() => {
+                                                  setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: true }));
+                                                  setExpandedFolders(prev => ({ ...prev, [folder._id]: true }));
+                                                }}>
+                                                  <Plus className="h-3 w-3 mr-2" />
+                                                  Add Project
                                                 </DropdownMenuItem>
-                                              </AlertDialogTrigger>
-                                              <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                  <AlertDialogTitle>
-                                                    Delete Folder?
-                                                  </AlertDialogTitle>
-                                                  <AlertDialogDescription>
-                                                    This will delete "{folder.name}". Projects will be moved to root.
-                                                  </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                  <AlertDialogCancel onClick={() => setDeleteFolderConfirmOpen(false)}>
-                                                    Cancel
-                                                  </AlertDialogCancel>
-                                                  <AlertDialogAction 
-                                                    onClick={() => handleDeleteFolder(folder._id)}
-                                                    className="bg-red-600 hover:bg-red-700"
+                                                <DropdownMenuItem onClick={() => handleEditFolder(folder)}>
+                                                  <Edit className="h-3 w-3 mr-2" />
+                                                  Rename
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <AlertDialog>
+                                                  <AlertDialogTrigger asChild>
+                                                    <DropdownMenuItem 
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setFolderToDelete(folder._id);
+                                                      }}
+                                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                      onSelect={(e) => {
+                                                        e.preventDefault();
+                                                        setDeleteFolderConfirmOpen(true);
+                                                      }}
+                                                    >
+                                                      <Trash2 className="h-3 w-3 mr-2" />
+                                                      Delete
+                                                    </DropdownMenuItem>
+                                                  </AlertDialogTrigger>
+                                                  <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                      <AlertDialogTitle>
+                                                        Delete Folder?
+                                                      </AlertDialogTitle>
+                                                      <AlertDialogDescription>
+                                                        This will delete "{folder.name}". Projects will be moved to root.
+                                                      </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                      <AlertDialogCancel onClick={() => setDeleteFolderConfirmOpen(false)}>
+                                                        Cancel
+                                                      </AlertDialogCancel>
+                                                      <AlertDialogAction 
+                                                        onClick={() => handleDeleteFolder(folder._id)}
+                                                        className="bg-red-600 hover:bg-red-700"
+                                                      >
+                                                        Delete
+                                                      </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                  </AlertDialogContent>
+                                                </AlertDialog>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </SidebarMenuSubItem>
+
+                                  {/* Projects under Folder */}
+                                  {expandedFolders[folder._id] && (
+                                    <>
+                                      {/* Add Project Input inside Folder */}
+                                      {showAddProjectInFolder[folder._id] && (
+                                        <SidebarMenuSubItem>
+                                          <div className="flex items-center gap-1 pl-8 py-1">
+                                            <Input
+                                              placeholder="Project name..."
+                                              value={newProjectInFolderName[folder._id] || ''}
+                                              onChange={(e) => setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: e.target.value }))}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  handleAddProjectInFolder(folder._id);
+                                                } else if (e.key === 'Escape') {
+                                                  setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: false }));
+                                                  setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: '' }));
+                                                }
+                                              }}
+                                              className="h-6 text-xs flex-1"
+                                              autoFocus
+                                            />
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-5 w-5 p-0"
+                                              onClick={() => handleAddProjectInFolder(folder._id)}
+                                            >
+                                              <Plus className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-5 w-5 p-0"
+                                              onClick={() => {
+                                                setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: false }));
+                                                setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: '' }));
+                                              }}
+                                            >
+                                              ×
+                                            </Button>
+                                          </div>
+                                        </SidebarMenuSubItem>
+                                      )}
+
+                                      {/* Project List inside Folder */}
+                                      {folder.projects?.map((project) => (
+                                        <SidebarMenuSubItem key={project._id}>
+                                          <div className="flex items-center justify-between w-full pl-8 pr-2 py-1 group">
+                                            <SidebarMenuSubButton
+                                              onClick={() => handleProjectClick(project.name, project._id, 'daily')}
+                                              isActive={isProjectActive(project._id, 'daily')}
+                                              className={`flex-1 text-xs cursor-pointer ${
+                                                isProjectActive(project._id, 'daily') 
+                                                  ? 'bg-blue-100 text-blue-900 font-medium' 
+                                                  : ''
+                                              }`}
+                                            >
+                                              {project.name}
+                                            </SidebarMenuSubButton>
+                                            {project.createdBy === currentUserId && (
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                                   >
-                                                    Delete
-                                                  </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                              </AlertDialogContent>
-                                            </AlertDialog>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
+                                                    <MoreVertical className="h-3 w-3" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-32">
+                                                  <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
+                                                    <Edit className="h-3 w-3 mr-2" />
+                                                    Rename
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
+                                                    <Copy className="h-3 w-3 mr-2" />
+                                                    Duplicate
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem onClick={() => openMoveProjectDialog(project)}>
+                                                    <FolderInput className="h-3 w-3 mr-2" />
+                                                    Move to Folder
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuSeparator />
+                                                  <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                      <DropdownMenuItem 
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setProjectToDelete(project.name);
+                                                        }}
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        onSelect={(e) => {
+                                                          e.preventDefault();
+                                                          setDeleteConfirmOpen(true);
+                                                        }}
+                                                      >
+                                                        <Trash2 className="h-3 w-3 mr-2" />
+                                                        Delete
+                                                      </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                      <AlertDialogHeader>
+                                                        <AlertDialogTitle>
+                                                          Delete Project?
+                                                        </AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                          This will delete "{project.name}" and ALL its reports.
+                                                        </AlertDialogDescription>
+                                                      </AlertDialogHeader>
+                                                      <AlertDialogFooter>
+                                                        <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>
+                                                          Cancel
+                                                        </AlertDialogCancel>
+                                                        <AlertDialogAction 
+                                                          onClick={() => {
+                                                            console.log("🔥 SIDEBAR ALERT: Delete clicked for project:", project.name);
+                                                            handleDeleteProject(project.name);
+                                                          }}
+                                                          className="bg-red-600 hover:bg-red-700"
+                                                        >
+                                                          Delete
+                                                        </AlertDialogAction>
+                                                      </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                  </AlertDialog>
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            )}
+                                          </div>
+                                        </SidebarMenuSubItem>
+                                      ))}
+
+                                      {(!folder.projects || folder.projects.length === 0) && !showAddProjectInFolder[folder._id] && (
+                                        <SidebarMenuSubItem>
+                                          <div className="px-8 py-1 text-xs text-muted-foreground italic">
+                                            No projects in this folder
+                                          </div>
+                                        </SidebarMenuSubItem>
                                       )}
                                     </>
                                   )}
-                                </div>
-                              </SidebarMenuSubItem>
-
-                              {/* Projects under Folder */}
-                              {expandedFolders[folder._id] && (
-                                <>
-                                  {/* Add Project Input inside Folder */}
-                                  {showAddProjectInFolder[folder._id] && (
-                                    <SidebarMenuSubItem>
-                                      <div className="flex items-center gap-1 pl-8 py-1">
-                                        <Input
-                                          placeholder="Project name..."
-                                          value={newProjectInFolderName[folder._id] || ''}
-                                          onChange={(e) => setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: e.target.value }))}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                              handleAddProjectInFolder(folder._id);
-                                            } else if (e.key === 'Escape') {
-                                              setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: false }));
-                                              setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: '' }));
-                                            }
-                                          }}
-                                          className="h-6 text-xs flex-1"
-                                          autoFocus
-                                        />
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-5 w-5 p-0"
-                                          onClick={() => handleAddProjectInFolder(folder._id)}
-                                        >
-                                          <Plus className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-5 w-5 p-0"
-                                          onClick={() => {
-                                            setShowAddProjectInFolder(prev => ({ ...prev, [folder._id]: false }));
-                                            setNewProjectInFolderName(prev => ({ ...prev, [folder._id]: '' }));
-                                          }}
-                                        >
-                                          ×
-                                        </Button>
-                                      </div>
-                                    </SidebarMenuSubItem>
-                                  )}
-
-                                  {/* Project List inside Folder */}
-                                  {folder.projects?.map((project) => (
-                                    <SidebarMenuSubItem key={project._id}>
-                                      <div className="flex items-center justify-between w-full pl-8 pr-2 py-1 group">
-                                        <SidebarMenuSubButton
-                                          onClick={() => handleProjectClick(project.name, project._id, 'daily')}
-                                          isActive={isProjectActive(project._id, 'daily')}
-                                          className={`flex-1 text-xs cursor-pointer ${
-                                            isProjectActive(project._id, 'daily') 
-                                              ? 'bg-blue-100 text-blue-900 font-medium' 
-                                              : ''
-                                          }`}
-                                        >
-                                          {project.name}
-                                        </SidebarMenuSubButton>
-                                        {project.createdBy === currentUserId && (
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                              >
-                                                <MoreVertical className="h-3 w-3" />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-32">
-                                              <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
-                                                <Edit className="h-3 w-3 mr-2" />
-                                                Rename
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
-                                                <Copy className="h-3 w-3 mr-2" />
-                                                Duplicate
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => openMoveProjectDialog(project)}>
-                                                <FolderInput className="h-3 w-3 mr-2" />
-                                                Move to Folder
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                  <DropdownMenuItem 
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setProjectToDelete(project.name);
-                                                    }}
-                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                    onSelect={(e) => {
-                                                      e.preventDefault();
-                                                      setDeleteConfirmOpen(true);
-                                                    }}
-                                                  >
-                                                    <Trash2 className="h-3 w-3 mr-2" />
-                                                    Delete
-                                                  </DropdownMenuItem>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                  <AlertDialogHeader>
-                                                    <AlertDialogTitle>
-                                                      Delete Project?
-                                                    </AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                      This will delete "{project.name}" and ALL its reports.
-                                                    </AlertDialogDescription>
-                                                  </AlertDialogHeader>
-                                                  <AlertDialogFooter>
-                                                    <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>
-                                                      Cancel
-                                                    </AlertDialogCancel>
-                                                    <AlertDialogAction 
-                                                      onClick={() => {
-                                                        console.log("🔥 SIDEBAR ALERT: Delete clicked for project:", project.name);
-                                                        handleDeleteProject(project.name);
-                                                      }}
-                                                      className="bg-red-600 hover:bg-red-700"
-                                                    >
-                                                      Delete
-                                                    </AlertDialogAction>
-                                                  </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                              </AlertDialog>
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
-                                        )}
-                                      </div>
-                                    </SidebarMenuSubItem>
-                                  ))}
-
-                                  {(!folder.projects || folder.projects.length === 0) && !showAddProjectInFolder[folder._id] && (
-                                    <SidebarMenuSubItem>
-                                      <div className="px-8 py-1 text-xs text-muted-foreground italic">
-                                        No projects in this folder
-                                      </div>
-                                    </SidebarMenuSubItem>
-                                  )}
-                                </>
-                              )}
-                            </React.Fragment>
-                          ))}
+                                </React.Fragment>
+                              ))}
 
                           {/* Root Projects (without folder) */}
                           {rootProjects.length > 0 && (
@@ -1381,7 +1463,9 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
             </Collapsible>
           </SidebarGroup>
 
-          <SidebarSeparator />
+              <SidebarSeparator />
+            </>
+          )}
 
           {/* Other Forms Section */}
           <SidebarGroup>
@@ -1399,8 +1483,8 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <Link to="/admin-form" className="flex items-center gap-2">
-                      <UserCheck className="h-4 w-4" />
-                      <span>Admin Form</span>
+                      <ClipboardList className="h-4 w-4" />
+                      <span>Other Form</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

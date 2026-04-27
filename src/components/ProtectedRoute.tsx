@@ -6,11 +6,13 @@ import { useToast } from "@/hooks/use-toast";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   fallbackPath?: string;
+  requiredRole?: string;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  fallbackPath = "/login" 
+  fallbackPath = "/login",
+  requiredRole
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +30,24 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         
         if (result.success) {
           setIsAuthenticated(true);
+
+          // 🎯 ADD ROLE CHECK
+          if (requiredRole) {
+            const userRole = result.user?.role;
+            console.log("🔒 PROTECTED ROUTE: Checking role", { requiredRole, userRole });
+            
+            if (userRole !== requiredRole) {
+              console.log("🔒 PROTECTED ROUTE: Role check failed", { requiredRole, userRole });
+              setIsAuthenticated(false);
+              toast({
+                title: "Access Denied",
+                description: `${requiredRole} access required to view this page`,
+                variant: "destructive",
+              });
+              navigate(fallbackPath);
+              return null;
+            }
+          }
         } else {
           setIsAuthenticated(false);
           toast({
