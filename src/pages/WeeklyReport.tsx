@@ -2703,7 +2703,17 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     hsePermits: hsesData?.permit || [],
     hseFirstAid: hsesData?.firstAidAccident,
     hseOtherConcerns: hsesData?.otherActivities,
-    hsePhotoReferences: hsesData?.hsePhotoReferences,
+    hsePhotoReferences: (() => {
+      console.log(`🔍 HSE Data being passed to mapper:`, {
+        hsesData,
+        hsePhotoReferences: hsesData?.hsePhotoReferences,
+        hasHseData: !!hsesData,
+        hasPhotoReferences: !!hsesData?.hsePhotoReferences,
+        hseToolboxMeetingLength: hsesData?.hsePhotoReferences?.hseToolboxMeeting?.length || 0,
+        hseActivityPhotosLength: hsesData?.hsePhotoReferences?.hseActivityPhotos?.length || 0
+      });
+      return hsesData?.hsePhotoReferences;
+    })(),
     weekDates: (() => {
       // Parse "06-Mar-26 ~ 12-Mar-26" format from sharedData.dateRange
       if (!sharedData.dateRange) return ['', '', '', '', '', '', ''];

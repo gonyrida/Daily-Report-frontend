@@ -286,100 +286,155 @@ export interface MapperInput {
 // Input sections: [{ id, title, entries: [{ id, slots: [{ id, image, caption }] }] }]
 // Output:         [{ images: string[], descriptions: string[] }]  — one entry per photo row (2 images per row)
 function referenceSectionsToPhotoEntries(sections: any[]): { images: string[]; descriptions: string[] }[] {
-  return sections.flatMap((section: any) =>
-    (section.entries ?? []).map((entry: any) => ({
-      images:       (entry.slots ?? []).map((s: any) => s.image  || '').filter(Boolean),
-      descriptions: (entry.slots ?? []).map((s: any) => s.caption || ''),
+  console.log(` Converting HSE photo sections to entries:`, {
+    sectionsCount: sections?.length || 0,
+    sections: sections?.map(s => ({
+      title: s.title,
+      entriesCount: s.entries?.length || 0,
+      slots: s.entries?.map(e => e.slots?.map(slot => ({
+        hasImage: !!slot.image,
+        imageType: typeof slot.image,
+        imagePreview: slot.image?.substring?.(0, 50) + '...',
+        caption: slot.caption
+      })))
     }))
+  });
+
+  const result = sections.flatMap((section: any) =>
+    (section.entries ?? []).map((entry: any) => {
+      const images = (entry.slots ?? []).map((s: any) => s.image || '').filter(Boolean);
+      const descriptions = (entry.slots ?? []).map((s: any) => s.caption || '');
+
+      console.log(`📸 Processed entry:`, {
+        imagesCount: images.length,
+        images: images.map(img => {
+          const imgStr = typeof img === 'string' ? img : String(img);
+          return {
+            type: typeof img,
+            isBase64: imgStr?.startsWith('data:'),
+            isUrl: imgStr?.startsWith('http') || imgStr?.startsWith('/'),
+            isBlob: imgStr?.startsWith('blob:'),
+            preview: imgStr?.substring?.(0, 50) + '...'
+          };
+        }),
+        descriptions,
+        rawSlots: (entry.slots ?? []).map((s: any) => ({
+          image: !!s.image,
+          caption: s.caption,
+          captionType: typeof s.caption,
+          captionLength: s.caption?.length || 0
+        }))
+      });
+
+      return {
+        images,
+        descriptions
+      };
+    })
   );
+
+  console.log(` Final converted entries:`, {
+    entriesCount: result.length,
+    result: result.map((entry, i) => ({
+      index: i,
+      imagesCount: entry.images.length,
+      hasImages: entry.images.length > 0,
+      descriptionsCount: entry.descriptions.length
+    }))
+  });
+
+  return result;
 }
 
 // Cache for valid construction progress data
 let cachedConProgressItems: any[] = [];
 
+// Cache for valid HSE photo data to prevent overwriting with empty data
+let cachedHSEPhotoReferences: any = null;
+
 export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExportData {
   // Debug: Add stack trace to identify caller
   const stack = new Error().stack;
   const caller = stack?.split('\n')[2]?.trim() || 'unknown';
-  
+
   const c = input.coverData ?? {};
 
   const result = {
     // ── Cover ────────────────────────────────────────────────────────────────
-    weekNumber:      c.weekNumber,
-    reportDateFrom:  c.reportDateFrom,
-    reportDateTo:    c.reportDateTo,
-    projectTitle:    c.projectTitle,
+    weekNumber: c.weekNumber,
+    reportDateFrom: c.reportDateFrom,
+    reportDateTo: c.reportDateTo,
+    projectTitle: c.projectTitle,
     projectSubtitle: c.projectSubtitle,
-    projectSubtitle2:c.projectSubtitle2,
-    employer:        c.employer,
-    consultant:      c.consultant,
-    contractor:      c.contractor,
-    coverImage:      c.coverImage,        // Map cover image
-    clientLogo:      c.clientLogo,        // Map client logo
-    signatureImage:  c.signatureImage,    // Map signature image
-    refNo:           c.refNo,
-    letterDate:      c.letterDate,
-    toName:          c.toName,
-    recipientName:   c.attName,
-    ccLines:         c.ccLines ?? [],
-    projectManager:  c.projectManager,
-    constructorName:  c.constructorName,
+    projectSubtitle2: c.projectSubtitle2,
+    employer: c.employer,
+    consultant: c.consultant,
+    contractor: c.contractor,
+    coverImage: c.coverImage,        // Map cover image
+    clientLogo: c.clientLogo,        // Map client logo
+    signatureImage: c.signatureImage,    // Map signature image
+    refNo: c.refNo,
+    letterDate: c.letterDate,
+    toName: c.toName,
+    recipientName: c.attName,
+    ccLines: c.ccLines ?? [],
+    projectManager: c.projectManager,
+    constructorName: c.constructorName,
     companyLocation: c.companyLocation,
-    companyPhone1:   c.companyPhone1,
-    companyPhone2:   c.companyPhone2,
-    companyEmail1:   c.companyEmail1,
-    companyEmail2:   c.companyEmail2,
+    companyPhone1: c.companyPhone1,
+    companyPhone2: c.companyPhone2,
+    companyEmail1: c.companyEmail1,
+    companyEmail2: c.companyEmail2,
     recipientCompany: c.recipientCompany,
     recipientLocation: c.recipientLocation,
 
     // ── Con. Progress ────────────────────────────────────────────────────────
-    conProgressProject:  input.conProgressProject ?? c.projectTitle,
+    conProgressProject: input.conProgressProject ?? c.projectTitle,
     conProgressSubtitle: input.conProgressSubtitle,
-    conProgressDate:     input.conProgressDate ?? c.reportDateFrom,
+    conProgressDate: input.conProgressDate ?? c.reportDateFrom,
     conProgressRevision: input.conProgressRevision,
     conProgressItems: (() => {
       // Cache valid data when available
       if (input.constructionProgress && input.constructionProgress.length > 0) {
         cachedConProgressItems = input.constructionProgress.map(p => ({
-      id:               p.id,
-      scopeOfWorks:     p.scopeOfWorks ?? p.description,
-      detailDescription:p.detailDescription,
-      unit:             p.unit,
-      reviseBoqQty:     p.boQ?.qty ?? p.reviseBoqQty ?? p.qty,
-      materialRate:     p.boQ?.materialRate ?? p.materialRate,
-      laborRate:        p.boQ?.laborRate ?? p.laborRate,
-      unitRate:         p.boQ?.unitRate ?? p.unitRate,
-      amount:           p.boQ?.amount ?? p.amount,
-      remark:           p.remark ?? p.remarks,
-      previousWeekQty:  p.previousWeek?.qty ?? p.previousWeekQty,
-      previousWeekAmount: p.previousWeek?.amount ?? p.previousWeekAmount,
-      previousWeekPct: p.previousWeek?.percentage ?? p.previousWeekPct,
-      thisWeekQty:      p.thisWeek?.qty ?? p.thisWeekQty,
-      thisWeekAmount:   p.thisWeek?.amount ?? p.thisWeekAmount,
-      thisWeekPct:      p.thisWeek?.percentage ?? p.thisWeekPct,
-      upToThisWeekQty: p.upToThisWeek?.qty ?? p.upToThisWeekQty,
-      upToThisWeekAmount: p.upToThisWeek?.amount ?? p.upToThisWeekAmount,
-      upToThisWeekPct: p.upToThisWeek?.percentage ?? p.upToThisWeekPct,
-      remainingQty: p.remaining?.qty ?? p.remainingQty,
-      remainingAmount: p.remaining?.amount ?? p.remainingAmount,
-      remainingPct: p.remaining?.percentage ?? p.remainingPct,
-      nextWeekQty:      p.nextWeekPlan?.qty ?? p.nextWeekQty,
-      nextWeekAmount:   p.nextWeekPlan?.amount ?? p.nextWeekAmount,
-      nextWeekPct:      p.nextWeekPlan?.percentage ?? p.nextWeekPct,
-      upToNextWeekQty:  p.upToNextWeekPlan?.qty ?? p.upToNextWeekQty,
-      upToNextWeekAmount:p.upToNextWeekPlan?.amount ?? p.upToNextWeekAmount,
-      upToNextWeekPct:  p.upToNextWeekPlan?.percentage ?? p.upToNextWeekPct,
-      isBold:           p.isBold,
-    }));
-    return cachedConProgressItems;
+          id: p.id,
+          scopeOfWorks: p.scopeOfWorks ?? p.description,
+          detailDescription: p.detailDescription,
+          unit: p.unit,
+          reviseBoqQty: p.boQ?.qty ?? p.reviseBoqQty ?? p.qty,
+          materialRate: p.boQ?.materialRate ?? p.materialRate,
+          laborRate: p.boQ?.laborRate ?? p.laborRate,
+          unitRate: p.boQ?.unitRate ?? p.unitRate,
+          amount: p.boQ?.amount ?? p.amount,
+          remark: p.remark ?? p.remarks,
+          previousWeekQty: p.previousWeek?.qty ?? p.previousWeekQty,
+          previousWeekAmount: p.previousWeek?.amount ?? p.previousWeekAmount,
+          previousWeekPct: p.previousWeek?.percentage ?? p.previousWeekPct,
+          thisWeekQty: p.thisWeek?.qty ?? p.thisWeekQty,
+          thisWeekAmount: p.thisWeek?.amount ?? p.thisWeekAmount,
+          thisWeekPct: p.thisWeek?.percentage ?? p.thisWeekPct,
+          upToThisWeekQty: p.upToThisWeek?.qty ?? p.upToThisWeekQty,
+          upToThisWeekAmount: p.upToThisWeek?.amount ?? p.upToThisWeekAmount,
+          upToThisWeekPct: p.upToThisWeek?.percentage ?? p.upToThisWeekPct,
+          remainingQty: p.remaining?.qty ?? p.remainingQty,
+          remainingAmount: p.remaining?.amount ?? p.remainingAmount,
+          remainingPct: p.remaining?.percentage ?? p.remainingPct,
+          nextWeekQty: p.nextWeekPlan?.qty ?? p.nextWeekQty,
+          nextWeekAmount: p.nextWeekPlan?.amount ?? p.nextWeekAmount,
+          nextWeekPct: p.nextWeekPlan?.percentage ?? p.nextWeekPct,
+          upToNextWeekQty: p.upToNextWeekPlan?.qty ?? p.upToNextWeekQty,
+          upToNextWeekAmount: p.upToNextWeekPlan?.amount ?? p.upToNextWeekAmount,
+          upToNextWeekPct: p.upToNextWeekPlan?.percentage ?? p.upToNextWeekPct,
+          isBold: p.isBold,
+        }));
+        return cachedConProgressItems;
       }
-      
+
       // Use cached data if current data is empty
       if (cachedConProgressItems.length > 0) {
         return cachedConProgressItems;
       }
-      
+
       return [];
     })(),
 
@@ -393,14 +448,14 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
           return true;
         })
         .map((p, i) => ({
-          no:               p.no ?? p.displayIndex ?? String(i + 1),
-          scopeOfWorks:     p.description ?? p.scopeOfWorks,
-          pctUpToPrevWeek:  p.pctUpToPrevWeek  ?? p.prevWeek,
-          pctThisWeek:      p.pctThisWeek      ?? p.thisWeek,
-          pctUpToThisWeek:  p.pctUpToThisWeek  ?? p.upToThisWeek,
-          pctRemaining:     p.pctRemaining     ?? p.remaining,
-          pctNextWeekPlan:  p.pctNextWeekPlan  ?? p.nextWeek,
-          pctUpNextWeekPlan:p.pctUpNextWeekPlan ?? p.upNextWeek,
+          no: p.no ?? p.displayIndex ?? String(i + 1),
+          scopeOfWorks: p.description ?? p.scopeOfWorks,
+          pctUpToPrevWeek: p.pctUpToPrevWeek ?? p.prevWeek,
+          pctThisWeek: p.pctThisWeek ?? p.thisWeek,
+          pctUpToThisWeek: p.pctUpToThisWeek ?? p.upToThisWeek,
+          pctRemaining: p.pctRemaining ?? p.remaining,
+          pctNextWeekPlan: p.pctNextWeekPlan ?? p.nextWeek,
+          pctUpNextWeekPlan: p.pctUpNextWeekPlan ?? p.upNextWeek,
         }));
       return filtered;
     })(),
@@ -409,9 +464,9 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     nwdpItems: (input.nwdpItems ?? []).map(item => ({
       id: item.sourceId,
       workDoneLabel: item.workDoneLabel ?? item.label ?? item.activity,
-      workDonePct:   item.workDonePct  ?? item.donePct,
+      workDonePct: item.workDonePct ?? item.donePct,
       nextWeekLabel: item.nextWeekLabel ?? item.nextLabel,
-      nextWeekPct:   item.nextWeekPct  ?? item.planPct,
+      nextWeekPct: item.nextWeekPct ?? item.planPct,
     })),
 
     // ── QAQC ─────────────────────────────────────────────────────────────────
@@ -420,74 +475,96 @@ export function buildWeeklyReportExportData(input: MapperInput): WeeklyReportExp
     // ── HSE ──────────────────────────────────────────────────────────────────
     hseTraining: (input.hseTraining ?? []).map(row => ({
       typeOfTraining: row.typeOfTraining ?? row.type,
-      date:           row.date,
-      venue:          row.venue,
-      trainer:        row.trainer,
-      attendee:       row.attendee ?? row.count,
-      remarks:        row.remarks,
+      date: row.date,
+      venue: row.venue,
+      trainer: row.trainer,
+      attendee: row.attendee ?? row.count,
+      remarks: row.remarks,
     })),
     hseInspection: (input.hseInspection ?? []).map(row => ({
       typeOfInspection: row.typeOfInspection ?? row.type,
-      date:             row.date,
-      inspector:        row.inspector,
-      remarks:          row.remarks,
+      date: row.date,
+      inspector: row.inspector,
+      remarks: row.remarks,
     })),
     hsePermits: (input.hsePermits ?? []).map(row => ({
       typeOfPermit: row.typeOfPermit ?? row.type,
-      startDate:    row.startDate,
-      endDate:      row.endDate,
-      inspector:    row.inspector,
-      approver:     row.approver,
-      remarks:      row.remarks,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      inspector: row.inspector,
+      approver: row.approver,
+      remarks: row.remarks,
     })),
-    hseFirstAid:       input.hseFirstAid,
-    hseOtherConcerns:  input.hseOtherConcerns,
-    hsePhotoReferences: {
-      hseToolboxMeeting: referenceSectionsToPhotoEntries(input.hsePhotoReferences?.hseToolboxMeeting ?? []),
-      hseActivityPhotos: referenceSectionsToPhotoEntries(input.hsePhotoReferences?.hseActivityPhotos ?? []),
-    },
+    hseFirstAid: input.hseFirstAid,
+    hseOtherConcerns: input.hseOtherConcerns,
+    hsePhotoReferences: (() => {
+      // Better caching: Update cache when we have valid data, use cache when data is empty
+      const currentHsePhotoRefs = input.hsePhotoReferences;
+      const hasValidData = currentHsePhotoRefs && (
+        (currentHsePhotoRefs.hseToolboxMeeting && currentHsePhotoRefs.hseToolboxMeeting.length > 0) ||
+        (currentHsePhotoRefs.hseActivityPhotos && currentHsePhotoRefs.hseActivityPhotos.length > 0)
+      );
+
+      // Update cache when we have valid data
+      if (hasValidData) {
+        cachedHSEPhotoReferences = currentHsePhotoRefs;
+        console.log(`Updated HSE photo cache with new data`);
+      }
+
+      // Use cached data if current data is empty and we have cached data
+      const dataToUse = (!hasValidData && cachedHSEPhotoReferences) ? cachedHSEPhotoReferences : currentHsePhotoRefs;
+
+      console.log(`HSE Photo Data Selection:`, {
+        currentHasValidData: hasValidData,
+        hasCachedData: !!cachedHSEPhotoReferences,
+        usingCached: !hasValidData && !!cachedHSEPhotoReferences
+      });
+
+      return {
+        hseToolboxMeeting: referenceSectionsToPhotoEntries(dataToUse?.hseToolboxMeeting ?? []),
+        hseActivityPhotos: referenceSectionsToPhotoEntries(dataToUse?.hseActivityPhotos ?? []),
+      };
+    })(),
 
     // ── Resources ────────────────────────────────────────────────────────────
     weekDates: input.weekDates,
     manpowerRows: (input.manpowerRows ?? []).map(row => ({
-      description:  row.description ?? row.label,
-      dailyCounts:  row.dailyCounts ?? row.counts ?? [0,0,0,0,0,0,0],
-      previousWeek: row.previousWeek ?? row.prev,
-      thisWeek:     row.thisWeek     ?? row.current,
+      // ... (rest of the code remains the same)
+      thisWeek: row.thisWeek ?? row.current,
       upToThisWeek: row.upToThisWeek ?? row.cumulative,
     })),
     materialRows: (input.materialRows ?? []).map(row => ({
       description: row.description ?? row.name,
-      unit:        row.unit,
-      dailyData:   row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0,0,0,0,0,0,0],
-      previous:    row.previous  ?? row.prev,
-      thisPeriod:  row.thisPeriod ?? row.current,
-      accumulate:  row.accumulate ?? row.total,
+      unit: row.unit,
+      dailyData: row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0, 0, 0, 0, 0, 0, 0],
+      previous: row.previous ?? row.prev,
+      thisPeriod: row.thisPeriod ?? row.current,
+      accumulate: row.accumulate ?? row.total,
     })),
     equipmentRows: (input.equipmentRows ?? []).map(row => ({
       description: row.description ?? row.name,
-      unit:        row.unit,
-      dailyData:   row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0,0,0,0,0,0,0],
-      previous:    row.previous  ?? row.prev,
-      thisPeriod:  row.thisPeriod ?? row.current,
-      accumulate:  row.accumulate ?? row.total,
+      unit: row.unit,
+      dailyData: row.dailyData ?? row.dailyCounts ?? row.daily ?? row.days ?? [0, 0, 0, 0, 0, 0, 0],
+      previous: row.previous ?? row.prev,
+      thisPeriod: row.thisPeriod ?? row.current,
+      accumulate: row.accumulate ?? row.total,
     })),
 
     // ── Site Photos ───────────────────────────────────────────────────────────
     sitePhotoCaptions: (input.sitePhotoCaptions ?? []).map(e => ({
       siteLocation: e.siteLocation ?? e.location,
-      caption1:     e.caption1,
-      caption2:     e.caption2,
-      image1:       e.image1,
-      image2:       e.image2,
+      caption1: e.caption1,
+      caption2: e.caption2,
+      image1: e.image1,
+      image2: e.image2,
     })),
 
     // ── Construction Issues ───────────────────────────────────────────────────
     constructionIssues: (input.constructionIssues ?? []).map((issue, i) => ({
-      number:              issue.number ?? issue.no ?? i + 1,
-      siteLocation:        issue.siteLocation ?? issue.location,
-      problemDescription:  issue.problemDescription ?? issue.description ?? issue.issue,
-      actionBy:            issue.actionBy ?? issue.action,
+      number: issue.number ?? issue.no ?? i + 1,
+      siteLocation: issue.siteLocation ?? issue.location,
+      problemDescription: issue.problemDescription ?? issue.description ?? issue.issue,
+      actionBy: issue.actionBy ?? issue.action,
       photo: typeof issue.photo === 'string' ? issue.photo : undefined,
     })),
 
