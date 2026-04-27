@@ -24,8 +24,6 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 		refetch,
 	} = useMaterials();
 
-	console.log("This is the materials", materials)
-
 	const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [editingMaterial, setEditingMaterial] = useState<MaterialItem | null>(null);

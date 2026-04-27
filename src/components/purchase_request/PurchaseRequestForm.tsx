@@ -796,11 +796,24 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		const purposesList = structuredClone(prSummaryData.summary.materialsActual);
 		const currentPurposeIdx = purposesList.findIndex((item: any) => item.purpose === formData.purpose);
 		purposesList[currentPurposeIdx]["actualTotal"] += formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+		const requestsList = structuredClone(prSummaryData.reports);
+		if (!formData._id) {
+			requestsList.push({
+				grandTotal: formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+				items: formData.items,
+				label: `MR# ${prSummaryData.summary.project.counter + 1}`,
+				purpose: formData.purpose,
+				requestDescription: formData.requestDescription,
+				requestRemarks: formData.requestRemarks
+			});
+		}
 		try {
 			const url = await exportPurchaseRequestPDF({
 				...formData,
 				requestDate: new Date(formData.requestDate).toISOString().split('T')[0],
 				...prSummaryData,
+				reports: requestsList,
 				summary: {
 					...prSummaryData.summary,
 					materialsActual: purposesList
