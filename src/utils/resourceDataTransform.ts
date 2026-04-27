@@ -361,3 +361,51 @@ export const transformResourcesToExcelFormat = (resources: Resources | null | un
     weekDates: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu']
   };
 };
+
+/**
+ * Transform HSE data to Excel export format
+ * Converts backend HSES format to the format expected by Weeklyreportexcelmapper
+ */
+export const transformHSEToExcelFormat = (hsesData: any) => {
+  if (!hsesData) {
+    return {
+      hseTraining: [],
+      hseInspection: [],
+      hsePermits: [],
+      hseFirstAid: '',
+      hseOtherConcerns: '',
+      hsePhotoReferences: { hseToolboxMeeting: [], hseActivityPhotos: [] }
+    };
+  }
+
+  return {
+    hseTraining: (hsesData.training || []).map((row: any) => ({
+      typeOfTraining: row.typeOfTraining || row.type,
+      date: row.date,
+      venue: row.venue,
+      trainer: row.trainer,
+      attendee: row.attendee || row.count,
+      remarks: row.remarks
+    })),
+    hseInspection: (hsesData.inspection || []).map((row: any) => ({
+      typeOfInspection: row.typeOfInspection || row.type,
+      date: row.date,
+      inspector: row.inspector,
+      remarks: row.remarks
+    })),
+    hsePermits: (hsesData.permit || []).map((row: any) => ({
+      typeOfPermit: row.typeOfPermit || row.type,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      inspector: row.inspector,
+      approver: row.approver,
+      remarks: row.remarks
+    })),
+    hseFirstAid: hsesData.firstAidAccident || '',
+    hseOtherConcerns: hsesData.otherActivities || '',
+    hsePhotoReferences: {
+      hseToolboxMeeting: hsesData.hsePhotoReferences?.hseToolboxMeeting || [],
+      hseActivityPhotos: hsesData.hsePhotoReferences?.hseActivityPhotos || []
+    }
+  };
+};

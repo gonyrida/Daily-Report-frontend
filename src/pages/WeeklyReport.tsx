@@ -28,7 +28,7 @@ import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } 
 import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
-import { transformResourcesToExcelFormat } from "@/utils/resourceDataTransform";
+import { transformResourcesToExcelFormat, transformHSEToExcelFormat } from "@/utils/resourceDataTransform";
 import { exportWeeklyReportToExcel } from "@/lib/weeklyreportexcel";
 import { exportWeeklyReportToPdf } from "@/lib/weeklyreportpdf";
 import {
@@ -2378,6 +2378,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         designConstruction: sharedData.designNConstruction || 'Design and construction details will be added here.',
         // Add resources data if available
         ...transformResourcesToExcelFormat(resourcesData),
+        // Add HSE data if available
+        ...transformHSEToExcelFormat(hsesData),
         // Add site photos if available - transform ReferenceSection format to SitePhotoEntry format
         sitePhotoCaptions: (() => {
           if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
@@ -2404,13 +2406,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
-        // Add HSE data if available
-        hseTraining: [],
-        hseInspection: [],
-        hsePermits: [],
-        hseFirstAid: '',
-        hseOtherConcerns: '',
-        hsePhotoReferences: { hseToolboxMeeting: [], hseActivityPhotos: [] },
         // Pass actual QAQC data — handles both formats:
         // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
         // 2. Frontend TableData format (after DB load): { '4.1': [rows], ... }
