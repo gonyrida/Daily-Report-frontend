@@ -103,24 +103,11 @@ const PendingApprovalsTab = ({
         // Find the request to get the workflow step
         const req = requests.find(r => r._id === reqId);
         if (!req) continue;
-        console.log('Approving request:', req);
         // Find the user's workflow step (role)
         const step = req.approvalWorkflow?.find(w => w.backupApprover === profile.id || w.approver === profile.id);
         const role = step?.role || 'approved';
         await apiPut(`/purchase-requests/${reqId}/status`, {
           status: 'approved',  // Changed from `role` to `'approved'`
-          approverId: profile.id,
-          notes: approveNotes,
-          role
-        });
-        console.log('=== APPROVAL DEBUG START ===');
-        console.log('Request ID:', reqId);
-        console.log('Full request object:', req);
-        console.log('User profile:', profile);
-        console.log('Found workflow step:', step);
-        console.log('Role being sent:', role);
-        console.log('API payload:', {
-          status: 'approved',
           approverId: profile.id,
           notes: approveNotes,
           role
@@ -277,8 +264,6 @@ const PendingApprovalsTab = ({
     if (userDetails?.firstName) {
       return `Pending on ${userDetails.firstName} ${userDetails.lastName}`;
     }
-
-    console.log('This is user details',userDetails)
     
     return 'Pending';
   };
@@ -286,7 +271,6 @@ const PendingApprovalsTab = ({
   const handleViewDetail = async (request) => {
     setLoadingRequest(true);
     setShowDetailsModal(true);
-    console.log("This is the request sent to detail from pending: ", request)
     try {
       const approversFromWorkflow = {
         preparedBy: request.approvalWorkflow.find(w => w.role === 'prepared')?.approver || '',

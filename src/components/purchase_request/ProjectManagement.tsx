@@ -116,14 +116,12 @@ const ProjectManagement = ({ projects, loadingProjects, onRefresh }) => {
     }
   };
 
-  // console.log('I am rendering');
-
   return (
     <div className="space-y-6">
       {/* Card Container */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-xl font-semibold">Project(s)</CardTitle>
+          <CardTitle className="text-xl font-semibold">{projects.length > 0 ? `${projects.length} ` : ''}Project(s)</CardTitle>
           <div className="flex gap-2">
             <Button 
               variant="default" 

@@ -79,6 +79,7 @@ const PurchaseRequest = ({onRefresh}) => {
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [requests, setRequests] = useState([]);
+  const [allRequests, setAllRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -283,7 +284,6 @@ const PurchaseRequest = ({onRefresh}) => {
         const result = await response.json();
         if (result.success) {
           setAllUsers(result.data);
-          // console.log('✅ Users loaded:', result.data);
         }
       } catch (error) {
         toast({
@@ -298,32 +298,21 @@ const PurchaseRequest = ({onRefresh}) => {
     fetchUsers();
   }, []);
 
-  // Add tab-specific fetching:
+  // Add my-request tab fetching:
   useEffect(() => {
     const fetchRequests = async () => {
       setLoadingRequests(true);
       try {
         // Build query params
         const params = new URLSearchParams();
-        if (activeTab === 'my-requests') {
-          params.set('page', pagination.page.toString());
-          params.set('limit', pagination.limit.toString());
-          if (statusFilter) params.set('status', statusFilter);
-          if (projectFilter) params.set('subProject', projectFilter);
-          if (purposeFilter) params.set('purpose', purposeFilter);
-        } else if (activeTab === 'all-mrs') {
-          params.set('page', allRequestsPagination.page.toString());
-          params.set('limit', allRequestsPagination.limit.toString());
-          if (allStatusFilter) params.set('status', allStatusFilter);
-          if (allProjectFilter) params.set('subProject', allProjectFilter);
-          if (allPurposeFilter) params.set('purpose', allPurposeFilter);
-          if (allRequesterFilter) params.set('requester', allRequesterFilter);
-        }
+        params.set('page', pagination.page.toString());
+        params.set('limit', pagination.limit.toString());
+        if (statusFilter) params.set('status', statusFilter);
+        if (projectFilter) params.set('subProject', projectFilter);
+        if (purposeFilter) params.set('purpose', purposeFilter);
         
         // Use different endpoints based on active tab
-        const baseEndpoint = activeTab === 'my-requests' 
-          ? '/purchase-requests/my-requests' 
-          : '/purchase-requests';
+        const baseEndpoint = '/purchase-requests/my-requests';
         const endpoint = `${baseEndpoint}${params.toString() ? `?${params.toString()}` : ''}`;
         
         const response = await apiGet(endpoint);
@@ -331,17 +320,13 @@ const PurchaseRequest = ({onRefresh}) => {
         if (result.success) {
           setRequests(result.data);
           if (result.pagination) {
-            if (activeTab === 'my-requests') {
-              setPagination(result.pagination);
-            } else if (activeTab === 'all-mrs') {
-              setAllRequestsPagination(result.pagination);
-            }
+            setPagination(result.pagination);
           }
         }
       } catch (error) {
         toast({
           title: "Error",
-          description: "Failed to load requests"
+          description: "Failed to your requests"
         });
       } finally {
         setLoadingRequests(false);
@@ -349,14 +334,53 @@ const PurchaseRequest = ({onRefresh}) => {
     };
     
     fetchRequests();
-  }, [activeTab, pagination.page, pagination.limit, statusFilter, projectFilter, purposeFilter, allRequestsPagination.page, allRequestsPagination.limit, allStatusFilter, allProjectFilter, allPurposeFilter, allRequesterFilter]); // Re-fetch when these change
+  }, [pagination.page, pagination.limit, statusFilter, projectFilter, purposeFilter]); // Re-fetch when these change
+
+  // Add all-mrs tab fetching:
+  useEffect(() => {
+    const fetchRequests = async () => {
+      setLoadingRequests(true);
+      try {
+        // Build query params
+        const params = new URLSearchParams();
+        params.set('page', allRequestsPagination.page.toString());
+        params.set('limit', allRequestsPagination.limit.toString());
+        if (allStatusFilter) params.set('status', allStatusFilter);
+        if (allProjectFilter) params.set('subProject', allProjectFilter);
+        if (allPurposeFilter) params.set('purpose', allPurposeFilter);
+        if (allRequesterFilter) params.set('requester', allRequesterFilter);
+        
+        // Use different endpoints based on active tab
+        const baseEndpoint = '/purchase-requests';
+        const endpoint = `${baseEndpoint}${params.toString() ? `?${params.toString()}` : ''}`;
+        
+        const response = await apiGet(endpoint);
+        const result = await response.json();
+        if (result.success) {
+          setAllRequests(result.data);
+          if (result.pagination) {
+            setAllRequestsPagination(result.pagination);
+          }
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load all requests"
+        });
+      } finally {
+        setLoadingRequests(false);
+      }
+    };
+    
+    fetchRequests();
+  }, [allRequestsPagination.page, allRequestsPagination.limit, allStatusFilter, allProjectFilter, allPurposeFilter, allRequesterFilter]); // Re-fetch when these change
 
   // Fetch pending approvals when filters or pagination changes
   useEffect(() => {
     if (activeTab === 'pending-approvals') {
       fetchPendingApprovals();
     }
-  }, [activeTab, pendingApprovalsPagination.page, pendingApprovalsPagination.limit, pendingStatusFilter, pendingProjectFilter, pendingPurposeFilter, pendingRequesterFilter]);
+  }, [pendingApprovalsPagination.page, pendingApprovalsPagination.limit, pendingStatusFilter, pendingProjectFilter, pendingPurposeFilter, pendingRequesterFilter]);
 
   // Extract unique purposes from projects and requests for the filter dropdown
   useEffect(() => {
@@ -368,7 +392,7 @@ const PurchaseRequest = ({onRefresh}) => {
       setAvailablePurposes(uniquePurposes);
     } else if (activeTab === 'all-mrs') {
       // Extract unique requester names for All Related Requests tab
-      const requestersFromRequests = requests.map(r => r.requesterName).filter(Boolean);
+      const requestersFromRequests = allRequests.map(r => r.requesterName).filter(Boolean);
       const uniqueRequesters = [...new Set(requestersFromRequests)];
       setAllAvailableRequesters(uniqueRequesters);
     } else if (activeTab === 'pending-approvals') {
@@ -383,7 +407,7 @@ const PurchaseRequest = ({onRefresh}) => {
       const uniqueRequesters = [...new Set(requestersFromRequests)];
       setPendingAvailableRequesters(uniqueRequesters);
     }
-  }, [PRProjects, requests, pendingApprovals, activeTab]);
+  }, [PRProjects, requests, pendingApprovals]);
 
   const getUsersForRole = (allowedRoles) => {
     return allUsers.filter(user => 
@@ -626,7 +650,11 @@ const PurchaseRequest = ({onRefresh}) => {
       const pr_projects_result = await pr_projects_response.json();
       
       if (my_requests_result.success) {
-        setRequests(my_requests_result.data);
+        if (targetTab === 'my-requests') {
+          setRequests(my_requests_result.data);
+        } else {
+          setAllRequests(my_requests_result.data);
+        }
         setPRProjects(pr_projects_result.data);
         // Update the correct pagination state
         if (my_requests_result.pagination) {
@@ -652,8 +680,6 @@ const PurchaseRequest = ({onRefresh}) => {
       setLoadingRequests(false);
     }
   };
-
-  // console.log("I am Rendering")
 
   return (
     <SidebarProvider>
@@ -1167,13 +1193,13 @@ const PurchaseRequest = ({onRefresh}) => {
                                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                                   <p className="mt-2 text-gray-600">Loading requests...</p>
                                 </div>
-                              ) : requests.length === 0 ? (
+                              ) : allRequests.length === 0 ? (
                                 <div className="text-center py-8">
                                   <p className="text-gray-600">No requests found</p>
                                 </div>
                               ) : (
                                 <>
-                                  {requests.map((request) => (
+                                  {allRequests.map((request) => (
                                     <tr 
                                       key={request.id} 
                                       className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
@@ -1335,11 +1361,7 @@ const PurchaseRequest = ({onRefresh}) => {
                   ) : null}
                   {profile?.role === 'approver' || profile?.role === 'admin' ? (
                     <TabsContent value="material-master" className="space-y-6">
-                      <MasterMaterials 
-                        // projects={PRProjects}
-                        // loadingProjects={loadingPRProjects}
-                        // onRefresh={fetchPRProjects}
-                      />
+                      <MasterMaterials/>
                     </TabsContent>
                   ) : null}
                 </Tabs>
