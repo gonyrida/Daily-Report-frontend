@@ -441,12 +441,12 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
         .map((p, i) => ({
           no: p.no ?? p.displayIndex ?? String(i + 1),
           scopeOfWorks: p.description ?? p.scopeOfWorks,
-          pctUpToPrevWeek: p.pctUpToPrevWeek ?? p.prevWeek,
-          pctThisWeek: p.pctThisWeek ?? p.thisWeek,
-          pctUpToThisWeek: p.pctUpToThisWeek ?? p.upToThisWeek,
-          pctRemaining: p.pctRemaining ?? p.remaining,
-          pctNextWeekPlan: p.pctNextWeekPlan ?? p.nextWeek,
-          pctUpNextWeekPlan: p.pctUpNextWeekPlan ?? p.upNextWeek,
+          pctUpToPrevWeek: String(p.pctUpToPrevWeek ?? p.prevWeek ?? ''),
+          pctThisWeek: String(p.pctThisWeek ?? p.thisWeek ?? ''),
+          pctUpToThisWeek: String(p.pctUpToThisWeek ?? p.upToThisWeek ?? ''),
+          pctRemaining: String(p.pctRemaining ?? p.remaining ?? ''),
+          pctNextWeekPlan: String(p.pctNextWeekPlan ?? p.nextWeek ?? ''),
+          pctUpNextWeekPlan: String(p.pctUpNextWeekPlan ?? p.upNextWeek ?? ''),
         }));
       return filtered;
     })(),
@@ -455,9 +455,9 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
     nwdpItems: (input.nwdpItems ?? []).map(item => ({
       id: item.sourceId,
       workDoneLabel: item.workDoneLabel ?? item.label ?? item.activity,
-      workDonePct: item.workDonePct ?? item.donePct,
+      workDonePct: String(item.workDonePct ?? item.donePct ?? ''),
       nextWeekLabel: item.nextWeekLabel ?? item.nextLabel,
-      nextWeekPct: item.nextWeekPct ?? item.planPct,
+      nextWeekPct: String(item.nextWeekPct ?? item.planPct ?? ''),
     })),
 
     // ── QAQC ─────────────────────────────────────────────────────────────────

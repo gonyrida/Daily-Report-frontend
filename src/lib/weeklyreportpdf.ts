@@ -4,338 +4,770 @@ import type { WeeklyReportExportData } from "./weeklyreportexcel";
 
 const pdfMake: any = (pdfMakeModule as any).default ?? pdfMakeModule;
 const pdfFonts: any = (pdfFontsModule as any).default ?? pdfFontsModule;
-const vfs = pdfFonts.pdfMake?.vfs ?? pdfFonts.vfs;
-if (vfs) {
-  pdfMake.vfs = vfs;
-} else {
-  console.warn("pdfmake vfs bundle could not be initialized.");
-}
+pdfMake.vfs = pdfFonts.pdfMake?.vfs || pdfFonts.vfs;
 
-const formatDateValue = (value?: string | number | Date): string => {
-  if (!value) return "";
-  if (value instanceof Date) {
-    return value.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
-  const text = String(value).trim();
-  if (!text) return "";
-  const parsed = new Date(text);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
-  return text;
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const s = (v?: string | number | null): string =>
+  v === undefined || v === null ? "" : String(v);
+
+const fmtDate = (v?: string | number | Date): string => {
+  if (!v) return "";
+  if (v instanceof Date)
+    return v.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  const str = String(v).trim();
+  const d = new Date(str);
+  if (!Number.isNaN(d.getTime()))
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return str;
 };
 
-const safeString = (value?: string | number | null): string => {
-  if (value === undefined || value === null) return "";
-  return String(value);
-};
-
-const loadImageAsDataUrl = async (src?: string): Promise<string | undefined> => {
+const loadImg = async (src?: string): Promise<string | undefined> => {
   if (!src) return undefined;
-  if (src.startsWith("data:")) {
-    return src;
-  }
-
+  if (src.startsWith("data:")) return src;
   try {
-    const response = await fetch(src);
-    if (!response.ok) {
-      console.warn("Failed to fetch image for PDF", src, response.status);
-      return undefined;
-    }
-
-    const blob = await response.blob();
-    return await new Promise((resolve, reject) => {
+    const r = await fetch(src);
+    if (!r.ok) return undefined;
+    const blob = await r.blob();
+    return new Promise((res, rej) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result);
-        } else {
-          reject(new Error("Failed to convert image blob to data URL"));
-        }
-      };
-      reader.onerror = reject;
+      reader.onloadend = () =>
+        typeof reader.result === "string" ? res(reader.result) : rej(new Error("FileReader failed"));
+      reader.onerror = rej;
       reader.readAsDataURL(blob);
     });
-  } catch (error) {
-    console.warn("Unable to load PDF image", src, error);
+  } catch {
     return undefined;
   }
 };
 
-const buildMetaTable = (data: WeeklyReportExportData) => {
-  const rows = [
+// ── Design tokens ──────────────────────────────────────────────────────────────
+const SEC_FILL   = "#9BC2E6"; // Section banner fill (light blue)
+const TBL_HDR    = "#A6A6A6"; // Table column header (grey)
+const TBL_ALT    = "#F2F2F2"; // Alternate table row
+const GRP_FILL   = "#D9E1F2"; // Group header row (resources manpower)
+const LTR_FILL   = "#2F75B5"; // Letter page header
+const QAQC_FILL  = "#DCE6F1"; // QAQC sub-section title fill
+const LOC_FILL   = "#D6DCE4"; // Site photo location banner
+
+// ── Layout helpers ─────────────────────────────────────────────────────────────
+
+const secBanner = (title: string, mt = 0): any => ({
+  table: { widths: ["*"], body: [[{ text: title, style: "secBanner", fillColor: SEC_FILL }]] },
+  layout: { defaultBorder: false },
+  margin: [0, mt, 0, 14],
+});
+
+const subHdr = (text: string, mt = 8): any => ({
+  text,
+  style: "subHdr",
+  margin: [0, mt, 0, 4],
+});
+
+const pb = (): any => ({ text: "", pageBreak: "after" });
+
+/**
+ * Build a styled table.
+ * Headers: { text, w?, align? }
+ * Row cells: { text, align?, fill?, bold?, colSpan? } | null (null = colspan placeholder)
+ */
+const mkTable = (
+  headers: { text: string; w?: any; align?: string }[],
+  rows: Array<Array<{ text: string; align?: string; fill?: string; bold?: boolean; colSpan?: number } | null>>,
+  opts: { hFill?: string; altRows?: boolean; compact?: boolean } = {},
+): any => {
+  const hFill   = opts.hFill ?? TBL_HDR;
+  const altRows = opts.altRows !== false;
+  const fSize   = opts.compact ? 8 : 9;
+
+  const headerRow: any[] = headers.map(h => ({
+    text: h.text,
+    style: "tblHdr",
+    fontSize: fSize,
+    fillColor: hFill,
+    alignment: h.align ?? "center",
+  }));
+
+  const body: any[] = [headerRow];
+
+  rows.forEach((row, ri) => {
+    const alt = altRows && ri % 2 === 1;
+    body.push(
+      row.map(cell => {
+        if (cell === null) return {};
+        return {
+          text: cell.text,
+          style: "tblCell",
+          fontSize: fSize,
+          fillColor: cell.fill ?? (alt ? TBL_ALT : "#FFFFFF"),
+          alignment: cell.align ?? "left",
+          ...(cell.colSpan ? { colSpan: cell.colSpan } : {}),
+          ...(cell.bold ? { bold: true } : {}),
+        };
+      }),
+    );
+  });
+
+  return {
+    table: {
+      headerRows: 1,
+      widths: headers.map(h => h.w ?? "auto"),
+      body,
+    },
+    layout: {
+      hLineWidth: (r: number, n: any) => (r === 0 || r === n.table.body.length) ? 0.8 : 0.4,
+      vLineWidth: () => 0.4,
+      hLineColor: () => "#CCCCCC",
+      vLineColor: () => "#CCCCCC",
+    },
+  };
+};
+
+// ── SECTION BUILDERS ───────────────────────────────────────────────────────────
+
+// ── Letter ────────────────────────────────────────────────────────────────────
+function buildLetter(data: WeeklyReportExportData, sig?: string): any[] {
+  const refNo   = s(data.refNo) || `WR-${s(data.weekNumber)}/${new Date().getFullYear()}`;
+  const dateTxt = fmtDate(data.letterDate) ||
+    new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const company  = s(data.recipientCompany) || s(data.toName);
+  const location = s(data.recipientLocation);
+  const attTo    = s(data.recipientName) || s(data.consultant) || "Project Manager";
+  const ccLines  = data.ccLines ?? [];
+  const bodyText =
+    `We are pleased to submit Weekly Progress Report No.${s(data.weekNumber)} from ` +
+    `${s(data.reportDateFrom)} to ${s(data.reportDateTo)} for ${s(data.projectTitle)}.\n\n` ;
+  const toBody: any[][] = [
     [
-      { text: "Project Name", style: "metaLabel" },
-      { text: safeString(data.projectTitle), style: "metaValue" },
-    ],
-    [
-      { text: "Project Subtitle", style: "metaLabel" },
-      { text: safeString(data.projectSubtitle), style: "metaValue" },
-    ],
-    [
-      { text: "Project Subtitle 2", style: "metaLabel" },
-      { text: safeString(data.projectSubtitle2), style: "metaValue" },
-    ],
-    [
-      { text: "Week", style: "metaLabel" },
-      { text: safeString(data.weekNumber), style: "metaValue" },
-    ],
-    [
-      { text: "Date Range", style: "metaLabel" },
+      { text: "To",   style: "ltBold" },
+      { text: ":",    style: "ltBold" },
       {
-        text: `${safeString(data.reportDateFrom)}${data.reportDateTo ? ` - ${safeString(data.reportDateTo)}` : ""}`,
-        style: "metaValue",
+        stack: [
+          { text: company,  style: "ltBold" },
+          ...(location ? [{ text: location, style: "ltBold" }] : []),
+        ],
       },
     ],
     [
-      { text: "Employer", style: "metaLabel" },
-      { text: safeString(data.employer), style: "metaValue" },
-    ],
-    [
-      { text: "Consultant", style: "metaLabel" },
-      { text: safeString(data.consultant), style: "metaValue" },
-    ],
-    [
-      { text: "Contractor", style: "metaLabel" },
-      { text: safeString(data.contractor), style: "metaValue" },
+      { text: "Att.", style: "ltBold" },
+      { text: ":",    style: "ltBold" },
+      { text: attTo,  style: "ltBold" },
     ],
   ];
-  return {
-    table: {
-      widths: [100, "auto"],
-      body: rows,
-    },
-    layout: {
-      hLineWidth: () => 0.5,
-      vLineWidth: () => 0,
-      hLineColor: () => "#cccccc",
-      paddingLeft: () => 4,
-      paddingRight: () => 4,
-      paddingTop: () => 4,
-      paddingBottom: () => 4,
-    },
-  };
-};
-
-const buildContactTable = (data: WeeklyReportExportData) => {
-  const rows = [
-    [
-      { text: "Project Manager", style: "metaLabel" },
-      { text: safeString(data.projectManager), style: "metaValue" },
-    ],
-    [
-      { text: "Constructor", style: "metaLabel" },
-      { text: safeString(data.constructorName), style: "metaValue" },
-    ],
-    [
-      { text: "Location", style: "metaLabel" },
-      { text: safeString(data.companyLocation), style: "metaValue" },
-    ],
-    [
-      { text: "Phone", style: "metaLabel" },
-      { text: `${safeString(data.companyPhone1)}${data.companyPhone2 ? ` / ${safeString(data.companyPhone2)}` : ""}`, style: "metaValue" },
-    ],
-    [
-      { text: "Email", style: "metaLabel" },
-      { text: `${safeString(data.companyEmail1)}${data.companyEmail2 ? ` / ${safeString(data.companyEmail2)}` : ""}`, style: "metaValue" },
-    ],
-  ];
-  return {
-    table: {
-      widths: [100, "auto"],
-      body: rows,
-    },
-    layout: {
-      hLineWidth: () => 0.5,
-      vLineWidth: () => 0,
-      hLineColor: () => "#cccccc",
-      paddingLeft: () => 4,
-      paddingRight: () => 4,
-      paddingTop: () => 4,
-      paddingBottom: () => 4,
-    },
-  };
-};
-
-const buildOverallProgressTable = (items?: WeeklyReportExportData["overallProgressItems"]) => {
-  const body = [
-    [
-      { text: "No", style: "tableHeader" },
-      { text: "Scope of Works", style: "tableHeader" },
-      { text: "Prev %", style: "tableHeader" },
-      { text: "This %", style: "tableHeader" },
-      { text: "Up To This Week %", style: "tableHeader" },
-      { text: "Remaining %", style: "tableHeader" },
-      { text: "Next Week %", style: "tableHeader" },
-      { text: "Up Next %", style: "tableHeader" },
-    ],
-  ];
-
-  (items ?? []).forEach((item) => {
-    body.push([
-      { text: safeString(item.no), style: "tableCell" },
-      { text: safeString(item.scopeOfWorks), style: "tableCell" },
-      { text: safeString(item.pctUpToPrevWeek), style: "tableCell" },
-      { text: safeString(item.pctThisWeek), style: "tableCell" },
-      { text: safeString(item.pctUpToThisWeek), style: "tableCell" },
-      { text: safeString(item.pctRemaining), style: "tableCell" },
-      { text: safeString(item.pctNextWeekPlan), style: "tableCell" },
-      { text: safeString(item.pctUpNextWeekPlan), style: "tableCell" },
+  ccLines.forEach((cc, i) => {
+    toBody.push([
+      { text: i === 0 ? "CC" : "", style: "ltBold" },
+      { text: ":",                  style: "ltBold" },
+      { text: cc,                   style: "ltBold" },
     ]);
   });
 
-  return {
-    table: {
-      headerRows: 1,
-      widths: [30, "auto", 35, 35, 55, 45, 45, 45],
-      body,
-    },
-    layout: {
-      fillColor: (rowIndex: number) => (rowIndex === 0 ? "#f2f2f2" : null),
-    },
-  };
-};
-
-const buildNwdpTable = (items?: WeeklyReportExportData["nwdpItems"]) => {
-  const body = [
-    [
-      { text: "Work Done", style: "tableHeader" },
-      { text: "%", style: "tableHeader" },
-      { text: "Next Week Plan", style: "tableHeader" },
-      { text: "%", style: "tableHeader" },
-    ],
-  ];
-
-  (items ?? []).forEach((item) => {
-    body.push([
-      { text: safeString(item.workDoneLabel), style: "tableCell" },
-      { text: safeString(item.workDonePct), style: "tableCell" },
-      { text: safeString(item.nextWeekLabel), style: "tableCell" },
-      { text: safeString(item.nextWeekPct), style: "tableCell" },
-    ]);
-  });
-
-  if (!items || items.length === 0) {
-    body.push([
-      { text: "No activities available", colSpan: 4, style: "tableCell" }
-    ]);
+  const sigBlock: any[] = [];
+  if (sig) {
+    sigBlock.push({ image: sig, width: 130, margin: [0, 4, 0, 4] });
+  } else {
+    sigBlock.push({
+      canvas: [{ type: "rect", x: 0, y: 0, w: 140, h: 55, r: 2, lineWidth: 0.5, lineColor: "#CCCCCC", dash: { length: 4 } }],
+      margin: [0, 4, 0, 0],
+    });
+    sigBlock.push({ text: "[Digital Signature]", style: "sigPlaceholder", margin: [0, -38, 0, 4] });
   }
 
-  return {
-    table: {
-      headerRows: 1,
-      widths: ["auto", 35, "auto", 35],
-      body,
+  return [
+    {
+      table: { widths: ["*"], body: [[{ text: `LETTER FOR WEEKLY PROGRESS REPORT   No. ${s(data.weekNumber)}`, style: "ltBanner", fillColor: LTR_FILL }]] },
+      layout: { defaultBorder: false },
+      margin: [0, 0, 0, 14],
     },
-    layout: {
-      fillColor: (rowIndex: number) => (rowIndex === 0 ? "#f2f2f2" : null),
+    {
+      table: {
+        widths: [58, 6, "*"],
+        body: [
+          [{ text: "Ref. No.", style: "ltLabel" }, { text: ":", style: "ltLabel" }, { text: refNo,   style: "ltBold" }],
+          [{ text: "Date",     style: "ltLabel" }, { text: ":", style: "ltLabel" }, { text: dateTxt, style: "ltBold" }],
+        ],
+      },
+      layout: { defaultBorder: false },
+      margin: [0, 0, 0, 10],
     },
-  };
-};
+    { table: { widths: [42, 6, "*"], body: toBody }, layout: { defaultBorder: false }, margin: [0, 0, 0, 16] },
+    { text: "Dear Sir,", style: "ltBody", bold: true, margin: [0, 0, 0, 8] },
+    { text: bodyText, style: "ltBody", margin: [0, 0, 0, 20] },
+    { text: "Sincerely Yours,", style: "ltBody", margin: [0, 0, 0, 50] },
+    ...sigBlock,
+    {
+      stack: [
+        {
+          text: [
+            { text: s(data.projectManager), bold: true },
+            { text: "  |  Project Manager", bold: true },
+          ],
+          style: "sigLine",
+        },
+        { text: s(data.contractor), style: "sigLine", bold: true, margin: [0, 0, 0, 15] },
+        ...(data.companyLocation ? [{ text: s(data.companyLocation), style: "sigContact", margin: [0, 0, 0, 15] }] : []),
+        {
+          text: [s(data.companyPhone1), data.companyPhone2 ? `  |  ${s(data.companyPhone2)}` : ""].join(""),
+          style: "sigContact",
+        },
+        ...(data.companyEmail1 ? [{ text: s(data.companyEmail1), style: "sigContact" }] : []),
+        ...(data.companyEmail2 ? [{ text: s(data.companyEmail2), style: "sigContact" }] : []),
+      ],
+    },
+  ];
+}
 
-const buildQaqcSection = (section: WeeklyReportExportData["qaqcSections"][number]) => {
-  const body = [
-    [
-      { text: section.codeHeader || "Code", style: "tableHeader" },
-      { text: section.statusHeader || "Status", style: "tableHeader" },
-      { text: section.dateHeader || "Date Responded", style: "tableHeader" },
-      { text: "Description", style: "tableHeader" },
-    ],
+// ── Table of Contents ─────────────────────────────────────────────────────────
+function buildTOC(): any[] {
+  const items: { text: string; sub: boolean }[] = [
+    { text: "1.  INTRODUCTION",                                                                       sub: false },
+    { text: "2.  OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK",                                        sub: false },
+    { text: "3.  ACTIVITIES OF WORK DONE / NEXT WEEK PLAN",                                           sub: false },
+    { text: "4.  QA/QC STATUS",                                                                       sub: false },
+    { text: "4.1  Non-Conformity Report (NCR)",                                                       sub: true  },
+    { text: "4.2  Corrective Action Request (CAR)",                                                   sub: true  },
+    { text: "4.3  Safety Corrective Action Request (SCAR)",                                           sub: true  },
+    { text: "4.4  PM Site Instruction (SI)",                                                          sub: true  },
+    { text: "4.5  Client Site Instruction (SI)",                                                      sub: true  },
+    { text: "4.6  Inspection Request (IR)",                                                           sub: true  },
+    { text: "4.7  Material for Approval (MFA)",                                                       sub: true  },
+    { text: "4.8  Request for Information (RFI)",                                                     sub: true  },
+    { text: "4.9  Request for Approval (RFA)",                                                        sub: true  },
+    { text: "4.10  Field Change Request (FCR)",                                                       sub: true  },
+    { text: "4.11  Variation Order (VO)",                                                             sub: true  },
+    { text: "4.12  Transmittal (TR)",                                                                 sub: true  },
+    { text: "4.13  Material Inspection Approval (MIR)",                                               sub: true  },
+    { text: "5.  HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)",                                   sub: false },
+    { text: "5.1  HSES Training / Introduction / Toolbox Meeting",                                    sub: true  },
+    { text: "5.2  HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist",             sub: true  },
+    { text: "5.3  Permit to Work",                                                                    sub: true  },
+    { text: "5.4  First Aid / Accident / Incident / Near Miss / Fatalities (if Any)",                sub: true  },
+    { text: "5.5  Other HSES Activities Concerns",                                                    sub: true  },
+    { text: "5.6  HSES Photo Reference",                                                              sub: true  },
+    { text: "6.  RESOURCES STATUS",                                                                   sub: false },
+    { text: "6.1  Manpower Status",                                                                   sub: true  },
+    { text: "6.2  Material Delivery Status",                                                          sub: true  },
+    { text: "6.3  Machinery / Equipment Status",                                                      sub: true  },
+    { text: "7.  SITE ACTIVITY PHOTOS",                                                               sub: false },
+    { text: "8.  CONSTRUCTION ISSUE",                                                                 sub: false },
+    { text: "9.  MASTER SCHEDULE",                                                                    sub: false },
   ];
 
-  (section.items ?? []).forEach((item) => {
-    body.push([
-      { text: safeString(item.code), style: "tableCell" },
-      { text: safeString(item.status), style: "tableCell" },
-      { text: safeString(item.date), style: "tableCell" },
-      { text: safeString(item.description || item.comment), style: "tableCell" },
+  return [
+    secBanner("TABLE OF CONTENTS"),
+    {
+      stack: items.map(it => ({
+        text: it.text,
+        style: it.sub ? "tocSub" : "tocMajor",
+        margin: [it.sub ? 20 : 0, 3, 0, 3],
+      })),
+    },
+  ];
+}
+
+// ── Introduction ──────────────────────────────────────────────────────────────
+function buildIntro(data: WeeklyReportExportData, coverImg?: string): any[] {
+  const items: any[] = [secBanner("1.  INTRODUCTION")];
+  items.push(subHdr("Project Overview", 0));
+  items[items.length - 1].margin = [0, 0, 0, 8];
+  items.push({ text: s(data.projectOverview) || "—", style: "bodyText" });
+  if (data.designConstruction) {
+    items.push(subHdr("Design & Construction"));
+    items[items.length - 1].margin = [0, 0, 0, 8];
+    items.push({ text: data.designConstruction, style: "bodyText" });
+  }
+  if (data.designList?.length) {
+    items.push({
+      ul: data.designList.filter(Boolean).map(l => ({ text: l, style: "bodyText" })),
+      margin: [8, 8, 0, 0],
+    });
+  }
+  if (coverImg) {
+    items.push({ image: coverImg, width: 400, margin: [0, 20, 0, 0], alignment: "center" });
+  }
+  return items;
+}
+
+// ── Overall Progress ──────────────────────────────────────────────────────────
+function buildOP(data: WeeklyReportExportData): any[] {
+  const items: any[] = [secBanner("2.  OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK")];
+
+  const rows = (data.overallProgressItems ?? []).map(it => [
+    { text: s(it.no),                 align: "center" },
+    { text: s(it.scopeOfWorks),       align: "left"   },
+    { text: s(it.pctUpToPrevWeek ?? ''),    align: "center" },
+    { text: s(it.pctThisWeek ?? ''),        align: "center" },
+    { text: s(it.pctUpToThisWeek ?? ''),    align: "center" },
+    { text: s(it.pctRemaining ?? ''),       align: "center" },
+    { text: s(it.pctNextWeekPlan ?? ''),    align: "center" },
+    { text: s(it.pctUpNextWeekPlan ?? ''),  align: "center" },
+  ]);
+
+  const emptyRow = [[
+    { text: "No overall progress data available.", colSpan: 8, align: "center" as const },
+    null, null, null, null, null, null, null,
+  ]];
+
+  items.push(mkTable(
+    [
+      { text: "No",                      w: 28  },
+      { text: "Scope of Works",          w: "*" },
+      { text: "% Up to\nPrev Week",      w: 50  },
+      { text: "% This\nWeek",            w: 44  },
+      { text: "% Up to\nThis Week",      w: 54  },
+      { text: "% Remaining",             w: 50  },
+      { text: "% Next\nWeek Plan",       w: 50  },
+      { text: "% Up Next\nWeek Plan",    w: 55  },
+    ],
+    rows.length ? rows : emptyRow,
+  ));
+
+  if (data.overallProgressRemark) {
+    items.push({ text: `Remark: ${s(data.overallProgressRemark)}`, style: "bodyText", margin: [0, 8, 0, 0] });
+  }
+  return items;
+}
+
+// ── NWDP ──────────────────────────────────────────────────────────────────────
+function buildNWDP(data: WeeklyReportExportData): any[] {
+  const items: any[] = [secBanner("3.  ACTIVITIES OF WORK DONE / NEXT WEEK PLAN")];
+
+  const rows = (data.nwdpItems ?? []).map(it => [
+    { text: s(it.workDoneLabel),  align: "left"   },
+    { text: it.workDonePct  != null ? `${s(it.workDonePct)}%`  : "", align: "center" },
+    { text: s(it.nextWeekLabel), align: "left"   },
+    { text: it.nextWeekPct  != null ? `${s(it.nextWeekPct)}%`  : "", align: "center" },
+  ]);
+
+  const emptyRow = [[
+    { text: "No activity data available.", colSpan: 4, align: "center" as const },
+    null, null, null,
+  ]];
+
+  items.push(mkTable(
+    [
+      { text: "Activities of Work Done", w: "*"  },
+      { text: "%",                        w: 50  },
+      { text: "Next Week Plan",           w: "*" },
+      { text: "%",                        w: 50  },
+    ],
+    rows.length ? rows : emptyRow,
+  ));
+  return items;
+}
+
+// ── QAQC ──────────────────────────────────────────────────────────────────────
+const QAQC_DEFS = [
+  { id: "4.1",  title: "Non-Conformity Report (NCR)",             keys: ["ncr"],  col3: "Status",        col4: "Date Responded"  },
+  { id: "4.2",  title: "Corrective Action Request (CAR)",          keys: ["car"],  col3: "Status",        col4: "Date Responded"  },
+  { id: "4.3",  title: "Safety Corrective Action Request (SCAR)",  keys: ["scar"], col3: "Status",        col4: "Date Responded"  },
+  { id: "4.4",  title: "PM Site Instruction (SI)",                 keys: ["pmsi"], col3: "Status",        col4: "Date Responded"  },
+  { id: "4.5",  title: "Client Site Instruction (SI)",             keys: ["csi"],  col3: "Issued By",     col4: "Issued Date"     },
+  { id: "4.6",  title: "Inspection Request (IR)",                  keys: ["ir"],   col3: "Received Date", col4: "Inspection Date" },
+  { id: "4.7",  title: "Material for Approval (MFA)",              keys: ["mfa"],  col3: "Status",        col4: "Date Responded"  },
+  { id: "4.8",  title: "Request for Information (RFI)",            keys: ["rfi"],  col3: "Status",        col4: "Date Responded"  },
+  { id: "4.9",  title: "Request for Approval (RFA)",               keys: ["rfa"],  col3: "Status",        col4: "Date Responded"  },
+  { id: "4.10", title: "Field Change Request (FCR)",               keys: ["fcr"],  col3: "Status",        col4: "Date Responded"  },
+  { id: "4.11", title: "Variation Order (VO)",                     keys: ["vo"],   col3: "Status",        col4: "Date Responded"  },
+  { id: "4.12", title: "Transmittal (TR)",                         keys: ["tr"],   col3: "Status",        col4: "Date Responded"  },
+  { id: "4.13", title: "Material Inspection Approval (MIR)",       keys: ["mir"],  col3: "Status",        col4: "Date Responded"  },
+];
+
+function buildQAQC(data: WeeklyReportExportData): any[] {
+  const items: any[] = [secBanner("4.  QA/QC STATUS")];
+
+  QAQC_DEFS.forEach(def => {
+    const sec = data.qaqcSections?.find(
+      sec => sec.sectionTitle === def.id || def.keys.includes((sec.sectionTitle ?? "").toLowerCase()),
+    );
+
+    // Sub-section title
+    items.push({
+      table: {
+        widths: ["*"],
+        body: [[{
+          text: [{ text: `${def.id}  `, bold: true }, { text: def.title }],
+          fillColor: QAQC_FILL,
+          style: "qaqcSubTitle",
+        }]],
+      },
+      layout: { defaultBorder: false },
+      margin: [0, 8, 0, 2],
+    });
+
+    const qRows = (sec?.items ?? []).map(it => [
+      { text: s(it.code),                     align: "center" },
+      { text: s(it.description || it.comment), align: "left"  },
+      { text: s(it.status),                   align: "center" },
+      { text: s(it.date),                     align: "center" },
     ]);
+
+    // Always show at least 3 empty rows when no data
+    const dataRows = qRows.length
+      ? qRows
+      : Array(3).fill(null).map(() => [
+          { text: "", align: "center" as const },
+          { text: "", align: "left"   as const },
+          { text: "", align: "center" as const },
+          { text: "", align: "center" as const },
+        ]);
+
+    items.push(mkTable(
+      [
+        { text: "Code",       w: 55  },
+        { text: "Description", w: "*" },
+        { text: def.col3,     w: 80  },
+        { text: def.col4,     w: 72  },
+      ],
+      dataRows,
+      { hFill: SEC_FILL },
+    ));
+
+    // Comments row
+    const comments = sec?.comments ?? "";
+    items.push({
+      table: {
+        widths: ["*"],
+        body: [[{
+          text: [{ text: "Comments: ", bold: true }, { text: comments }],
+          style: "tblCell",
+          fontSize: 9,
+        }]],
+      },
+      layout: {
+        hLineWidth: () => 0.4, vLineWidth: () => 0.4,
+        hLineColor: () => "#CCCCCC", vLineColor: () => "#CCCCCC",
+      },
+      margin: [0, 0, 0, 0],
+    });
   });
 
-  if (!section.items || section.items.length === 0) {
-    body.push([
-      { text: "No QAQC items available", colSpan: 4, style: "tableCell" }
-    ]);
+  return items;
+}
+
+// ── HSE ───────────────────────────────────────────────────────────────────────
+function buildHSE(data: WeeklyReportExportData): any[] {
+  const items: any[] = [secBanner("5.  HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)")];
+
+  if (data.hseTraining?.length) {
+    items.push(subHdr("5.1  HSES Training / Introduction / Toolbox Meeting", 0));
+    items.push(mkTable(
+      [
+        { text: "Type of Training", w: "*" },
+        { text: "Date",             w: 55  },
+        { text: "Venue",            w: 70  },
+        { text: "Trainer",          w: 70  },
+        { text: "Attendee",         w: 50  },
+        { text: "Remarks",          w: 80  },
+      ],
+      data.hseTraining.map(r => [
+        { text: s(r.typeOfTraining)                },
+        { text: s(r.date),    align: "center" },
+        { text: s(r.venue)                         },
+        { text: s(r.trainer)                       },
+        { text: s(r.attendee), align: "center" },
+        { text: s(r.remarks)                       },
+      ]),
+    ));
   }
 
-  return {
-    table: {
-      headerRows: 1,
-      widths: [55, 80, 65, "auto"],
-      body,
-    },
-    layout: {
-      fillColor: (rowIndex: number) => (rowIndex === 0 ? "#f2f2f2" : null),
-    },
-  };
-};
+  if (data.hseInspection?.length) {
+    items.push(subHdr("5.2  HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist"));
+    items.push(mkTable(
+      [
+        { text: "Type of Inspection", w: "*"  },
+        { text: "Date",               w: 55   },
+        { text: "Inspector",          w: 80   },
+        { text: "Remarks",            w: 100  },
+      ],
+      data.hseInspection.map(r => [
+        { text: s(r.typeOfInspection)               },
+        { text: s(r.date),       align: "center" },
+        { text: s(r.inspector)                      },
+        { text: s(r.remarks)                        },
+      ]),
+    ));
+  }
 
-const buildSimpleTable = (headers: string[], rows: Array<string[]> | Array<(string | number)[]>) => {
-  const body = [headers.map((text) => ({ text, style: "tableHeader" }))];
-  rows.forEach((row) => {
-    body.push(row.map((cell) => ({ text: safeString(cell), style: "tableCell" })));
+  if (data.hsePermits?.length) {
+    items.push(subHdr("5.3  Permit to Work"));
+    items.push(mkTable(
+      [
+        { text: "Type of Permit", w: "*" },
+        { text: "Start Date",     w: 55  },
+        { text: "End Date",       w: 55  },
+        { text: "Inspector",      w: 65  },
+        { text: "Approver",       w: 65  },
+        { text: "Remarks",        w: 75  },
+      ],
+      data.hsePermits.map(r => [
+        { text: s(r.typeOfPermit)                    },
+        { text: s(r.startDate), align: "center" },
+        { text: s(r.endDate),   align: "center" },
+        { text: s(r.inspector)                       },
+        { text: s(r.approver)                        },
+        { text: s(r.remarks)                         },
+      ]),
+    ));
+  }
+
+  if (data.hseFirstAid) {
+    items.push(subHdr("5.4  First Aid / Accident / Incident / Near Miss / Fatalities (if Any)"));
+    items.push({ text: s(data.hseFirstAid), style: "bodyText" });
+  }
+
+  if (data.hseOtherConcerns) {
+    items.push(subHdr("5.5  Other HSES Activities Concerns"));
+    items.push({ text: s(data.hseOtherConcerns), style: "bodyText" });
+  }
+
+  const tb = data.hsePhotoReferences?.hseToolboxMeeting ?? [];
+  const ap = data.hsePhotoReferences?.hseActivityPhotos ?? [];
+  if (tb.length || ap.length) {
+    items.push(subHdr("5.6  HSES Photo Reference"));
+
+    const renderPhotoGroup = (secTitle: string, entries: any[]) => {
+      if (!entries.length) return;
+      items.push({ text: secTitle, style: "photoSecTitle", margin: [0, 4, 0, 4] });
+      entries.forEach(entry => {
+        const imgs: string[] = entry.images ?? [];
+        const descs: string[] = entry.descriptions ?? [];
+        for (let i = 0; i < Math.max(imgs.length, 1); i += 2) {
+          const pair: any[] = [0, 1].map(j => {
+            const img  = imgs[i + j];
+            const desc = descs[i + j] ?? "";
+            return img
+              ? { stack: [{ image: img, fit: [225, 155], alignment: "center" }, { text: desc, style: "photoCaption", margin: [0, 2, 0, 0] }], width: "*" }
+              : { text: "", width: "*" };
+          });
+          items.push({ columns: pair, columnGap: 8, margin: [0, 0, 0, 6] });
+        }
+      });
+    };
+
+    renderPhotoGroup("5.6.1  HSES Training / Toolbox Meeting Photos", tb);
+    renderPhotoGroup("5.6.2  HSES Activity Photos", ap);
+  }
+
+  return items;
+}
+
+// ── Resources ─────────────────────────────────────────────────────────────────
+function buildResources(data: WeeklyReportExportData): any[] {
+  const items: any[] = [secBanner("6.  RESOURCES STATUS")];
+  const DAY_LABELS = ["Fri", "Sat", "Sun", "Mon", "Tue", "Wed", "Thu"];
+  const dates = data.weekDates?.length === 7 ? data.weekDates : Array(7).fill("");
+
+  const dayHdrs = DAY_LABELS.map((d, i) => ({
+    text: dates[i] ? `${d}\n${dates[i]}` : d,
+    w: 26,
+  }));
+
+  // 6.1 Manpower
+  items.push(subHdr("6.1  Manpower Status", 0));
+  const mpHdrs = [
+    { text: "Description", w: "*" },
+    ...dayHdrs,
+    { text: "Prev.\nWeek",        w: 44 },
+    { text: "This\nWeek",         w: 44 },
+    { text: "Up to\nThis Week",   w: 52 },
+  ];
+  const mpRows: any[] = [];
+  (data.manpowerRows ?? []).forEach(row => {
+    const isGrp = (row as any).isGroupHeader === true ||
+      /^[IVXLCDM]+\.\s/i.test(s(row.description));
+    const dc = row.dailyCounts ?? Array(7).fill("");
+    if (isGrp) {
+      mpRows.push([
+        { text: s(row.description), bold: true, fill: GRP_FILL, colSpan: 11 },
+        ...Array(10).fill(null),
+      ]);
+    } else {
+      mpRows.push([
+        { text: s(row.description) },
+        ...dc.slice(0, 7).map(v => ({ text: s(v), align: "center" as const })),
+        { text: s(row.previousWeek),  align: "center" },
+        { text: s(row.thisWeek),      align: "center" },
+        { text: s(row.upToThisWeek),  align: "center" },
+      ]);
+    }
   });
-  return {
-    table: {
-      headerRows: 1,
-      widths: Array(headers.length).fill("auto"),
-      body,
-    },
-    layout: {
-      fillColor: (rowIndex: number) => (rowIndex === 0 ? "#f2f2f2" : null),
-    },
-  };
-};
+  if (!mpRows.length) {
+    mpRows.push([{ text: "No manpower data.", colSpan: 11, align: "center" as const }, ...Array(10).fill(null)]);
+  }
+  items.push(mkTable(mpHdrs, mpRows, { compact: true }));
 
+  // 6.2 Material
+  items.push(subHdr("6.2  Material Delivery Status"));
+  const matHdrs = [
+    { text: "Description", w: "*" },
+    ...dayHdrs,
+    { text: "Previous",    w: 44 },
+    { text: "This\nPeriod", w: 44 },
+    { text: "Accumulate",  w: 52 },
+  ];
+  const matRows = (data.materialRows ?? []).map(row => [
+    { text: `${s(row.description)}${row.unit ? ` (${s(row.unit)})` : ""}` },
+    ...(row.dailyData ?? Array(7).fill("")).slice(0, 7).map(v => ({ text: s(v), align: "center" as const })),
+    { text: s(row.previous),   align: "center" },
+    { text: s(row.thisPeriod), align: "center" },
+    { text: s(row.accumulate), align: "center" },
+  ]);
+  if (!matRows.length) {
+    matRows.push([{ text: "No material data.", colSpan: 11, align: "center" as const }, ...Array(10).fill(null)]);
+  }
+  items.push(mkTable(matHdrs, matRows, { compact: true }));
+
+  // 6.3 Equipment
+  items.push(subHdr("6.3  Machinery / Equipment Status"));
+  const eqHdrs = [
+    { text: "Description", w: "*" },
+    ...dayHdrs,
+    { text: "Previous",    w: 44 },
+    { text: "This\nPeriod", w: 44 },
+    { text: "Accumulate",  w: 52 },
+  ];
+  const eqRows = (data.equipmentRows ?? []).map(row => [
+    { text: `${s(row.description)}${row.unit ? ` (${s(row.unit)})` : ""}` },
+    ...(row.dailyData ?? Array(7).fill("")).slice(0, 7).map(v => ({ text: s(v), align: "center" as const })),
+    { text: s(row.previous),   align: "center" },
+    { text: s(row.thisPeriod), align: "center" },
+    { text: s(row.accumulate), align: "center" },
+  ]);
+  if (!eqRows.length) {
+    eqRows.push([{ text: "No equipment data.", colSpan: 11, align: "center" as const }, ...Array(10).fill(null)]);
+  }
+  items.push(mkTable(eqHdrs, eqRows, { compact: true }));
+
+  return items;
+}
+
+// ── Site Activity Photos ───────────────────────────────────────────────────────
+function buildSitePhotos(data: WeeklyReportExportData): any[] {
+  const items: any[] = [secBanner("7.  SITE ACTIVITY PHOTOS")];
+
+  if (!data.sitePhotoCaptions?.length) {
+    items.push({ text: "No site activity photos available.", style: "bodyText" });
+    return items;
+  }
+
+  data.sitePhotoCaptions.forEach(entry => {
+    if (entry.siteLocation) {
+      items.push({
+        table: { widths: ["*"], body: [[{ text: s(entry.siteLocation), style: "photoLocBanner", fillColor: LOC_FILL }]] },
+        layout: { defaultBorder: false },
+        margin: [0, 8, 0, 4],
+      });
+    }
+
+    const pairs: [string | undefined, string | undefined][] = [
+      [entry.image1, entry.caption1],
+      [entry.image2, entry.caption2],
+    ];
+    const cols: any[] = pairs
+      .filter(([img, cap]) => img || cap)
+      .map(([img, cap]) =>
+        img
+          ? {
+              stack: [
+                { image: img, fit: [226, 155], alignment: "center" },
+                { text: s(cap), style: "photoCaption", alignment: "center", margin: [0, 2, 0, 0] },
+              ],
+              width: "*",
+            }
+          : { text: s(cap), style: "bodyText", width: "*" },
+      );
+
+    if (cols.length) {
+      items.push({ columns: cols, columnGap: 8, margin: [0, 0, 0, 8] });
+    }
+  });
+
+  return items;
+}
+
+// ── Construction Issues ────────────────────────────────────────────────────────
+function buildConstructionIssues(data: WeeklyReportExportData): any[] {
+  const items: any[] = [secBanner("8.  CONSTRUCTION ISSUE")];
+
+  const rows = (data.constructionIssues ?? []).map(issue => [
+    { text: s(issue.number),             align: "center" },
+    { text: s(issue.siteLocation)                        },
+    { text: s(issue.problemDescription)                  },
+    { text: s(issue.actionBy)                            },
+  ]);
+
+  const emptyRow = [[
+    { text: "No construction issues available.", colSpan: 4, align: "center" as const },
+    null, null, null,
+  ]];
+
+  items.push(mkTable(
+    [
+      { text: "No",                   w: 28  },
+      { text: "Site Location",        w: 100 },
+      { text: "Problem Description",  w: "*" },
+      { text: "Action By",            w: 100 },
+    ],
+    rows.length ? rows : emptyRow,
+  ));
+
+  const withPhotos = (data.constructionIssues ?? []).filter(i => i.photo);
+  if (withPhotos.length) {
+    items.push(subHdr("Issue Photos"));
+    for (let i = 0; i < withPhotos.length; i += 2) {
+      const pair: any[] = [0, 1].map(j => {
+        const issue = withPhotos[i + j];
+        if (!issue?.photo) return { text: "", width: "*" };
+        return {
+          stack: [
+            { image: issue.photo, fit: [226, 155], alignment: "center" },
+            {
+              text: `Issue ${s(issue.number)}: ${s(issue.siteLocation)}`,
+              style: "photoCaption",
+              alignment: "center",
+              margin: [0, 2, 0, 0],
+            },
+          ],
+          width: "*",
+        };
+      });
+      items.push({ columns: pair, columnGap: 8, margin: [0, 0, 0, 8] });
+    }
+  }
+
+  return items;
+}
+
+// ── Main export ────────────────────────────────────────────────────────────────
 export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, filename = "WeeklyReport.pdf") {
-  const companyLogo = await loadImageAsDataUrl("/cacpm_logo.png");
-  const clientLogo = await loadImageAsDataUrl(data.clientLogo);
-  const signatureImage = await loadImageAsDataUrl(data.signatureImage);
-
-  const sectionList = [
-    "Cover",
-    "Letter",
-    "CONTENT",
-    "1.Intro",
-    "2.OP",
-    "3.NWDP",
-    "4.QAQC",
-    "5.HSE",
-    "6.Resources",
-    "7.Site Activity Photos",
-    "8.Construction Issues",
-  ];
+  const [companyLogo, clientLogo, signatureImage, coverImage] = await Promise.all([
+    loadImg("/cacpm_logo.png"),
+    loadImg(data.clientLogo),
+    loadImg(data.signatureImage),
+    loadImg(data.coverImage),
+  ]);
 
   const projectTitles = [data.projectTitle, data.projectSubtitle, data.projectSubtitle2].filter(Boolean);
 
-  const content: any[] = [
+  // ── Cover page (unchanged) ────────────────────────────────────────────────
+  const coverContent: any[] = [
     {
       table: {
-        widths: [10, 6, "*"],  // Column 1 = banner, Column 2 = all content
+        widths: [10, 6, "*"],
         body: [
           [
-            // Column 1: Dark blue banner cell (rowspan for full height)
             {
               text: "",
               fillColor: "#16365C",
               border: [false, false, false, false],
-              rowSpan: 4,  // Spans all rows
+              rowSpan: 4,
             },
             {
               text: "",
               fillColor: "#FFFFFF",
               border: [false, false, false, false],
-              rowSpan: 4,  // Spans all rows
+              rowSpan: 4,
             },
-            // Column 2 Row 1: Header (logos, title)
             {
               stack: [
                 {
@@ -348,33 +780,32 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
                 },
                 {
                   table: {
-                    widths: ["*"],           // Full width
+                    widths: ["*"],
                     body: [
                       [
                         {
                           text: "WEEKLY PROGRESS REPORT",
                           style: "coverTitleBanner",
-                          fillColor: "#002060",    // Blue background on CELL, not style
-                          color: "#FFFFFF",        // White text
+                          fillColor: "#002060",
+                          color: "#FFFFFF",
                           alignment: "center",
-                          margin: [0, 0, 0, 0],    // Padding inside the cell
+                          margin: [0, 0, 0, 0],
                         },
                       ],
                     ],
                   },
                   layout: { defaultBorder: false },
-                  margin: [0, 75, 0, 12],       // Bottom spacing
+                  margin: [0, 75, 0, 12],
                 },
-                { text: `Week - ${safeString(data.weekNumber)}`, style: "coverWeek" },
-                { text: `From ${safeString(data.reportDateFrom)} ~ ${safeString(data.reportDateTo)}`, style: "coverDateRange", margin: [0, 4, 0, 0] },
+                { text: `Week - ${s(data.weekNumber)}`, style: "coverWeek" },
+                { text: `From ${s(data.reportDateFrom)} ~ ${s(data.reportDateTo)}`, style: "coverDateRange", margin: [0, 4, 0, 0] },
               ],
               margin: [14, 14, 14, 14],
             },
           ],
           [
-            {}, // Empty - rowSpan handles this
-            {}, // Empty - rowSpan handles this
-            // Column 2 Row 2: Cover image
+            {},
+            {},
             {
               stack: data.coverImage
                 ? [{ image: data.coverImage, fit: [520, 260], alignment: "center" }]
@@ -383,25 +814,23 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
             },
           ],
           [
-            {}, // Empty - rowSpan handles this
-            {}, // Empty - rowSpan handles this
-            // Column 2 Row 3: Project titles
+            {},
+            {},
             {
-              stack: projectTitles.map((line) => ({ text: line, style: "coverProjectTitle" })),
+              stack: projectTitles.map(line => ({ text: line, style: "coverProjectTitle" })),
               margin: [21, 18, 21, 0],
             },
           ],
           [
-            {}, // Empty - rowSpan handles this
-            {}, // Empty - rowSpan handles this
-            // Column 2 Row 4: Employee/Contractor
+            {},
+            {},
             {
               table: {
                 widths: [90, 12, "*"],
                 body: [
-                  [{ text: "Employee", style: "partyLabel" }, { text: ":", style: "partyLabel" }, { text: safeString(data.employer), style: "partyValue" }],
-                  [{ text: "", style: "partyLabel" }, { text: "", style: "partyLabel" }, { text: "", style: "partyValue" }],
-                  [{ text: "Contractor", style: "partyLabel" }, { text: ":", style: "partyLabel" }, { text: safeString(data.contractor), style: "partyValue" }],
+                  [{ text: "Employee",   style: "partyLabel" }, { text: ":", style: "partyLabel" }, { text: s(data.employer),   style: "partyValue" }],
+                  [{ text: "",           style: "partyLabel" }, { text: "", style: "partyLabel" },   { text: "",                 style: "partyValue" }],
+                  [{ text: "Contractor", style: "partyLabel" }, { text: ":", style: "partyLabel" }, { text: s(data.contractor), style: "partyValue" }],
                 ],
               },
               layout: { defaultBorder: false },
@@ -412,222 +841,82 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
       },
       layout: { defaultBorder: false },
     },
-    { text: "", pageBreak: "after" },
-    { text: "Letter", style: "sectionHeader" },
-    { text: `Ref. No. ${safeString(data.refNo)}`, style: "paragraph" },
-    { text: `Date: ${formatDateValue(data.letterDate)}`, style: "paragraph" },
-    { text: `To: ${safeString(data.toName)}`, style: "paragraph" },
-    { text: `Company: ${safeString(data.recipientCompany)}`, style: "paragraph" },
-    { text: `Location: ${safeString(data.recipientLocation)}`, style: "paragraph" },
-    { text: "", margin: [0, 8, 0, 0] },
-    {
-      text: `Dear ${safeString(data.toName) || "Sir / Madam"},\n\nPlease find attached the weekly progress report for the project. The report identifies the construction progress, overall progress, next week plan, QA/QC updates, HSE activities, resources analysis, site activity photos, and construction issues.\n\nShould you require any further clarification, please feel free to contact the project team.`,
-      style: "bodyText",
-    },
-    { text: "", margin: [0, 12, 0, 0] },
-    { text: `Yours faithfully,`, style: "paragraph" },
-    { text: safeString(data.projectManager) || "Project Manager", style: "paragraph" },
-    { text: safeString(data.constructorName), style: "paragraph" },
-    { text: "", pageBreak: "after" },
-    { text: "CONTENT", style: "sectionHeader" },
-    {
-      ol: sectionList.map((section) => ({ text: section, style: "contentItem" })),
-      margin: [0, 8, 0, 0],
-    },
-    { text: "", pageBreak: "after" },
-    { text: "1.Intro", style: "sectionHeader" },
-    { text: safeString(data.projectOverview), style: "bodyText" },
-    { text: "", margin: [0, 8, 0, 0] },
-    { text: safeString(data.designConstruction), style: "bodyText" },
-    { text: "", pageBreak: "after" },
-    { text: "2.OP Overall Progress", style: "sectionHeader" },
-    buildOverallProgressTable(data.overallProgressItems),
   ];
 
-  if (data.overallProgressRemark) {
-    content.push({ text: `Remark: ${safeString(data.overallProgressRemark)}`, style: "bodyText", margin: [0, 8, 0, 0] });
-  }
+  // ── Assemble all pages ────────────────────────────────────────────────────
+  const content: any[] = [
+    ...coverContent,
+    pb(),
+    ...buildLetter(data, signatureImage),
+    pb(),
+    ...buildTOC(),
+    pb(),
+    ...buildIntro(data, coverImage),
+    pb(),
+    ...buildOP(data),
+    pb(),
+    ...buildNWDP(data),
+    pb(),
+    ...buildQAQC(data),
+    pb(),
+    ...buildHSE(data),
+    pb(),
+    ...buildResources(data),
+    pb(),
+    ...buildSitePhotos(data),
+    pb(),
+    ...buildConstructionIssues(data),
+  ];
 
-  content.push({ text: "", pageBreak: "after" });
-  content.push({ text: "3.NWDP", style: "sectionHeader" });
-  content.push(buildNwdpTable(data.nwdpItems));
-  content.push({ text: "", pageBreak: "after" });
-  content.push({ text: "4.QAQC", style: "sectionHeader" });
+  // ── Document definition ───────────────────────────────────────────────────
+  const docDefinition: any = {
+    pageSize: { width: 617.28, height: 786.89 },
+    pageMargins: [50, 50, 50, 50],
 
-  if (data.qaqcSections && data.qaqcSections.length > 0) {
-    data.qaqcSections.forEach((section) => {
-      content.push({ text: section.sectionTitle || "QAQC Section", style: "tableSubheader", margin: [0, 8, 0, 4] });
-      content.push(buildQaqcSection(section));
-      if (section.comments) {
-        content.push({ text: `Comments: ${safeString(section.comments)}`, style: "bodyText", margin: [0, 4, 0, 0] });
-      }
-    });
-  } else {
-    content.push({ text: "No QAQC data available.", style: "bodyText" });
-  }
-
-  content.push({ text: "", pageBreak: "after" });
-  content.push({ text: "5.HSE", style: "sectionHeader" });
-
-  if (data.hseTraining && data.hseTraining.length > 0) {
-    content.push({ text: "Training", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push(
-      buildSimpleTable(
-        ["Training Type", "Date", "Venue", "Trainer", "Attendee", "Remarks"],
-        data.hseTraining.map((row) => [
-          safeString(row.typeOfTraining),
-          safeString(row.date),
-          safeString(row.venue),
-          safeString(row.trainer),
-          safeString(row.attendee),
-          safeString(row.remarks),
-        ])
-      )
-    );
-  }
-
-  if (data.hseInspection && data.hseInspection.length > 0) {
-    content.push({ text: "Inspection", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push(
-      buildSimpleTable(
-        ["Inspection Type", "Date", "Inspector", "Remarks"],
-        data.hseInspection.map((row) => [
-          safeString(row.typeOfInspection),
-          safeString(row.date),
-          safeString(row.inspector),
-          safeString(row.remarks),
-        ])
-      )
-    );
-  }
-
-  if (data.hsePermits && data.hsePermits.length > 0) {
-    content.push({ text: "Permits", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push(
-      buildSimpleTable(
-        ["Permit Type", "Start Date", "End Date", "Inspector", "Approver", "Remarks"],
-        data.hsePermits.map((row) => [
-          safeString(row.typeOfPermit),
-          safeString(row.startDate),
-          safeString(row.endDate),
-          safeString(row.inspector),
-          safeString(row.approver),
-          safeString(row.remarks),
-        ])
-      )
-    );
-  }
-
-  if (data.hseFirstAid) {
-    content.push({ text: "First Aid / Accident", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push({ text: safeString(data.hseFirstAid), style: "bodyText" });
-  }
-
-  if (data.hseOtherConcerns) {
-    content.push({ text: "Other HSE Concerns", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push({ text: safeString(data.hseOtherConcerns), style: "bodyText" });
-  }
-
-  content.push({ text: "", pageBreak: "after" });
-  content.push({ text: "6.Resources", style: "sectionHeader" });
-
-  if (data.manpowerRows && data.manpowerRows.length > 0) {
-    const headerRow = ["Description", ...(data.weekDates ?? ["D1", "D2", "D3", "D4", "D5", "D6", "D7"])];
-    const rows = data.manpowerRows.map((row) => [
-      safeString(row.description),
-      ...(row.dailyCounts ?? []).map((count) => safeString(count)),
-    ]);
-    content.push({ text: "Manpower", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push(buildSimpleTable(headerRow, rows));
-  }
-
-  if (data.materialRows && data.materialRows.length > 0) {
-    const rows = data.materialRows.map((row) => [
-      safeString(row.description),
-      safeString(row.unit),
-      safeString(row.previous),
-      safeString(row.thisPeriod),
-      safeString(row.accumulate),
-    ]);
-    content.push({ text: "Material", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push(buildSimpleTable(["Description", "Unit", "Prev", "This", "Accumulate"], rows));
-  }
-
-  if (data.equipmentRows && data.equipmentRows.length > 0) {
-    const rows = data.equipmentRows.map((row) => [
-      safeString(row.description),
-      safeString(row.unit),
-      safeString(row.previous),
-      safeString(row.thisPeriod),
-      safeString(row.accumulate),
-    ]);
-    content.push({ text: "Equipment", style: "tableSubheader", margin: [0, 8, 0, 4] });
-    content.push(buildSimpleTable(["Description", "Unit", "Prev", "This", "Accumulate"], rows));
-  }
-
-  content.push({ text: "", pageBreak: "after" });
-  content.push({ text: "7.Site Activity Photos", style: "sectionHeader" });
-
-  if (data.sitePhotoCaptions && data.sitePhotoCaptions.length > 0) {
-    data.sitePhotoCaptions.forEach((entry) => {
-      content.push({ text: safeString(entry.siteLocation), style: "tableSubheader", margin: [0, 8, 0, 4] });
-      content.push({ text: safeString(entry.caption1), style: "bodyText" });
-      if (entry.caption2) {
-        content.push({ text: safeString(entry.caption2), style: "bodyText", margin: [0, 2, 0, 0] });
-      }
-    });
-  } else {
-    content.push({ text: "No site activity photo captions available.", style: "bodyText" });
-  }
-
-  content.push({ text: "", pageBreak: "after" });
-  content.push({ text: "8.Construction Issues", style: "sectionHeader" });
-
-  if (data.constructionIssues && data.constructionIssues.length > 0) {
-    const rows = data.constructionIssues.map((issue) => [
-      safeString(issue.number),
-      safeString(issue.siteLocation),
-      safeString(issue.problemDescription),
-      safeString(issue.actionBy),
-    ]);
-    content.push(buildSimpleTable(["No", "Site Location", "Problem Description", "Action By"], rows));
-  } else {
-    content.push({ text: "No construction issues available.", style: "bodyText" });
-  }
-
-  const docDefinition = {
-    // pageSize: "A4",
-    pageSize: { width: 617.28, height: 786.89 },  // Landscape A4
-    pageMargins: [65, 65, 65, 65],
-    info: {
-      title: filename,
-    },
+    info: { title: filename },
     content,
+
     styles: {
-      coverTitle: { fontSize: 22, bold: true, alignment: "center", margin: [0, 0, 0, 6] },
-      coverSubtitle: { fontSize: 14, alignment: "center", margin: [0, 0, 0, 4] },
-      coverLabel: { fontSize: 11, alignment: "center", color: "#666666" },
-      coverBannerText: { fontSize: 18, bold: true, color: "#002060", alignment: "center" },
-      coverTitleBanner: { fontSize: 16, bold: true, color: "#FFFFFF", alignment: "center" },
-      coverWeek: { fontSize: 14, bold: true, color: "#000000", alignment: "center" },
-      coverDateRange: { fontSize: 10, bold: true, color: "#000000", alignment: "center" },
+      // Cover
+      coverTitleBanner:  { fontSize: 16, bold: true, color: "#FFFFFF", alignment: "center" },
+      coverWeek:         { fontSize: 14, bold: true, color: "#000000", alignment: "center" },
+      coverDateRange:    { fontSize: 10, bold: true, color: "#000000", alignment: "center" },
       coverProjectTitle: { fontSize: 14, bold: true, italics: true, alignment: "center", margin: [0, 2, 0, 2] },
-      coverPlaceholder: { fontSize: 12, italics: true, color: "#FFFFFF", alignment: "center", margin: [0, 80, 0, 80] },
-      partyLabel: { fontSize: 12, bold: true, color: "#000000", alignment: "left" },
-      partyValue: { fontSize: 12, bold: true, alignment: "left" },
-      sectionHeader: { fontSize: 16, bold: true, margin: [0, 0, 0, 8] },
-      tableSubheader: { fontSize: 12, bold: true },
-      tableHeader: { fontSize: 9, bold: true, color: "#000000" },
-      tableCell: { fontSize: 9, margin: [0, 2, 0, 2] },
-      metaLabel: { fontSize: 10, bold: true, color: "#1f2937" },
-      metaValue: { fontSize: 10, color: "#1f2937" },
-      bodyText: { fontSize: 10, lineHeight: 1.3 },
-      contentItem: { fontSize: 11, margin: [0, 2, 0, 2] },
-      paragraph: { fontSize: 10, margin: [0, 2, 0, 2] },
+      coverPlaceholder:  { fontSize: 12, italics: true, color: "#FFFFFF", alignment: "center", margin: [0, 80, 0, 80] },
+      partyLabel:        { fontSize: 12, bold: true, color: "#000000", alignment: "left" },
+      partyValue:        { fontSize: 12, bold: true, alignment: "left" },
+      // Page chrome
+      pageHdrLeft:  { fontSize: 9, bold: true, color: "#1F2937" },
+      pageHdrRight: { fontSize: 9, color: "#4B5563" },
+      pageFooter:   { fontSize: 8, color: "#6B7280" },
+      // Section chrome
+      secBanner: { fontSize: 12, bold: true, color: "#000000", margin: [5, 5, 5, 5] },
+      subHdr:    { fontSize: 13, bold: true, color: "#000000" },
+      // Letter
+      ltBanner:      { fontSize: 15, bold: true, color: "#FFFFFF", margin: [0, 0, 0, 0] },
+      ltLabel:       { fontSize: 11, bold: true },
+      ltBold:        { fontSize: 11, bold: true },
+      ltValue:       { fontSize: 11 },
+      ltBody:        { fontSize: 11, lineHeight: 1.4 },
+      sigLine:       { fontSize: 12, color: "#000000" },
+      sigContact:    { fontSize: 11, color: "#000000" },
+      sigPlaceholder:{ fontSize: 9, color: "#9CA3AF", italics: true, alignment: "center" },
+      // TOC
+      tocMajor: { fontSize: 11, color: "#000000" },
+      tocSub:   { fontSize: 11, color: "#000000" },
+      // Tables
+      tblHdr:      { fontSize: 9, bold: true, color: "#000000", margin: [2, 3, 2, 3] },
+      tblCell:     { fontSize: 9, margin: [2, 2, 2, 2] },
+      qaqcSubTitle:{ fontSize: 10, margin: [4, 4, 4, 4] },
+      // Body
+      bodyText: { fontSize: 10, lineHeight: 1.35 },
+      // Photos
+      photoLocBanner: { fontSize: 11, bold: true, alignment: "center", margin: [4, 4, 4, 4] },
+      photoSecTitle:  { fontSize: 10, bold: true },
+      photoCaption:   { fontSize: 9, color: "#4B5563" },
     },
-    defaultStyle: {
-      font: "Roboto",
-    },
+
+    defaultStyle: { font: "Roboto" },
   };
 
   pdfMake.createPdf(docDefinition).download(filename);
