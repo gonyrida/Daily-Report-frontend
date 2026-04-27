@@ -2367,9 +2367,9 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         // Add construction issues with converted photos
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
-          siteLocation: issue.location || `Site Location ${i + 1}`,
-          problemDescription: issue.problem || 'No description provided',
-          actionBy: issue.actionBy || 'To be determined',
+          siteLocation: issue.location || ``,
+          problemDescription: issue.problem || '',
+          actionBy: issue.actionBy || '',
           photo: issue.photo,
         })),
         // Add other data if available

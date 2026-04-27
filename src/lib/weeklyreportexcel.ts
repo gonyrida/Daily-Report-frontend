@@ -3347,54 +3347,50 @@ export async function buildSitePhotos(
     }, 'sp.photoR.F');
     safeStyle(ws.getCell(row, 7), { border: { right: thin } }, 'sp.photoR.G');
 
-    // Insert images — anchored inside C (col index 2) and F (col index 5) only
-    // Using ext (width/height) for proper single-cell positioning
+    // Insert images — anchored inside C (left box) and F (right box).
     // ExcelJS uses 0-based col/row for image anchors.
-    console.log(`📸 Attempting to add images for row ${photoRow}:`, {
-      hasImage1: !!entry.image1,
-      hasImage2: !!entry.image2,
-      image1Type: typeof entry.image1,
-      image1Length: typeof entry.image1 === 'string' ? entry.image1.length : 'N/A',
-      image1Prefix: typeof entry.image1 === 'string' ? entry.image1.substring(0, 50) : 'N/A',
-      image2Type: typeof entry.image2,
-      image2Length: typeof entry.image2 === 'string' ? entry.image2.length : 'N/A',
-      image2Prefix: typeof entry.image2 === 'string' ? entry.image2.substring(0, 50) : 'N/A',
-    });
-
-    if (entry.image1) {
+    if (entry.image1 && typeof entry.image1 === 'string' && entry.image1.trim() !== '') {
       try {
-        console.log(`📸 Adding image1 to column C (col 2), row ${photoRow - 1}`);
         await addImageToWorksheet(workbook, ws, entry.image1, {
           tl: { col: 2, row: photoRow - 1 },
-          ext: { width: 354.24, height: 225 },
-          editAs: 'oneCell',
+          br: { col: 3, row: photoRow },
+          editAs: 'twoCell',
         } as any);
-        console.log(`✅ image1 added successfully`);
-      } catch (err) {
-        console.error('❌ Failed to add image1:', err);
+      } catch {
         ws.getCell(photoRow, 3).value = 'N/A';
+        safeStyle(ws.getCell(photoRow, 3),
+          { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+            alignment: { horizontal: 'center', vertical: 'middle' } },
+          'sp.na1');
       }
     } else {
-      console.log(`⚠️ No image1, setting N/A`);
       ws.getCell(photoRow, 3).value = 'N/A';
+      safeStyle(ws.getCell(photoRow, 3),
+        { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'sp.na1');
     }
 
-    if (entry.image2) {
+    if (entry.image2 && typeof entry.image2 === 'string' && entry.image2.trim() !== '') {
       try {
-        console.log(`📸 Adding image2 to column F (col 5), row ${photoRow - 1}`);
         await addImageToWorksheet(workbook, ws, entry.image2, {
           tl: { col: 5, row: photoRow - 1 },
-          ext: { width: 354.24, height: 225 },
-          editAs: 'oneCell',
+          br: { col: 6, row: photoRow },
+          editAs: 'twoCell',
         } as any);
-        console.log(`✅ image2 added successfully`);
-      } catch (err) {
-        console.error('❌ Failed to add image2:', err);
+      } catch {
         ws.getCell(photoRow, 6).value = 'N/A';
+        safeStyle(ws.getCell(photoRow, 6),
+          { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+            alignment: { horizontal: 'center', vertical: 'middle' } },
+          'sp.na2');
       }
     } else {
-      console.log(`⚠️ No image2, setting N/A`);
       ws.getCell(photoRow, 6).value = 'N/A';
+      safeStyle(ws.getCell(photoRow, 6),
+        { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'sp.na2');
     }
     row++;
 
@@ -3438,14 +3434,17 @@ export async function buildConstructionIssues(
   // No tab color — matches template
 
   // ── Column widths A..E exactly as template ──────────────────────────────
-  // Template has ONLY 5 columns (A-E), NOT 19.
   ws.getColumn(1).width = 5.71;   // A margin
-  ws.getColumn(2).width = 51.71;  // B text side (labels + description body)
-  ws.getColumn(3).width = 1.14;   // C thin spacer framing left of photo
-  ws.getColumn(4).width = 48.71;  // D photo box
-  ws.getColumn(5).width = 1.28;   // E thin spacer framing right of photo
+  ws.getColumn(2).width = 51.71;  // B text side (label + description body + action)
+  ws.getColumn(3).width = 1.14;   // C thin spacer (left frame of photo column)
+  ws.getColumn(4).width = 48.71;  // D photo body
+  ws.getColumn(5).width = 1.28;   // E thin spacer (right frame of photo column)
 
-  // ── Styles ───────────────────────────────────────────────────────────────
+  // ── Reusable border pieces ──────────────────────────────────────────────
+  const thin = { style: 'thin' as const };
+  const allBorders = { top: thin, bottom: thin, left: thin, right: thin };
+
+  // ── Styles ──────────────────────────────────────────────────────────────
   const titleStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
@@ -3455,64 +3454,45 @@ export async function buildConstructionIssues(
     font: { bold: true, size: 12, name: 'Arial' },
     fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
+  // Issue number row — template has ONLY left border on the leading cell.
   const issueNumberStyle: Partial<ExcelJS.Style> = {
     font: { bold: true, size: 11, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
   const siteLocationStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, bottom: thin, left: thin },
   };
   const photoRefHeaderStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'center', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: { top: thin, left: thin, right: thin, bottom: thin },
   };
   const descLabelStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
-    alignment: { horizontal: 'left', vertical: 'top' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    alignment: { horizontal: 'left', vertical: 'middle' },
+    border: allBorders,
   };
   const descBodyStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'top', wrapText: true },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
   const actionStyle: Partial<ExcelJS.Style> = {
     font: { size: 10, name: 'Arial' },
     alignment: { horizontal: 'left', vertical: 'middle' },
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+    border: allBorders,
   };
-  const photoBoxStyle: Partial<ExcelJS.Style> = {
-    border: {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    },
+  // Photo frame column borders (C left edge, E right edge)
+  const photoFrameLeftStyle: Partial<ExcelJS.Style> = {
+    border: { left: thin },
+  };
+  const photoFrameRightStyle: Partial<ExcelJS.Style> = {
+    border: { right: thin },
   };
 
   let r = 2;
@@ -3523,7 +3503,7 @@ export async function buildConstructionIssues(
   safeStyle(ws.getCell(r, 2), titleStyle, 'ci.title');
   for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(r, c), titleStyle, 'ci.title.span');
   safeMerge(ws, r, 2, r, 5);
-  r++; // 3 — blank row
+  r++; // 3 — blank
   r++; // 4
 
   // ── Row 4: Banner "Construction Issue" — merged B:E ─────────────────────
@@ -3536,34 +3516,42 @@ export async function buildConstructionIssues(
 
   // ── Issue blocks ─────────────────────────────────────────────────────────
   const issues = d.constructionIssues ?? [];
+  const issuesToRender: ConstructionIssue[] = [];
 
-  // Always show exactly 4 issue boxes
-  const issuesToRender = [];
-  for (let i = 0; i < 4; i++) {
-    if (i < issues.length) {
-      // Use actual issue data
-      issuesToRender.push(issues[i]);
-    } else {
-      // Use empty issue box with just the number
+  if (issues.length > 0) {
+    // Render all actual issues
+    issuesToRender.push(...issues);
+  } else {
+    // If no issues, render 4 empty placeholder boxes
+    for (let i = 0; i < 4; i++) {
       issuesToRender.push({ number: i + 1 } as ConstructionIssue);
     }
   }
 
   for (let idx = 0; idx < issuesToRender.length; idx++) {
-    const issue = issuesToRender[idx];
-    r = await renderIssueBlock(workbook, ws, r, issue, idx);
+    r = await renderIssueBlock(workbook, ws, r, issuesToRender[idx], idx);
   }
 
-  // Inner helper — one issue block is 14 rows.
-  // Relative row offsets (0..13):
-  //   +0  (h=18)   : issue number       → B:E merged
-  //   +1  (h=18)   : "Site Location:"   → B single     | "Photo Reference" → C:E merged
-  //   +2  (h=5.25) : top of desc band   | photo frame opens (C, E span +2..+13)
-  //   +3  (h=18)   : desc body opens    | photo body D opens (D spans +3..+12)
-  //   +4..+10      : desc body continues
-  //   +11 (h=18)   : desc body ends     (B body spans +3..+10, i.e. 8 rows)
-  //   +12 (h=18)   : "Action by:"       → B spans +12..+13
-  //   +13 (h=5.25) : bottom of block    (photo frame closes)
+  // ────────────────────────────────────────────────────────────────────────
+  // renderIssueBlock: emits exactly 14 rows, matching template byte-for-byte.
+  //
+  // Relative offsets (r0 = first row of block):
+  //   r0+0   (h=18.0)   Issue number       [B:E merged, only L border]
+  //   r0+1   (h=18.0)   "Site Location:"   [B single]
+  //                     "Photo Reference"  [C:E merged]
+  //   r0+2   (h=5.25)   "Problems / Descriptions:" label opens [B(r0+2:r0+3)]
+  //                     Photo frame opens: C(r0+2:r0+13), E(r0+2:r0+13)
+  //   r0+3   (h=18.0)   Photo body opens   [D(r0+3:r0+12)]
+  //                     End of label B
+  //   r0+4   (h=18.0)   Description body opens [B(r0+4:r0+11)]
+  //   r0+5..r0+10       (inside desc body merge)
+  //   r0+11  (h=18.0)   End of description body
+  //   r0+12  (h=18.0)   "Action by:" opens [B(r0+12:r0+13)]
+  //                     End of photo body D
+  //   r0+13  (h=5.25)   Bottom spacer; end of all photo column merges
+  //
+  //   Block is 14 rows total. Returns r0 + 14.
+  // ────────────────────────────────────────────────────────────────────────
   async function renderIssueBlock(
     wb: ExcelJS.Workbook,
     ws: ExcelJS.Worksheet,
@@ -3573,24 +3561,32 @@ export async function buildConstructionIssues(
   ): Promise<number> {
     const r0 = startRow;
 
-    // Row heights
+    // Row heights — exactly 14 rows
     ws.getRow(r0 + 0).height = 18;     // issue number
     ws.getRow(r0 + 1).height = 18;     // site location / photo ref header
-    ws.getRow(r0 + 2).height = 5.25;   // top of desc band
-    for (let k = 3; k <= 18; k++) ws.getRow(r0 + k).height = 18;  // desc body (+ action top + photo extension)
-    ws.getRow(r0 + 12).height = 18;    // action-by continuation row
+    ws.getRow(r0 + 2).height = 5.25;   // top spacer (opens label + photo frame)
+    for (let k = 3; k <= 12; k++) ws.getRow(r0 + k).height = 18;  // body rows
     ws.getRow(r0 + 13).height = 5.25;  // bottom spacer
 
-    // r+0 : Issue number (B:E merged)
+    // ── r0+0 : Issue number (B:E merged, only L border) ──────────────────
     {
       const row = r0 + 0;
       ws.getCell(row, 2).value = issue.number ?? (idx + 1);
       safeStyle(ws.getCell(row, 2), issueNumberStyle, 'ci.num');
-      for (let c = 3; c <= 5; c++) safeStyle(ws.getCell(row, c), issueNumberStyle, 'ci.num.span');
+      // Spanning cells get no border styling (template has none on C5/D5)
+      // but we still need to apply font for the merge to render cleanly.
+      for (let c = 3; c <= 5; c++) {
+        safeStyle(ws.getCell(row, c),
+          { font: { size: 11, name: 'Arial' } }, 'ci.num.span');
+      }
+      // Right edge needs a closing border
+      safeStyle(ws.getCell(row, 5),
+        { border: { right: thin }, font: { size: 11, name: 'Arial' } },
+        'ci.num.right');
       safeMerge(ws, row, 2, row, 5);
     }
 
-    // r+1 : Site Location (B single) + Photo Reference header (C:E merged)
+    // ── r0+1 : Site Location (B) + Photo Reference header (C:E) ──────────
     {
       const row = r0 + 1;
       ws.getCell(row, 2).value = `Site Location: ${issue.siteLocation ?? ''}`;
@@ -3598,62 +3594,76 @@ export async function buildConstructionIssues(
 
       ws.getCell(row, 3).value = 'Photo Reference';
       safeStyle(ws.getCell(row, 3), photoRefHeaderStyle, 'ci.photoRef');
-      safeStyle(ws.getCell(row, 4), photoRefHeaderStyle, 'ci.photoRef.span');
-      safeStyle(ws.getCell(row, 5), photoRefHeaderStyle, 'ci.photoRef.span');
+      // Spanning cells in the C:E merge
+      safeStyle(ws.getCell(row, 4),
+        { border: allBorders,
+          font: { size: 10, name: 'Arial' },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'ci.photoRef.span');
+      safeStyle(ws.getCell(row, 5),
+        { border: allBorders,
+          font: { size: 10, name: 'Arial' },
+          alignment: { horizontal: 'center', vertical: 'middle' } },
+        'ci.photoRef.right');
       safeMerge(ws, row, 3, row, 5);
     }
 
-    // Photo frame — open verticals now: C and E span r+2..r+13 (12 rows)
+    // ── Photo frame: C and E vertical spacers span r0+2..r0+13 (12 rows) ─
     {
       const top = r0 + 2;
       const bot = r0 + 13;
-      // Left vertical spacer C
-      safeStyle(ws.getCell(top, 3), photoBoxStyle, 'ci.photoC');
-      for (let rr = top + 1; rr <= bot; rr++) {
-        safeStyle(ws.getCell(rr, 3), photoBoxStyle, 'ci.photoC.span');
+
+      // Column C: left frame edge
+      for (let rr = top; rr <= bot; rr++) {
+        safeStyle(ws.getCell(rr, 3), photoFrameLeftStyle, 'ci.photoC');
       }
+      // Bottom-left corner gets a bottom border too
+      safeStyle(ws.getCell(bot, 3),
+        { border: { left: thin, bottom: thin } }, 'ci.photoC.bot');
       safeMerge(ws, top, 3, bot, 3);
 
-      // Right vertical spacer E
-      safeStyle(ws.getCell(top, 5), photoBoxStyle, 'ci.photoE');
-      for (let rr = top + 1; rr <= bot; rr++) {
-        safeStyle(ws.getCell(rr, 5), photoBoxStyle, 'ci.photoE.span');
+      // Column E: right frame edge
+      for (let rr = top; rr <= bot; rr++) {
+        safeStyle(ws.getCell(rr, 5), photoFrameRightStyle, 'ci.photoE');
       }
+      safeStyle(ws.getCell(bot, 5),
+        { border: { right: thin, bottom: thin } }, 'ci.photoE.bot');
       safeMerge(ws, top, 5, bot, 5);
 
-      // Photo body D spans r+3..r+18 (15 rows)
+      // Column D: photo body merge spans r0+3..r0+12 (10 rows)
       const dTop = r0 + 3;
-      const dBot = r0 + 18;
-      safeStyle(ws.getCell(dTop, 4), photoBoxStyle, 'ci.photoD');
-      for (let rr = dTop + 1; rr <= dBot; rr++) {
-        safeStyle(ws.getCell(rr, 4), photoBoxStyle, 'ci.photoD.span');
-      }
+      const dBot = r0 + 12;
+      // Bottom of D needs a bottom border to close the frame between D12 and the spacer row
+      // (Template shows D18 has B=thin — the bottom spacer carries the bottom edge.)
+      // So we put bottom: thin on D at r0+13 (the spacer row) instead.
+      safeStyle(ws.getCell(r0 + 13, 4), { border: { bottom: thin } }, 'ci.photoD.bot');
       safeMerge(ws, dTop, 4, dBot, 4);
 
-      // ── Add issue photo if provided ──────────────────────────────────────
+      // ── Insert image, or N/A placeholder ───────────────────────────────
       if (issue.photo && typeof issue.photo === 'string' && issue.photo.trim() !== '') {
-        // ExcelJS uses 0-based indices for tl/br; column D = index 3
-        await addImageToWorksheet(wb, ws, issue.photo, {
-          tl: { col: 3, row: dTop - 1 },        // D, top row (0-based)
-          ext: { width: 336, height: 100 },
-          editAs: 'absolute',
-        } as any);
+        try {
+          await addImageToWorksheet(wb, ws, issue.photo, {
+            tl: { col: 3, row: dTop - 1 },
+            br: { col: 4, row: dBot },
+            editAs: 'twoCell',
+          } as any);
+        } catch {
+          ws.getCell(dTop, 4).value = 'N/A';
+          safeStyle(ws.getCell(dTop, 4),
+            { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+              alignment: { horizontal: 'center', vertical: 'middle' } },
+            'ci.na');
+        }
       } else {
-        // No photo — show N/A centered in the box
-        const naStyle: Partial<ExcelJS.Style> = {
-          font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
-          alignment: { horizontal: 'center', vertical: 'middle' },
-          border: {
-            top: { style: 'thin' }, bottom: { style: 'thin' },
-            left: { style: 'thin' }, right: { style: 'thin' },
-          },
-        };
         ws.getCell(dTop, 4).value = 'N/A';
-        safeStyle(ws.getCell(dTop, 4), naStyle, 'ci.na');
+        safeStyle(ws.getCell(dTop, 4),
+          { font: { size: 14, name: 'Arial', italic: true, color: { argb: 'FF888888' } },
+            alignment: { horizontal: 'center', vertical: 'middle' } },
+          'ci.na');
       }
     }
 
-    // r+2..r+3 : "Problems / Descriptions:" label — B spans 2 rows
+    // ── r0+2..r0+3 : "Problems / Descriptions:" label — B spans 2 rows ───
     {
       const top = r0 + 2;
       const bot = r0 + 3;
@@ -3663,7 +3673,7 @@ export async function buildConstructionIssues(
       safeMerge(ws, top, 2, bot, 2);
     }
 
-    // r+4..r+11 : description body — B spans 8 rows
+    // ── r0+4..r0+11 : description body — B spans 8 rows ──────────────────
     {
       const top = r0 + 4;
       const bot = r0 + 11;
@@ -3675,7 +3685,7 @@ export async function buildConstructionIssues(
       safeMerge(ws, top, 2, bot, 2);
     }
 
-    // r+12..r+13 : "Action by: …" — B spans 2 rows
+    // ── r0+12..r0+13 : "Action by:" — B spans 2 rows ─────────────────────
     {
       const top = r0 + 12;
       const bot = r0 + 13;
@@ -3685,6 +3695,6 @@ export async function buildConstructionIssues(
       safeMerge(ws, top, 2, bot, 2);
     }
 
-    return r0 + 19;
+    return r0 + 14;
   }
 }
