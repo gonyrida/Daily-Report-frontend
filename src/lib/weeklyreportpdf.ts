@@ -66,6 +66,34 @@ const subHdr = (text: string, mt = 8): any => ({
 const pb = (): any => ({ text: "", pageBreak: "after" });
 
 /**
+ * Create a text line with dashed underline (for form-style fields)
+ * @param text - The text content to display
+ * @param lines - Number of dashed lines to show (default: 1)
+ */
+const dashedLineText = (text: string, lines = 1): any => {
+  const content: any[] = [{ text: text || "", style: "bodyText" }];
+  // Add dashed lines
+  for (let i = 0; i < lines; i++) {
+    content.push({
+      canvas: [
+        {
+          type: "line",
+          x1: 0,
+          y1: 0,
+          x2: 515,
+          y2: 0,
+          lineColor: "#000000",
+          lineWidth: 0.5,
+          lineDash: [1, 1],
+        },
+      ],
+      margin: [0, 4, 0, 0],
+    });
+  }
+  return { stack: content, margin: [0, 0, 0, 8] };
+};
+
+/**
  * Build a styled table.
  * Headers: { text, w?, align? }
  * Row cells: { text, align?, fill?, bold?, colSpan? } | null (null = colspan placeholder)
@@ -114,10 +142,10 @@ const mkTable = (
       body,
     },
     layout: {
-      hLineWidth: (r: number, n: any) => (r === 0 || r === n.table.body.length) ? 0.8 : 0.4,
-      vLineWidth: () => 0.4,
-      hLineColor: () => "#CCCCCC",
-      vLineColor: () => "#CCCCCC",
+      hLineWidth: (r: number, n: any) => (r === 0 || r === n.table.body.length) ? 1 : 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => "#000000",
+      vLineColor: () => "#000000",
     },
   };
 };
@@ -378,71 +406,116 @@ const QAQC_DEFS = [
 ];
 
 function buildQAQC(data: WeeklyReportExportData): any[] {
-  const items: any[] = [secBanner("4.  QA/QC STATUS")];
+  const items: any[] = [];
 
-  QAQC_DEFS.forEach(def => {
+  // Main section header - force new page
+  items.push(secBanner("4.  QA/QC STATUS"));
+  items[0].pageBreak = 'before';
+
+  QAQC_DEFS.forEach((def, index) => {
+    // Repeat header banner every 3 sections (new page indicator)
+    if (index > 0 && index % 3 === 0) {
+      const continuedBanner = secBanner("4.  QA/QC STATUS (Continued)");
+      continuedBanner.pageBreak = 'before';
+      items.push(continuedBanner);
+    }
+
     const sec = data.qaqcSections?.find(
       sec => sec.sectionTitle === def.id || def.keys.includes((sec.sectionTitle ?? "").toLowerCase()),
     );
 
     // Sub-section title
-    items.push({
+    const subTitle = {
       table: {
         widths: ["*"],
         body: [[{
           text: [{ text: `${def.id}  `, bold: true }, { text: def.title }],
-          fillColor: QAQC_FILL,
           style: "qaqcSubTitle",
         }]],
       },
       layout: { defaultBorder: false },
       margin: [0, 8, 0, 2],
+    };
+
+    const qRows = (sec?.items ?? []).map(it => {
+      // Handle special fields for sections 4.5 and 4.6
+      let col3Value: string;
+      let col4Value: string;
+
+      if (def.id === "4.5") {
+        // Client Site Instruction: Issued By, Issued Date
+        col3Value = (it as any).issuedBy || it.status || "";
+        col4Value = (it as any).issuedDate || (it as any).dateResponse || "";
+      } else if (def.id === "4.6") {
+        // Inspection Request: Received Date, Inspection Date
+        col3Value = (it as any).receivedDate || (it as any).dateResponse || "";
+        col4Value = (it as any).inspectionDate || "";
+      } else {
+        // Standard: Status, Date Responded
+        col3Value = it.status || "";
+        col4Value = (it as any).dateResponse || "";
+      }
+
+      return [
+        { text: s(it.code),                     align: "center" },
+        { text: s(it.description || it.comment), align: "left"  },
+        { text: s(col3Value),                   align: "center" },
+        { text: s(col4Value),                   align: "center" },
+      ];
     });
 
-    const qRows = (sec?.items ?? []).map(it => [
-      { text: s(it.code),                     align: "center" },
-      { text: s(it.description || it.comment), align: "left"  },
-      { text: s(it.status),                   align: "center" },
-      { text: s(it.date),                     align: "center" },
+    // Always show exactly 5 rows total (data + empty padding like Excel)
+    const emptyRowsNeeded = Math.max(0, 5 - qRows.length);
+    const emptyRows = Array(emptyRowsNeeded).fill(null).map(() => [
+      { text: "", align: "center" as const },
+      { text: "", align: "left"   as const },
+      { text: "", align: "center" as const },
+      { text: "", align: "center" as const },
     ]);
+    const dataRows = [...qRows, ...emptyRows];
 
-    // Always show at least 3 empty rows when no data
-    const dataRows = qRows.length
-      ? qRows
-      : Array(3).fill(null).map(() => [
-          { text: "", align: "center" as const },
-          { text: "", align: "left"   as const },
-          { text: "", align: "center" as const },
-          { text: "", align: "center" as const },
-        ]);
-
-    items.push(mkTable(
+    const table = mkTable(
       [
-        { text: "Code",       w: 55  },
-        { text: "Description", w: "*" },
-        { text: def.col3,     w: 80  },
-        { text: def.col4,     w: 72  },
+        { text: "Code",        w: 125 },
+        { text: "Description", w: 200 },
+        { text: def.col3,      w: 75  },
+        { text: def.col4,      w: 75  },
       ],
       dataRows,
-      { hFill: SEC_FILL },
-    ));
+      { hFill: SEC_FILL, altRows: false },
+    );
 
-    // Comments row
+    // Comments row - match Excel style: "Comments:" bold+underline, then value
     const comments = sec?.comments ?? "";
-    items.push({
+    const commentsRow = {
       table: {
         widths: ["*"],
         body: [[{
-          text: [{ text: "Comments: ", bold: true }, { text: comments }],
+          text: [
+            { text: "Comments: ", bold: true, decoration: "underline" },
+            { text: comments }
+          ],
           style: "tblCell",
           fontSize: 9,
+          margin: [4, 8, 4, 8],
+          alignment: "left",
+          valign: "top",
         }]],
       },
       layout: {
-        hLineWidth: () => 0.4, vLineWidth: () => 0.4,
-        hLineColor: () => "#CCCCCC", vLineColor: () => "#CCCCCC",
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => "#000000",
+        vLineColor: () => "#000000",
       },
       margin: [0, 0, 0, 0],
+    };
+
+    // Wrap section title, table, and comments in a stack to keep them together
+    items.push({
+      stack: [subTitle, table, commentsRow],
+      pageBreak: 'avoid',
+      margin: [0, 0, 0, 10],
     });
   });
 
@@ -453,86 +526,159 @@ function buildQAQC(data: WeeklyReportExportData): any[] {
 function buildHSE(data: WeeklyReportExportData): any[] {
   const items: any[] = [secBanner("5.  HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)")];
 
-  if (data.hseTraining?.length) {
-    items.push(subHdr("5.1  HSES Training / Introduction / Toolbox Meeting", 0));
-    items.push(mkTable(
-      [
-        { text: "Type of Training", w: "*" },
-        { text: "Date",             w: 55  },
-        { text: "Venue",            w: 70  },
-        { text: "Trainer",          w: 70  },
-        { text: "Attendee",         w: 50  },
-        { text: "Remarks",          w: 80  },
-      ],
-      data.hseTraining.map(r => [
-        { text: s(r.typeOfTraining)                },
-        { text: s(r.date),    align: "center" },
-        { text: s(r.venue)                         },
-        { text: s(r.trainer)                       },
-        { text: s(r.attendee), align: "center" },
-        { text: s(r.remarks)                       },
-      ]),
-    ));
-  }
+  // 5.1 HSES Training - always show with min 3 rows like Excel
+  items.push(subHdr("5.1  HSES Training / Introduction / Toolbox Meeting", 0));
+  const trainingRows = (data.hseTraining ?? []).map(r => [
+    { text: s(r.typeOfTraining)                },
+    { text: s(r.date),    align: "center" },
+    { text: s(r.venue)                         },
+    { text: s(r.trainer)                       },
+    { text: s(r.attendee), align: "center" },
+    { text: s(r.remarks)                       },
+  ]);
+  const trainingEmpty = Array(Math.max(0, 3 - trainingRows.length)).fill(null).map(() => [
+    { text: "", align: "left"   as const },
+    { text: "", align: "center" as const },
+    { text: "", align: "left"   as const },
+    { text: "", align: "left"   as const },
+    { text: "", align: "center" as const },
+    { text: "", align: "left"   as const },
+  ]);
+  items.push(mkTable(
+    [
+      { text: "Type of Training", w: "*" },
+      { text: "Date",             w: 55  },
+      { text: "Venue",            w: 70  },
+      { text: "Trainer",          w: 70  },
+      { text: "Attendee",         w: 50  },
+      { text: "Remarks",          w: 80  },
+    ],
+    [...trainingRows, ...trainingEmpty],
+    { hFill: SEC_FILL, altRows: false },
+  ));
 
-  if (data.hseInspection?.length) {
-    items.push(subHdr("5.2  HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist"));
-    items.push(mkTable(
-      [
-        { text: "Type of Inspection", w: "*"  },
-        { text: "Date",               w: 55   },
-        { text: "Inspector",          w: 80   },
-        { text: "Remarks",            w: 100  },
-      ],
-      data.hseInspection.map(r => [
-        { text: s(r.typeOfInspection)               },
-        { text: s(r.date),       align: "center" },
-        { text: s(r.inspector)                      },
-        { text: s(r.remarks)                        },
-      ]),
-    ));
-  }
+  // 5.2 HSES Inspection - always show with min 3 rows like Excel
+  items.push(subHdr("5.2  HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist"));
+  const inspectionRows = (data.hseInspection ?? []).map(r => [
+    { text: s(r.typeOfInspection)               },
+    { text: s(r.date),       align: "center" },
+    { text: s(r.inspector)                      },
+    { text: s(r.remarks)                        },
+  ]);
+  const inspectionEmpty = Array(Math.max(0, 3 - inspectionRows.length)).fill(null).map(() => [
+    { text: "", align: "left"   as const },
+    { text: "", align: "center" as const },
+    { text: "", align: "left"   as const },
+    { text: "", align: "left"   as const },
+  ]);
+  items.push(mkTable(
+    [
+      { text: "Type of Inspection", w: "*"  },
+      { text: "Date",               w: 55   },
+      { text: "Inspector",          w: 80   },
+      { text: "Remarks",            w: 100  },
+    ],
+    [...inspectionRows, ...inspectionEmpty],
+    { hFill: SEC_FILL, altRows: false },
+  ));
 
-  if (data.hsePermits?.length) {
-    items.push(subHdr("5.3  Permit to Work"));
-    items.push(mkTable(
-      [
-        { text: "Type of Permit", w: "*" },
-        { text: "Start Date",     w: 55  },
-        { text: "End Date",       w: 55  },
-        { text: "Inspector",      w: 65  },
-        { text: "Approver",       w: 65  },
-        { text: "Remarks",        w: 75  },
-      ],
-      data.hsePermits.map(r => [
-        { text: s(r.typeOfPermit)                    },
-        { text: s(r.startDate), align: "center" },
-        { text: s(r.endDate),   align: "center" },
-        { text: s(r.inspector)                       },
-        { text: s(r.approver)                        },
-        { text: s(r.remarks)                         },
-      ]),
-    ));
-  }
+  // 5.3 Permit to Work - always show with min 3 rows like Excel
+  items.push(subHdr("5.3  Permit to Work"));
+  const permitRows = (data.hsePermits ?? []).map(r => [
+    { text: s(r.typeOfPermit)                    },
+    { text: s(r.startDate), align: "center" },
+    { text: s(r.endDate),   align: "center" },
+    { text: s(r.inspector)                       },
+    { text: s(r.approver)                        },
+    { text: s(r.remarks)                         },
+  ]);
+  const permitEmpty = Array(Math.max(0, 3 - permitRows.length)).fill(null).map(() => [
+    { text: "", align: "left"   as const },
+    { text: "", align: "center" as const },
+    { text: "", align: "center" as const },
+    { text: "", align: "left"   as const },
+    { text: "", align: "left"   as const },
+    { text: "", align: "left"   as const },
+  ]);
+  items.push(mkTable(
+    [
+      { text: "Type of Permit", w: "*" },
+      { text: "Start Date",     w: 55  },
+      { text: "End Date",       w: 55  },
+      { text: "Inspector",      w: 65  },
+      { text: "Approver",       w: 65  },
+      { text: "Remarks",        w: 75  },
+    ],
+    [...permitRows, ...permitEmpty],
+    { hFill: SEC_FILL, altRows: false },
+  ));
 
-  if (data.hseFirstAid) {
-    items.push(subHdr("5.4  First Aid / Accident / Incident / Near Miss / Fatalities (if Any)"));
-    items.push({ text: s(data.hseFirstAid), style: "bodyText" });
-  }
+  // 5.4 First Aid - always show with dashed line
+  items.push(subHdr("5.4  First Aid / Accident / Incident / Near Miss / Fatalities (if Any)"));
+  items.push(dashedLineText(s(data.hseFirstAid ?? ""), 1));
 
-  if (data.hseOtherConcerns) {
-    items.push(subHdr("5.5  Other HSES Activities Concerns"));
-    items.push({ text: s(data.hseOtherConcerns), style: "bodyText" });
-  }
+  // 5.5 Other Concerns - always show with dashed line
+  items.push(subHdr("5.5  Other HSES Activities Concerns"));
+  items.push(dashedLineText(s(data.hseOtherConcerns ?? ""), 1));
 
   const tb = data.hsePhotoReferences?.hseToolboxMeeting ?? [];
   const ap = data.hsePhotoReferences?.hseActivityPhotos ?? [];
   if (tb.length || ap.length) {
     items.push(subHdr("5.6  HSES Photo Reference"));
 
-    const renderPhotoGroup = (secTitle: string, entries: any[]) => {
+    // Helper to create photo box with connected caption (like Excel)
+    const createPhotoBox = (img: string | undefined, desc: string): any => {
+      const photoContent = img
+        ? { image: img, fit: [200, 140], alignment: "center" as const }
+        : { text: "N/A", style: "tblCell", fontSize: 11, alignment: "center" as const, margin: [0, 60, 0, 0] };
+
+      // Single table with 2 rows: photo row + caption row (connected borders)
+      return {
+        table: {
+          widths: ["*"],
+          body: [
+            [{ stack: [photoContent], margin: [4, 4, 4, 4] }], // Photo cell
+            [{ text: desc || "", style: "photoCaption", alignment: "center" as const, fontSize: 9, margin: [2, 2, 2, 2] }], // Caption cell
+          ],
+        },
+        layout: {
+          hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 0.5 : 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#000000",
+          vLineColor: () => "#000000",
+        },
+        width: "*",
+      };
+    };
+
+    // Helper to create blue header box like Excel
+    const createPhotoHeader = (title: string): any => ({
+      table: {
+        widths: ["*"],
+        body: [[{
+          text: title,
+          bold: true,
+          fontSize: 11,
+          color: "#000000",
+          fillColor: SEC_FILL, // Blue background like Excel
+          alignment: "center" as const,
+          margin: [0, 4, 0, 4],
+        }]],
+      },
+      layout: {
+        hLineWidth: () => 1,
+        vLineWidth: () => 1,
+        hLineColor: () => "#000000",
+        vLineColor: () => "#000000",
+      },
+      margin: [0, 0, 0, 0],
+    });
+
+    const renderPhotoGroup = (headerText: string, secTitle: string, entries: any[]) => {
       if (!entries.length) return;
-      items.push({ text: secTitle, style: "photoSecTitle", margin: [0, 4, 0, 4] });
+      // Blue header box
+      items.push(createPhotoHeader(headerText));
+      items.push({ text: secTitle, style: "photoSecTitle", margin: [0, 6, 0, 4] });
       entries.forEach(entry => {
         const imgs: string[] = entry.images ?? [];
         const descs: string[] = entry.descriptions ?? [];
@@ -540,17 +686,15 @@ function buildHSE(data: WeeklyReportExportData): any[] {
           const pair: any[] = [0, 1].map(j => {
             const img  = imgs[i + j];
             const desc = descs[i + j] ?? "";
-            return img
-              ? { stack: [{ image: img, fit: [225, 155], alignment: "center" }, { text: desc, style: "photoCaption", margin: [0, 2, 0, 0] }], width: "*" }
-              : { text: "", width: "*" };
+            return createPhotoBox(img, desc);
           });
-          items.push({ columns: pair, columnGap: 8, margin: [0, 0, 0, 6] });
+          items.push({ columns: pair, columnGap: 8, margin: [0, 0, 0, 8] });
         }
       });
     };
 
-    renderPhotoGroup("5.6.1  HSES Training / Toolbox Meeting Photos", tb);
-    renderPhotoGroup("5.6.2  HSES Activity Photos", ap);
+    renderPhotoGroup("HSE Toolbox Meeting", "5.6.1  HSES Training / Toolbox Meeting Photos", tb);
+    renderPhotoGroup("HSE Activity Photo", "5.6.2  HSES Activity Photos", ap);
   }
 
   return items;

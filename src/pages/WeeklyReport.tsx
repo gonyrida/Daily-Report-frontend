@@ -2243,6 +2243,19 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           actionBy: issue.actionBy,
           photo: issue.photo,
         })),
+        qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => {
+          const isBackendFormat = value && typeof value === 'object' && !Array.isArray(value) && 'items' in value;
+          const rawItems = isBackendFormat ? (value.items || []) : (Array.isArray(value) ? value : []);
+          const items = rawItems.map((item: any) => ({
+            ...item,
+            dateResponse: item.dateResponse || item.dateResponded || '',
+          }));
+          const comments = isBackendFormat
+            ? (value.comments || '')
+            : (Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '');
+          return { sectionTitle: key, items, comments };
+        }) : [],
+        ...transformHSEToExcelFormat(hsesData),
       });
 
       await exportWeeklyReportToPdf(exportData, filename);
