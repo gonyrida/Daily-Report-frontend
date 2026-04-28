@@ -1003,51 +1003,101 @@ function buildSitePhotos(data: WeeklyReportExportData): any[] {
 function buildConstructionIssues(data: WeeklyReportExportData): any[] {
   const items: any[] = [secBanner("8.  CONSTRUCTION ISSUE")];
 
-  const rows = (data.constructionIssues ?? []).map(issue => [
-    { text: s(issue.number),             align: "center" },
-    { text: s(issue.siteLocation)                        },
-    { text: s(issue.problemDescription)                  },
-    { text: s(issue.actionBy)                            },
-  ]);
+  // Inner banner matching Excel - "Construction Issue" centered with blue fill
+  items.push({
+    table: {
+      widths: ["*"],
+      body: [[{
+        text: "Construction Issue",
+        bold: true,
+        fontSize: 12,
+        fillColor: SEC_FILL,
+        alignment: "center",
+        margin: [0, 6, 0, 6],
+      }]],
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => "#000000",
+      vLineColor: () => "#000000",
+    },
+    margin: [0, 0, 0, 0],
+  });
 
-  const emptyRow = [[
-    { text: "No construction issues available.", colSpan: 4, align: "center" as const },
-    null, null, null,
-  ]];
+  const issues = data.constructionIssues ?? [];
+  const issuesToRender: any[] = [];
 
-  items.push(mkTable(
-    [
-      { text: "No",                   w: 28  },
-      { text: "Site Location",        w: 100 },
-      { text: "Problem Description",  w: "*" },
-      { text: "Action By",            w: 100 },
-    ],
-    rows.length ? rows : emptyRow,
-  ));
+  // Always render up to 4 boxes - actual issues first, then empty placeholders
+  const actualIssues = issues.slice(0, 4); // Take first 4 actual issues
+  const emptySlotsNeeded = Math.max(0, 4 - actualIssues.length);
 
-  const withPhotos = (data.constructionIssues ?? []).filter(i => i.photo);
-  if (withPhotos.length) {
-    items.push(subHdr("Issue Photos"));
-    for (let i = 0; i < withPhotos.length; i += 2) {
-      const pair: any[] = [0, 1].map(j => {
-        const issue = withPhotos[i + j];
-        if (!issue?.photo) return { text: "", width: "*" };
-        return {
-          stack: [
-            { image: issue.photo, fit: [226, 155], alignment: "center" },
-            {
-              text: `Issue ${s(issue.number)}: ${s(issue.siteLocation)}`,
-              style: "photoCaption",
-              alignment: "center",
-              margin: [0, 2, 0, 0],
-            },
-          ],
-          width: "*",
-        };
-      });
-      items.push({ columns: pair, columnGap: 8, margin: [0, 0, 0, 8] });
-    }
+  issuesToRender.push(...actualIssues);
+
+  // Add empty placeholder boxes for remaining slots
+  for (let i = 0; i < emptySlotsNeeded; i++) {
+    issuesToRender.push({ number: actualIssues.length + i + 1 });
   }
+
+  // Build a single continuous table with all issue blocks
+  const tableBody: any[][] = [];
+
+  for (let i = 0; i < issuesToRender.length; i++) {
+    const issue = issuesToRender[i];
+    const issueNum = issue.number ?? (i + 1);
+
+    // ── Issue number row (full width, underlined number) ──
+    tableBody.push([
+      { text: String(issueNum), bold: true, fontSize: 11, decoration: "underline", alignment: "left", margin: [4, 4, 4, 4], colSpan: 2 },
+      null,
+    ]);
+
+    // ── Site Location header row + Photo Reference header (two columns) ──
+    tableBody.push([
+      { text: `Site Location: ${s(issue.siteLocation || "")}`, fontSize: 10, alignment: "left", margin: [4, 4, 4, 4] },
+      { text: "Photo Reference", fontSize: 10, alignment: "center", margin: [4, 4, 4, 4] },
+    ]);
+
+    // ── Body row: Problems/Descriptions on left, Photo on right ──
+    const photoCell = issue.photo
+      ? { image: issue.photo, fit: [240, 270], alignment: "center" as const }
+      : { text: "", alignment: "center" as const, margin: [0, 130, 0, 130] };
+
+    tableBody.push([
+      {
+        stack: [
+          { text: "Problems / Descriptions:", fontSize: 10, margin: [0, 0, 0, 6] },
+          { text: s(issue.problemDescription || ""), fontSize: 10, alignment: "left" },
+        ],
+        margin: [4, 4, 4, 4],
+      },
+      {
+        stack: [photoCell],
+        margin: [4, 4, 4, 4],
+        alignment: "center",
+      },
+    ]);
+
+    // ── Action by row (left side only) ──
+    tableBody.push([
+      { text: `Action by: ${s(issue.actionBy || "")}`, fontSize: 10, alignment: "left", margin: [4, 4, 4, 4] },
+      { text: "", margin: [4, 4, 4, 4] },
+    ]);
+  }
+
+  // Single continuous table for all issues
+  items.push({
+    table: {
+      widths: ["*", "*"],
+      body: tableBody,
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => "#000000",
+      vLineColor: () => "#000000",
+    },
+  });
 
   return items;
 }
