@@ -291,16 +291,21 @@ function buildIntro(data: WeeklyReportExportData, coverImg?: string): any[] {
 function buildOP(data: WeeklyReportExportData): any[] {
   const items: any[] = [secBanner("2.  OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK")];
 
-  const rows = (data.overallProgressItems ?? []).map(it => [
-    { text: s(it.no),                 align: "center" },
-    { text: s(it.scopeOfWorks),       align: "left"   },
-    { text: s(it.pctUpToPrevWeek ?? ''),    align: "center" },
-    { text: s(it.pctThisWeek ?? ''),        align: "center" },
-    { text: s(it.pctUpToThisWeek ?? ''),    align: "center" },
-    { text: s(it.pctRemaining ?? ''),       align: "center" },
-    { text: s(it.pctNextWeekPlan ?? ''),    align: "center" },
-    { text: s(it.pctUpNextWeekPlan ?? ''),  align: "center" },
-  ]);
+  console.log('PDF DEBUG: overallProgressItems:', JSON.stringify(data.overallProgressItems, null, 2));
+
+  const rows = (data.overallProgressItems ?? []).map((it, idx) => {
+    console.log(`PDF DEBUG: Row ${idx} pctUpToPrevWeek=`, it.pctUpToPrevWeek, 'type=', typeof it.pctUpToPrevWeek);
+    return [
+      { text: s(it.no),                 align: "center" },
+      { text: s(it.scopeOfWorks),       align: "left"   },
+      { text: s(it.pctUpToPrevWeek ?? ''),    align: "center" },
+      { text: s(it.pctThisWeek ?? ''),        align: "center" },
+      { text: s(it.pctUpToThisWeek ?? ''),    align: "center" },
+      { text: s(it.pctRemaining ?? ''),       align: "center" },
+      { text: s(it.pctNextWeekPlan ?? ''),    align: "center" },
+      { text: s(it.pctUpNextWeekPlan ?? ''),  align: "center" },
+    ];
+  });
 
   const emptyRow = [[
     { text: "No overall progress data available.", colSpan: 8, align: "center" as const },

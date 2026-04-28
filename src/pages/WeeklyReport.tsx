@@ -324,6 +324,17 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
   // Overall Progress hook
   const overallProgressHook = useOverallProgress(currentReportId || '');
 
+  // Sync overall progress data to sharedData for PDF export (unsaved changes)
+  useEffect(() => {
+    if (overallProgressHook.rows) {
+      setSharedData(prev => ({
+        ...prev,
+        overallProgress: overallProgressHook.rows,
+        overallProgressRemark: overallProgressRemark,
+      }));
+    }
+  }, [overallProgressHook.rows, overallProgressRemark]);
+
   // Issues hook for state management
   const issuesHook = useIssues();
 
@@ -2223,6 +2234,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         projectOverview: sharedData.projectOverview || '',
         designConstruction: sharedData.designNConstruction || '',
         designList: [],
+        overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
+        overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
           siteLocation: issue.location,
@@ -2325,8 +2338,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           ccLines: sharedData.ccList || [],
         },
         // Add missing overall progress data
-        overallProgress: formatRowsWithDisplayIndex(overallProgressHook.rows),
-        overallProgressRemark: overallProgressRemark,   // ← use the state
+        overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
+        overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
         // Add construction progress data - cast to any to bypass type mismatch
         constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
         conProgressProject: sharedData.projectName,

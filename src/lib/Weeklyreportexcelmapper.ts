@@ -434,20 +434,26 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
     overallProgressItems: (() => {
       const filtered = (input.overallProgress ?? [])
         .filter(row => {
-          // Remove the overly aggressive filter - keep all rows for now
-          // If you need to filter, do it based on actual business logic
           return true;
         })
-        .map((p, i) => ({
-          no: p.no ?? p.displayIndex ?? String(i + 1),
-          scopeOfWorks: p.description ?? p.scopeOfWorks,
-          pctUpToPrevWeek: String(p.pctUpToPrevWeek ?? p.prevWeek ?? ''),
-          pctThisWeek: String(p.pctThisWeek ?? p.thisWeek ?? ''),
-          pctUpToThisWeek: String(p.pctUpToThisWeek ?? p.upToThisWeek ?? ''),
-          pctRemaining: String(p.pctRemaining ?? p.remaining ?? ''),
-          pctNextWeekPlan: String(p.pctNextWeekPlan ?? p.nextWeek ?? ''),
-          pctUpNextWeekPlan: String(p.pctUpNextWeekPlan ?? p.upNextWeek ?? ''),
-        }));
+        .map((p, i) => {
+          // Helper to safely convert to string, returning '' for null/undefined/0
+          const toStr = (v: unknown) => {
+            if (v === null || v === undefined || v === '') return '';
+            return String(v);
+          };
+
+          return {
+            no: p.no ?? p.displayIndex ?? String(i + 1),
+            scopeOfWorks: p.description ?? p.scopeOfWorks ?? '',
+            pctUpToPrevWeek: toStr(p.pctUpToPrevWeek ?? p.prevWeek ?? p.prev ?? ''),
+            pctThisWeek:     toStr(p.pctThisWeek     ?? p.thisWeek  ?? p.today ?? ''),
+            pctUpToThisWeek: toStr(p.pctUpToThisWeek ?? p.upToThisWeek ?? p.accumulated ?? ''),
+            pctRemaining:    toStr(p.pctRemaining    ?? p.remaining ?? 0),
+            pctNextWeekPlan:    toStr(p.pctNextWeekPlan    ?? p.nextWeek ?? p.nextWeekPlan ?? ''),
+            pctUpNextWeekPlan:  toStr(p.pctUpNextWeekPlan  ?? p.upNextWeek ?? p.upNextWeekPlan ?? ''),
+          };
+        });
       return filtered;
     })(),
 
