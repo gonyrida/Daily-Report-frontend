@@ -2186,7 +2186,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     setIsExporting(true);
     try {
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.pdf`;
-      
+
       // Convert File objects to base64 for construction issues
       const issuesWithBase64Photos = await Promise.all(
         issuesHook.issuesData.map(async (issue) => {
@@ -2195,7 +2195,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             photo = await new Promise<string>((resolve) => {
               const reader = new FileReader();
               reader.onload = () => resolve(reader.result as string);
-              reader.readAsDataURL(issue.photo as File); // Explicit type assertion
+              reader.readAsDataURL(issue.photo as File);
             });
           } else if (typeof issue.photo === 'string') {
             photo = issue.photo;
@@ -2204,7 +2204,16 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         })
       );
 
-      // Create export data with converted photos - include coverData and override constructionIssues
+      // Debug resources data before export
+      console.log("[WeeklyReport Export] resourcesData:", resourcesData);
+      console.log("[WeeklyReport Export] manPower keys:", resourcesData?.manPower ? Object.keys(resourcesData.manPower) : 'null');
+      console.log("[WeeklyReport Export] managementTeam:", resourcesData?.manPower?.managementTeam);
+      console.log("[WeeklyReport Export] workingTeamInterior:", resourcesData?.manPower?.workingTeamInterior);
+      console.log("[WeeklyReport Export] workingTeamMEP:", resourcesData?.manPower?.workingTeamMEP);
+      const transformedResources = transformResourcesToExcelFormat(resourcesData);
+      console.log("[WeeklyReport Export] transformedResources:", transformedResources);
+
+      // Create export data with converted photos
       const dateParts = sharedData.dateRange?.split(' ~ ') || [];
       const exportData = await buildWeeklyReportExportData({
         coverData: {
@@ -2256,6 +2265,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           return { sectionTitle: key, items, comments };
         }) : [],
         ...transformHSEToExcelFormat(hsesData),
+        ...transformResourcesToExcelFormat(resourcesData),
       });
 
       await exportWeeklyReportToPdf(exportData, filename);
