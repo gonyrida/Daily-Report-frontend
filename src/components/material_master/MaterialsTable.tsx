@@ -1,6 +1,7 @@
 import { MaterialItem } from '@/components/material_master/types/material';
 import { formatPrice, formatDate, getUnitLabel } from '@/components/material_master/helpers/materialHelper';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useProfileContext } from '@/contexts/ProfileContext';
 
 interface MaterialsTableProps {
 	materials: MaterialItem[];
@@ -13,6 +14,7 @@ export default function MaterialsTable({
 	selectedMaterials,
 	onSelectionChange,
 }: MaterialsTableProps) {
+	const { profile } = useProfileContext();
 	const toggleSelect = (id: string) => {
 		if (selectedMaterials.includes(id)) {
 			onSelectionChange(selectedMaterials.filter(s => s !== id));
@@ -44,13 +46,14 @@ export default function MaterialsTable({
 			<table className="w-full border-collapse border">
 				<thead className="bg-muted/50">
 					<tr>
-						<th className="w-12 px-4 py-3 text-left">
-							<Checkbox
-								checked={selectedMaterials.length === materials.length && materials.length > 0}
-
-								onCheckedChange={toggleSelectAll}
-							/>
-						</th>
+						{profile.role !== "user" && (
+							<th className="w-12 px-4 py-3 text-left">
+								<Checkbox
+									checked={selectedMaterials.length === materials.length && materials.length > 0}
+									onCheckedChange={toggleSelectAll}
+								/>
+							</th>
+						)}
 						<th className="px-4 py-3 text-left font-medium">Reference</th>
 						<th className="px-4 py-3 text-left font-medium">Code</th>
 						<th className="px-4 py-3 text-left font-medium">Description</th>
@@ -66,12 +69,14 @@ export default function MaterialsTable({
 							key={material._id}
 							className="border-t cursor-pointer"
 						>
-							<td className="px-4">
-								<Checkbox
-									checked={selectedMaterials.includes(material._id)}
-									onCheckedChange={() => toggleSelect(material._id)}
-								/>
-							</td>
+							{profile.role !== "user" && (
+								<td className="px-4">
+									<Checkbox
+										checked={selectedMaterials.includes(material._id)}
+										onCheckedChange={() => toggleSelect(material._id)}
+									/>
+								</td>
+							)}
 							<td className="px-4 py-1">
 								<div className="flex items-center gap-2">
 									<span className="text-xs truncate max-w-[100px]">

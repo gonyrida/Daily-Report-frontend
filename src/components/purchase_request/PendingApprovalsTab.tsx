@@ -486,7 +486,7 @@ const PendingApprovalsTab = ({
 											checked={selectedRequests.length === requests.length && requests.length > 0}
 											onChange={e => {
 												if (e.target.checked) {
-													setSelectedRequests(requests.map(r => r.id));
+													setSelectedRequests(requests.map(r => r._id));
 												} else {
 													setSelectedRequests([]);
 												}

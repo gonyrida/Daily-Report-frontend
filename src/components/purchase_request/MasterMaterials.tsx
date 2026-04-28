@@ -5,6 +5,7 @@ import { MaterialItem } from '@/components/material_master/types/material';
 import MaterialsTable from '../material_master/MaterialsTable';
 import MaterialDialog from '../material_master/MaterialDialog';
 import useMaterials from '@/components/material_master/hooks/useMaterial';
+import { useProfileContext } from '@/contexts/ProfileContext';
 
 interface MasterMaterialsProps {
 	onRefresh?: () => void;
@@ -29,6 +30,7 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 	const [editingMaterial, setEditingMaterial] = useState<MaterialItem | null>(null);
 	const [searchTerm, setSearchTerm] = useState('');
 	const [filterBrand, setFilterBrand] = useState('');
+	const { profile } = useProfileContext();
 
 	// Filter materials based on search and brand
 	const filteredMaterials = materials.filter(material => {
@@ -147,29 +149,33 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 					<CardTitle className="text-xl font-semibold">Material Items</CardTitle>
 
 					<div className="flex gap-2">
-						<Button
-							variant="default"
-							size="sm"
-							onClick={handleCreateNew}
-						>
-							New Item
-						</Button>
-						<Button
-							variant="default"
-							size="sm"
-							onClick={handleEdit}
-							disabled={selectedMaterials.length !== 1}
-						>
-							Edit Item
-						</Button>
-						<Button
-							variant="destructive"
-							size="sm"
-							onClick={handleDelete}
-							disabled={selectedMaterials.length === 0}
-						>
-							Delete Selected ({selectedMaterials.length})
-						</Button>
+						{profile.role !== 'user' && (
+							<>
+								<Button
+									variant="default"
+									size="sm"
+									onClick={handleCreateNew}
+								>
+									New Item
+								</Button>
+								<Button
+									variant="default"
+									size="sm"
+									onClick={handleEdit}
+									disabled={selectedMaterials.length !== 1}
+								>
+									Edit Item
+								</Button>
+								<Button
+									variant="destructive"
+									size="sm"
+									onClick={handleDelete}
+									disabled={selectedMaterials.length === 0}
+								>
+									Delete Selected ({selectedMaterials.length})
+								</Button>
+							</>
+						)}
 						<Button
 							variant="outline"
 							size="sm"
