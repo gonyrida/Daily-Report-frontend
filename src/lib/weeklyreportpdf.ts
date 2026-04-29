@@ -67,6 +67,56 @@ const subHdr = (text: string, mt = 8): any => ({
 const pb = (): any => ({ text: "", pageBreak: "after" });
 
 /**
+ * Create an Excel-style data bar cell with percentage value.
+ * Shows a horizontal bar (0-100% width) with centered text on top.
+ * @param pct - Percentage value (0-100)
+ * @param width - Total cell width in points (default: 45)
+ * @param height - Bar height in points (default: 12)
+ * @param barColor - Color of the bar (default: light blue)
+ * @param bgColor - Background color behind the bar (default: white)
+ */
+const dataBarCell = (
+  pct: string | number | null | undefined,
+  width = 45,
+  barColor = "#FFC000",
+): any => {
+  const raw = typeof pct === "string" ? parseFloat(pct) : Number(pct);
+  const value = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0;
+  // Account for outer cell padding (4 pt each side) so inner widths don't overflow
+  const innerW = Math.max(1, width - 8);
+  const barW = Math.round((value / 100) * innerW);
+  const restW = innerW - barW;
+  const label = value.toFixed(1) + "%";
+  const fz = 8;
+
+  // 0% — plain text, no bar
+  if (barW <= 0) {
+    return { text: label, fontSize: fz, alignment: "center" };
+  }
+
+  // 100% — full colored cell with centered text
+  if (restW <= 0) {
+    return { text: label, fontSize: fz, alignment: "center", fillColor: barColor };
+  }
+
+  // Partial — nested 2-column table: [colored bar | white + text]
+  return {
+    table: {
+      widths: [barW, restW],
+      body: [[
+        { text: "", fillColor: barColor, border: [false, false, false, false] },
+        { text: label, fontSize: fz, alignment: "right", border: [false, false, false, false], margin: [0, 1, 0, 0] },
+      ]],
+    },
+    layout: {
+      defaultBorder: false,
+      paddingLeft: () => 0, paddingRight: () => 0,
+      paddingTop: () => 0, paddingBottom: () => 0,
+    },
+  };
+};
+
+/**
  * Create a text line with dashed underline (for form-style fields)
  * @param text - The text content to display
  * @param lines - Number of dashed lines to show (default: 1)
@@ -96,25 +146,29 @@ const dashedLineText = (text: string, lines = 1): any => {
 
 /**
  * Build a styled table.
- * Headers: { text, w?, align? }
+ * Headers: { text, w?, align?, colSpan? }
  * Row cells: { text, align?, fill?, bold?, colSpan? } | null (null = colspan placeholder)
  */
 const mkTable = (
-  headers: { text: string; w?: any; align?: string }[],
-  rows: Array<Array<{ text: string; align?: string; fill?: string; bold?: boolean; colSpan?: number } | null>>,
+  headers: { text: string; w?: any; align?: string; colSpan?: number }[],
+  rows: Array<Array<{ text: string; align?: string; fill?: string; bold?: boolean; colSpan?: number; margin?: number[]; borderLeft?: boolean } | null>>,
   opts: { hFill?: string; altRows?: boolean; compact?: boolean } = {},
 ): any => {
   const hFill   = opts.hFill ?? TBL_HDR;
   const altRows = opts.altRows !== false;
   const fSize   = opts.compact ? 8 : 9;
 
-  const headerRow: any[] = headers.map(h => ({
-    text: h.text,
-    style: "tblHdr",
-    fontSize: fSize,
-    fillColor: hFill,
-    alignment: h.align ?? "center",
-  }));
+  const headerRow: any[] = headers.map(h => {
+    if (h === null) return {};
+    return {
+      text: h.text,
+      style: "tblHdr",
+      fontSize: fSize,
+      fillColor: hFill,
+      alignment: h.align ?? "center",
+      ...(h.colSpan ? { colSpan: h.colSpan } : {}),
+    };
+  });
 
   const body: any[] = [headerRow];
 
@@ -123,7 +177,7 @@ const mkTable = (
     body.push(
       row.map(cell => {
         if (cell === null) return {};
-        return {
+        const result: any = {
           text: cell.text,
           style: "tblCell",
           fontSize: fSize,
@@ -131,7 +185,12 @@ const mkTable = (
           alignment: cell.align ?? "left",
           ...(cell.colSpan ? { colSpan: cell.colSpan } : {}),
           ...(cell.bold ? { bold: true } : {}),
+          ...(cell.margin ? { margin: cell.margin } : {}),
         };
+        if (cell.borderLeft === false) {
+          result.border = [0, 1, 1, 1];
+        }
+        return result;
       }),
     );
   });
@@ -139,7 +198,7 @@ const mkTable = (
   return {
     table: {
       headerRows: 1,
-      widths: headers.map(h => h.w ?? "auto"),
+      widths: headers.map(h => h?.w ?? "auto"),
       body,
     },
     layout: {
@@ -365,27 +424,67 @@ function buildOP(data: WeeklyReportExportData): any[] {
 function buildNWDP(data: WeeklyReportExportData): any[] {
   const items: any[] = [secBanner("3.  ACTIVITIES OF WORK DONE / NEXT WEEK PLAN")];
 
-  const rows = (data.nwdpItems ?? []).map(it => [
-    { text: s(it.workDoneLabel),  align: "left"   },
-    { text: it.workDonePct  != null ? `${s(it.workDonePct)}%`  : "", align: "center" },
-    { text: s(it.nextWeekLabel), align: "left"   },
-    { text: it.nextWeekPct  != null ? `${s(it.nextWeekPct)}%`  : "", align: "center" },
-  ]);
+  const buildDisplayText = (id: string, text: string): string => {
+    if (!id) return text || '';
+    if (id === '-') return text ? `- ${text}` : '-';
+    if (!text) return id;
+    return id.endsWith('.') ? `${id} ${text}` : `${id}. ${text}`;
+  };
 
-  const emptyRow = [[
-    { text: "No activity data available.", colSpan: 4, align: "center" as const },
-    null, null, null,
+  const getIdStyle = (id: string): { bold: boolean; leftPt: number } => {
+    const t = id.trim();
+    if (/^[IVX]/i.test(t))  return { bold: true,  leftPt: 8  };
+    if (t === '-')           return { bold: false, leftPt: 40 };
+    if (/^\d+$/.test(t))    return { bold: true,  leftPt: 16 };
+    return                         { bold: false, leftPt: 16 };
+  };
+
+  const fSize = 9;
+
+  const headerRow: any[] = [
+    { text: "Activities of Work Done", bold: true, fontSize: fSize, fillColor: SEC_FILL, alignment: "center", colSpan: 2 },
+    {},
+    { text: "Next Week Plan", bold: true, fontSize: fSize, fillColor: SEC_FILL, alignment: "center", colSpan: 2 },
+    {},
+  ];
+
+  const dataRows = (data.nwdpItems ?? []).map(it => {
+    const itemId = it.sourceId || it.id || '';
+    const { bold: isBold, leftPt } = getIdStyle(itemId);
+    const workDoneText = buildDisplayText(itemId, it.workDoneLabel || '');
+    const nextWeekText = buildDisplayText(itemId, it.nextWeekLabel || '');
+    return [
+      { text: workDoneText, style: "tblCell", fontSize: fSize, alignment: "left", bold: isBold, margin: [leftPt, 2, 2, 2] },
+      dataBarCell(it.workDonePct, 45),
+      { text: nextWeekText, style: "tblCell", fontSize: fSize, alignment: "left", bold: isBold, margin: [leftPt, 2, 2, 2] },
+      dataBarCell(it.nextWeekPct, 45),
+    ];
+  });
+
+  const emptyRow: any[][] = [[
+    { text: "No activity data available.", colSpan: 4, alignment: "center" as const, style: "tblCell", fontSize: fSize },
+    {}, {}, {},
   ]];
 
-  items.push(mkTable(
-    [
-      { text: "Activities of Work Done", w: "*"  },
-      { text: "%",                        w: 50  },
-      { text: "Next Week Plan",           w: "*" },
-      { text: "%",                        w: 50  },
-    ],
-    rows.length ? rows : emptyRow,
-  ));
+  const body = [headerRow, ...(dataRows.length ? dataRows : emptyRow)];
+
+  items.push({
+    table: {
+      headerRows: 1,
+      widths: ["*", 45, "*", 45],
+      body,
+    },
+    layout: {
+      // Only draw horizontal lines at top, below header row, and at bottom
+      hLineWidth: (i: number, node: any) =>
+        i === 0 || i === 1 || i === node.table.body.length ? 1 : 0,
+      // Remove vertical borders at positions 1 and 3 (between text and % columns)
+      vLineWidth: (i: number) => (i === 1 || i === 3) ? 0 : 0.5,
+      hLineColor: () => "#000000",
+      vLineColor: () => "#000000",
+    },
+  });
+
   return items;
 }
 
@@ -627,32 +726,47 @@ function buildHSE(data: WeeklyReportExportData): any[] {
   if (tb.length || ap.length) {
     items.push(subHdr("5.6  HSES Photo Reference"));
 
-    // Helper to create photo box with connected caption (like Excel)
+    // Photo cell: fixed-height image area + caption row, connected borders.
     const createPhotoBox = (img: string | undefined, desc: string): any => {
-      const photoContent = img
-        ? { image: img, fit: [200, 140], alignment: "center" as const }
-        : { text: "N/A", style: "tblCell", fontSize: 11, alignment: "center" as const, margin: [0, 60, 0, 0] };
+      const photoCell = img
+        ? {
+            stack: [{ image: img, fit: [230, 150], alignment: "center" as const }],
+            margin: [2, 2, 2, 2],
+            alignment: "center" as const,
+            // Force consistent height regardless of image presence
+            minHeight: 100,
+          }
+        : {
+            text: "",
+            margin: [0, 50, 0, 50], // empty cell ~100pt tall, matches photo height
+          };
 
-      // Single table with 2 rows: photo row + caption row (connected borders)
       return {
         table: {
           widths: ["*"],
+          heights: [100, 18], // pin photo row + caption row
           body: [
-            [{ stack: [photoContent], margin: [4, 4, 4, 4] }], // Photo cell
-            [{ text: desc || "", style: "photoCaption", alignment: "center" as const, fontSize: 9, margin: [2, 2, 2, 2] }], // Caption cell
+            [photoCell],
+            [{
+              text: desc || "",
+              style: "photoCaption",
+              alignment: "center" as const,
+              fontSize: 9,
+              margin: [2, 3, 2, 3],
+            }],
           ],
         },
         layout: {
-          hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 0.5 : 0.5,
+          hLineWidth: () => 0.5,
           vLineWidth: () => 0.5,
           hLineColor: () => "#000000",
           vLineColor: () => "#000000",
         },
-        width: "*",
       };
     };
 
-    // Helper to create blue header box like Excel
+    // Blue banner header — single full-width cell, no surrounding margin so
+    // the first photo row sits flush underneath it (matches the source PDF).
     const createPhotoHeader = (title: string): any => ({
       table: {
         widths: ["*"],
@@ -660,42 +774,58 @@ function buildHSE(data: WeeklyReportExportData): any[] {
           text: title,
           bold: true,
           fontSize: 11,
-          color: "#000000",
-          fillColor: SEC_FILL, // Blue background like Excel
+          fillColor: SEC_FILL,
           alignment: "center" as const,
-          margin: [0, 4, 0, 4],
+          margin: [0, 5, 0, 5],
         }]],
       },
       layout: {
-        hLineWidth: () => 1,
-        vLineWidth: () => 1,
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
         hLineColor: () => "#000000",
         vLineColor: () => "#000000",
       },
-      margin: [0, 0, 0, 0],
+      margin: [0, 8, 0, 0], // small space above, none below — flush with photos
     });
 
-    const renderPhotoGroup = (headerText: string, secTitle: string, entries: any[]) => {
+    const renderPhotoGroup = (headerText: string, entries: any[]) => {
       if (!entries.length) return;
-      // Blue header box
-      items.push(createPhotoHeader(headerText));
-      items.push({ text: secTitle, style: "photoSecTitle", margin: [0, 6, 0, 4] });
+
+      // Flatten all photo+caption pairs from all entries into a single sequence.
+      const flat: { img?: string; desc: string }[] = [];
       entries.forEach(entry => {
         const imgs: string[] = entry.images ?? [];
         const descs: string[] = entry.descriptions ?? [];
-        for (let i = 0; i < Math.max(imgs.length, 1); i += 2) {
-          const pair: any[] = [0, 1].map(j => {
-            const img  = imgs[i + j];
-            const desc = descs[i + j] ?? "";
-            return createPhotoBox(img, desc);
-          });
-          items.push({ columns: pair, columnGap: 8, margin: [0, 0, 0, 8] });
+        const n = Math.max(imgs.length, descs.length);
+        for (let i = 0; i < n; i++) {
+          flat.push({ img: imgs[i], desc: descs[i] ?? "" });
         }
       });
+
+      // Header (banner) — emitted once for the group; pdfmake will carry
+      // photos onto subsequent pages without repeating it, matching the
+      // template behavior on pages 14→15 and 16→17.
+      items.push(createPhotoHeader(headerText));
+
+      // Render in pairs of two cells per row.
+      for (let i = 0; i < flat.length; i += 2) {
+        const left = flat[i];
+        const right = flat[i + 1];
+        items.push({
+          columns: [
+            createPhotoBox(left.img, left.desc),
+            right
+              ? createPhotoBox(right.img, right.desc)
+              : { text: "", width: "*" }, // odd-count tail
+          ],
+          columnGap: 0, // borders touch — matches source layout
+          margin: [0, 0, 0, 0],
+        });
+      }
     };
 
-    renderPhotoGroup("HSE Toolbox Meeting", "5.6.1  HSES Training / Toolbox Meeting Photos", tb);
-    renderPhotoGroup("HSE Activity Photo", "5.6.2  HSES Activity Photos", ap);
+    renderPhotoGroup("HSE Toolbox Meeting", tb);
+    renderPhotoGroup("HSE Activity Photo", ap);
   }
 
   return items;

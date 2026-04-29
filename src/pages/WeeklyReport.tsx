@@ -18,6 +18,7 @@ import { useHsesData } from "@/hooks/useHsesData";
 import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
 import { toRoman } from "@/lib/numberUtils";
+import { mergeConstructionIntoActivityRows } from "@/utils/constructionProgressToActivities";
 import { useIssues } from "@/hooks/useIssues";
 import { useConstructionProgress } from "@/hooks/useConstructionProgress";
 import { ConstructionProgressData } from "@/types/constructionProgress";
@@ -2245,6 +2246,25 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         designList: [],
         overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
         overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
+        constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
+        conProgressProject: sharedData.projectName,
+        conProgressDate: dateParts[0],
+        nwdpItems: (() => {
+          const constructionItems = constructionProgressHook.constructionData?.items || [];
+          const weeklySource = mergeConstructionIntoActivityRows(constructionItems, weeklyActivities || [], 'weekly');
+          const nextSource = mergeConstructionIntoActivityRows(constructionItems, nextWeekPlan || [], 'next');
+          return weeklySource.map((weekRow, i) => ({
+            sourceId: weekRow.displayId || weekRow.sourceId || '',
+            id: weekRow.displayId || weekRow.sourceId || '',
+            workDoneLabel: weekRow.description,
+            workDonePct: weekRow.percent,
+            nextWeekLabel: nextSource[i]?.description,
+            nextWeekPct: nextSource[i]?.percent,
+            indentLevel: weekRow.indentLevel ?? 0,
+          })).filter(item =>
+            item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
+          );
+        })(),
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
           siteLocation: issue.location,
@@ -2354,68 +2374,28 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           companyPhone2: sharedData.companyPhone2 || '+855 23 789 012',
           companyEmail1: sharedData.companyEmail1 || 'info@cacpm.com',
           companyEmail2: sharedData.companyEmail2,
-          recipientCompany: sharedData.recipientCompany || sharedData.employer || 'Client Organization',
-          recipientLocation: sharedData.recipientLocation || 'Phnom Penh, Cambodia',
-          toName: sharedData.recipientName || 'Project Manager',
-          attName: sharedData.recipientName || 'Project Manager',
-          ccLines: sharedData.ccList || [],
         },
-        // Add missing overall progress data
         overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
         overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
-        // Add construction progress data - cast to any to bypass type mismatch
         constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
         conProgressProject: sharedData.projectName,
         conProgressDate: dateParts[0],
-        // Add activities data - properly transform to match expected structure
         nwdpItems: (() => {
-          const allItems: any[] = [];
-
-          (weeklyActivities || []).forEach(a => {
-            allItems.push({
-              rowId: a.id || '',
-              sourceId: a.displayId || a.sourceId || '',
-              id: a.displayId || a.sourceId || '',
-              workDoneLabel: a.description,
-              workDonePct: a.percent,
-              nextWeekLabel: undefined,
-              nextWeekPct: undefined,
-            });
-          });
-
-          (nextWeekPlan || []).forEach(a => {
-            const sourceId = a.displayId || a.sourceId || '';
-            const rowId = a.id || '';
-
-            let matched = false;
-            for (let i = 0; i < allItems.length; i++) {
-              const byRowId = rowId && allItems[i].rowId === rowId;
-              const bySourceId = sourceId && allItems[i].sourceId === sourceId;
-              if ((byRowId || bySourceId) && allItems[i].nextWeekLabel === undefined) {
-                allItems[i].nextWeekLabel = a.description;
-                allItems[i].nextWeekPct = a.percent;
-                matched = true;
-                break;
-              }
-            }
-
-            if (!matched) {
-              allItems.push({
-                rowId,
-                sourceId,
-                workDoneLabel: undefined,
-                workDonePct: undefined,
-                nextWeekLabel: a.description,
-                nextWeekPct: a.percent,
-              });
-            }
-          });
-
-          return allItems.filter(item =>
+          const constructionItems = constructionProgressHook.constructionData?.items || [];
+          const weeklySource = mergeConstructionIntoActivityRows(constructionItems, weeklyActivities || [], 'weekly');
+          const nextSource = mergeConstructionIntoActivityRows(constructionItems, nextWeekPlan || [], 'next');
+          return weeklySource.map((weekRow, i) => ({
+            sourceId: weekRow.displayId || weekRow.sourceId || '',
+            id: weekRow.displayId || weekRow.sourceId || '',
+            workDoneLabel: weekRow.description,
+            workDonePct: weekRow.percent,
+            nextWeekLabel: nextSource[i]?.description,
+            nextWeekPct: nextSource[i]?.percent,
+            indentLevel: weekRow.indentLevel ?? 0,
+          })).filter(item =>
             item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
           );
         })(),
-        // Add construction issues with converted photos
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
           siteLocation: issue.location || ``,
@@ -2423,10 +2403,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           actionBy: issue.actionBy || '',
           photo: issue.photo,
         })),
-        // Add other data if available
         projectOverview: sharedData.projectOverview || 'Project overview will be added here.',
         designConstruction: sharedData.designNConstruction || 'Design and construction details will be added here.',
-        // Add resources data if available
         ...transformResourcesToExcelFormat(resourcesData),
         // Add HSE data if available
         ...transformHSEToExcelFormat(hsesData),

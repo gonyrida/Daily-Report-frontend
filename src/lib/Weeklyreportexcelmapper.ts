@@ -459,7 +459,9 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
 
     // ── NWDP ─────────────────────────────────────────────────────────────────
     nwdpItems: (input.nwdpItems ?? []).map(item => ({
-      id: item.sourceId,
+      id: item.sourceId || item.id,
+      sourceId: item.sourceId || item.id,
+      indentLevel: item.indentLevel,
       workDoneLabel: item.workDoneLabel ?? item.label ?? item.activity,
       workDonePct: String(item.workDonePct ?? item.donePct ?? ''),
       nextWeekLabel: item.nextWeekLabel ?? item.nextLabel,
