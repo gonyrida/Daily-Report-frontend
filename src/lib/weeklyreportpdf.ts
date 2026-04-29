@@ -1360,11 +1360,10 @@ function buildConstructionIssues(data: WeeklyReportExportData, issuePhotos: Map<
 
 // ── Master Schedule ───────────────────────────────────────────────────────────
 function buildMasterSchedule(data: WeeklyReportExportData, scheduleImages: Map<string, string | undefined>): any[] {
-  const items: any[] = [secBanner("9.  MASTER SCHEDULE")];
+  const items: any[] = [];
   const entries = data.masterSchedule ?? [];
 
   if (!entries.length) {
-    items.push({ text: "No master schedule files available.", style: "bodyText" });
     return items;
   }
 
@@ -1418,13 +1417,22 @@ function buildMasterSchedule(data: WeeklyReportExportData, scheduleImages: Map<s
       const caption = entry.caption || entry.fileName || "";
       items.push(createPhotoBox(entry.supabaseUrl, caption));
     } else if (hasConvertedImages) {
-      // PDF with converted images - render each page as an image
+      // PDF with converted images - render each page as landscape image, no box, no filename
       entry.convertedImages!.forEach((img, index) => {
-        const caption = index === 0
-          ? (entry.caption || entry.fileName || `Page ${img.pageNumber}`)
-          : `Page ${img.pageNumber}`;
-        items.push(createPhotoBox(img.supabaseUrl, caption));
+        const resolvedImg = resolveImage(img.supabaseUrl);
+        if (resolvedImg) {
+          items.push({
+            image: resolvedImg,
+            fit: [700, 500], // Larger fit for landscape
+            alignment: "center" as const,
+            margin: [0, 0, 0, 0],
+            pageBreak: index === 0 ? 'before' : undefined, // Page break before first image
+            pageOrientation: 'landscape', // Switch to landscape for these images
+          });
+        }
       });
+      // Switch back to portrait after all images
+      items.push({ text: '', pageBreak: 'after', pageOrientation: 'portrait' });
     } else {
       // Document / non-renderable file — info block with link
       const fileLink = entry.supabaseUrl || "";

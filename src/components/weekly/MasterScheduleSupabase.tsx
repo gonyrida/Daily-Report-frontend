@@ -10,7 +10,7 @@ import { Upload, FileText, Image, X, Download, Trash2 } from 'lucide-react';
 import { MasterScheduleEntry } from '@/types/weeklyReport.types';
 import { uploadScheduleFileToSupabase, deleteScheduleFileFromSupabase } from '@/utils/weeklyReportSupabase';
 import { useToast } from '@/hooks/use-toast';
-import { updateMasterSchedule, convertPdfToImages } from '@/services/weeklyReportService';
+import { updateMasterSchedule, convertPdfToImages, convertPdfToImagesStandalone } from '@/services/weeklyReportService';
 
 interface MasterScheduleSupabaseProps {
   entries: MasterScheduleEntry[];
@@ -31,6 +31,49 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false); // Track if initial data has loaded
+
+  // Convert pending PDFs when reportId becomes available
+  useEffect(() => {
+    if (!reportId || entries.length === 0) return;
+
+    // Find PDFs that don't have converted images yet
+    const pendingPdfs = entries.filter(e => {
+      const isPdf = e.fileType === 'application/pdf' || e.fileName?.toLowerCase().endsWith('.pdf');
+      const needsConversion = isPdf && e.supabaseUrl && (!e.convertedImages || e.convertedImages.length === 0);
+      return needsConversion;
+    });
+
+    if (pendingPdfs.length > 0) {
+      console.log(`[MasterSchedule] Converting ${pendingPdfs.length} pending PDF(s) now that reportId is available...`);
+
+      pendingPdfs.forEach(async (entry) => {
+        try {
+          console.log(`[MasterSchedule] Converting pending PDF ${entry.id}: ${entry.fileName}`);
+          const response = await convertPdfToImages(reportId, entry.id, entry.supabaseUrl!);
+
+          if (response.success && response.data) {
+            // Update the entry with converted images
+            const updatedEntries = entries.map(e =>
+              e.id === entry.id
+                ? { ...e, convertedImages: response.data.images }
+                : e
+            );
+
+            onChange(updatedEntries);
+
+            toast({
+              title: "PDF Converted",
+              description: `"${entry.fileName}" converted to ${response.data.pageCount} image(s)`
+            });
+          } else {
+            console.error(`[MasterSchedule] Pending PDF conversion failed for ${entry.id}:`, response.error);
+          }
+        } catch (convError) {
+          console.error(`[MasterSchedule] Pending PDF conversion error for ${entry.id}:`, convError);
+        }
+      });
+    }
+  }, [reportId]); // Run when reportId changes
 
   // Save schedule to database
   const saveScheduleToDatabase = async (updatedEntries: MasterScheduleEntry[]) => {
@@ -152,11 +195,16 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
       });
 
       // Convert PDFs to images for rendering (fire and forget, don't block UI)
+      console.log(`[MasterSchedule] Checking PDF conversion - reportId: ${reportId}, newEntries: ${newEntries.length}`);
+
       if (reportId) {
-        const pdfEntries = newEntries.filter(e =>
-          e.fileType === 'application/pdf' ||
-          e.fileName?.toLowerCase().endsWith('.pdf')
-        );
+        const pdfEntries = newEntries.filter(e => {
+          const isPdf = e.fileType === 'application/pdf' || e.fileName?.toLowerCase().endsWith('.pdf');
+          console.log(`[MasterSchedule] Entry ${e.fileName}: fileType=${e.fileType}, isPdf=${isPdf}`);
+          return isPdf;
+        });
+
+        console.log(`[MasterSchedule] Found ${pdfEntries.length} PDF(s) to convert`);
 
         if (pdfEntries.length > 0) {
           console.log(`[MasterSchedule] Converting ${pdfEntries.length} PDF(s) to images...`);
@@ -165,7 +213,9 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
           pdfEntries.forEach(async (entry) => {
             try {
               if (entry.supabaseUrl) {
+                console.log(`[MasterSchedule] Calling convertPdfToImages for ${entry.id} with URL: ${entry.supabaseUrl}`);
                 const response = await convertPdfToImages(reportId, entry.id, entry.supabaseUrl);
+                console.log(`[MasterSchedule] Conversion response for ${entry.id}:`, response);
 
                 if (response.success && response.data) {
                   // Update the entry with converted images
@@ -183,10 +233,64 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
                   });
                 } else {
                   console.error(`[MasterSchedule] PDF conversion failed for ${entry.id}:`, response.error);
+                  toast({
+                    title: "PDF Conversion Failed",
+                    description: response.error || "Failed to convert PDF to images",
+                    variant: "destructive"
+                  });
                 }
+              } else {
+                console.log(`[MasterSchedule] No supabaseUrl for entry ${entry.id}, skipping conversion`);
               }
             } catch (convError) {
               console.error(`[MasterSchedule] PDF conversion error for ${entry.id}:`, convError);
+              toast({
+                title: "PDF Conversion Error",
+                description: convError instanceof Error ? convError.message : "Unknown error",
+                variant: "destructive"
+              });
+            }
+          });
+        }
+      } else {
+        // No reportId - use standalone conversion (works for unsaved reports)
+        console.log(`[MasterSchedule] No reportId - using standalone conversion`);
+
+        const pdfEntries = newEntries.filter(e => {
+          const isPdf = e.fileType === 'application/pdf' || e.fileName?.toLowerCase().endsWith('.pdf');
+          return isPdf;
+        });
+
+        if (pdfEntries.length > 0) {
+          console.log(`[MasterSchedule] Converting ${pdfEntries.length} PDF(s) with standalone API...`);
+
+          pdfEntries.forEach(async (entry) => {
+            try {
+              if (entry.supabaseUrl) {
+                console.log(`[MasterSchedule] Calling convertPdfToImagesStandalone for ${entry.id}`);
+                const response = await convertPdfToImagesStandalone(entry.supabaseUrl, entry.id);
+                console.log(`[MasterSchedule] Standalone conversion response:`, response);
+
+                if (response.success && response.data) {
+                  // Update the entry with converted images
+                  const updatedEntries = allEntries.map(e =>
+                    e.id === entry.id
+                      ? { ...e, convertedImages: response.data.images }
+                      : e
+                  );
+
+                  handleChange(updatedEntries);
+
+                  toast({
+                    title: "PDF Converted",
+                    description: `"${entry.fileName}" converted to ${response.data.pageCount} image(s)`
+                  });
+                } else {
+                  console.error(`[MasterSchedule] Standalone PDF conversion failed:`, response.error);
+                }
+              }
+            } catch (convError) {
+              console.error(`[MasterSchedule] Standalone PDF conversion error:`, convError);
             }
           });
         }

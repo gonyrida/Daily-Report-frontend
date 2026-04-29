@@ -539,6 +539,30 @@ export const convertPdfToImages = async (
   return handleApiResponse(response);
 };
 
+/**
+ * Convert PDF to images WITHOUT saving report (for unsaved reports)
+ * POST /api/weekly-reports/convert-pdf-standalone
+ */
+export const convertPdfToImagesStandalone = async (
+  pdfUrl: string,
+  tempId: string
+): Promise<ApiResponse<{
+  images: Array<{
+    pageNumber: number;
+    supabaseUrl: string;
+    supabasePath: string;
+    width: number;
+    height: number;
+  }>;
+  pageCount: number;
+}>> => {
+  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/convert-pdf-standalone`, {
+    pdfUrl,
+    tempId
+  });
+  return handleApiResponse(response);
+};
+
 // ============================================================================
 // Manpower Aggregation API Functions
 // ============================================================================

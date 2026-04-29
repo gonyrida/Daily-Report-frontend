@@ -596,7 +596,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                   id: item.id,
                   type: item.type,
                   file: item.fileData ? new File([item.fileData], item.fileName || "file") : null,
-                  caption: item.caption || item.fileName || ""
+                  caption: item.caption || item.fileName || "",
+                  supabaseUrl: item.supabaseUrl,
+                  supabasePath: item.supabasePath,
+                  fileName: item.fileName,
+                  fileSize: item.fileSize,
+                  fileType: item.fileType,
+                  convertedImages: item.convertedImages
                 }));
                 setScheduleSections([{
                   id: crypto.randomUUID(),
@@ -2313,6 +2319,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           caption: e.caption,
           fileName: e.fileName,
           fileType: e.fileType,
+          convertedImages: e.convertedImages,
         })),
       });
 
@@ -2468,6 +2475,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           caption: e.caption,
           fileName: e.fileName,
           fileType: e.fileType,
+          convertedImages: e.convertedImages,
         })),
         // Pass actual QAQC data — handles both formats:
         // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
