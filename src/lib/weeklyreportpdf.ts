@@ -379,24 +379,45 @@ function buildIntro(data: WeeklyReportExportData, coverImg?: string): any[] {
 function buildOP(data: WeeklyReportExportData): any[] {
   const items: any[] = [secBanner("2.  OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK")];
 
-  console.log('PDF DEBUG: overallProgressItems:', JSON.stringify(data.overallProgressItems, null, 2));
+  // Check if ID is Roman numeral (e.g., "I.", "II.", "III.", "IV.", "V.", etc.)
+  const isRomanId = (id: string | number | undefined): boolean => {
+    const str = String(id || '');
+    return /^[IVXLCDM]+\./.test(str.trim());
+  };
 
-  const rows = (data.overallProgressItems ?? []).map((it, idx) => {
-    console.log(`PDF DEBUG: Row ${idx} pctUpToPrevWeek=`, it.pctUpToPrevWeek, 'type=', typeof it.pctUpToPrevWeek);
+  const rows = (data.overallProgressItems ?? []).map((it) => {
+    const roman = isRomanId(it.no);
+
+    // Data bar colors
+    const BLUE = "#4472C4";
+    const ORANGE = "#ED7D31";
+    const GREEN = "#70AD47";
+
+    // Build cells with bold for Roman IDs and data bars for specific columns
+    const baseCell = (text: string | number | undefined, align: "center" | "left" = "center") => ({
+      text: s(text ?? ''),
+      align,
+      bold: roman,
+      fill: "#FFFFFF",
+    });
+
     return [
-      { text: s(it.no),                 align: "center" },
-      { text: s(it.scopeOfWorks),       align: "left"   },
-      { text: s(it.pctUpToPrevWeek ?? ''),    align: "center" },
-      { text: s(it.pctThisWeek ?? ''),        align: "center" },
-      { text: s(it.pctUpToThisWeek ?? ''),    align: "center" },
-      { text: s(it.pctRemaining ?? ''),       align: "center" },
-      { text: s(it.pctNextWeekPlan ?? ''),    align: "center" },
-      { text: s(it.pctUpNextWeekPlan ?? ''),  align: "center" },
+      baseCell(it.no, "center"),
+      baseCell(it.scopeOfWorks, "left"),
+      baseCell(it.pctUpToPrevWeek, "center"),
+      baseCell(it.pctThisWeek, "center"),
+      // % Up to This Week - blue data bar
+      dataBarCell(it.pctUpToThisWeek, 54, BLUE),
+      // % Remaining - orange data bar
+      dataBarCell(it.pctRemaining, 50, ORANGE),
+      baseCell(it.pctNextWeekPlan, "center"),
+      // % Up Next Week Plan - green data bar
+      dataBarCell(it.pctUpNextWeekPlan, 55, GREEN),
     ];
   });
 
   const emptyRow = [[
-    { text: "No overall progress data available.", colSpan: 8, align: "center" as const },
+    { text: "No overall progress data available.", colSpan: 8, align: "center" as const, fill: "#FFFFFF" },
     null, null, null, null, null, null, null,
   ]];
 
@@ -412,6 +433,7 @@ function buildOP(data: WeeklyReportExportData): any[] {
       { text: "% Up Next\nWeek Plan",    w: 55  },
     ],
     rows.length ? rows : emptyRow,
+    { hFill: SEC_FILL, altRows: false }
   ));
 
   if (data.overallProgressRemark) {
@@ -422,8 +444,6 @@ function buildOP(data: WeeklyReportExportData): any[] {
 
 // ── NWDP ──────────────────────────────────────────────────────────────────────
 function buildNWDP(data: WeeklyReportExportData): any[] {
-  const items: any[] = [secBanner("3.  ACTIVITIES OF WORK DONE / NEXT WEEK PLAN")];
-
   const buildDisplayText = (id: string, text: string): string => {
     if (!id) return text || '';
     if (id === '-') return text ? `- ${text}` : '-';
@@ -441,6 +461,7 @@ function buildNWDP(data: WeeklyReportExportData): any[] {
 
   const fSize = 9;
 
+  // Header row that will repeat on each page
   const headerRow: any[] = [
     { text: "Activities of Work Done", bold: true, fontSize: fSize, fillColor: SEC_FILL, alignment: "center", colSpan: 2 },
     {},
@@ -466,26 +487,58 @@ function buildNWDP(data: WeeklyReportExportData): any[] {
     {}, {}, {},
   ]];
 
-  const body = [headerRow, ...(dataRows.length ? dataRows : emptyRow)];
+  if (!dataRows.length) {
+    return [
+      secBanner("3.  ACTIVITIES OF WORK DONE / NEXT WEEK PLAN"),
+      {
+        table: { headerRows: 1, widths: ["*", 45, "*", 45], body: [headerRow, ...emptyRow] },
+        layout: {
+          hLineWidth: (i: number, node: any) => i === 0 || i === 1 || i === node.table.body.length ? 1 : 0,
+          vLineWidth: (i: number) => (i === 1 || i === 3) ? 0 : 0.5,
+          hLineColor: () => "#000000",
+          vLineColor: () => "#000000",
+        },
+      },
+    ];
+  }
 
-  items.push({
-    table: {
-      headerRows: 1,
-      widths: ["*", 45, "*", 45],
-      body,
-    },
-    layout: {
-      // Only draw horizontal lines at top, below header row, and at bottom
-      hLineWidth: (i: number, node: any) =>
-        i === 0 || i === 1 || i === node.table.body.length ? 1 : 0,
-      // Remove vertical borders at positions 1 and 3 (between text and % columns)
-      vLineWidth: (i: number) => (i === 1 || i === 3) ? 0 : 0.5,
-      hLineColor: () => "#000000",
-      vLineColor: () => "#000000",
-    },
+  // Split into chunks to repeat banner on new pages (~25 rows per page)
+  const ROWS_PER_PAGE = 25;
+  const chunks: any[][][] = [];
+  for (let i = 0; i < dataRows.length; i += ROWS_PER_PAGE) {
+    chunks.push(dataRows.slice(i, i + ROWS_PER_PAGE));
+  }
+
+  const result: any[] = [];
+  chunks.forEach((chunk, index) => {
+    const isFirst = index === 0;
+    const bannerText = isFirst
+      ? "3.  ACTIVITIES OF WORK DONE / NEXT WEEK PLAN"
+      : "3.  ACTIVITIES OF WORK DONE / NEXT WEEK PLAN";
+    const banner = secBanner(bannerText);
+    if (!isFirst) banner.pageBreak = 'before';
+    result.push(banner);
+
+    // Deep copy headerRow to avoid pdfmake mutation issues across tables
+    const freshHeaderRow = JSON.parse(JSON.stringify(headerRow));
+
+    result.push({
+      table: {
+        headerRows: 1,
+        widths: ["*", 45, "*", 45],
+        body: [freshHeaderRow, ...chunk],
+      },
+      layout: {
+        hLineWidth: (i: number, node: any) =>
+          i === 0 || i === 1 || i === node.table.body.length ? 1 : 0,
+        vLineWidth: (i: number) => (i === 1 || i === 3) ? 0 : 0.5,
+        hLineColor: () => "#000000",
+        vLineColor: () => "#000000",
+      },
+    });
   });
 
-  return items;
+  return result;
 }
 
 // ── QAQC ──────────────────────────────────────────────────────────────────────
