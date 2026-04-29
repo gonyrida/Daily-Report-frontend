@@ -4,14 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
@@ -24,22 +16,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { 
-  Switch 
-} from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Search, 
   Plus, 
-  Download, 
-  Mail, 
-  UserX,
+  Mail,
   Edit,
-  MoreHorizontal,
-  Shield,
-  Power,
-  Check, 
-  ChevronDown,
+  MoreHorizontal
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -69,11 +52,6 @@ const UserManagement = () => {
   const [isCreatingUser, setIsCreatingUser] = useState(false); // Status for loading state
   const [editingUser, setEditingUser] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
-
-  // Select dropdown states
-  const [positionOpen, setPositionOpen] = useState(false);
-  const [departmentOpen, setDepartmentOpen] = useState(false);
-  const [orgLevelOpen, setOrgLevelOpen] = useState(false);
 
   // Pagination state
   const [pagination, setPagination] = useState({
@@ -123,52 +101,15 @@ const UserManagement = () => {
 
   // Filter users
   useEffect(() => {
-    let filtered = users;
-    
-    if (searchTerm) {
-      filtered = filtered.filter(user =>
-        user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    if (roleFilter !== 'all') {
-      filtered = filtered.filter(user => user.role === roleFilter);
-    }
-    
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(user => user.status === statusFilter);
-    }
-    
-    setFilteredUsers(filtered);
-  }, [users, searchTerm, roleFilter, statusFilter]);
+    // Set a timer to run after 500ms
+    const delayDebounceFn = setTimeout(() => {
+      // Call the unified fetcher
+      handleFilter(roleFilter);
+    }, 500);
 
-  const handleRoleChange = async (userId, newRole) => {
-    // API call to update role
-    setUsers(prev => prev.map(user => 
-      user._id === userId ? { ...user, role: newRole } : user
-    ));
-    toast({ title: "Success", description: "User role updated" });
-  };
-
-  const handleStatusToggle = async (userId, newStatus) => {
-    // API call to update status
-    setUsers(prev => prev.map(user => 
-      user._id === userId ? { ...user, status: newStatus } : user
-    ));
-    toast({ title: "Success", description: `User ${newStatus === 'active' ? 'activated' : 'deactivated'}` });
-  };
-
-  const handleResendVerification = async (userId) => {
-    // API call to resend verification email
-    toast({ title: "Success", description: "Verification email sent" });
-  };
-
-  const exportUsers = () => {
-    // Export logic
-    toast({ title: "Export started", description: "User data will be downloaded" });
-  };
+    // this clears the previous timer and starts a new one if the user types again.
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   // Add before return statement
   const handleCreateUser = async () => {
@@ -246,41 +187,50 @@ const UserManagement = () => {
     });
   };
 
+  const handleFilter = async (value) => {
+    try {
+      // Build query params
+      const params = new URLSearchParams();
+      params.set('page', "1");
+      params.set('limit', pagination.limit.toString());
+      if (searchTerm) params.set('search', searchTerm);
+      if (value) params.set('role', value);
+
+      const response = await apiGet(`/admin/all-users${params.toString() ? `?${params.toString()}` : ''}`);
+      const result = await response.json();
+      if (result.success) {
+        setUsers(result.data);
+        setFilteredUsers(result.data);
+        setPagination(result.pagination);
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to filter users by role" });
+      }
+    } catch (error) {
+      console.error('Failed to fetch users by role:', error);
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <HierarchicalSidebar />
         <SidebarInset>
           <div className="space-y-6">
-            <div className="flex flex-col space-y-4">
-              {/* Header with breadcrumb and buttons */}
-              <div className="container mx-auto p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <SidebarTrigger />
-                    <div className="flex flex-col space-y-1">
-                      <h1 className="text-lg font-semibold">User Management</h1>
-                      {/* Breadcrumb */}
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <button 
-                          onClick={() => navigate('/admin')}
-                          className="hover:text-foreground transition-colors"
-                        >
-                          Admin Dashboard
-                        </button>
-                        <span>/</span>
-                        <span className="text-foreground">User Management</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Action buttons */}
-                  <div className="flex gap-2">
-                    <Button onClick={() => setShowAddUser(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add User
-                    </Button>
-                  </div>
+            {/* Header with breadcrumb and buttons */}
+            <div className="flex items-center gap-4 ml-6 mt-6">
+              <SidebarTrigger />
+              <div className="flex flex-col space-y-1">
+                <h1 className="text-lg font-semibold">User Management</h1>
+                {/* Breadcrumb */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <button 
+                    onClick={() => navigate('/admin')}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    Admin Dashboard
+                  </button>
+                  <span>/</span>
+                  <span className="text-foreground">User Management</span>
                 </div>
               </div>
             </div>
@@ -302,31 +252,33 @@ const UserManagement = () => {
                     />
                   </div>
                   
-                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <Select 
+                    value={roleFilter}
+                    onValueChange={(value) => {
+                      setRoleFilter(value);
+                      handleFilter(value);
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Filter by role" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="approver">Approver</SelectItem>
                       <SelectItem value="user">User</SelectItem>
                     </SelectContent>
                   </Select>
-
-                  {/* <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select> */}
-
                   <div className="text-sm text-muted-foreground flex items-center">
                     {filteredUsers.length} users found
                   </div>
+
+                  <Button
+                    onClick={() => setShowAddUser(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add User
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -359,10 +311,6 @@ const UserManagement = () => {
                         <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                           Role
                         </th>
-                        {/* Comment out Status Column */}
-                        {/* <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                          Status
-                        </th> */}
                         <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">
                           Actions
                         </th>
@@ -402,12 +350,6 @@ const UserManagement = () => {
                               {user.role}
                             </Badge>
                           </td>
-                          {/* Comment out Status */}
-                          {/* <td className="p-4 align-middle">
-                            <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
-                              {user.status}
-                            </Badge>
-                          </td> */}
                           <td className="p-4 align-middle">
                             <div className="flex items-center justify-center gap-2">
                               <DropdownMenu>
@@ -421,14 +363,6 @@ const UserManagement = () => {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                   </DropdownMenuItem>
-                                  {/* <DropdownMenuItem>
-                                    <Shield className="mr-2 h-4 w-4" />
-                                    Toggle Role
-                                  </DropdownMenuItem> */}
-                                  {/* <DropdownMenuItem>
-                                    <Power className="mr-2 h-4 w-4" />
-                                    Toggle Status
-                                  </DropdownMenuItem> */}
                                   <DropdownMenuItem>
                                     <Mail className="mr-2 h-4 w-4" />
                                     Resend Verification

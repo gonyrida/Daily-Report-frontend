@@ -24,10 +24,9 @@ export const verifyAuth = async () => {
   }
 };
 
-export const loginUser = async (email: string /*, password: string */) => {
+export const loginUser = async (email: string , password: string) => {
   try {
-    // const response = await apiPost(API_ENDPOINTS.AUTH.LOGIN, { email, password });
-    const response = await apiPost(API_ENDPOINTS.AUTH.LOGIN, { email });
+    const response = await apiPost(API_ENDPOINTS.AUTH.LOGIN, { email, password });
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: "Login failed" }));
