@@ -2286,6 +2286,30 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         }) : [],
         ...transformHSEToExcelFormat(hsesData),
         ...transformResourcesToExcelFormat(resourcesData),
+        sitePhotoCaptions: (() => {
+          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          const result: any[] = [];
+          siteActivitiesSections.forEach((section: any) => {
+            if (section.entries && section.entries.length > 0) {
+              section.entries.forEach((entry: any) => {
+                if (entry.slots && entry.slots.length > 0) {
+                  for (let i = 0; i < entry.slots.length; i += 2) {
+                    const slot1 = entry.slots[i];
+                    const slot2 = entry.slots[i + 1];
+                    result.push({
+                      siteLocation: section.title || 'Site Location',
+                      caption1: slot1?.caption || '',
+                      caption2: slot2?.caption || '',
+                      image1: slot1?.image,
+                      image2: slot2?.image,
+                    });
+                  }
+                }
+              });
+            }
+          });
+          return result;
+        })(),
       });
 
       await exportWeeklyReportToPdf(exportData, filename);

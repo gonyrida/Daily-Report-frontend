@@ -676,8 +676,15 @@ function buildQAQC(data: WeeklyReportExportData): any[] {
 }
 
 // ── HSE ───────────────────────────────────────────────────────────────────────
-function buildHSE(data: WeeklyReportExportData): any[] {
+function buildHSE(data: WeeklyReportExportData, hsePhotos: Map<string, string | undefined>): any[] {
   const items: any[] = [secBanner("5.  HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)")];
+
+  // Helper to resolve image (use loaded dataURL if available)
+  const resolveImage = (img: string | undefined): string | undefined => {
+    if (!img) return undefined;
+    if (img.startsWith("data:")) return img;
+    return hsePhotos.get(img) || img;
+  };
 
   // 5.1 HSES Training - always show with min 3 rows like Excel
   items.push(subHdr("5.1  HSES Training / Introduction / Toolbox Meeting", 0));
@@ -774,6 +781,7 @@ function buildHSE(data: WeeklyReportExportData): any[] {
   items.push(subHdr("5.5  Other HSES Activities Concerns"));
   items.push(dashedLineText(s(data.hseOtherConcerns ?? ""), 1));
 
+  // 5.6 HSES Photo Reference - only show if there are any photos; no empty table
   const tb = data.hsePhotoReferences?.hseToolboxMeeting ?? [];
   const ap = data.hsePhotoReferences?.hseActivityPhotos ?? [];
   if (tb.length || ap.length) {
@@ -781,9 +789,10 @@ function buildHSE(data: WeeklyReportExportData): any[] {
 
     // Photo cell: fixed-height image area + caption row, connected borders.
     const createPhotoBox = (img: string | undefined, desc: string): any => {
-      const photoCell = img
+      const resolvedImg = resolveImage(img);
+      const photoCell = resolvedImg
         ? {
-            stack: [{ image: img, fit: [230, 150], alignment: "center" as const }],
+            stack: [{ image: resolvedImg, fit: [230, 150], alignment: "center" as const }],
             margin: [2, 2, 2, 2],
             alignment: "center" as const,
             // Force consistent height regardless of image presence
@@ -1139,7 +1148,7 @@ function buildResources(data: WeeklyReportExportData): any[] {
 }
 
 // ── Site Activity Photos ───────────────────────────────────────────────────────
-function buildSitePhotos(data: WeeklyReportExportData): any[] {
+function buildSitePhotos(data: WeeklyReportExportData, sitePhotos: Map<string, string | undefined>): any[] {
   const items: any[] = [secBanner("7.  SITE ACTIVITY PHOTOS")];
 
   if (!data.sitePhotoCaptions?.length) {
@@ -1147,35 +1156,91 @@ function buildSitePhotos(data: WeeklyReportExportData): any[] {
     return items;
   }
 
+  const resolveImage = (img: string | undefined): string | undefined => {
+    if (!img) return undefined;
+    if (img.startsWith("data:")) return img;
+    return sitePhotos.get(img) || img;
+  };
+
+  const createPhotoBox = (img: string | undefined, desc: string): any => {
+    const resolvedImg = resolveImage(img);
+    const photoCell = resolvedImg
+      ? {
+          stack: [{ image: resolvedImg, fit: [230, 150], alignment: "center" as const }],
+          margin: [2, 2, 2, 2],
+          alignment: "center" as const,
+          minHeight: 100,
+        }
+      : {
+          text: "",
+          margin: [0, 50, 0, 50],
+        };
+
+    return {
+      table: {
+        widths: ["*"],
+        heights: [100, 18],
+        body: [
+          [photoCell],
+          [{
+            text: desc || "",
+            style: "photoCaption",
+            alignment: "center" as const,
+            fontSize: 9,
+            margin: [2, 3, 2, 3],
+          }],
+        ],
+      },
+      layout: {
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => "#000000",
+        vLineColor: () => "#000000",
+      },
+    };
+  };
+
+  const createLocationHeader = (title: string): any => ({
+    table: {
+      widths: ["*"],
+      body: [[{
+        text: title,
+        bold: true,
+        fontSize: 11,
+        fillColor: LOC_FILL,
+        alignment: "center" as const,
+        margin: [0, 5, 0, 5],
+      }]],
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => "#000000",
+      vLineColor: () => "#000000",
+    },
+    margin: [0, 8, 0, 0],
+  });
+
   data.sitePhotoCaptions.forEach(entry => {
     if (entry.siteLocation) {
-      items.push({
-        table: { widths: ["*"], body: [[{ text: s(entry.siteLocation), style: "photoLocBanner", fillColor: LOC_FILL }]] },
-        layout: { defaultBorder: false },
-        margin: [0, 8, 0, 4],
-      });
+      items.push(createLocationHeader(s(entry.siteLocation)));
     }
 
-    const pairs: [string | undefined, string | undefined][] = [
-      [entry.image1, entry.caption1],
-      [entry.image2, entry.caption2],
-    ];
-    const cols: any[] = pairs
-      .filter(([img, cap]) => img || cap)
-      .map(([img, cap]) =>
-        img
-          ? {
-              stack: [
-                { image: img, fit: [226, 155], alignment: "center" },
-                { text: s(cap), style: "photoCaption", alignment: "center", margin: [0, 2, 0, 0] },
-              ],
-              width: "*",
-            }
-          : { text: s(cap), style: "bodyText", width: "*" },
-      );
+    const flat: { img?: string; desc: string }[] = [];
+    if (entry.image1 || entry.caption1) flat.push({ img: entry.image1, desc: entry.caption1 ?? "" });
+    if (entry.image2 || entry.caption2) flat.push({ img: entry.image2, desc: entry.caption2 ?? "" });
 
-    if (cols.length) {
-      items.push({ columns: cols, columnGap: 8, margin: [0, 0, 0, 8] });
+    for (let i = 0; i < flat.length; i += 2) {
+      const left = flat[i];
+      const right = flat[i + 1];
+      items.push({
+        columns: [
+          createPhotoBox(left.img, left.desc),
+          right ? createPhotoBox(right.img, right.desc) : { text: "", width: "*" },
+        ],
+        columnGap: 0,
+        margin: [0, 0, 0, 0],
+      });
     }
   });
 
@@ -1183,8 +1248,15 @@ function buildSitePhotos(data: WeeklyReportExportData): any[] {
 }
 
 // ── Construction Issues ────────────────────────────────────────────────────────
-function buildConstructionIssues(data: WeeklyReportExportData): any[] {
+function buildConstructionIssues(data: WeeklyReportExportData, issuePhotos: Map<string, string | undefined>): any[] {
   const items: any[] = [secBanner("8.  CONSTRUCTION ISSUE")];
+
+  // Helper to resolve image (use loaded dataURL if available)
+  const resolveImage = (img: string | undefined): string | undefined => {
+    if (!img) return undefined;
+    if (img.startsWith("data:")) return img;
+    return issuePhotos.get(img) || img;
+  };
 
   // Inner banner matching Excel - "Construction Issue" centered with blue fill
   items.push({
@@ -1242,8 +1314,9 @@ function buildConstructionIssues(data: WeeklyReportExportData): any[] {
     ]);
 
     // ── Body row: Problems/Descriptions on left, Photo on right ──
-    const photoCell = issue.photo
-      ? { image: issue.photo, fit: [240, 270], alignment: "center" as const }
+    const resolvedPhoto = resolveImage(issue.photo);
+    const photoCell = resolvedPhoto
+      ? { image: resolvedPhoto, fit: [240, 270], alignment: "center" as const }
       : { text: "", alignment: "center" as const, margin: [0, 130, 0, 130] };
 
     tableBody.push([
@@ -1285,14 +1358,77 @@ function buildConstructionIssues(data: WeeklyReportExportData): any[] {
   return items;
 }
 
-// ── Main export ────────────────────────────────────────────────────────────────
-export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, filename = "WeeklyReport.pdf") {
+// ── Helper: Load all images from data ─────────────────────────────────────────
+async function loadAllImages(data: WeeklyReportExportData): Promise<{
+  companyLogo?: string;
+  clientLogo?: string;
+  signatureImage?: string;
+  coverImage?: string;
+  sitePhotos: Map<string, string | undefined>;
+  issuePhotos: Map<string, string | undefined>;
+  hsePhotos: Map<string, string | undefined>;
+}> {
+  // Load main images
   const [companyLogo, clientLogo, signatureImage, coverImage] = await Promise.all([
     loadImg("/cacpm_logo.png"),
     loadImg(data.clientLogo),
     loadImg(data.signatureImage),
     loadImg(data.coverImage),
   ]);
+
+  // Collect and load site photo images
+  const sitePhotoUrls = new Set<string>();
+  data.sitePhotoCaptions?.forEach(entry => {
+    if (entry.image1 && !entry.image1.startsWith("data:")) sitePhotoUrls.add(entry.image1);
+    if (entry.image2 && !entry.image2.startsWith("data:")) sitePhotoUrls.add(entry.image2);
+  });
+
+  const sitePhotos = new Map<string, string | undefined>();
+  await Promise.all(
+    Array.from(sitePhotoUrls).map(async url => {
+      sitePhotos.set(url, await loadImg(url));
+    })
+  );
+
+  // Collect and load construction issue photos
+  const issuePhotoUrls = new Set<string>();
+  data.constructionIssues?.forEach(issue => {
+    if (issue.photo && !issue.photo.startsWith("data:")) issuePhotoUrls.add(issue.photo);
+  });
+
+  const issuePhotos = new Map<string, string | undefined>();
+  await Promise.all(
+    Array.from(issuePhotoUrls).map(async url => {
+      issuePhotos.set(url, await loadImg(url));
+    })
+  );
+
+  // Collect and load HSE photo images
+  const hsePhotoUrls = new Set<string>();
+  data.hsePhotoReferences?.hseToolboxMeeting?.forEach((entry: any) => {
+    entry.images?.forEach((img: string) => {
+      if (img && !img.startsWith("data:")) hsePhotoUrls.add(img);
+    });
+  });
+  data.hsePhotoReferences?.hseActivityPhotos?.forEach((entry: any) => {
+    entry.images?.forEach((img: string) => {
+      if (img && !img.startsWith("data:")) hsePhotoUrls.add(img);
+    });
+  });
+
+  const hsePhotos = new Map<string, string | undefined>();
+  await Promise.all(
+    Array.from(hsePhotoUrls).map(async url => {
+      hsePhotos.set(url, await loadImg(url));
+    })
+  );
+
+  return { companyLogo, clientLogo, signatureImage, coverImage, sitePhotos, issuePhotos, hsePhotos };
+}
+
+// ── Main export ────────────────────────────────────────────────────────────────
+export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, filename = "WeeklyReport.pdf") {
+  const { companyLogo, clientLogo, signatureImage, coverImage, sitePhotos, issuePhotos, hsePhotos } = await loadAllImages(data);
 
   const projectTitles = [data.projectTitle, data.projectSubtitle, data.projectSubtitle2].filter(Boolean);
 
@@ -1354,8 +1490,8 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
             {},
             {},
             {
-              stack: data.coverImage
-                ? [{ image: data.coverImage, fit: [520, 260], alignment: "center" }]
+              stack: coverImage
+                ? [{ image: coverImage, fit: [520, 260], alignment: "center" }]
                 : [{ text: "No Cover Image Available", style: "coverPlaceholder" }],
               fillColor: "#FFFFFF",
             },
@@ -1406,13 +1542,13 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
     pb(),
     ...buildQAQC(data),
     pb(),
-    ...buildHSE(data),
+    ...buildHSE(data, hsePhotos),
     pb(),
     ...buildResources(data),
     pb(),
-    ...buildSitePhotos(data),
+    ...buildSitePhotos(data, sitePhotos),
     pb(),
-    ...buildConstructionIssues(data),
+    ...buildConstructionIssues(data, issuePhotos),
   ];
 
   // ── Document definition ───────────────────────────────────────────────────
