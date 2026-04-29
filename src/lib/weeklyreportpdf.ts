@@ -1358,6 +1358,108 @@ function buildConstructionIssues(data: WeeklyReportExportData, issuePhotos: Map<
   return items;
 }
 
+// ── Master Schedule ───────────────────────────────────────────────────────────
+function buildMasterSchedule(data: WeeklyReportExportData, scheduleImages: Map<string, string | undefined>): any[] {
+  const items: any[] = [secBanner("9.  MASTER SCHEDULE")];
+  const entries = data.masterSchedule ?? [];
+
+  if (!entries.length) {
+    items.push({ text: "No master schedule files available.", style: "bodyText" });
+    return items;
+  }
+
+  const resolveImage = (url: string | undefined): string | undefined => {
+    if (!url) return undefined;
+    if (url.startsWith("data:")) return url;
+    return scheduleImages.get(url) || url;
+  };
+
+  const createPhotoBox = (url: string | undefined, caption: string): any => {
+    const resolvedImg = resolveImage(url);
+    const photoCell = resolvedImg
+      ? {
+          stack: [{ image: resolvedImg, fit: [490, 320], alignment: "center" as const }],
+          margin: [2, 2, 2, 2],
+          alignment: "center" as const,
+        }
+      : { text: "", margin: [0, 80, 0, 80] };
+
+    return {
+      table: {
+        widths: ["*"],
+        body: [
+          [photoCell],
+          [{
+            text: caption || "",
+            style: "photoCaption",
+            alignment: "center" as const,
+            fontSize: 9,
+            margin: [2, 3, 2, 3],
+          }],
+        ],
+      },
+      layout: {
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => "#000000",
+        vLineColor: () => "#000000",
+      },
+      margin: [0, 0, 0, 8],
+    };
+  };
+
+  entries.forEach(entry => {
+    const isImage = entry.type === "image" || entry.type === "chart";
+    const hasImage = isImage && entry.supabaseUrl;
+    const hasConvertedImages = entry.convertedImages && entry.convertedImages.length > 0;
+
+    if (hasImage) {
+      // Full-width image (schedule charts need width)
+      const caption = entry.caption || entry.fileName || "";
+      items.push(createPhotoBox(entry.supabaseUrl, caption));
+    } else if (hasConvertedImages) {
+      // PDF with converted images - render each page as an image
+      entry.convertedImages!.forEach((img, index) => {
+        const caption = index === 0
+          ? (entry.caption || entry.fileName || `Page ${img.pageNumber}`)
+          : `Page ${img.pageNumber}`;
+        items.push(createPhotoBox(img.supabaseUrl, caption));
+      });
+    } else {
+      // Document / non-renderable file — info block with link
+      const fileLink = entry.supabaseUrl || "";
+      items.push({
+        table: {
+          widths: ["*"],
+          body: [[{
+            stack: [
+              { text: entry.fileName || "Untitled", bold: true, fontSize: 10 },
+              ...(fileLink ? [{
+                text: "Click to view/download file",
+                link: fileLink,
+                color: "#2563EB",
+                fontSize: 9,
+                margin: [0, 4, 0, 0],
+                decoration: "underline"
+              }] : []),
+            ],
+            margin: [8, 8, 8, 8],
+          }]],
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#000000",
+          vLineColor: () => "#000000",
+        },
+        margin: [0, 0, 0, 8],
+      });
+    }
+  });
+
+  return items;
+}
+
 // ── Helper: Load all images from data ─────────────────────────────────────────
 async function loadAllImages(data: WeeklyReportExportData): Promise<{
   companyLogo?: string;
@@ -1367,6 +1469,7 @@ async function loadAllImages(data: WeeklyReportExportData): Promise<{
   sitePhotos: Map<string, string | undefined>;
   issuePhotos: Map<string, string | undefined>;
   hsePhotos: Map<string, string | undefined>;
+  scheduleImages: Map<string, string | undefined>;
 }> {
   // Load main images
   const [companyLogo, clientLogo, signatureImage, coverImage] = await Promise.all([
@@ -1423,12 +1526,36 @@ async function loadAllImages(data: WeeklyReportExportData): Promise<{
     })
   );
 
-  return { companyLogo, clientLogo, signatureImage, coverImage, sitePhotos, issuePhotos, hsePhotos };
+  // Collect and load master schedule images
+  const scheduleImageUrls = new Set<string>();
+  data.masterSchedule?.forEach(entry => {
+    // Regular images/charts
+    if ((entry.type === "image" || entry.type === "chart") && entry.supabaseUrl && !entry.supabaseUrl.startsWith("data:")) {
+      scheduleImageUrls.add(entry.supabaseUrl);
+    }
+    // Converted PDF images
+    if (entry.convertedImages && entry.convertedImages.length > 0) {
+      entry.convertedImages.forEach(img => {
+        if (img.supabaseUrl && !img.supabaseUrl.startsWith("data:")) {
+          scheduleImageUrls.add(img.supabaseUrl);
+        }
+      });
+    }
+  });
+
+  const scheduleImages = new Map<string, string | undefined>();
+  await Promise.all(
+    Array.from(scheduleImageUrls).map(async url => {
+      scheduleImages.set(url, await loadImg(url));
+    })
+  );
+
+  return { companyLogo, clientLogo, signatureImage, coverImage, sitePhotos, issuePhotos, hsePhotos, scheduleImages };
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
 export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, filename = "WeeklyReport.pdf") {
-  const { companyLogo, clientLogo, signatureImage, coverImage, sitePhotos, issuePhotos, hsePhotos } = await loadAllImages(data);
+  const { companyLogo, clientLogo, signatureImage, coverImage, sitePhotos, issuePhotos, hsePhotos, scheduleImages } = await loadAllImages(data);
 
   const projectTitles = [data.projectTitle, data.projectSubtitle, data.projectSubtitle2].filter(Boolean);
 
@@ -1549,6 +1676,8 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
     ...buildSitePhotos(data, sitePhotos),
     pb(),
     ...buildConstructionIssues(data, issuePhotos),
+    pb(),
+    ...buildMasterSchedule(data, scheduleImages),
   ];
 
   // ── Document definition ───────────────────────────────────────────────────

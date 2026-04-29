@@ -17,7 +17,7 @@ export interface OverallProgressRow {
   nextWeek?: number | string;
   pctUpNextWeekPlan?: number | string;
   upNextWeek?: number | string;
-  rowType?: "title" | "detail" | "subDetail";
+  rowType?: "title" | "detail" | "subDetail" | "custom";
   displayIndex?: string;
   sourceId?: string;
   searchTerm?: string;

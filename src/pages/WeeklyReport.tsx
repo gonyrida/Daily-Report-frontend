@@ -595,11 +595,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                 const convertedSchedule = report.sections.masterSchedule.map(item => ({
                   id: item.id,
                   type: item.type,
-                  title: item.title || "",
-                  description: item.description || "",
-                  date: item.date || "",
                   file: item.fileData ? new File([item.fileData], item.fileName || "file") : null,
-                  caption: item.title || ""
+                  caption: item.caption || item.fileName || ""
                 }));
                 setScheduleSections([{
                   id: crypto.randomUUID(),
@@ -2310,6 +2307,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
+        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
+          type: e.type,
+          supabaseUrl: e.supabaseUrl,
+          caption: e.caption,
+          fileName: e.fileName,
+          fileType: e.fileType,
+        })),
       });
 
       await exportWeeklyReportToPdf(exportData, filename);
@@ -2458,6 +2462,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
+        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
+          type: e.type,
+          supabaseUrl: e.supabaseUrl,
+          caption: e.caption,
+          fileName: e.fileName,
+          fileType: e.fileType,
+        })),
         // Pass actual QAQC data — handles both formats:
         // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
         // 2. Frontend TableData format (after DB load): { '4.1': [rows], ... }

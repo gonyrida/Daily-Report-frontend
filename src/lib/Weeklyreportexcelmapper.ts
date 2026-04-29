@@ -316,6 +316,23 @@ export interface MapperInput {
   projectOverview?: string;
   designConstruction?: string;
   designList?: string[];
+
+  // from MasterScheduleSupabase component
+  masterSchedule?: Array<{
+    id?: string;
+    type?: 'document' | 'image' | 'chart';
+    supabaseUrl?: string;
+    caption?: string;
+    fileName?: string;
+    fileType?: string;
+    convertedImages?: Array<{
+      pageNumber: number;
+      supabaseUrl: string;
+      supabasePath: string;
+      width: number;
+      height: number;
+    }>;
+  }>;
 }
 
 // Converts ReferenceSection format → HSEPhotoEntry[] expected by buildHSE.
@@ -580,6 +597,17 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
     projectOverview: input.projectOverview,
     designConstruction: input.designConstruction,
     designList: input.designList,
+
+    // ── Master Schedule ──────────────────────────────────────────────────────
+    masterSchedule: (input.masterSchedule ?? []).map(entry => ({
+      type: entry.type || 'document',
+      supabaseUrl: entry.supabaseUrl,
+      caption: entry.caption,
+      fileName: entry.fileName,
+      fileType: entry.fileType,
+      convertedImages: entry.convertedImages,
+    })),
+
   };
 
   return result;

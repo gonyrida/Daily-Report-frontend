@@ -467,9 +467,9 @@ export const bulkDeleteWeeklyReports = async (ids: string[]): Promise<ApiRespons
 /**
  * Get master schedule for a weekly report
  */
-export const getWeeklyReportMasterSchedule = async (reportId: string): Promise<ApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>> => {
+export const getWeeklyReportMasterSchedule = async (reportId: string): Promise<ApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[] }>> => {
   const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule`);
-  return handleApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>(response);
+  return handleApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[] }>(response);
 };
 
 /**
@@ -483,13 +483,11 @@ export const updateMasterSchedule = async (id: string, data: MasterScheduleEntry
 /**
  * Save master schedule for a weekly report
  */
-export const saveWeeklyReportMasterSchedule = async (reportId: string, entries: MasterScheduleEntry[], title?: string, description?: string): Promise<ApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>> => {
+export const saveWeeklyReportMasterSchedule = async (reportId: string, entries: MasterScheduleEntry[]): Promise<ApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[] }>> => {
   const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule`, {
-    entries,
-    title,
-    description
+    entries
   });
-  return handleApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[]; title: string }>(response);
+  return handleApiResponse<{ weeklyReportId: string; entries: MasterScheduleEntry[] }>(response);
 };
 
 /**
@@ -511,9 +509,34 @@ export const deleteMasterScheduleEntry = async (reportId: string, entryId: strin
 /**
  * Get list of all files in master schedule
  */
-export const getMasterScheduleFiles = async (reportId: string): Promise<ApiResponse<Array<{ id: string; type: string; title: string; fileName: string; fileSize: number; fileType: string; supabaseUrl: string; uploadedAt: string }>>> => {
+export const getMasterScheduleFiles = async (reportId: string): Promise<ApiResponse<Array<{ id: string; type: string; fileName: string; fileSize: number; fileType: string; supabaseUrl: string; uploadedAt: string }>>> => {
   const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule/files`);
-  return handleApiResponse<Array<{ id: string; type: string; title: string; fileName: string; fileSize: number; fileType: string; supabaseUrl: string; uploadedAt: string }>>(response);
+  return handleApiResponse<Array<{ id: string; type: string; fileName: string; fileSize: number; fileType: string; supabaseUrl: string; uploadedAt: string }>>(response);
+};
+
+/**
+ * Convert PDF to images for rendering in PDF export
+ * POST /api/weekly-reports/:id/master-schedule/:entryId/convert-pdf
+ */
+export const convertPdfToImages = async (
+  reportId: string,
+  entryId: string,
+  pdfUrl: string
+): Promise<ApiResponse<{
+  entryId: string;
+  images: Array<{
+    pageNumber: number;
+    supabaseUrl: string;
+    supabasePath: string;
+    width: number;
+    height: number;
+  }>;
+  pageCount: number;
+}>> => {
+  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/master-schedule/${entryId}/convert-pdf`, {
+    pdfUrl
+  });
+  return handleApiResponse(response);
 };
 
 // ============================================================================

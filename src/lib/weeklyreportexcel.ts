@@ -93,7 +93,23 @@ export interface WeeklyReportExportData {
   // ── 8. Construction Issues ────────────────────────────────────────────────────
   constructionIssues?: ConstructionIssue[];
 
-  // ── 9. Introduction (1.Intro) ───────────────────────────────────────────────────
+  // ── 9. Master Schedule ────────────────────────────────────────────────────────
+  masterSchedule?: Array<{
+    type: 'document' | 'image' | 'chart';
+    supabaseUrl?: string;
+    caption?: string;
+    fileName?: string;
+    fileType?: string;
+    convertedImages?: Array<{
+      pageNumber: number;
+      supabaseUrl: string;
+      supabasePath: string;
+      width: number;
+      height: number;
+    }>;
+  }>;
+
+  // ── 10. Introduction (1.Intro) ───────────────────────────────────────────────────
   projectOverview?: string;
   designConstruction?: string;
   designList?: string[];
