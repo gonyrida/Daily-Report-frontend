@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { X, UploadCloud, FileSpreadsheet, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { ConstructionProgressItem } from '../../types/constructionProgress';
 import {
@@ -108,35 +108,41 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
     }
   };
 
-  const handleConfirmImport = () => {
-    const validRows = parsedRows.filter(row => row.isValid);
-    if (validRows.length === 0) return;
+  const [isImporting, setIsImporting] = useState(false);
 
-    // Enable calculations when importing
-    if (!isCreateNewMode && !allowCalculations) {
-      setAllowCalculations(true);
-    }
-
-    const importedItems = mapToConstructionItems(validRows, existingItems);
-
-    // Apply calculations if in create mode or calculations are allowed
-    const shouldCalculate = isCreateNewMode || allowCalculations;
-    const finalItems = shouldCalculate
-      ? computeAllAmounts(importedItems)
-      : importedItems;
-
-    onConfirm(finalItems);
-
-    // Reset state
-    setParsedRows([]);
-    setErrors([]);
-    setFileName('');
-    onClose();
-  };
-
-  const validRows = parsedRows.filter(row => row.isValid);
+  const validRows = useMemo(() => parsedRows.filter(row => row.isValid), [parsedRows]);
   const hasValidRows = validRows.length > 0;
   const hasErrors = errors.length > 0;
+
+  const handleConfirmImport = useCallback(() => {
+    if (validRows.length === 0) return;
+
+    setIsImporting(true);
+
+    // Defer heavy computation off the current paint frame to avoid UI freeze
+    requestAnimationFrame(() => {
+      try {
+        if (!isCreateNewMode && !allowCalculations) {
+          setAllowCalculations(true);
+        }
+
+        const importedItems = mapToConstructionItems(validRows, existingItems);
+        const shouldCalculate = isCreateNewMode || allowCalculations;
+        const finalItems = shouldCalculate
+          ? computeAllAmounts(importedItems)
+          : importedItems;
+
+        onConfirm(finalItems);
+
+        setParsedRows([]);
+        setErrors([]);
+        setFileName('');
+        onClose();
+      } finally {
+        setIsImporting(false);
+      }
+    });
+  }, [validRows, isCreateNewMode, allowCalculations, setAllowCalculations, existingItems, onConfirm, onClose]);
 
   if (!show) return null;
 
@@ -365,15 +371,15 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             </button>
             <button
               onClick={handleConfirmImport}
-              disabled={!hasValidRows}
+              disabled={!hasValidRows || isImporting}
               className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${
-                hasValidRows
+                hasValidRows && !isImporting
                   ? 'bg-green-600 text-white hover:bg-green-700'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >
-              <UploadCloud size={16} />
-              Import {validRows.length > 0 && `(${validRows.length})`} Row{validRows.length !== 1 ? 's' : ''}
+              {isImporting ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
+              {isImporting ? 'Importing...' : `Import ${validRows.length > 0 ? `(${validRows.length})` : ''} Row${validRows.length !== 1 ? 's' : ''}`}
             </button>
           </div>
         </div>

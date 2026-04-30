@@ -395,11 +395,12 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
 
       if (isMetadataRow || looksLikeFooter) continue;
 
-      parsed.errors = validateRow(parsed, i - headerRow).map((e) => e.message);
-      parsed.isValid = parsed.errors.length === 0;
+      const rowErrors = validateRow(parsed, i - headerRow);
+      parsed.errors = rowErrors.map((e) => e.message);
+      parsed.isValid = rowErrors.length === 0;
 
       if (!parsed.isValid) {
-        errors.push(...validateRow(parsed, i - headerRow));
+        errors.push(...rowErrors);
       }
 
       rows.push(parsed);
