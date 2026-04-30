@@ -8,6 +8,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
+import MasterReportView from "@/components/weekly/MasterReportView";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -192,6 +193,8 @@ const WeeklyReportDashboard = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('projectId');
+  const folderId  = searchParams.get('folderId');
+  const reportType = searchParams.get('type');
   
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
@@ -400,6 +403,28 @@ const WeeklyReportDashboard = () => {
   
   const weeklyTotal = weeklyReports.filter(r => r.status === 'submitted').length;
   const lastSubmitted = getLastSubmittedThisMonth(filteredReports, getCurrentUserId());
+
+  // ── Master Report mode ──────────────────────────────────────────────────
+  // When ?folderId=xxx&type=master is present, render the folder-level
+  // aggregated view instead of the normal project dashboard.
+  if (folderId && reportType === 'master') {
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <HierarchicalSidebar />
+          <SidebarInset>
+            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+              <SidebarTrigger />
+              <h1 className="text-lg font-semibold">Master Weekly Report</h1>
+            </header>
+            <main className="flex-1 overflow-auto">
+              <MasterReportView folderId={folderId} />
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   return (
     <SidebarProvider>

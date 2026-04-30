@@ -1,0 +1,96 @@
+// src/types/masterReport.types.ts
+// Types for the folder-level Master Weekly Report (dynamically aggregated, read-only)
+
+// ── Photo shape (mirrors WeeklyReport sections.photos.locations[]) ─────────
+export interface PhotoSlot {
+  image: string;
+  caption: string;
+}
+
+export interface PhotoEntry {
+  slots: PhotoSlot[];
+}
+
+export interface PhotoLocation {
+  location?: string;
+  title?: string;
+  entries: PhotoEntry[];
+}
+
+// ── Activity item with an extra projectSource tag ─────────────────────────
+export interface MasterActivityItem {
+  description: string;
+  percent?: number;
+  percentage?: string;
+  source?: string;
+  projectSource: string; // name of the originating project
+  addedAt?: string;
+}
+
+// ── Construction issue with source tag ────────────────────────────────────
+export interface MasterIssueItem {
+  no?: string | number;
+  location?: string;
+  problem?: string;
+  actionBy?: string;
+  photo?: string;
+  projectSource: string;
+}
+
+// ── Aggregated manpower totals ─────────────────────────────────────────────
+export interface AggregatedManpower {
+  managementTotal: number;
+  workingInteriorTotal: number;
+  workingMEPTotal: number;
+  grandTotal: number;
+}
+
+// ── Weighted progress result ───────────────────────────────────────────────
+export interface AggregatedProgress {
+  /** Weighted average: Σ(progress_i × manpower_i) / Σ(manpower_i), or simple mean fallback */
+  weighted: number;
+  /** Per-project progress keyed by projectId string */
+  perProject: Record<string, number>;
+}
+
+// ── Per-project lightweight summary row ───────────────────────────────────
+export interface MasterProjectSummary {
+  projectId: string;
+  projectName: string;
+  weekNumber: number;
+  status: string;
+  startDate: string;
+  endDate: string;
+  activityCount: number;
+  issueCount: number;
+  progress: number;
+}
+
+// ── Full aggregated payload ────────────────────────────────────────────────
+export interface MasterAggregated {
+  activities: {
+    weeklyActivities: MasterActivityItem[];
+    nextWeekPlan: MasterActivityItem[];
+  };
+  manpower: AggregatedManpower;
+  /** Photos grouped by project name */
+  photos: Record<string, PhotoLocation[]>;
+  progress: AggregatedProgress;
+  issues: MasterIssueItem[];
+}
+
+// ── Top-level master report shape (matches API response data) ─────────────
+export interface MasterWeeklyReport {
+  type: 'master';
+  folder: {
+    _id: string;
+    name: string;
+    companyId?: string;
+    createdAt?: string;
+    [key: string]: unknown;
+  };
+  weekNumber: number;
+  /** One entry per project that has a report for this week */
+  reports: MasterProjectSummary[];
+  aggregated: MasterAggregated;
+}

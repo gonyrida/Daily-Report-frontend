@@ -555,8 +555,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               // Also update the siteActivitiesSections to match loaded data
               if (report.sections.photos.locations) {
                 const convertedSections = report.sections.photos.locations.map(location => ({
-                  id: crypto.randomUUID(),
-                  title: location.location,
+                  id: location.id || crypto.randomUUID(),
+                  title: location.title || 'Site Activity Photos',
                   entries: location.entries || []
                 }));
                 setSiteActivitiesSections(convertedSections);
@@ -1372,10 +1372,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         locations: []
       };
 
-      if (siteActivitiesSections && siteActivitiesSections.length > 0) {
+      // Use photosData instead of siteActivitiesSections (photosData is what SitePhotos component updates)
+      const photoSections = photosData?.locations || siteActivitiesSections || [];
+
+      if (photoSections && photoSections.length > 0) {
         // Convert frontend format to backend format with base64 images
         const locations = await Promise.all(
-          siteActivitiesSections.map(async (section) => {
+          photoSections.map(async (section) => {
             const convertedEntries = await Promise.all(
               (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
@@ -1395,7 +1398,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               })
             );
             return {
-              location: section.title,
+              id: section.id || `location-${Date.now()}`,
+              title: section.title || 'Site Activity Photos',
               entries: convertedEntries
             };
           })
@@ -1786,10 +1790,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         locations: []
       };
 
-      if (siteActivitiesSections && siteActivitiesSections.length > 0) {
+      // Use photosData instead of siteActivitiesSections (photosData is what SitePhotos component updates)
+      const photoSections = photosData?.locations || siteActivitiesSections || [];
+
+      if (photoSections && photoSections.length > 0) {
         // Convert frontend format to backend format with base64 images
         const locations = await Promise.all(
-          siteActivitiesSections.map(async (section) => {
+          photoSections.map(async (section) => {
             const convertedEntries = await Promise.all(
               (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
@@ -1809,7 +1816,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               })
             );
             return {
-              location: section.title,
+              id: section.id || `location-${Date.now()}`,
+              title: section.title || 'Site Activity Photos',
               entries: convertedEntries
             };
           })

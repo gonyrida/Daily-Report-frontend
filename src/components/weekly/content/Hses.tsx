@@ -85,7 +85,6 @@ const Hses: React.FC<HsesProps & {
       }
     } catch (error) {
       console.error('Error aggregating images:', error);
-      alert('Error during image aggregation');
     } finally {
       setIsAggregating(false);
     }

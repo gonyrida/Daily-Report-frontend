@@ -23,6 +23,7 @@ import type {
   ExportStatus,
   MasterScheduleEntry
 } from '@/types/weeklyReport.types';
+import type { MasterWeeklyReport } from '@/types/masterReport.types';
 
 // ============================================================================
 // Base API URL and Error Handling
@@ -688,7 +689,31 @@ export const createReportWithImages = async (
     aggregateImages: true,
     aggregationOptions
   };
-  
+
   const response = await apiPost(WEEKLY_REPORTS_BASE_URL, requestData);
   return handleApiResponse<WeeklyReport>(response);
+};
+
+// ============================================================================
+// Master Report (folder-level aggregation – read-only, no stored document)
+// ============================================================================
+
+/**
+ * Fetch the dynamically aggregated master report for a folder + week.
+ * Calls GET /api/weekly-reports/master?folderId=xxx&weekNumber=xx
+ */
+export const getMasterWeeklyReport = async (
+  folderId: string,
+  weekNumber: number
+): Promise<ApiResponse<MasterWeeklyReport>> => {
+  try {
+    const params = new URLSearchParams({ folderId, weekNumber: weekNumber.toString() });
+    const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/master?${params}`);
+    return handleApiResponse<MasterWeeklyReport>(response);
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch master report'
+    };
+  }
 };

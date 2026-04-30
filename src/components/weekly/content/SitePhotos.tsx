@@ -32,7 +32,6 @@ const SitePhotos: React.FC<SitePhotosProps> = ({
   const handleAggregateSitePhotos = async () => {
     // Check if we have the required data
     if (!sharedData?.dateRange || (!sharedData?.projectId && !sharedData?.projectName)) {
-      alert('Project and date range are required for image aggregation');
       return;
     }
 
@@ -63,9 +62,6 @@ const SitePhotos: React.FC<SitePhotosProps> = ({
         if (result.success && result.data) {
           const newPhotosData = result.data.sections?.photos;
           onChange?.(newPhotosData);
-          alert(`✅ Successfully aggregated ${result.aggregated?.sitePhotoCount || 0} site photos from ${result.aggregated?.dailyReportCount || 0} daily reports`);
-        } else {
-          alert(`Aggregation failed: ${result.error}`);
         }
       } else {
         // Unsaved report: Preview and update local state only
@@ -90,7 +86,6 @@ const SitePhotos: React.FC<SitePhotosProps> = ({
       }
     } catch (error) {
       console.error('Error aggregating site photos:', error);
-      alert('Error during image aggregation');
     } finally {
       setIsAggregating(false);
     }
