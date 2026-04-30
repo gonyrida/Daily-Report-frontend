@@ -59,7 +59,7 @@ const SitePhotos: React.FC<SitePhotosProps> = ({
       if (reportId) {
         // Saved report: Update directly in database
         const result = await updateReportImages(reportId, { maxImagesPerReport: 2 });
-        
+
         if (result.success && result.data) {
           const newPhotosData = result.data.sections?.photos;
           onChange?.(newPhotosData);
@@ -78,12 +78,12 @@ const SitePhotos: React.FC<SitePhotosProps> = ({
         );
 
         if (result.success && result.data) {
-          const newPhotosData = {
+          const newPhotosData = result.data.photosSection || {
             title: "Site Activities Photos",
-            locations: result.data.sitePhotos
+            locations: []
           };
           onChange?.(newPhotosData);
-          alert(`✅ Preview: ${result.data.sitePhotos.length} site photos from ${result.data.dailyReportCount} daily reports. Will be saved when you save the report.`);
+          alert(`✅ Preview: ${result.data.sitePhotoCount || 0} site photos from ${result.data.dailyReportCount || 0} daily reports. Will be saved when you save the report.`);
         } else {
           alert(`Aggregation failed: ${result.error}`);
         }
