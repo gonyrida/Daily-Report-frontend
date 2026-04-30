@@ -5,14 +5,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, Image, BarChart, X, Download, Trash2 } from 'lucide-react';
+import { Upload, FileText, Image, X, Download, Trash2 } from 'lucide-react';
 import { MasterScheduleEntry } from '@/types/weeklyReport.types';
 import { uploadScheduleFileToSupabase, deleteScheduleFileFromSupabase } from '@/utils/weeklyReportSupabase';
 import { useToast } from '@/hooks/use-toast';
-import { updateMasterSchedule } from '@/services/weeklyReportService';
+import { updateMasterSchedule, convertPdfToImages, convertPdfToImagesStandalone } from '@/services/weeklyReportService';
 
 interface MasterScheduleSupabaseProps {
   entries: MasterScheduleEntry[];
@@ -33,6 +31,49 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false); // Track if initial data has loaded
+
+  // Convert pending PDFs when reportId becomes available
+  useEffect(() => {
+    if (!reportId || entries.length === 0) return;
+
+    // Find PDFs that don't have converted images yet
+    const pendingPdfs = entries.filter(e => {
+      const isPdf = e.fileType === 'application/pdf' || e.fileName?.toLowerCase().endsWith('.pdf');
+      const needsConversion = isPdf && e.supabaseUrl && (!e.convertedImages || e.convertedImages.length === 0);
+      return needsConversion;
+    });
+
+    if (pendingPdfs.length > 0) {
+      console.log(`[MasterSchedule] Converting ${pendingPdfs.length} pending PDF(s) now that reportId is available...`);
+
+      pendingPdfs.forEach(async (entry) => {
+        try {
+          console.log(`[MasterSchedule] Converting pending PDF ${entry.id}: ${entry.fileName}`);
+          const response = await convertPdfToImages(reportId, entry.id, entry.supabaseUrl!);
+
+          if (response.success && response.data) {
+            // Update the entry with converted images
+            const updatedEntries = entries.map(e =>
+              e.id === entry.id
+                ? { ...e, convertedImages: response.data.images }
+                : e
+            );
+
+            onChange(updatedEntries);
+
+            toast({
+              title: "PDF Converted",
+              description: `"${entry.fileName}" converted to ${response.data.pageCount} image(s)`
+            });
+          } else {
+            console.error(`[MasterSchedule] Pending PDF conversion failed for ${entry.id}:`, response.error);
+          }
+        } catch (convError) {
+          console.error(`[MasterSchedule] Pending PDF conversion error for ${entry.id}:`, convError);
+        }
+      });
+    }
+  }, [reportId]); // Run when reportId changes
 
   // Save schedule to database
   const saveScheduleToDatabase = async (updatedEntries: MasterScheduleEntry[]) => {
@@ -129,11 +170,9 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
           const newEntry: MasterScheduleEntry = {
             id: crypto.randomUUID(),
             type: entryType,
-            title: file.name.replace(/\.[^/.]+$/, ''),
             fileName: file.name,
             fileSize: file.size,
             fileType: file.type,
-            date: new Date().toISOString().split('T')[0],
             supabaseUrl: uploadResult.supabaseUrl,
             supabasePath: uploadResult.supabasePath
           };
@@ -145,13 +184,117 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
       }
 
       setUploadProgress(100);
-      
-      handleChange([...entries, ...newEntries]);
+
+      // Add new entries to state
+      const allEntries = [...entries, ...newEntries];
+      handleChange(allEntries);
 
       toast({
         title: "Upload Successful",
         description: `${files.length} file(s) uploaded to Supabase`
       });
+
+      // Convert PDFs to images for rendering (fire and forget, don't block UI)
+      console.log(`[MasterSchedule] Checking PDF conversion - reportId: ${reportId}, newEntries: ${newEntries.length}`);
+
+      if (reportId) {
+        const pdfEntries = newEntries.filter(e => {
+          const isPdf = e.fileType === 'application/pdf' || e.fileName?.toLowerCase().endsWith('.pdf');
+          console.log(`[MasterSchedule] Entry ${e.fileName}: fileType=${e.fileType}, isPdf=${isPdf}`);
+          return isPdf;
+        });
+
+        console.log(`[MasterSchedule] Found ${pdfEntries.length} PDF(s) to convert`);
+
+        if (pdfEntries.length > 0) {
+          console.log(`[MasterSchedule] Converting ${pdfEntries.length} PDF(s) to images...`);
+
+          // Start conversion in background
+          pdfEntries.forEach(async (entry) => {
+            try {
+              if (entry.supabaseUrl) {
+                console.log(`[MasterSchedule] Calling convertPdfToImages for ${entry.id} with URL: ${entry.supabaseUrl}`);
+                const response = await convertPdfToImages(reportId, entry.id, entry.supabaseUrl);
+                console.log(`[MasterSchedule] Conversion response for ${entry.id}:`, response);
+
+                if (response.success && response.data) {
+                  // Update the entry with converted images
+                  const updatedEntries = allEntries.map(e =>
+                    e.id === entry.id
+                      ? { ...e, convertedImages: response.data.images }
+                      : e
+                  );
+
+                  handleChange(updatedEntries);
+
+                  toast({
+                    title: "PDF Converted",
+                    description: `"${entry.fileName}" converted to ${response.data.pageCount} image(s)`
+                  });
+                } else {
+                  console.error(`[MasterSchedule] PDF conversion failed for ${entry.id}:`, response.error);
+                  toast({
+                    title: "PDF Conversion Failed",
+                    description: response.error || "Failed to convert PDF to images",
+                    variant: "destructive"
+                  });
+                }
+              } else {
+                console.log(`[MasterSchedule] No supabaseUrl for entry ${entry.id}, skipping conversion`);
+              }
+            } catch (convError) {
+              console.error(`[MasterSchedule] PDF conversion error for ${entry.id}:`, convError);
+              toast({
+                title: "PDF Conversion Error",
+                description: convError instanceof Error ? convError.message : "Unknown error",
+                variant: "destructive"
+              });
+            }
+          });
+        }
+      } else {
+        // No reportId - use standalone conversion (works for unsaved reports)
+        console.log(`[MasterSchedule] No reportId - using standalone conversion`);
+
+        const pdfEntries = newEntries.filter(e => {
+          const isPdf = e.fileType === 'application/pdf' || e.fileName?.toLowerCase().endsWith('.pdf');
+          return isPdf;
+        });
+
+        if (pdfEntries.length > 0) {
+          console.log(`[MasterSchedule] Converting ${pdfEntries.length} PDF(s) with standalone API...`);
+
+          pdfEntries.forEach(async (entry) => {
+            try {
+              if (entry.supabaseUrl) {
+                console.log(`[MasterSchedule] Calling convertPdfToImagesStandalone for ${entry.id}`);
+                const response = await convertPdfToImagesStandalone(entry.supabaseUrl, entry.id);
+                console.log(`[MasterSchedule] Standalone conversion response:`, response);
+
+                if (response.success && response.data) {
+                  // Update the entry with converted images
+                  const updatedEntries = allEntries.map(e =>
+                    e.id === entry.id
+                      ? { ...e, convertedImages: response.data.images }
+                      : e
+                  );
+
+                  handleChange(updatedEntries);
+
+                  toast({
+                    title: "PDF Converted",
+                    description: `"${entry.fileName}" converted to ${response.data.pageCount} image(s)`
+                  });
+                } else {
+                  console.error(`[MasterSchedule] Standalone PDF conversion failed:`, response.error);
+                }
+              }
+            } catch (convError) {
+              console.error(`[MasterSchedule] Standalone PDF conversion error:`, convError);
+            }
+          });
+        }
+      }
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -197,7 +340,7 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
   const getEntryIcon = (type: string) => {
     switch (type) {
       case 'image': return <Image className="w-4 h-4" />;
-      case 'chart': return <BarChart className="w-4 h-4" />;
+      case 'chart': return <FileText className="w-4 h-4" />;
       default: return <FileText className="w-4 h-4" />;
     }
   };
@@ -276,21 +419,6 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
               <Image className="w-4 h-4 mr-2" />
               Images
             </Button>
-            <Button
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.pdf,.xlsx,.xls,.doc,.docx';
-                input.multiple = true;
-                input.onchange = (e) => handleFileUpload((e.target as HTMLInputElement).files, 'chart');
-                input.click();
-              }}
-              disabled={disabled || isUploading}
-              variant="outline"
-            >
-              <BarChart className="w-4 h-4 mr-2" />
-              Charts
-            </Button>
           </div>
 
           <input
@@ -315,7 +443,7 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
                         className="w-full h-auto max-h-96 object-contain bg-gray-50 dark:bg-gray-900 rounded-lg"
                       />
                       <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white p-3 rounded-b-lg">
-                        <p className="text-sm">{entry.caption || entry.title}</p>
+                        <p className="text-sm">{entry.caption || entry.fileName}</p>
                       </div>
                     </div>
                   ) : entry.fileType === "application/pdf" || entry.fileName?.toLowerCase().endsWith('.pdf') ? (
@@ -375,31 +503,7 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
                   )}
                 </div>
                 
-                {/* File metadata section */}
                 <div className="mt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      value={entry.title}
-                      onChange={(e) => updateEntry(entry.id, { title: e.target.value })}
-                      placeholder="Title"
-                      disabled={disabled}
-                    />
-                    <Input
-                      type="date"
-                      value={entry.date}
-                      onChange={(e) => updateEntry(entry.id, { date: e.target.value })}
-                      disabled={disabled}
-                    />
-                  </div>
-                  
-                  <Textarea
-                    value={entry.description || ''}
-                    onChange={(e) => updateEntry(entry.id, { description: e.target.value })}
-                    placeholder="Description"
-                    rows={2}
-                    disabled={disabled}
-                  />
-
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <span>{entry.fileName}</span>
                     <span>{formatFileSize(entry.fileSize)}</span>
@@ -413,7 +517,7 @@ export const MasterScheduleSupabase: React.FC<MasterScheduleSupabaseProps> = ({
             <div className="text-center py-8 text-gray-500">
               <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>No schedule files uploaded yet</p>
-              <p className="text-sm">Upload documents, images, or charts to get started</p>
+              <p className="text-sm">Upload documents, images, to get started</p>
             </div>
           )}
         </CardContent>

@@ -271,14 +271,25 @@ export interface ResourceSection {
 }
 
 /**
+ * Converted PDF page image
+ */
+export interface ConvertedPdfImage {
+  pageNumber: number;
+  supabaseUrl: string;
+  supabasePath: string;
+  width: number;
+  height: number;
+}
+
+/**
  * Master schedule entry with Supabase file support
  */
 export interface MasterScheduleEntry {
   id: string;
   type: 'document' | 'image' | 'chart';
-  title: string;
+  title?: string;
   description?: string;
-  date: string;
+  date?: string;
   fileName?: string;
   fileData?: string; // Base64 for legacy support
   supabaseUrl?: string; // New: Supabase storage URL
@@ -287,6 +298,7 @@ export interface MasterScheduleEntry {
   fileType?: string;
   caption?: string;
   file?: File; // Temporary file object during upload
+  convertedImages?: ConvertedPdfImage[]; // Converted PDF page images for rendering
 }
 
 /**

@@ -6,12 +6,15 @@ import { ProgressRow } from '@/types/progress.types';
  *   Roman numerals (I, II, III, IV, V, …)  → title row
  *   Pure integers (1, 2, 3, …)             → detail row
  *   Decimal (1.1, 2.3, …)                  → subDetail row
- *   Anything else (A, B, a, 1a, …)         → skip (caller drops it)
+ *   Anything else (A, B, F1, …)            → custom row (preserved, never skipped)
+ *
+ * This function ONLY classifies — it never filters or drops rows.
+ * Filtering for display is the view layer's responsibility.
  */
-function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' | 'skip' {
-  if (!id) return 'skip';
+function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' | 'custom' {
+  if (!id) return 'custom';
   const trimmed = id.trim();
-  if (!trimmed) return 'skip';
+  if (!trimmed) return 'custom';
 
   // Strict roman numeral: only uppercase I, V, X, L, C, D, M in valid order.
   // No case-insensitive flag — lowercase should NOT be a title.
@@ -20,21 +23,24 @@ function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' | 'skip' {
     return 'title';
   }
 
-  // Decimal detail: "1.1", "2.3", etc.
-  if (/^\d+\.\d+$/.test(trimmed)) return 'subDetail';
+  // Decimal detail: "1.1", "2.3", "1.1.1", "1.1.2", etc.
+  if (/^\d+(\.\d+)+$/.test(trimmed)) return 'subDetail';
 
   // Pure integer: "1", "2", "12", etc.
   if (/^\d+$/.test(trimmed)) return 'detail';
 
-  // Everything else (alpha, mixed, punctuation) → skip
-  return 'skip';
+  // Dash-only id → skip
+  if (/^[-]+$/.test(trimmed)) return 'custom';
+
+  // Alpha, mixed, punctuation, etc. → custom (filtered out in overall progress)
+  return 'custom';
 }
 
 /**
  * Build scoped source IDs for construction items.
- * Prefixes detail/subDetail rows with their parent title (e.g., "I::1", "II::3")
+ * Prefixes all non-title rows with their parent title (e.g., "I::1", "II::F1")
  * to prevent collisions between items with the same raw ID in different phases.
- * Returns empty string for skipped items to keep indices aligned.
+ * Every item gets a non-empty scoped ID — nothing is dropped here.
  */
 function buildScopedSourceIds(items: ConstructionProgressItem[]): string[] {
   const keys: string[] = [];
@@ -51,9 +57,8 @@ function buildScopedSourceIds(items: ConstructionProgressItem[]): string[] {
     if (type === 'title') {
       currentTitle = id;
       keys.push(currentTitle);
-    } else if (type === 'skip') {
-      keys.push(''); // placeholder so indices line up with items array
     } else {
+      // detail, subDetail, and custom all get scoped under the current title
       keys.push(`${currentTitle}::${id}`);
     }
   }
@@ -110,11 +115,12 @@ export function mergeConstructionIntoOverallRows(
 
     const rowType = resolveRowType(rawId);
 
-    // Skip non-standard IDs (alpha, mixed, etc.)
-    if (rowType === 'skip') continue;
+    // Skip non-standard IDs (alpha, mixed, etc.) and subDetail rows (decimal IDs)
+    // Only allow: title (Roman numerals) and detail (pure integers)
+    if (rowType === 'custom' || rowType === 'subDetail') continue;
 
     const scopedId = scopedIds[i];
-    if (!scopedId) continue;
+    if (!scopedId) continue; // only trips when item.id was empty — caught above in practice
 
     // Skip if this scoped sourceId already exists in storage (prevents re-adding on re-render)
     if (existingSourceIds.has(scopedId)) continue;

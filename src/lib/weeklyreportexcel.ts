@@ -15,7 +15,7 @@
 
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { detectIdType, resolveIdType } from '@/utils/idEngine';
+import { resolveIdType } from '@/utils/idEngine';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -93,7 +93,23 @@ export interface WeeklyReportExportData {
   // ── 8. Construction Issues ────────────────────────────────────────────────────
   constructionIssues?: ConstructionIssue[];
 
-  // ── 9. Introduction (1.Intro) ───────────────────────────────────────────────────
+  // ── 9. Master Schedule ────────────────────────────────────────────────────────
+  masterSchedule?: Array<{
+    type: 'document' | 'image' | 'chart';
+    supabaseUrl?: string;
+    caption?: string;
+    fileName?: string;
+    fileType?: string;
+    convertedImages?: Array<{
+      pageNumber: number;
+      supabaseUrl: string;
+      supabasePath: string;
+      width: number;
+      height: number;
+    }>;
+  }>;
+
+  // ── 10. Introduction (1.Intro) ───────────────────────────────────────────────────
   projectOverview?: string;
   designConstruction?: string;
   designList?: string[];
@@ -144,10 +160,12 @@ export interface OverallProgressItem {
 
 export interface NWDPItem {
   id?: string;
+  sourceId?: string;
   workDoneLabel?: string;
   workDonePct?: number | string;
   nextWeekLabel?: string;
   nextWeekPct?: number | string;
+  indentLevel?: number;
 }
 
 export interface QAQCSection {
@@ -1864,84 +1882,44 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
   });
   r += 1;
 
-  // Helper function to calculate indentation level based on ID structure
-  const getIndentationLevel = (id: string): number => {
-    if (!id) return 0;
-
-    const trimmed = id.trim();
-    const idType = detectIdType(trimmed);
-
-    // Roman numerals (I, II, III, IV, V, etc.) and ambiguous single letters
-    // that function as roman numerals (e.g. "I" = section 1) — level 0
-    if (idType === 'roman' || idType === 'ambiguous') return 0;
-
-    // Arabic numbers with dots (1., 2., 3., etc.) - level 1
-    if (/^\d+\.$/.test(trimmed)) return 1;
-
-    // Triple decimal (1.1.1, 1.2.1, etc.) - level 3
-    if (/^\d+\.\d+\.\d+$/.test(trimmed)) return 3;
-
-    // Decimal numbers (1.1, 1.2, 2.1, etc.) - level 2
-    if (/^\d+\.\d+$/.test(trimmed)) return 2;
-
-    // Dash only (-, --, ---) - level 4
-    if (/^-+$/.test(trimmed)) return 4;
-
-    // Numbers without dots (1, 2, 3) - level 1
-    if (/^\d+$/.test(trimmed)) return 1;
-
-    // Alpha letters (A, B, C) treated as level-1 subsections
-    if (idType === 'alpha') return 1;
-
-    return 1;
+  // Build combined display text matching the template cell format.
+  // "-" (alpha placeholder) keeps the dash prefix; IDs already ending with "."
+  // skip the extra dot to avoid "1.. text".
+  const buildDisplayText = (id: string, text: string): string => {
+    if (!id) return text || '';
+    if (id === '-') return text ? `- ${text}` : '-';
+    if (!text) return id;
+    return id.endsWith('.') ? `${id} ${text}` : `${id}. ${text}`;
   };
 
-  // Helper function to add indentation with custom spacing
-  const addIndentation = (text: string, level: number): string => {
-    let spaces = 0;
-
-    switch (level) {
-      case 0: // Roman numerals - 2 spaces
-        spaces = 2;
-        break;
-      case 1: // Arabic numbers (1., 2.) - 4 spaces
-        spaces = 4;
-        break;
-      case 2: // Decimal numbers (1.1) - 4 spaces
-        spaces = 4;
-        break;
-      case 3: // Triple decimal (1.1.1) - 4 spaces
-        spaces = 4;
-        break;
-      case 4: // Dashes (-) - 8 spaces
-        spaces = 8;
-        break;
-      default:
-        spaces = 0;
-    }
-
-    return ' '.repeat(spaces) + text;
+  // Derive bold + Excel indent from ID pattern, matching the template exactly:
+  //   Roman  (I, II…)  → bold, indent 1
+  //   Integer (1, 2…)  → bold, indent 2
+  //   Decimal (1.1…)   → normal, indent 2
+  //   Dash   (-)       → normal, indent 6
+  const getIdStyle = (id: string): { bold: boolean; indent: number } => {
+    const t = id.trim();
+    if (/^[IVX]/i.test(t))  return { bold: true,  indent: 1 };
+    if (t === '-')           return { bold: false, indent: 6 };
+    if (/^\d+$/.test(t))    return { bold: true,  indent: 2 };
+    return                         { bold: false, indent: 2 };
   };
 
   // Add data rows
   if (d.nwdpItems && d.nwdpItems.length > 0) {
     d.nwdpItems.forEach((item) => {
-      // ID + Scope of work (combined in column B) with indentation
-      const itemId = (item as any).sourceId || item.id || '';
-      const scopeText = item.workDoneLabel || '';
-      const workDoneText = itemId && scopeText ? `${itemId}. ${scopeText}` : (itemId || scopeText);
-      const workDoneIndentLevel = getIndentationLevel(itemId);
-      const isRomanLevel = workDoneIndentLevel === 0;
-      const formattedWorkDone = addIndentation(workDoneText, workDoneIndentLevel);
+      const itemId = item.sourceId || item.id || '';
+      const { bold: isBold, indent } = getIdStyle(itemId);
 
-      ws.getCell(r, 2).value = formattedWorkDone;
+      const workDoneText = buildDisplayText(itemId, item.workDoneLabel || '');
+      ws.getCell(r, 2).value = workDoneText;
 
       // Set explicit row height to ensure visibility
       ws.getRow(r).height = 20;
 
       ws.getCell(r, 2).style = {
-        font: { bold: isRomanLevel, size: isRomanLevel ? 11 : 10, name: 'Arial' },
-        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+        font: { bold: isBold, size: 10, name: 'Arial' },
+        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true, indent },
         border: {
           top: { style: 'hair' },
           bottom: { style: 'hair' },
@@ -1962,17 +1940,12 @@ async function buildNWDP(workbook: ExcelJS.Workbook, d: WeeklyReportExportData) 
         }
       };
 
-      // Next week plan description (with same indentation as work done)
-      const nextWeekText = item.nextWeekLabel || '';
-      const nextWeekWithId = itemId && nextWeekText
-        ? `${itemId}. ${nextWeekText}`
-        : (nextWeekText || (itemId ? `${itemId}.` : ''));
-      const formattedNextWeek = addIndentation(nextWeekWithId || '', workDoneIndentLevel);
-
-      ws.getCell(r, 4).value = formattedNextWeek;
+      // Next week plan description
+      const nextWeekText = buildDisplayText(itemId, item.nextWeekLabel || '');
+      ws.getCell(r, 4).value = nextWeekText;
       ws.getCell(r, 4).style = {
-        font: { bold: isRomanLevel, size: isRomanLevel ? 11 : 10, name: 'Arial' },
-        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+        font: { bold: isBold, size: 10, name: 'Arial' },
+        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true, indent },
         border: {
           top: { style: 'hair' },
           bottom: { style: 'hair' },

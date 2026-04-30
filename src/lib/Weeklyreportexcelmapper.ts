@@ -316,6 +316,23 @@ export interface MapperInput {
   projectOverview?: string;
   designConstruction?: string;
   designList?: string[];
+
+  // from MasterScheduleSupabase component
+  masterSchedule?: Array<{
+    id?: string;
+    type?: 'document' | 'image' | 'chart';
+    supabaseUrl?: string;
+    caption?: string;
+    fileName?: string;
+    fileType?: string;
+    convertedImages?: Array<{
+      pageNumber: number;
+      supabaseUrl: string;
+      supabasePath: string;
+      width: number;
+      height: number;
+    }>;
+  }>;
 }
 
 // Converts ReferenceSection format → HSEPhotoEntry[] expected by buildHSE.
@@ -434,30 +451,38 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
     overallProgressItems: (() => {
       const filtered = (input.overallProgress ?? [])
         .filter(row => {
-          // Remove the overly aggressive filter - keep all rows for now
-          // If you need to filter, do it based on actual business logic
           return true;
         })
-        .map((p, i) => ({
-          no: p.no ?? p.displayIndex ?? String(i + 1),
-          scopeOfWorks: p.description ?? p.scopeOfWorks,
-          pctUpToPrevWeek: p.pctUpToPrevWeek ?? p.prevWeek,
-          pctThisWeek: p.pctThisWeek ?? p.thisWeek,
-          pctUpToThisWeek: p.pctUpToThisWeek ?? p.upToThisWeek,
-          pctRemaining: p.pctRemaining ?? p.remaining,
-          pctNextWeekPlan: p.pctNextWeekPlan ?? p.nextWeek,
-          pctUpNextWeekPlan: p.pctUpNextWeekPlan ?? p.upNextWeek,
-        }));
+        .map((p, i) => {
+          // Helper to safely convert to string, returning '' for null/undefined/0
+          const toStr = (v: unknown) => {
+            if (v === null || v === undefined || v === '') return '';
+            return String(v);
+          };
+
+          return {
+            no: p.no ?? p.displayIndex ?? String(i + 1),
+            scopeOfWorks: p.description ?? p.scopeOfWorks ?? '',
+            pctUpToPrevWeek: toStr(p.pctUpToPrevWeek ?? p.prevWeek ?? p.prev ?? ''),
+            pctThisWeek:     toStr(p.pctThisWeek     ?? p.thisWeek  ?? p.today ?? ''),
+            pctUpToThisWeek: toStr(p.pctUpToThisWeek ?? p.upToThisWeek ?? p.accumulated ?? ''),
+            pctRemaining:    toStr(p.pctRemaining    ?? p.remaining ?? 0),
+            pctNextWeekPlan:    toStr(p.pctNextWeekPlan    ?? p.nextWeek ?? p.nextWeekPlan ?? ''),
+            pctUpNextWeekPlan:  toStr(p.pctUpNextWeekPlan  ?? p.upNextWeek ?? p.upNextWeekPlan ?? ''),
+          };
+        });
       return filtered;
     })(),
 
     // ── NWDP ─────────────────────────────────────────────────────────────────
     nwdpItems: (input.nwdpItems ?? []).map(item => ({
-      id: item.sourceId,
+      id: item.sourceId || item.id,
+      sourceId: item.sourceId || item.id,
+      indentLevel: item.indentLevel,
       workDoneLabel: item.workDoneLabel ?? item.label ?? item.activity,
-      workDonePct: item.workDonePct ?? item.donePct,
+      workDonePct: String(item.workDonePct ?? item.donePct ?? ''),
       nextWeekLabel: item.nextWeekLabel ?? item.nextLabel,
-      nextWeekPct: item.nextWeekPct ?? item.planPct,
+      nextWeekPct: String(item.nextWeekPct ?? item.planPct ?? ''),
     })),
 
     // ── QAQC ─────────────────────────────────────────────────────────────────
@@ -572,6 +597,17 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
     projectOverview: input.projectOverview,
     designConstruction: input.designConstruction,
     designList: input.designList,
+
+    // ── Master Schedule ──────────────────────────────────────────────────────
+    masterSchedule: (input.masterSchedule ?? []).map(entry => ({
+      type: entry.type || 'document',
+      supabaseUrl: entry.supabaseUrl,
+      caption: entry.caption,
+      fileName: entry.fileName,
+      fileType: entry.fileType,
+      convertedImages: entry.convertedImages,
+    })),
+
   };
 
   return result;

@@ -18,6 +18,7 @@ import { useHsesData } from "@/hooks/useHsesData";
 import { useIntroductionText } from "@/hooks/useIntroductionText";
 import { useOverallProgress } from "@/hooks/useOverallProgress";
 import { toRoman } from "@/lib/numberUtils";
+import { mergeConstructionIntoActivityRows } from "@/utils/constructionProgressToActivities";
 import { useIssues } from "@/hooks/useIssues";
 import { useConstructionProgress } from "@/hooks/useConstructionProgress";
 import { ConstructionProgressData } from "@/types/constructionProgress";
@@ -324,6 +325,17 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
   // Overall Progress hook
   const overallProgressHook = useOverallProgress(currentReportId || '');
 
+  // Sync overall progress data to sharedData for PDF export (unsaved changes)
+  useEffect(() => {
+    if (overallProgressHook.rows) {
+      setSharedData(prev => ({
+        ...prev,
+        overallProgress: overallProgressHook.rows,
+        overallProgressRemark: overallProgressRemark,
+      }));
+    }
+  }, [overallProgressHook.rows, overallProgressRemark]);
+
   // Issues hook for state management
   const issuesHook = useIssues();
 
@@ -583,11 +595,14 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                 const convertedSchedule = report.sections.masterSchedule.map(item => ({
                   id: item.id,
                   type: item.type,
-                  title: item.title || "",
-                  description: item.description || "",
-                  date: item.date || "",
                   file: item.fileData ? new File([item.fileData], item.fileName || "file") : null,
-                  caption: item.title || ""
+                  caption: item.caption || item.fileName || "",
+                  supabaseUrl: item.supabaseUrl,
+                  supabasePath: item.supabasePath,
+                  fileName: item.fileName,
+                  fileSize: item.fileSize,
+                  fileType: item.fileType,
+                  convertedImages: item.convertedImages
                 }));
                 setScheduleSections([{
                   id: crypto.randomUUID(),
@@ -2175,7 +2190,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     setIsExporting(true);
     try {
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.pdf`;
-      
+
       // Convert File objects to base64 for construction issues
       const issuesWithBase64Photos = await Promise.all(
         issuesHook.issuesData.map(async (issue) => {
@@ -2184,7 +2199,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             photo = await new Promise<string>((resolve) => {
               const reader = new FileReader();
               reader.onload = () => resolve(reader.result as string);
-              reader.readAsDataURL(issue.photo as File); // Explicit type assertion
+              reader.readAsDataURL(issue.photo as File);
             });
           } else if (typeof issue.photo === 'string') {
             photo = issue.photo;
@@ -2193,7 +2208,16 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         })
       );
 
-      // Create export data with converted photos - include coverData and override constructionIssues
+      // Debug resources data before export
+      console.log("[WeeklyReport Export] resourcesData:", resourcesData);
+      console.log("[WeeklyReport Export] manPower keys:", resourcesData?.manPower ? Object.keys(resourcesData.manPower) : 'null');
+      console.log("[WeeklyReport Export] managementTeam:", resourcesData?.manPower?.managementTeam);
+      console.log("[WeeklyReport Export] workingTeamInterior:", resourcesData?.manPower?.workingTeamInterior);
+      console.log("[WeeklyReport Export] workingTeamMEP:", resourcesData?.manPower?.workingTeamMEP);
+      const transformedResources = transformResourcesToExcelFormat(resourcesData);
+      console.log("[WeeklyReport Export] transformedResources:", transformedResources);
+
+      // Create export data with converted photos
       const dateParts = sharedData.dateRange?.split(' ~ ') || [];
       const exportData = await buildWeeklyReportExportData({
         coverData: {
@@ -2205,14 +2229,97 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
           coverImage: sharedData.coverImage,
           clientLogo: sharedData.clientLogo,
+          signatureImage: sharedData.signatureImage || '/cacpm_logo.png',
           refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+          letterDate: new Date().toISOString().split('T')[0],
+          projectManager: sharedData.signatoryName || 'Project Manager',
+          companyLocation: sharedData.companyLocation || 'Phnom Penh, Cambodia',
+          companyPhone1: sharedData.companyPhone1 || '+855 23 123 456',
+          companyPhone2: sharedData.companyPhone2 || '+855 23 789 012',
+          companyEmail1: sharedData.companyEmail1 || 'info@cacpm.com',
+          companyEmail2: sharedData.companyEmail2,
+          recipientCompany: sharedData.recipientCompany || sharedData.employer || 'Client Organization',
+          recipientLocation: sharedData.recipientLocation || 'Phnom Penh, Cambodia',
+          toName: sharedData.recipientName || 'Project Manager',
+          attName: sharedData.recipientName || 'Project Manager',
+          ccLines: sharedData.ccList || [],
         },
+        projectOverview: sharedData.projectOverview || '',
+        designConstruction: sharedData.designNConstruction || '',
+        designList: [],
+        overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
+        overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
+        constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
+        conProgressProject: sharedData.projectName,
+        conProgressDate: dateParts[0],
+        nwdpItems: (() => {
+          const constructionItems = constructionProgressHook.constructionData?.items || [];
+          const weeklySource = mergeConstructionIntoActivityRows(constructionItems, weeklyActivities || [], 'weekly');
+          const nextSource = mergeConstructionIntoActivityRows(constructionItems, nextWeekPlan || [], 'next');
+          return weeklySource.map((weekRow, i) => ({
+            sourceId: weekRow.displayId || weekRow.sourceId || '',
+            id: weekRow.displayId || weekRow.sourceId || '',
+            workDoneLabel: weekRow.description,
+            workDonePct: weekRow.percent,
+            nextWeekLabel: nextSource[i]?.description,
+            nextWeekPct: nextSource[i]?.percent,
+            indentLevel: weekRow.indentLevel ?? 0,
+          })).filter(item =>
+            item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
+          );
+        })(),
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
           siteLocation: issue.location,
           problemDescription: issue.problem,
           actionBy: issue.actionBy,
           photo: issue.photo,
+        })),
+        qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => {
+          const isBackendFormat = value && typeof value === 'object' && !Array.isArray(value) && 'items' in value;
+          const rawItems = isBackendFormat ? (value.items || []) : (Array.isArray(value) ? value : []);
+          const items = rawItems.map((item: any) => ({
+            ...item,
+            dateResponse: item.dateResponse || item.dateResponded || '',
+          }));
+          const comments = isBackendFormat
+            ? (value.comments || '')
+            : (Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '');
+          return { sectionTitle: key, items, comments };
+        }) : [],
+        ...transformHSEToExcelFormat(hsesData),
+        ...transformResourcesToExcelFormat(resourcesData),
+        sitePhotoCaptions: (() => {
+          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          const result: any[] = [];
+          siteActivitiesSections.forEach((section: any) => {
+            if (section.entries && section.entries.length > 0) {
+              section.entries.forEach((entry: any) => {
+                if (entry.slots && entry.slots.length > 0) {
+                  for (let i = 0; i < entry.slots.length; i += 2) {
+                    const slot1 = entry.slots[i];
+                    const slot2 = entry.slots[i + 1];
+                    result.push({
+                      siteLocation: section.title || 'Site Location',
+                      caption1: slot1?.caption || '',
+                      caption2: slot2?.caption || '',
+                      image1: slot1?.image,
+                      image2: slot2?.image,
+                    });
+                  }
+                }
+              });
+            }
+          });
+          return result;
+        })(),
+        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
+          type: e.type,
+          supabaseUrl: e.supabaseUrl,
+          caption: e.caption,
+          fileName: e.fileName,
+          fileType: e.fileType,
+          convertedImages: e.convertedImages,
         })),
       });
 
@@ -2302,70 +2409,28 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           companyPhone2: sharedData.companyPhone2 || '+855 23 789 012',
           companyEmail1: sharedData.companyEmail1 || 'info@cacpm.com',
           companyEmail2: sharedData.companyEmail2,
-          recipientCompany: sharedData.recipientCompany || sharedData.employer || 'Client Organization',
-          recipientLocation: sharedData.recipientLocation || 'Phnom Penh, Cambodia',
-          // Add missing fields for Att. and CC using actual user input
-          recipientName: sharedData.recipientName || 'Project Manager',
-          attName: sharedData.recipientName || 'Project Manager',
-          toName: sharedData.recipientName || 'Project Manager',
-          ccLines: sharedData.ccList || [],
         },
-        // Add missing overall progress data
-        overallProgress: formatRowsWithDisplayIndex(overallProgressHook.rows),
-        overallProgressRemark: overallProgressRemark,   // ← use the state
-        // Add construction progress data - cast to any to bypass type mismatch
+        overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
+        overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
         constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
         conProgressProject: sharedData.projectName,
         conProgressDate: dateParts[0],
-        // Add activities data - properly transform to match expected structure
         nwdpItems: (() => {
-          const allItems: any[] = [];
-
-          (weeklyActivities || []).forEach(a => {
-            allItems.push({
-              rowId: a.id || '',
-              sourceId: a.displayId || a.sourceId || '',
-              id: a.displayId || a.sourceId || '',
-              workDoneLabel: a.description,
-              workDonePct: a.percent,
-              nextWeekLabel: undefined,
-              nextWeekPct: undefined,
-            });
-          });
-
-          (nextWeekPlan || []).forEach(a => {
-            const sourceId = a.displayId || a.sourceId || '';
-            const rowId = a.id || '';
-
-            let matched = false;
-            for (let i = 0; i < allItems.length; i++) {
-              const byRowId = rowId && allItems[i].rowId === rowId;
-              const bySourceId = sourceId && allItems[i].sourceId === sourceId;
-              if ((byRowId || bySourceId) && allItems[i].nextWeekLabel === undefined) {
-                allItems[i].nextWeekLabel = a.description;
-                allItems[i].nextWeekPct = a.percent;
-                matched = true;
-                break;
-              }
-            }
-
-            if (!matched) {
-              allItems.push({
-                rowId,
-                sourceId,
-                workDoneLabel: undefined,
-                workDonePct: undefined,
-                nextWeekLabel: a.description,
-                nextWeekPct: a.percent,
-              });
-            }
-          });
-
-          return allItems.filter(item =>
+          const constructionItems = constructionProgressHook.constructionData?.items || [];
+          const weeklySource = mergeConstructionIntoActivityRows(constructionItems, weeklyActivities || [], 'weekly');
+          const nextSource = mergeConstructionIntoActivityRows(constructionItems, nextWeekPlan || [], 'next');
+          return weeklySource.map((weekRow, i) => ({
+            sourceId: weekRow.displayId || weekRow.sourceId || '',
+            id: weekRow.displayId || weekRow.sourceId || '',
+            workDoneLabel: weekRow.description,
+            workDonePct: weekRow.percent,
+            nextWeekLabel: nextSource[i]?.description,
+            nextWeekPct: nextSource[i]?.percent,
+            indentLevel: weekRow.indentLevel ?? 0,
+          })).filter(item =>
             item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
           );
         })(),
-        // Add construction issues with converted photos
         constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
           number: i + 1,
           siteLocation: issue.location || ``,
@@ -2373,10 +2438,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           actionBy: issue.actionBy || '',
           photo: issue.photo,
         })),
-        // Add other data if available
         projectOverview: sharedData.projectOverview || 'Project overview will be added here.',
         designConstruction: sharedData.designNConstruction || 'Design and construction details will be added here.',
-        // Add resources data if available
         ...transformResourcesToExcelFormat(resourcesData),
         // Add HSE data if available
         ...transformHSEToExcelFormat(hsesData),
@@ -2406,6 +2469,14 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
+        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
+          type: e.type,
+          supabaseUrl: e.supabaseUrl,
+          caption: e.caption,
+          fileName: e.fileName,
+          fileType: e.fileType,
+          convertedImages: e.convertedImages,
+        })),
         // Pass actual QAQC data — handles both formats:
         // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
         // 2. Frontend TableData format (after DB load): { '4.1': [rows], ... }

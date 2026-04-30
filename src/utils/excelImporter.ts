@@ -1,5 +1,5 @@
 import { ConstructionProgressItem } from '../types/constructionProgress';
-import { detectIdType } from './idEngine';
+import { detectIdType, buildUniqueId } from './idEngine';
 import ExcelJS from 'exceljs';
 
 export interface ImportValidationError {
@@ -47,6 +47,7 @@ export interface ParsedImportRow {
   upToNextWeekPlanPct?: number;
 
   remark: string;
+  isBold?: boolean;
   isValid: boolean;
   errors: string[];
 }
@@ -187,6 +188,15 @@ function cellToPercent(value: any): number | undefined {
   return n;
 }
 
+function isCellBold(cell: ExcelJS.Cell): boolean {
+  if (cell.font?.bold) return true;
+  const val = cell.value;
+  if (typeof val === 'object' && val !== null && 'richText' in val) {
+    return (val as any).richText?.some((t: any) => t.font?.bold === true) ?? false;
+  }
+  return false;
+}
+
 /**
  * Scan the first ~20 rows looking for a header. Because this sheet uses a
  * two-row header (main on row N, sub-headers on row N+1 for the BoQ group),
@@ -304,6 +314,12 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
       row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
         const field = mapping[colNumber];
         if (!field) return;
+
+        // Capture bold formatting from the id or scopeOfWorks cell.
+        // Either column being bold marks the whole row as bold.
+        if ((field === 'id' || field === 'scopeOfWorks') && isCellBold(cell)) {
+          parsed.isBold = true;
+        }
 
         const raw = cell.value;
 
@@ -469,12 +485,18 @@ function validateRow(row: ParsedImportRow, rowNumber: number): ImportValidationE
  * Convert ParsedImportRow[] to ConstructionProgressItem[].
  * We trust explicit amounts/percentages from the sheet when provided,
  * and fall back to qty × unitRate otherwise.
+ *
+ * Each item receives a `uniqueId` built from its full ancestor chain so that
+ * rows with identical display IDs (e.g. two "1"s under different roman sections)
+ * are unambiguously distinguishable for import matching and updates.
  */
 export function mapToConstructionItems(
   parsedRows: ParsedImportRow[],
   _existingItems: ConstructionProgressItem[] = []
 ): ConstructionProgressItem[] {
-  return parsedRows.map((row) => {
+  // Pass 1: build items without uniqueId so buildUniqueId can resolve types
+  // using the full sibling/ancestor context of the imported array.
+  const items = parsedRows.map((row) => {
     const idType = detectIdType(row.id);
     const isStructural =
       idType === 'alpha' ||
@@ -545,10 +567,17 @@ export function mapToConstructionItems(
       remaining,
       nextWeekPlan,
       upToNextWeekPlan,
-      isBold: isStructural,
+      isBold: row.isBold ?? isStructural,
       source: 'bulk',
     } as ConstructionProgressItem;
   });
+
+  // Pass 2: assign uniqueId using the fully-built array so ancestor lookups
+  // have the correct sibling/type context for every row.
+  return items.map((item, idx) => ({
+    ...item,
+    uniqueId: buildUniqueId(items, idx),
+  }));
 }
 
 /**

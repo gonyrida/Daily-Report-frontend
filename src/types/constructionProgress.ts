@@ -14,6 +14,7 @@ export interface ProgressData {
 
 export interface ConstructionProgressItem {
   id: string;
+  uniqueId?: string;
   isBold?: boolean;
   scopeOfWorks: string;
   detailDescription: string;
