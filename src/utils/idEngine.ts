@@ -253,6 +253,77 @@ export function computeNextId(items: ConstructionProgressItem[], insertAfterInde
 }
 
 /**
+ * Build a globally unique ID for the item at `index` by concatenating its
+ * full ancestor chain, separated by "-".
+ *
+ * Each level contributes its own display ID:
+ *   roman → "I"
+ *   level1 under I → "I-1"
+ *   level2 under I>1 → "I-1-1.1"
+ *   alpha under I>1>1.1 → "I-1-1.1-A"
+ *   empty leaf (F1) under I>1>1.1>A → "I-1-1.1-A-F1"
+ *
+ * The key boundary rule: when scanning upward for an ancestor of type T,
+ * we start the scan from the immediately-preceding ancestor of type T+1
+ * (one level higher), so ancestors from sibling branches are never picked up.
+ */
+export function buildUniqueId(
+  items: Array<{ id: string; scopeOfWorks: string }>,
+  index: number
+): string {
+  const asItems = items as ConstructionProgressItem[];
+  const item = asItems[index];
+  if (!item) return '';
+
+  const type = resolveIdType(item.id, asItems, index);
+
+  if (type === 'roman') return item.id;
+
+  // Locate the nearest ancestor of a specific type by scanning backward
+  // from `from` down to (exclusive) `stopBefore`.
+  const findAncestor = (from: number, stopBefore: number, targetType: IdType): { id: string; idx: number } | null => {
+    for (let i = from; i > stopBefore; i--) {
+      if (resolveIdType(asItems[i].id, asItems, i) === targetType) {
+        return { id: asItems[i].id, idx: i };
+      }
+    }
+    return null;
+  };
+
+  const roman = findAncestor(index - 1, -1, 'roman');
+  const romanIdx = roman?.idx ?? -1;
+  const parts: string[] = roman ? [roman.id] : [];
+
+  if (type === 'level1') { parts.push(item.id); return parts.join('-'); }
+
+  const l1 = findAncestor(index - 1, romanIdx, 'level1');
+  const l1Idx = l1?.idx ?? romanIdx;
+  if (l1) parts.push(l1.id);
+
+  if (type === 'level2') { parts.push(item.id); return parts.join('-'); }
+
+  const l2 = findAncestor(index - 1, l1Idx, 'level2');
+  const l2Idx = l2?.idx ?? l1Idx;
+  if (l2) parts.push(l2.id);
+
+  if (type === 'level3') { parts.push(item.id); return parts.join('-'); }
+
+  const l3 = findAncestor(index - 1, l2Idx, 'level3');
+  const l3Idx = l3?.idx ?? l2Idx;
+  if (l3) parts.push(l3.id);
+
+  if (type === 'alpha') { parts.push(item.id); return parts.join('-'); }
+
+  // 'empty' — use alpha ancestor if present, then leaf id from id or scopeOfWorks
+  const alpha = findAncestor(index - 1, l3Idx, 'alpha');
+  if (alpha) parts.push(alpha.id);
+
+  const leafId = item.id || item.scopeOfWorks.trim().split(/\s+/)[0] || `row${index}`;
+  parts.push(leafId);
+  return parts.join('-');
+}
+
+/**
  * After inserting `count` rows at `insertedAt`, renumber all same-type siblings below,
  * then cascade: if level1 IDs changed → fix level2 children → fix level3 grandchildren.
  */

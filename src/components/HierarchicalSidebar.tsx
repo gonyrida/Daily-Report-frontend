@@ -835,10 +835,8 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                 Daily Report
                               </span>
                               <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary"
+                                <div
+                                  className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary flex items-center justify-center rounded cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (!dailyReportOpen) {
@@ -848,7 +846,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                   }}
                                 >
                                   <Plus className="h-3 w-3" />
-                                </Button>
+                                </div>
                                 {dailyReportOpen ? (
                                   <ChevronDown className="h-3 w-3" />
                                 ) : (

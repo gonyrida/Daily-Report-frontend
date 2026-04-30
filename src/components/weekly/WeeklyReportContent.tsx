@@ -134,12 +134,12 @@ const setOverallRowsFromTable = (
   });
 };
 
-// ---------- visible rows (filter tombstones AND subDetail rows) ----------
-// Store ALL rows in session storage (including subDetail), but only display
-// title and detail rows in the table. subDetail rows like "1.1", "2.3" are
-// kept in storage for reference but not shown in Overall Progress table.
+// ---------- visible rows (filter tombstones, subDetail, and custom rows) ----------
+// Store ALL rows in session storage, but only display title (Roman numerals)
+// and detail (pure integers) rows in the table. subDetail (decimals) and
+// custom (alpha, dash, empty) rows are kept in storage but not shown.
 const visibleOverallRows = useMemo(
-  () => overallRows.filter((r) => !r.isDeleted && r.rowType !== "subDetail"),
+  () => overallRows.filter((r) => !r.isDeleted && r.rowType !== "subDetail" && r.rowType !== "custom"),
   [overallRows],
 );
 
