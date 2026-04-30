@@ -612,3 +612,83 @@ export const createReportWithManpower = async (data: CreateWeeklyReportRequest, 
   const response = await apiPost(WEEKLY_REPORTS_BASE_URL, requestData);
   return handleApiResponse<WeeklyReport>(response);
 };
+
+// ============================================================================
+// Image Aggregation API Functions
+// ============================================================================
+
+export interface AggregatedPhoto {
+  date: string;
+  section: 'HSE' | 'SITE';
+  image: string;
+  caption: string;
+  source: string;
+  sectionTitle?: string;
+}
+
+export interface AggregatedImagesData {
+  hsePhotos: AggregatedPhoto[];
+  sitePhotos: AggregatedPhoto[];
+  hsePhotoReferences: {
+    hseToolboxMeeting: any[];
+    hseActivityPhotos: any[];
+  };
+  photosSection: {
+    title: string;
+    locations: any[];
+  };
+  dailyReportCount: number;
+  hsePhotoCount: number;
+  sitePhotoCount: number;
+}
+
+/**
+ * Preview aggregated images from daily reports without saving to weekly report
+ * GET /api/weekly-reports/aggregate-images
+ */
+export const previewAggregatedImages = async (
+  projectIdentifier: string,
+  startDate: string,
+  endDate: string,
+  options: { useProjectId?: boolean; maxImagesPerReport?: number } = {}
+): Promise<ApiResponse<AggregatedImagesData>> => {
+  const params = new URLSearchParams({
+    projectIdentifier,
+    startDate,
+    endDate,
+    ...(options.useProjectId && { useProjectId: 'true' }),
+    ...(options.maxImagesPerReport && { maxImagesPerReport: options.maxImagesPerReport.toString() })
+  });
+  
+  const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/aggregate-images?${params}`);
+  return handleApiResponse<AggregatedImagesData>(response);
+};
+
+/**
+ * Update weekly report with aggregated images from daily reports
+ * POST /api/weekly-reports/:id/update-images
+ */
+export const updateReportImages = async (
+  reportId: string, 
+  options: { maxImagesPerReport?: number } = {}
+): Promise<ApiResponse<WeeklyReport> & { aggregated?: { hsePhotoCount: number; sitePhotoCount: number; dailyReportCount: number } }> => {
+  const response = await apiPost(`${WEEKLY_REPORTS_BASE_URL}/${reportId}/update-images`, options);
+  return handleApiResponse<WeeklyReport>(response) as any;
+};
+
+/**
+ * Create weekly report with automatic image aggregation from daily reports
+ */
+export const createReportWithImages = async (
+  data: CreateWeeklyReportRequest, 
+  aggregationOptions: { maxImagesPerReport?: number } = {}
+): Promise<ApiResponse<WeeklyReport>> => {
+  const requestData = {
+    ...data,
+    aggregateImages: true,
+    aggregationOptions
+  };
+  
+  const response = await apiPost(WEEKLY_REPORTS_BASE_URL, requestData);
+  return handleApiResponse<WeeklyReport>(response);
+};

@@ -3007,8 +3007,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={overallProgressHook.setRows}
-                    overallProgressRemark={overallProgressRemark}          // ← ADD
-                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
+                    overallProgressRemark={overallProgressRemark}
+                    setOverallProgressRemark={setOverallProgressRemark}
                     reportId={currentReportId}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}
@@ -3021,6 +3021,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     onClearQaqcData={handleClearQaqcData}
                     onClearHsesData={handleClearHsesData}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3044,6 +3046,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     nextWeekPlan={nextWeekPlan}
                     setNextWeekPlan={setNextWeekPlan}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3063,13 +3067,15 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
-                    overallProgressRemark={overallProgressRemark}          // ← ADD
-                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
+                    overallProgressRemark={overallProgressRemark}
+                    setOverallProgressRemark={setOverallProgressRemark}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}
                     nextWeekPlan={nextWeekPlan}
                     setNextWeekPlan={setNextWeekPlan}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3096,6 +3102,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setQaqcData={setQaqcData}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     onClearQaqcData={(fn) => { clearQaqcDataRef.current = fn; }}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3122,6 +3130,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setHsesData={setHsesData}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     onClearHsesData={(fn) => { clearHsesDataRef.current = fn; }}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3146,6 +3156,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setNextWeekPlan={setNextWeekPlan}
                     resourcesData={resourcesData}
                     setResourcesData={setResourcesData}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3154,46 +3166,19 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             {activeTab === "photos" && (
               <>
                 <div className="bg-card rounded-lg border p-6">
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">7. {siteActivitiesTitle}</h2>
-                      <Button
-                        onClick={() => {
-                          const newSection = {
-                            id: crypto.randomUUID(),
-                            title: `Photo Section ${siteActivitiesSections.length + 1}`,
-                            entries: []
-                          };
-                          setSiteActivitiesSections([...siteActivitiesSections, newSection]);
-                        }}
-                        className="flex items-center gap-2"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        Add Section
-                      </Button>
-                    </div>
-                    <ReferenceSection
-                      sections={siteActivitiesSections}
-                      setSections={setSiteActivitiesSections}
-                      onExportReference={() => { }}
-                      isExporting={isExportingSiteActivities}
-                      tableTitle={siteActivitiesTitle}
-                      setTableTitle={setSiteActivitiesTitle}
-                      hideTitle={false}
-                    />
-                  </div>
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    reportId={currentReportId}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
+                  />
                 </div>
               </>
             )}

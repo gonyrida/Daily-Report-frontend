@@ -36,4 +36,6 @@ export interface WeeklyReportContentProps {
   constructionProgressItems?: ConstructionProgressItem[];
   resourcesData?: any;
   setResourcesData?: (resourcesData: any) => void;
+  photosData?: any;
+  setPhotosData?: (photosData: any) => void;
 }

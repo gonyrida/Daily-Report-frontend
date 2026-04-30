@@ -5,6 +5,7 @@ import Activities from "./content/Activities";
 import { QaqcStatusNew } from "./content/QaqcStatusNew";
 import Hses from "./content/Hses";
 import Resource from "./content/Resource";
+import SitePhotos from "./content/SitePhotos";
 import { Section, TabType, WeeklyReportContentProps } from "@/types/weeklyReportContent.types";
 import { QAQC_SECTIONS } from "@/constants/qaqcSections";
 import { useActivities } from "@/hooks/useActivities";
@@ -46,7 +47,9 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   onClearHsesData,
   constructionProgressItems,
   resourcesData,
-  setResourcesData
+  setResourcesData,
+  photosData,
+  setPhotosData
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -516,6 +519,8 @@ useEffect(() => {
           isEditing={true}
           data={currentHsesData}
           onChange={setHsesData}
+          sharedData={sharedData}
+          reportId={reportId}
         />
       </div>
 
@@ -544,12 +549,13 @@ useEffect(() => {
 
       {/* Photos Tab */}
       <div style={{ display: activeTab === "photos" ? "block" : "none" }} className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
-          7. SITE ACTIVITY PHOTOS
-        </h2>
-        <div className="text-center py-12 text-muted-foreground">
-          Site activity photos content will be displayed here.
-        </div>
+        <SitePhotos
+          data={photosData}
+          onChange={setPhotosData}
+          isEditing={true}
+          reportId={reportId}
+          sharedData={sharedData}
+        />
       </div>
 
       {/* Issues Tab */}
