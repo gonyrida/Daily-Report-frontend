@@ -22,7 +22,9 @@ import {
   Plus, 
   Mail,
   Edit,
-  MoreHorizontal
+  MoreHorizontal,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -70,9 +72,17 @@ const UserManagement = () => {
     email: '',
     position: '',
     department: '',
+    password: '',
     orgLevel: undefined,
     role: 'user'
   });
+
+  // Separate state for password confirmation in edit mode
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordConfirmError, setPasswordConfirmError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -114,7 +124,17 @@ const UserManagement = () => {
   // Add before return statement
   const handleCreateUser = async () => {
     try {
-      setIsCreatingUser(true); // Start loading      
+      setIsCreatingUser(true); // Start loading
+
+      // Validate password match in edit mode
+      if (isEditMode && newUser.password && newUser.password !== confirmPassword) {
+        toast({ 
+          title: "Error", 
+          description: "Passwords do not match" 
+        });
+        setIsCreatingUser(false);
+        return;
+      }
 
       let response;
       if (isEditMode && editingUser) {
@@ -137,9 +157,11 @@ const UserManagement = () => {
           email: '',
           position: '',
           department: '',
+          password: '',
           orgLevel: undefined,
           role: 'user'
         });
+        setConfirmPassword('');
         fetchUsers(); // Refresh user list
       } else {
         toast({ 
@@ -166,6 +188,7 @@ const UserManagement = () => {
       position: user.position || '',
       department: user.department || '',
       orgLevel: user.orgLevel,
+      password: '',
       role: user.role
     });
     setIsEditMode(true);
@@ -182,9 +205,15 @@ const UserManagement = () => {
       email: '',
       position: '',
       department: '',
+      password: '',
       orgLevel: undefined,
       role: 'user'
     });
+    setConfirmPassword('');
+    setShowConfirmPassword(false);
+    setPasswordConfirmError('');
+    setShowPassword(false);
+    setPasswordError('');
   };
 
   const handleFilter = async (value) => {
@@ -363,10 +392,10 @@ const UserManagement = () => {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  {/* <DropdownMenuItem>
                                     <Mail className="mr-2 h-4 w-4" />
                                     Resend Verification
-                                  </DropdownMenuItem>
+                                  </DropdownMenuItem> */}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
@@ -477,6 +506,91 @@ const UserManagement = () => {
                       onChange={(e) => setNewUser({...newUser, department: e.target.value})}
                     />
                   </div>
+
+                  {/* Password Inputs for Edit Mode */}
+                  {isEditMode && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>New Password (Optional)</Label>
+                        <div className='relative'>
+                          <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="New Password" 
+                            value={newUser.password}
+                            onChange={(e) => {
+                              setNewUser({...newUser, password: e.target.value});
+                              // Clear error when user types
+                              if (e.target.value.length < 8) {
+                                setPasswordError('Password must be at least 8 characters');
+                                setPasswordConfirmError('');
+                              } else if (e.target.value !== confirmPassword ) {
+                                setPasswordError('');
+                                setPasswordConfirmError('Passwords do not match');
+                              } else {
+                                setPasswordError('');
+                                setPasswordConfirmError('');
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2"
+                            onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        {passwordError && (
+                          <p className="text-sm text-red-500 mt-1">{passwordError}</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Confirm Password</Label>
+                        <div className='relative'>
+                          <Input 
+                            id="confirmPassword"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Confirm Password" 
+                            value={confirmPassword}
+                            onChange={(e) => {
+                              setConfirmPassword(e.target.value);
+                              // Validate match immediately
+                              if (e.target.value !== newUser.password) {
+                                setPasswordConfirmError('Passwords do not match');
+                              } else {
+                                setPasswordConfirmError('');
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        {passwordConfirmError && (
+                          <p className="text-sm text-red-500 mt-1">{passwordConfirmError}</p>
+                        )}
+                      </div>
+                    </>
+                  )}
                   <Select 
                     value={newUser.orgLevel?.toString()}
                     onValueChange={(value) => setNewUser({...newUser, orgLevel: parseInt(value)})}

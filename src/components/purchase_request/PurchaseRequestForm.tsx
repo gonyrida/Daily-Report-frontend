@@ -740,12 +740,27 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		label: `${user.firstName} ${user.lastName} (${user.role})`
 	}))
 
+	const amountInWords = () => {
+		const total = formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+		const dollars = Math.floor(total);
+		const cents = Math.round((total - dollars) * 100);
+		
+		const wordResult = numberToWords(dollars);
+		const centsStr = cents.toString().padStart(2, '0');
+		
+		return `${wordResult} and ${centsStr}/100 Dollars`;
+	};
+
 	const handleExport = async (mode: 'excel' | 'pdf') => {
 		setIsExporting(true);
+		// Clone materialsActual list
 		const purposesList = structuredClone(prSummaryData.summary.materialsActual);
+		// Search through purposeList to find current purpose index
 		const currentPurposeIdx = purposesList.findIndex((item: any) => item.purpose === formData.purpose);
+		// Add current request total to actualTotal
 		purposesList[currentPurposeIdx]["actualTotal"] += formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
 
+		// Clone reports list
 		const requestsList = structuredClone(prSummaryData.reports);
 		if (!formData._id) {
 			requestsList.push({
@@ -761,6 +776,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			if (mode === 'excel') {
 				await exportPurchaseRequestExcel({
 					...formData,
+					amountInWords: amountInWords(),
 					label: formData.no <= 0 || !formData.no ? `MR# ${prSummaryData.summary.project.counter + 1}` : `MR# ${formData.no}`,
 					requestDate: new Date(formData.requestDate).toISOString().split('T')[0],
 					...prSummaryData,
@@ -774,6 +790,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 			} else {
 				await exportPurchaseRequestPDF({
 					...formData,
+					amountInWords: amountInWords(),
 					requestDate: new Date(formData.requestDate).toISOString().split('T')[0],
 					label: formData.no <= 0 || !formData.no ? `MR# ${prSummaryData.summary.project.counter + 1}` : `MR# ${formData.no}`,
 					...prSummaryData,
@@ -793,8 +810,11 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 
 	const handlePreview = async () => {
 		setIsPreviewing(true);
+		// Clone materialsActual list
 		const purposesList = structuredClone(prSummaryData.summary.materialsActual);
+		// Search through purposeList to find current purpose index
 		const currentPurposeIdx = purposesList.findIndex((item: any) => item.purpose === formData.purpose);
+		// Add current request total to actualTotal
 		purposesList[currentPurposeIdx]["actualTotal"] += formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
 
 		const requestsList = structuredClone(prSummaryData.reports);
@@ -811,6 +831,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		try {
 			const url = await exportPurchaseRequestPDF({
 				...formData,
+				amountInWords: amountInWords(),
 				requestDate: new Date(formData.requestDate).toISOString().split('T')[0],
 				...prSummaryData,
 				reports: requestsList,
