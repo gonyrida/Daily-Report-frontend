@@ -70,14 +70,19 @@ function buildScopedSourceIds(items: ConstructionProgressItem[]): string[] {
  *
  * Contract:
  *   1. Tombstones are sacred. A row with `isDeleted === true` is NEVER
- *      revived and NEVER duplicated. It stays in the stored array so the
- *      next merge still sees it.
- *   2. Existing rows (active or tombstoned) keep their React id, their
- *      position in the array, and all user edits (percentages, description
- *      overrides if any). Construction data does not overwrite them.
- *   3. All construction items from the payload are appended. Duplicate sourceIds
- *      are allowed to support displaying duplicate level 1 IDs.
- *   4. User-added custom rows (no sourceId) are left exactly where they are.
+ *      revived in-place. It stays in the stored array so the next merge
+ *      still sees it. If its sourceId reappears in the live set, Phase 2
+ *      appends a fresh active row — the tombstone remains as history.
+ *   2. Existing active rows keep their React id, their position in the
+ *      array, and all user edits. Construction data does not overwrite them.
+ *   3. New construction items are appended. The same scopedId appearing
+ *      twice in one payload is deduplicated within that payload.
+ *   4. User-added custom rows (no sourceId) are never touched.
+ *   5. Construction-sourced rows whose sourceId is absent from the current
+ *      items payload are tombstoned (isDeleted: true) by Phase 1.
+ *      CALLER NOTE: do not call this function with an empty items array
+ *      while construction data is still loading — Phase 1 will tombstone
+ *      all sourced rows because none are "live".
  *
  * The caller is responsible for filtering `isDeleted` out of the UI. This
  * function operates on the full stored array, tombstones included.
@@ -88,47 +93,63 @@ export function mergeConstructionIntoOverallRows(
 ): ProgressRow[] {
   const existing = existingRows ?? [];
 
-  if (!items || items.length === 0) {
-    // Nothing to merge — return existing untouched (including tombstones).
-    return existing;
+  // Build scoped IDs for all incoming items up front (needed by both phases).
+  const scopedIds = items?.length ? buildScopedSourceIds(items) : [];
+
+  // Build the live set: scoped IDs that survive the row-type filter.
+  // Only these IDs should remain active after the merge.
+  const liveScopedIds = new Set<string>();
+  if (items?.length) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item?.id) continue;
+      const rawId = item.id.trim();
+      if (!rawId) continue;
+      const rowType = resolveRowType(rawId);
+      if (rowType === 'custom' || rowType === 'subDetail') continue;
+      const scopedId = scopedIds[i];
+      if (scopedId) liveScopedIds.add(scopedId);
+    }
   }
 
-  // Track sourceIds already in the existing array to prevent re-adding them.
-  // This prevents duplicates when the merge runs multiple times (re-renders).
-  const existingSourceIds = new Set<string>();
-  for (const row of existing) {
-    if (row.sourceId) existingSourceIds.add(row.sourceId);
+  // Phase 1 — Sync deletions.
+  // Construction-sourced rows (have a sourceId) whose sourceId is absent from
+  // the live set are tombstoned. User-added rows (no sourceId) and rows that
+  // are already tombstoned are returned unchanged.
+  const result: ProgressRow[] = existing.map(row => {
+    if (!row.sourceId || row.isDeleted) return row;
+    if (!liveScopedIds.has(row.sourceId)) return { ...row, isDeleted: true };
+    return row;
+  });
+
+  if (!items?.length) return result;
+
+  // Phase 2 — Append new items.
+  // Track active sourceIds after Phase 1 to avoid re-adding rows that are
+  // already present and alive. Tombstoned rows are intentionally excluded so
+  // that a reappearing sourceId creates a fresh active row (resurrection).
+  const activeSourceIds = new Set<string>();
+  for (const row of result) {
+    if (row.sourceId && !row.isDeleted) activeSourceIds.add(row.sourceId);
   }
-
-  // Start from the existing array — we only ever APPEND.
-  const result: ProgressRow[] = [...existing];
-
-  // Build scoped IDs to prevent collisions between items with same raw ID in different phases
-  const scopedIds = buildScopedSourceIds(items);
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (!item || !item.id) continue;
+    if (!item?.id) continue;
 
     const rawId = item.id.trim();
     if (!rawId) continue;
 
     const rowType = resolveRowType(rawId);
 
-    // Skip non-standard IDs (alpha, mixed, etc.) and subDetail rows (decimal IDs)
-    // Only allow: title (Roman numerals) and detail (pure integers)
+    // Only allow: title (Roman numerals) and detail (pure integers).
     if (rowType === 'custom' || rowType === 'subDetail') continue;
 
     const scopedId = scopedIds[i];
-    if (!scopedId) continue; // only trips when item.id was empty — caught above in practice
+    if (!scopedId) continue;
 
-    // Skip if this scoped sourceId already exists in storage (prevents re-adding on re-render)
-    if (existingSourceIds.has(scopedId)) continue;
-
-    // Brand-new construction item → seed a fresh row.
-    // Add to tracking set so we don't add it again if the same item appears
-    // twice in the same payload.
-    existingSourceIds.add(scopedId);
+    if (activeSourceIds.has(scopedId)) continue;
+    activeSourceIds.add(scopedId); // guard against duplicate scopedIds in the same payload
 
     const prevWeekPct   = item.previousWeek?.percentage     ?? 0;
     const thisWeekPct   = item.thisWeek?.percentage         ?? 0;

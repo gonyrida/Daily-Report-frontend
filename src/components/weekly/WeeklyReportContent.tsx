@@ -114,9 +114,11 @@ useEffect(() => {
     );
 
     // Avoid pointless state update if nothing changed.
+    // IMPORTANT: Must check isDeleted too — Phase 1 tombstoning changes isDeleted
+    // while keeping the same id, so id-only comparison would incorrectly skip the update.
     if (
       merged.length === prev.length &&
-      merged.every((r, i) => r.id === prev[i]?.id)
+      merged.every((r, i) => r.id === prev[i]?.id && r.isDeleted === prev[i]?.isDeleted)
     ) {
       return prev;
     }
