@@ -28,7 +28,7 @@ import { Button } from "../ui/button";
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgressProps> = ({
-  data, onDataChange, reportId, isCreateNewMode = false
+  data, onDataChange, reportId, isCreateNewMode = false, readOnly = false
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingCell, setEditingCell] = useState<EditableCell | null>(null);
@@ -606,18 +606,22 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
             placeholder="Search scope of works or description..."
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <button
-            onClick={() => { setInsertMode('after'); setAddRowsAfter(-1); setAddRowsCount(1); setShowAddRows(true); }}
-            className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex items-center gap-2"
-          >
-            <Plus size={16} /> Add Rows
-          </button>
-          <button 
-            onClick={() => setShowImportExcel(true)}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2"
-          >
-            <UploadCloud size={16} /> Import Excel
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                onClick={() => { setInsertMode('after'); setAddRowsAfter(-1); setAddRowsCount(1); setShowAddRows(true); }}
+                className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex items-center gap-2"
+              >
+                <Plus size={16} /> Add Rows
+              </button>
+              <button
+                onClick={() => setShowImportExcel(true)}
+                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2"
+              >
+                <UploadCloud size={16} /> Import Excel
+              </button>
+            </>
+          )}
         </div>
 
         {/* Table */}

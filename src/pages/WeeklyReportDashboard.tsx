@@ -8,8 +8,14 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
-import MasterReportView from "@/components/weekly/MasterReportView";
+import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
+import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import { Button } from "@/components/ui/button";
+import { transformMasterToReportData } from "@/utils/masterReportTransform";
+import { ConstructionProgressItem, ConstructionProgressData } from "@/types/constructionProgress";
+import { MasterConstructionProgressItem } from "@/types/masterReport.types";
+import { getMasterWeeklyReport } from "@/services/weeklyReportService";
+import { TabType } from "@/types/weeklyReportContent.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -196,6 +202,9 @@ const WeeklyReportDashboard = () => {
   const folderId  = searchParams.get('folderId');
   const reportType = searchParams.get('type');
   
+  // Current week for master report view
+  const [currentWeek, setCurrentWeek] = useState(() => getWeekNumber(new Date()));
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
@@ -216,18 +225,19 @@ const WeeklyReportDashboard = () => {
   }, []);
 
   // Parallel data fetching with React Query
+  const currentUserId = getCurrentUserId();
   const results = useQueries({
     queries: [
       {
-        queryKey: ['weeklyReportsMeta', projectId, searchTerm, filterStatus],
+        queryKey: ['weeklyReportsMeta', currentUserId, projectId, searchTerm, filterStatus],
         queryFn: () => getWeeklyReportsMeta({
           projectId: projectId || undefined,
           searchTerm,
           status: filterStatus === 'all' ? undefined : filterStatus,
           limit: 50
         }),
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        refetchOnWindowFocus: false,
+        staleTime: 0, // Always fetch fresh data
+        refetchOnWindowFocus: true,
       },
       {
         queryKey: ['companyReports', projectId, searchTerm],
@@ -258,27 +268,10 @@ const WeeklyReportDashboard = () => {
   const isLoading = weeklyReportsQuery.isLoading;
   const isLoadingCompany = companyReportsQuery.isLoading;
   
-  // Filter reports on client side (for now - will move to server side later)
+  // Filter reports on client side
   const filteredReports = weeklyReports.filter(report => {
-    // First check if report belongs to current user
-    const currentUserId = getCurrentUserId();
-    
-    // Handle different userId formats from database
-    let isOwner = false;
-    if (typeof report.userId === 'string') {
-      isOwner = report.userId === currentUserId;
-    } else if (report.userId && typeof report.userId === 'object') {
-      isOwner = (report.userId as any).$oid === currentUserId || 
-                 (report.userId as any)._id === currentUserId || 
-                 (report.userId as any).id === currentUserId;
-    } else if (report.userId) {
-      isOwner = report.userId.toString() === currentUserId;
-    }
-    
-    // If not owner, don't show in personal tab
-    if (!isOwner) return false;
-    
-    // Filter by project if specified
+    // Backend already filters by userId, so all reports belong to current user
+    // Just filter by project if specified
     if (projectId) {
       const reportProjectId = report.projectId;
       // If report has no projectId, show it (it's the owner's report with no project assigned)
@@ -406,19 +399,268 @@ const WeeklyReportDashboard = () => {
 
   // ── Master Report mode ──────────────────────────────────────────────────
   // When ?folderId=xxx&type=master is present, render the folder-level
-  // aggregated view instead of the normal project dashboard.
+  // aggregated view using WeeklyReportContent for unified interface
+  const { data: masterReportData } = useQuery({
+    queryKey: ['masterReport', folderId, currentWeek],
+    queryFn: () => getMasterWeeklyReport(folderId!, currentWeek),
+    enabled: !!folderId && reportType === 'master',
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
   if (folderId && reportType === 'master') {
+    const transformedData = masterReportData?.data 
+      ? transformMasterToReportData(masterReportData.data)
+      : null;
+
+    // Tab state for master report
+    const [masterActiveTab, setMasterActiveTab] = useState<TabType>('table-of-content');
+    const [masterShowSecondNav, setMasterShowSecondNav] = useState(false);
+
     return (
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
           <HierarchicalSidebar />
           <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <h1 className="text-lg font-semibold">Master Weekly Report</h1>
+            <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+                <h1 className="text-lg font-semibold">
+                  Master Weekly Report{transformedData ? `: ${transformedData.metadata.folderName}` : ''}
+                </h1>
+              </div>
+              {/* Week selector for master report */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Week</span>
+                <select
+                  value={currentWeek}
+                  onChange={(e) => setCurrentWeek(parseInt(e.target.value))}
+                  className="w-20 h-9 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {Array.from({ length: 52 }, (_, i) => i + 1).map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </div>
             </header>
-            <main className="flex-1 overflow-auto">
-              <MasterReportView folderId={folderId} />
+            
+            {/* Tab Navigation */}
+            {transformedData && (
+              <>
+                <div className="px-6 py-3 border-b bg-background">
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <Button
+                      variant={masterActiveTab === "construction-progress" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("construction-progress");
+                        setMasterShowSecondNav(false);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Con.Prog
+                    </Button>
+                    <Button
+                      variant={masterActiveTab === "cover" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("cover");
+                        setMasterShowSecondNav(false);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Cover
+                    </Button>
+                    <Button
+                      variant={masterActiveTab === "letter" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("letter");
+                        setMasterShowSecondNav(false);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Letter
+                    </Button>
+                    <Button
+                      variant={masterActiveTab === "table-of-content" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("table-of-content");
+                        setMasterShowSecondNav(true);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Table of Content
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Second Navigation Bar */}
+                {masterShowSecondNav && (
+                  <div className="w-full px-2 sm:px-4 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
+                    <div className="relative flex items-center justify-center gap-1">
+                      {/* Left Arrow */}
+                      <button
+                        onClick={() => {
+                          const el = document.getElementById("master-second-nav-scroll");
+                          if (el) el.scrollBy({ left: -150, behavior: "smooth" });
+                        }}
+                        className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m15 18-6-6 6-6" />
+                        </svg>
+                      </button>
+
+                      {/* Scrollable Tab Row */}
+                      <div
+                        id="master-second-nav-scroll"
+                        className="flex flex-row items-center justify-center gap-1.5 overflow-x-auto overflow-y-hidden"
+                        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                        onMouseDown={(e) => {
+                          const el = e.currentTarget;
+                          el.dataset.isDown = "true";
+                          el.dataset.startX = String(e.pageX - el.offsetLeft);
+                          el.dataset.scrollLeft = String(el.scrollLeft);
+                        }}
+                        onMouseLeave={(e) => { e.currentTarget.dataset.isDown = "false"; }}
+                        onMouseUp={(e) => { e.currentTarget.dataset.isDown = "false"; }}
+                        onMouseMove={(e) => {
+                          const el = e.currentTarget;
+                          if (el.dataset.isDown !== "true") return;
+                          e.preventDefault();
+                          const x = e.pageX - el.offsetLeft;
+                          const walk = (x - Number(el.dataset.startX)) * 1.5;
+                          el.scrollLeft = Number(el.dataset.scrollLeft) - walk;
+                        }}
+                      >
+                        <style>{`#master-second-nav-scroll::-webkit-scrollbar { display: none; }`}</style>
+                        {[
+                          { id: 1, name: "Intro", tab: "table-of-content" },
+                          { id: 2, name: "O.progress", tab: "overall-progress" },
+                          { id: 3, name: "Activities", tab: "activities" },
+                          { id: 4, name: "QAQC", tab: "qaqc-status" },
+                          { id: 5, name: "HSES", tab: "hses" },
+                          { id: 6, name: "Resources", tab: "resource" },
+                          { id: 7, name: "Photos", tab: "photos" },
+                          { id: 8, name: "Issues", tab: "issues" },
+                          { id: 9, name: "Schedule", tab: "schedule" },
+                        ].map((section) => {
+                          const isActiveSection = masterActiveTab === section.tab;
+                          return (
+                            <Button
+                              key={section.id}
+                              variant={isActiveSection ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setMasterActiveTab(section.tab as TabType);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="px-3 py-1.5 text-xs rounded-full transition-all duration-200 hover:scale-105 flex-shrink-0 h-8 min-w-fit"
+                            >
+                              {section.id}. {section.name}
+                            </Button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Right Arrow */}
+                      <button
+                        onClick={() => {
+                          const el = document.getElementById("master-second-nav-scroll");
+                          if (el) el.scrollBy({ left: 150, behavior: "smooth" });
+                        }}
+                        className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            
+            <main className="flex-1 p-6">
+              {transformedData ? (
+                <>
+                  {/* Construction Progress Tab */}
+                  {masterActiveTab === "construction-progress" && (() => {
+                    const cpEntries = Object.values(transformedData.constructionProgress);
+                    if (cpEntries.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card rounded-lg border">
+                          <p className="text-lg font-medium">No Construction Progress Data</p>
+                          <p className="text-sm">No construction progress data available for this week</p>
+                        </div>
+                      );
+                    }
+                    const ep = { qty: 0, amount: 0, percentage: 0 };
+                    const allItems: ConstructionProgressItem[] = cpEntries.flatMap(
+                      (projectData) => projectData.items.map(
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        ({ projectSource: _ps, ...item }: MasterConstructionProgressItem): ConstructionProgressItem => ({
+                          ...item,
+                          boQ: item.boQ ?? { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 },
+                          previousWeek:     item.previousWeek     ?? ep,
+                          thisWeek:         item.thisWeek         ?? ep,
+                          upToThisWeek:     item.upToThisWeek     ?? ep,
+                          remaining:        item.remaining        ?? ep,
+                          nextWeekPlan:     item.nextWeekPlan     ?? ep,
+                          upToNextWeekPlan: item.upToNextWeekPlan ?? ep,
+                        })
+                      )
+                    );
+                    const conProgData: ConstructionProgressData = {
+                      projectInfo: {
+                        project: transformedData.metadata.folderName,
+                        subtitle: `Aggregated from ${transformedData.metadata.projectCount} project${transformedData.metadata.projectCount !== 1 ? 's' : ''}`,
+                        date: '',
+                        revision: '',
+                      },
+                      items: allItems,
+                    };
+                    return (
+                      <WeeklyReportConstructionProgress
+                        data={conProgData}
+                        isCreateNewMode={false}
+                      />
+                    );
+                  })()}
+
+                  {/* Other Tabs - Use WeeklyReportContent */}
+                  {masterActiveTab !== "construction-progress" && (
+                    <WeeklyReportContent
+                      mode="master"
+                      masterMetadata={transformedData.metadata}
+                      weeklyActivities={transformedData.weeklyActivities}
+                      nextWeekPlan={transformedData.nextWeekPlan}
+                      overallProgressData={{ rows: transformedData.overallProgressRows, setRows: () => {}, updateRows: () => {}, addTitleRow: () => {}, addDetailRow: () => {} }}
+                      overallProgressRemark={transformedData.overallProgressRemark}
+                      resourcesData={transformedData.resourcesData}
+                      photosData={{ locations: transformedData.photosLocations }}
+                      constructionIssues={transformedData.constructionIssues}
+                      activeTab={masterActiveTab}
+                      setActiveTab={setMasterActiveTab}
+                      setShowSecondNav={() => {}}
+                      sharedData={{
+                        projectOverview: `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`,
+                        designNConstruction: `Aggregated data from ${transformedData.metadata.projectCount} projects`
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center justify-center py-24">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
             </main>
           </SidebarInset>
         </div>

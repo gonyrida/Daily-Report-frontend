@@ -1,6 +1,8 @@
 // src/types/masterReport.types.ts
 // Types for the folder-level Master Weekly Report (dynamically aggregated, read-only)
 
+import { ConstructionProgressItem } from './constructionProgress';
+
 // ── Photo shape (mirrors WeeklyReport sections.photos.locations[]) ─────────
 export interface PhotoSlot {
   image: string;
@@ -66,6 +68,12 @@ export interface MasterProjectSummary {
   progress: number;
 }
 
+// ── Construction Progress item — backend spreads the full ConstructionProgressItem
+//    and adds projectSource, so we extend that type directly.
+export interface MasterConstructionProgressItem extends ConstructionProgressItem {
+  projectSource: string;
+}
+
 // ── Full aggregated payload ────────────────────────────────────────────────
 export interface MasterAggregated {
   activities: {
@@ -77,6 +85,14 @@ export interface MasterAggregated {
   photos: Record<string, PhotoLocation[]>;
   progress: AggregatedProgress;
   issues: MasterIssueItem[];
+  /** Construction progress grouped by project name */
+  constructionProgress: Record<string, {
+    projectInfo: {
+      project: string;
+      subtitle: string;
+    };
+    items: MasterConstructionProgressItem[];
+  }>;
 }
 
 // ── Top-level master report shape (matches API response data) ─────────────

@@ -6,7 +6,8 @@ import { QaqcStatusNew } from "./content/QaqcStatusNew";
 import Hses from "./content/Hses";
 import Resource from "./content/Resource";
 import SitePhotos from "./content/SitePhotos";
-import { Section, TabType, WeeklyReportContentProps } from "@/types/weeklyReportContent.types";
+import MasterReportBanner from "./MasterReportBanner";
+import { Section, TabType, WeeklyReportContentProps, WeeklyReportMode } from "@/types/weeklyReportContent.types";
 import { QAQC_SECTIONS } from "@/constants/qaqcSections";
 import { useActivities } from "@/hooks/useActivities";
 import { useConstructionIssue } from "@/hooks/useConstructionIssue";
@@ -49,7 +50,12 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   resourcesData,
   setResourcesData,
   photosData,
-  setPhotosData
+  setPhotosData,
+  // NEW: Master mode props
+  mode = 'single',
+  masterMetadata,
+  constructionIssues,
+  setConstructionIssues
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -163,6 +169,10 @@ useEffect(() => {
   const currentSetWeeklyActivities = externalSetWeeklyActivities || setWeeklyActivities;
   const currentNextWeekPlan = externalNextWeekPlan || nextWeekPlan;
   const currentSetNextWeekPlan = externalSetNextWeekPlan || setNextWeekPlan;
+
+  // Master mode detection
+  const isMasterMode = mode === 'master';
+  const isEditable = !isMasterMode; // Disable editing in master mode
 
   // Initialize all hooks at parent level
   const constructionIssueHook = useConstructionIssue(reportId || '');
@@ -425,6 +435,10 @@ useEffect(() => {
   // Render all tabs but hide inactive ones with display:none to prevent remounting
   return (
     <div className="space-y-0">
+      {/* Master Report Banner - shown only in master mode */}
+      {isMasterMode && masterMetadata && (
+        <MasterReportBanner metadata={masterMetadata} />
+      )}
       {/* Activities Tab */}
       <div style={{ display: activeTab === "activities" ? "block" : "none" }} className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -432,11 +446,12 @@ useEffect(() => {
         </h2>
         <Activities 
           weeklyActivities={currentWeeklyActivities}
-          setWeeklyActivities={currentSetWeeklyActivities}
+          setWeeklyActivities={isEditable ? currentSetWeeklyActivities : undefined}
           nextWeekPlan={currentNextWeekPlan}
-          setNextWeekPlan={currentSetNextWeekPlan}
+          setNextWeekPlan={isEditable ? currentSetNextWeekPlan : undefined}
           reportId={reportId}
           constructionProgressItems={constructionProgressItems}
+          mode={mode}
         />
       </div>
 
@@ -587,13 +602,14 @@ useEffect(() => {
         </h2>
         <OverallProgress
           rows={visibleOverallRows}
-          setRows={setOverallRowsFromTable}
-          updateRows={setOverallRowsFromTable}
+          setRows={isEditable ? setOverallRowsFromTable : undefined}
+          updateRows={isEditable ? setOverallRowsFromTable : undefined}
           addTitleRow={() => {}}
           addDetailRow={() => {}}
-          descriptionsReadOnly={false}
+          descriptionsReadOnly={!isEditable}
           remark={overallProgressRemark}
-          setRemark={setOverallProgressRemark}
+          setRemark={isEditable ? setOverallProgressRemark : undefined}
+          mode={mode}
         />
       </div>
 

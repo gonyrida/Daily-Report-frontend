@@ -1,12 +1,18 @@
 import { ActivityRow } from "./activity.types";
 import { ConstructionProgressItem } from "./constructionProgress";
+import { MasterReportMetadata } from "@/utils/masterReportTransform";
 
 export interface Section {
   id: string;
   title: string;
 }
 
-export type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
+export type TabType = "construction-progress" | "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
+
+/**
+ * Mode for WeeklyReportContent - 'single' for individual reports, 'master' for aggregated folder view
+ */
+export type WeeklyReportMode = 'single' | 'master';
 
 export interface WeeklyReportContentProps {
   showIntroduction?: boolean;
@@ -38,4 +44,10 @@ export interface WeeklyReportContentProps {
   setResourcesData?: (resourcesData: any) => void;
   photosData?: any;
   setPhotosData?: (photosData: any) => void;
+  
+  // NEW: Master mode support
+  mode?: WeeklyReportMode;
+  masterMetadata?: MasterReportMetadata;
+  constructionIssues?: any[];
+  setConstructionIssues?: (issues: any[]) => void;
 }
