@@ -7,6 +7,7 @@ import Hses from "./content/Hses";
 import Resource from "./content/Resource";
 import SitePhotos from "./content/SitePhotos";
 import MasterReportBanner from "./MasterReportBanner";
+import MasterReportCover from "./MasterReportCover";
 import { Section, TabType, WeeklyReportContentProps, WeeklyReportMode } from "@/types/weeklyReportContent.types";
 import { QAQC_SECTIONS } from "@/constants/qaqcSections";
 import { useActivities } from "@/hooks/useActivities";
@@ -54,6 +55,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   // NEW: Master mode props
   mode = 'single',
   masterMetadata,
+  coverData,
   constructionIssues,
   setConstructionIssues
 }) => {
@@ -439,6 +441,24 @@ useEffect(() => {
       {isMasterMode && masterMetadata && (
         <MasterReportBanner metadata={masterMetadata} />
       )}
+      
+      {/* Cover Tab - only shown in master mode */}
+      {isMasterMode && activeTab === "cover" && masterMetadata && (
+        <div className="bg-card">
+          <MasterReportCover coverData={coverData || {
+            projectName: masterMetadata.folderName,
+            reportTitle: `Master Weekly Report - Week ${masterMetadata.weekNumber}`,
+            weekNumber: masterMetadata.weekNumber.toString(),
+            dateRange: `Week ${masterMetadata.weekNumber}`,
+            coverImage: '',
+            clientLogo: '',
+            projectTitle: masterMetadata.folderName,
+            employer: 'Multiple Clients',
+            contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+          }} />
+        </div>
+      )}
+      
       {/* Activities Tab */}
       <div style={{ display: activeTab === "activities" ? "block" : "none" }} className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">

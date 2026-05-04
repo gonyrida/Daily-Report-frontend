@@ -55,6 +55,19 @@ export interface AggregatedProgress {
   perProject: Record<string, number>;
 }
 
+// ── Cover & Letter data (simplified for master view)
+export interface MasterReportCoverData {
+  projectName: string;
+  reportTitle: string;
+  weekNumber: string;
+  dateRange: string;
+  coverImage: string;
+  clientLogo: string;
+  projectTitle: string;
+  employer: string;
+  contractorName: string;
+}
+
 // ── Per-project lightweight summary row ───────────────────────────────────
 export interface MasterProjectSummary {
   projectId: string;
@@ -66,6 +79,7 @@ export interface MasterProjectSummary {
   activityCount: number;
   issueCount: number;
   progress: number;
+  employer?: string;
 }
 
 // ── Construction Progress item — backend spreads the full ConstructionProgressItem

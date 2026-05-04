@@ -639,6 +639,7 @@ const WeeklyReportDashboard = () => {
                     <WeeklyReportContent
                       mode="master"
                       masterMetadata={transformedData.metadata}
+                      coverData={transformedData.coverData}
                       weeklyActivities={transformedData.weeklyActivities}
                       nextWeekPlan={transformedData.nextWeekPlan}
                       overallProgressData={{ rows: transformedData.overallProgressRows, setRows: () => {}, updateRows: () => {}, addTitleRow: () => {}, addDetailRow: () => {} }}

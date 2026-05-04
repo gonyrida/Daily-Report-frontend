@@ -1,7 +1,7 @@
 // src/utils/masterReportTransform.ts
 // Transform MasterWeeklyReport data into WeeklyReportContentProps format
 
-import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem } from '@/types/masterReport.types';
+import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData } from '@/types/masterReport.types';
 import { ActivityRow } from '@/types/activity.types';
 import { ProgressRow } from '@/types/progress.types';
 import { Resources, ManPowerEntry } from '@/types/resources.types';
@@ -95,14 +95,7 @@ export interface TransformedMasterData {
   metadata: MasterReportMetadata;
   
   // Cover & Letter data (simplified for master view)
-  coverData: {
-    projectName: string;
-    reportTitle: string;
-    weekNumber: string;
-    dateRange: string;
-    contractorName: string;
-    clientName: string;
-  };
+  coverData: MasterReportCoverData;
   
   letterData: {
     projectName: string;
@@ -235,14 +228,70 @@ export const transformMasterToReportData = (master: MasterWeeklyReport): Transfo
     totalManpower,
   };
   
+  // Extract unique employer names from reports
+  const uniqueEmployers = [...new Set(reports
+    .map(report => report.employer)
+    .filter(employer => employer && employer.trim() !== '')
+  )];
+  
+  // Build client name string
+  const clientName = uniqueEmployers.length === 0 
+    ? 'Multiple Clients' 
+    : uniqueEmployers.length === 1 
+    ? uniqueEmployers[0]
+    : uniqueEmployers.slice(0, 2).join(', ') + (uniqueEmployers.length > 2 ? ` +${uniqueEmployers.length - 2} more` : '');
+
+  // Calculate actual date range from reports
+  const allDates = reports.flatMap(report => {
+    const dates = [];
+    if (report.startDate) dates.push(new Date(report.startDate));
+    if (report.endDate) dates.push(new Date(report.endDate));
+    return dates;
+  });
+  
+  const validDates = allDates.filter(date => !isNaN(date.getTime()));
+  const minDate = validDates.length > 0 ? new Date(Math.min(...validDates.map(d => d.getTime()))) : null;
+  const maxDate = validDates.length > 0 ? new Date(Math.max(...validDates.map(d => d.getTime()))) : null;
+  
+  // Debug logging
+  console.log('Master Report Date Range Debug:', {
+    reportsCount: reports.length,
+    allDates: allDates.map(d => d.toString()),
+    validDates: validDates.map(d => d.toString()),
+    minDate: minDate?.toString(),
+    maxDate: maxDate?.toString(),
+    sampleReport: reports[0] ? {
+      startDate: reports[0].startDate,
+      endDate: reports[0].endDate
+    } : null
+  });
+  
+  // Format date range
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+  
+  const dateRange = minDate && maxDate 
+    ? `${formatDate(minDate)} - ${formatDate(maxDate)}`
+    : `Week ${weekNumber}`;
+    
+  console.log('Final dateRange:', dateRange);
+
   // Build cover data for master view
   const coverData = {
     projectName: folder.name,
     reportTitle: `Master Weekly Report - Week ${weekNumber}`,
     weekNumber: weekNumber.toString(),
-    dateRange: `${projectCount} Projects`,
+    dateRange,
+    coverImage: '',
+    clientLogo: '',
+    projectTitle: folder.name,
+    employer: clientName,
     contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
-    clientName: folder.companyId || 'Multiple Clients',
   };
   
   // Build letter data

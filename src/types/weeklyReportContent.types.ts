@@ -1,6 +1,7 @@
 import { ActivityRow } from "./activity.types";
 import { ConstructionProgressItem } from "./constructionProgress";
 import { MasterReportMetadata } from "@/utils/masterReportTransform";
+import { MasterReportCoverData } from "@/types/masterReport.types";
 
 export interface Section {
   id: string;
@@ -48,6 +49,7 @@ export interface WeeklyReportContentProps {
   // NEW: Master mode support
   mode?: WeeklyReportMode;
   masterMetadata?: MasterReportMetadata;
+  coverData?: MasterReportCoverData;
   constructionIssues?: any[];
   setConstructionIssues?: (issues: any[]) => void;
 }
