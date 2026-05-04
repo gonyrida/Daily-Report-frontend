@@ -1465,6 +1465,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Collect all form data
       reportData = {
+        projectId: sharedData.projectId || projectId || '',
         projectName: sharedData.projectName || 'Default Project',
         weekNumber: parseInt(sharedData.weekNumber) || 1,
         startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
@@ -1883,6 +1884,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Collect all form data
       reportData = {
+        projectId: sharedData.projectId || projectId || '',
         projectName: sharedData.projectName || 'Default Project',
         weekNumber: parseInt(sharedData.weekNumber) || 1,
         startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
