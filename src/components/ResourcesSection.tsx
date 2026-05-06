@@ -2,6 +2,7 @@ import { Users, Package, Truck } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import SiteWorkingTeamGroup from "./SiteWorkingTeamGroup";
 import ManagementTeamGroup from "./ManagementTeamGroup";
+import { useEffect } from "react";
 
 interface ResourcesSectionProps {
   managementTeam: ResourceRow[];
@@ -14,6 +15,10 @@ interface ResourcesSectionProps {
   setMaterials: (rows: ResourceRow[]) => void;
   machinery: ResourceRow[];
   setMachinery: (rows: ResourceRow[]) => void;
+  firstSectionTitle?: string;
+  setFirstSectionTitle?: (title: string) => void;
+  secondSectionTitle?: string;
+  setSecondSectionTitle?: (title: string) => void;
 }
 // add more options as needed
 export const MANAGEMENT_OPTIONS = [
@@ -234,12 +239,25 @@ const ResourcesSection = ({
   setMaterials,
   machinery,
   setMachinery,
+  firstSectionTitle,
+  setFirstSectionTitle,
+  secondSectionTitle,
+  setSecondSectionTitle
 }: ResourcesSectionProps) => {
+  useEffect(() => {
+    // Sync local section title states with props
+    if (firstSectionTitle) {
+      setFirstSectionTitle(firstSectionTitle);
+    }
+    if (secondSectionTitle) {
+      setSecondSectionTitle(secondSectionTitle);
+    }
+  }, [firstSectionTitle, secondSectionTitle]);
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
         <div className="w-1 h-5 bg-accent rounded-full" />
-        Man Power
+        Manpower
       </h2>
 
       <div className="grid lg:grid-cols-1 gap-4">
@@ -248,11 +266,19 @@ const ResourcesSection = ({
           setManagementTeam={setManagementTeam}
           mepTeam={mepTeam}
           setMepTeam={setMepTeam}
+          sectionTitle={firstSectionTitle}
+          onValueChange={(value) => 
+            value.trim() ? setFirstSectionTitle?.(value) : setFirstSectionTitle?.("Management Team")
+          }
         />
         
         <SiteWorkingTeamGroup
           interiorTeam={interiorTeam}
           setInteriorTeam={setInteriorTeam}
+          sectionTitle={secondSectionTitle}
+          onValueChange={(value) =>
+            value.trim() ? setSecondSectionTitle?.(value) : setSecondSectionTitle?.("Site Team")
+          }
         />
 
         <ResourceTable
