@@ -5,6 +5,7 @@ import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation,
 import { ActivityRow } from '@/types/activity.types';
 import { ProgressRow } from '@/types/progress.types';
 import { Resources, ManPowerEntry } from '@/types/resources.types';
+import { selectMasterCoverImage, ReportWithCover, isValidCoverImage, constructImageUrl, DEFAULT_MASTER_COVER_IMAGES } from '@/utils/imageUtils';
 /**
  * Construction Issue interface matching WeeklyReport.tsx usage
  */
@@ -134,8 +135,8 @@ const createManPowerEntry = (total: number, description: string): ManPowerEntry 
 /**
  * Transform MasterWeeklyReport into format usable by WeeklyReportContent
  */
-export const transformMasterToReportData = (master: MasterWeeklyReport): TransformedMasterData => {
-  const { aggregated, reports, folder, weekNumber } = master;
+export const transformMasterToReportData = (master: MasterWeeklyReport & { availableCoverImages?: any[] }): TransformedMasterData => {
+  const { aggregated, reports, folder, weekNumber, availableCoverImages: backendCoverImages } = master;
   
   // Get project names for metadata
   const projectNames = reports.map(r => r.projectName);
@@ -241,57 +242,120 @@ export const transformMasterToReportData = (master: MasterWeeklyReport): Transfo
     ? uniqueEmployers[0]
     : uniqueEmployers.slice(0, 2).join(', ') + (uniqueEmployers.length > 2 ? ` +${uniqueEmployers.length - 2} more` : '');
 
-  // Calculate actual date range from reports
-  const allDates = reports.flatMap(report => {
-    const dates = [];
-    if (report.startDate) dates.push(new Date(report.startDate));
-    if (report.endDate) dates.push(new Date(report.endDate));
-    return dates;
-  });
-  
-  const validDates = allDates.filter(date => !isNaN(date.getTime()));
-  const minDate = validDates.length > 0 ? new Date(Math.min(...validDates.map(d => d.getTime()))) : null;
-  const maxDate = validDates.length > 0 ? new Date(Math.max(...validDates.map(d => d.getTime()))) : null;
-  
-  // Debug logging
-  console.log('Master Report Date Range Debug:', {
-    reportsCount: reports.length,
-    allDates: allDates.map(d => d.toString()),
-    validDates: validDates.map(d => d.toString()),
-    minDate: minDate?.toString(),
-    maxDate: maxDate?.toString(),
-    sampleReport: reports[0] ? {
-      startDate: reports[0].startDate,
-      endDate: reports[0].endDate
-    } : null
-  });
-  
-  // Format date range
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
+  // Derive the master date range from each report's cover.dateRange string
+  // (e.g. "17-Apr-26 ~ 23-Apr-26") — this is what the user actually entered and
+  // what each individual report displays, so it is the authoritative value.
+  // The model-level startDate/endDate fields are NOT reliable (they can reflect
+  // creation/query time rather than the actual week dates).
+  const parseCoverDateRange = (str: string): { start: Date | null; end: Date | null } => {
+    const m = str?.match(/(\d{1,2}-[A-Za-z]{3}-\d{2})\s*~\s*(\d{1,2}-[A-Za-z]{3}-\d{2})/);
+    if (!m) return { start: null, end: null };
+    const toDate = (part: string): Date | null => {
+      const [day, month, year] = part.split('-');
+      const d = new Date(`${month} ${day}, 20${year}`);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    return { start: toDate(m[1]), end: toDate(m[2]) };
   };
-  
-  const dateRange = minDate && maxDate 
-    ? `${formatDate(minDate)} - ${formatDate(maxDate)}`
+
+  const parsedRanges = reports
+    .map(r => parseCoverDateRange(r.cover?.dateRange || ''))
+    .filter(dr => dr.start && dr.end) as { start: Date; end: Date }[];
+
+  const allStarts = parsedRanges.map(dr => dr.start);
+  const allEnds   = parsedRanges.map(dr => dr.end);
+
+  // Fallback: use model-level startDate/endDate if no cover dateRange strings exist
+  const fallbackDates = parsedRanges.length === 0
+    ? reports.flatMap(r => {
+        const dates: Date[] = [];
+        if (r.startDate) dates.push(new Date(r.startDate));
+        if (r.endDate)   dates.push(new Date(r.endDate));
+        return dates;
+      }).filter(d => !isNaN(d.getTime()))
+    : [];
+
+  const minDate = allStarts.length > 0
+    ? new Date(Math.min(...allStarts.map(d => d.getTime())))
+    : fallbackDates.length > 0 ? new Date(Math.min(...fallbackDates.map(d => d.getTime()))) : null;
+
+  const maxDate = allEnds.length > 0
+    ? new Date(Math.max(...allEnds.map(d => d.getTime())))
+    : fallbackDates.length > 0 ? new Date(Math.max(...fallbackDates.map(d => d.getTime()))) : null;
+
+  // Format using app-wide DD-MMM-YY ~ DD-MMM-YY convention
+  const formatDate = (date: Date) => {
+    const day   = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const year  = date.getFullYear().toString().slice(-2);
+    return `${day}-${month}-${year}`;
+  };
+
+  const dateRange = minDate && maxDate
+    ? `${formatDate(minDate)} ~ ${formatDate(maxDate)}`
     : `Week ${weekNumber}`;
-    
-  console.log('Final dateRange:', dateRange);
+
+  // Select cover image using priority strategy
+  // 1. Try submitted reports first, then any report with valid image
+  // 2. Map reports to include cover information from nested cover object
+
+  const reportsWithCover: ReportWithCover[] = reports.map(report => ({
+    projectId: report.projectId,
+    projectName: report.projectName,
+    status: report.status,
+    startDate: report.startDate,
+    endDate: report.endDate,
+    createdAt: report.createdAt || report.startDate,
+    submittedAt: report.submittedAt || report.endDate,
+    cover: report.cover,
+    // Also check direct coverImage field
+    coverImage: (report as any).coverImage
+  }));
+  
+  const selectedReport = selectMasterCoverImage(reportsWithCover, "submitted");
+  
+  // Extract employer and project name from the selected report's cover section
+  const selectedEmployer = selectedReport?.cover?.employer || selectedReport?.employer || '';
+  const selectedProjectName = selectedReport?.cover?.projectName || selectedReport?.projectName || folder.name;
+  
+  // Use selected employer only (single employer from selected report)
+  const finalEmployer = selectedEmployer;
+  
+  // Get the cover image URL from the selected report
+  const selectedCoverImage = selectedReport 
+    ? constructImageUrl(selectedReport.coverImage || selectedReport.cover?.coverImage || '')
+    : DEFAULT_MASTER_COVER_IMAGES.placeholder;
+
+  // Use available cover images from backend, or fallback to extracting from reports.
+  // Apply constructImageUrl so raw/relative paths become loadable absolute URLs.
+  const rawAvailableCoverImages = backendCoverImages || reports
+    .filter(r => r.cover?.coverImage && isValidCoverImage(r.cover.coverImage))
+    .map(r => ({
+      projectId: r.projectId,
+      projectName: r.projectName,
+      coverImage: r.cover?.coverImage || '',
+      status: r.status,
+      submittedAt: r.submittedAt,
+    }));
+
+  const availableCoverImages = rawAvailableCoverImages.map(img => ({
+    ...img,
+    coverImage: constructImageUrl(img.coverImage),
+  }));
+
 
   // Build cover data for master view
-  const coverData = {
-    projectName: folder.name,
+  const coverData: MasterReportCoverData = {
+    projectName: selectedProjectName,
     reportTitle: `Master Weekly Report - Week ${weekNumber}`,
     weekNumber: weekNumber.toString(),
     dateRange,
-    coverImage: '',
+    coverImage: selectedCoverImage,
     clientLogo: '',
-    projectTitle: folder.name,
-    employer: clientName,
+    projectTitle: selectedProjectName,
+    employer: finalEmployer,
     contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+    availableCoverImages,
   };
   
   // Build letter data

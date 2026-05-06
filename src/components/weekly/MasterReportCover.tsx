@@ -1,15 +1,18 @@
 // src/components/weekly/MasterReportCover.tsx
 // Read-only display of cover information for master report
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Calendar,
   FileText,
   Building,
   ImageIcon,
+  Images,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { MasterReportCoverData } from "@/types/masterReport.types";
+import { DEFAULT_MASTER_COVER_IMAGES, isValidCoverImage, constructImageUrl } from "@/utils/imageUtils";
+import MasterReportCoverSelector from "./MasterReportCoverSelector";
 
 interface MasterReportCoverProps {
   coverData: MasterReportCoverData;
@@ -20,9 +23,32 @@ const MasterReportCover: React.FC<MasterReportCoverProps> = ({
 }) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === "dark";
-  
-  // Debug logging
-  console.log('MasterReportCover received data:', coverData);
+
+  // Track image load error state
+  const [imageError, setImageError] = useState(false);
+
+  // Track selected cover image
+  const [selectedCoverImage, setSelectedCoverImage] = useState(coverData.coverImage);
+
+  // Track selector visibility
+  const [showSelector, setShowSelector] = useState(false);
+
+  // Determine if we have a valid cover image to display
+  const hasValidCoverImage = isValidCoverImage(selectedCoverImage) && !imageError;
+
+  // Check if there are available cover images to select from
+  const hasAvailableImages = coverData.availableCoverImages && coverData.availableCoverImages.length > 0;
+
+  // Handle image loading error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle image selection from selector
+  const handleSelectImage = (imageUrl: string) => {
+    setSelectedCoverImage(constructImageUrl(imageUrl));
+    setImageError(false);
+  };
 
   return (
     <div className="w-full">
@@ -105,31 +131,71 @@ const MasterReportCover: React.FC<MasterReportCoverProps> = ({
           </div>
         </div>
 
-        {/* Cover Image Placeholder */}
+        {/* Cover Image Display */}
         <div className="px-4 sm:px-6 lg:px-8 mb-6 sm:mb-8">
           <div className="flex flex-col space-y-4">
             <div
-              className={`relative w-full aspect-[16/9] sm:aspect-[16/9] overflow-hidden rounded-2xl border-2 border-dashed ${isDark ? "border-blue-600 bg-blue-900/20" : "border-blue-300 bg-blue-50"} flex items-center justify-center`}
+              className={`relative w-full aspect-[16/9] overflow-hidden rounded-2xl ${hasValidCoverImage
+                  ? "border-0"
+                  : "border-2 border-dashed"
+                } ${isDark ? "border-blue-600 bg-blue-900/20" : "border-blue-300 bg-blue-50"} flex items-center justify-center`}
             >
-              <div className="text-center">
-                <div className="flex justify-center mb-3">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-20"></div>
-                    <div className={`relative p-3 rounded-full ${isDark ? "bg-blue-800" : "bg-blue-100"}`}>
-                      <ImageIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              {hasValidCoverImage ? (
+                // Display actual cover image
+                <img
+                  src={selectedCoverImage}
+                  alt="Master Report Cover"
+                  className="w-full h-full object-cover"
+                  onError={handleImageError}
+                />
+              ) : (
+                // Display placeholder when no valid image
+                <div className="text-center">
+                  <div className="flex justify-center mb-3">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-20"></div>
+                      <div className={`relative p-3 rounded-full ${isDark ? "bg-blue-800" : "bg-blue-100"}`}>
+                        <ImageIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                      </div>
                     </div>
                   </div>
+                  <p className="text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                    Master Report Cover
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    {hasAvailableImages
+                      ? `${coverData.availableCoverImages?.length} images available - click button below to select`
+                      : "No cover images available in reports"}
+                  </p>
                 </div>
-                <p className="text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-                  Master Report Cover
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  Aggregated from multiple projects
-                </p>
-              </div>
+              )}
             </div>
+
+            {/* Select Cover Image Button */}
+            {hasAvailableImages && (
+              <button
+                onClick={() => setShowSelector(true)}
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${isDark
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-blue-500 hover:bg-blue-600 text-white"
+                  }`}
+              >
+                <Images className="w-5 h-5" />
+                <span>Select Cover Image ({coverData.availableCoverImages?.length} available)</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Cover Image Selector Modal */}
+        {showSelector && coverData.availableCoverImages && (
+          <MasterReportCoverSelector
+            availableImages={coverData.availableCoverImages}
+            selectedImage={selectedCoverImage}
+            onSelectImage={handleSelectImage}
+            onClose={() => setShowSelector(false)}
+          />
+        )}
 
         {/* Project Name */}
         <div className="px-4 sm:px-6 lg:px-8 mb-6 sm:mb-8">

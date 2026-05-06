@@ -9,6 +9,7 @@ import SitePhotos from "./content/SitePhotos";
 import MasterReportBanner from "./MasterReportBanner";
 import MasterReportCover from "./MasterReportCover";
 import { Section, TabType, WeeklyReportContentProps, WeeklyReportMode } from "@/types/weeklyReportContent.types";
+import { DEFAULT_MASTER_COVER_IMAGES } from "@/utils/imageUtils";
 import { QAQC_SECTIONS } from "@/constants/qaqcSections";
 import { useActivities } from "@/hooks/useActivities";
 import { useConstructionIssue } from "@/hooks/useConstructionIssue";
@@ -450,7 +451,7 @@ useEffect(() => {
             reportTitle: `Master Weekly Report - Week ${masterMetadata.weekNumber}`,
             weekNumber: masterMetadata.weekNumber.toString(),
             dateRange: `Week ${masterMetadata.weekNumber}`,
-            coverImage: '',
+            coverImage: DEFAULT_MASTER_COVER_IMAGES.placeholder,
             clientLogo: '',
             projectTitle: masterMetadata.folderName,
             employer: 'Multiple Clients',

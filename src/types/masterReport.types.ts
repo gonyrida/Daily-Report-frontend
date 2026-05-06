@@ -56,6 +56,14 @@ export interface AggregatedProgress {
 }
 
 // ── Cover & Letter data (simplified for master view)
+export interface AvailableCoverImageInfo {
+  projectId: string;
+  projectName: string;
+  coverImage: string;
+  status: string;
+  submittedAt?: string;
+}
+
 export interface MasterReportCoverData {
   projectName: string;
   reportTitle: string;
@@ -66,6 +74,8 @@ export interface MasterReportCoverData {
   projectTitle: string;
   employer: string;
   contractorName: string;
+  // Available cover images from all reports for selection
+  availableCoverImages?: AvailableCoverImageInfo[];
 }
 
 // ── Per-project lightweight summary row ───────────────────────────────────
@@ -80,6 +90,19 @@ export interface MasterProjectSummary {
   issueCount: number;
   progress: number;
   employer?: string;
+  /** Report creation timestamp for sorting */
+  createdAt?: string;
+  /** Report submission timestamp for sorting submitted reports */
+  submittedAt?: string;
+  /** Cover data including cover image */
+  cover?: {
+    coverImage?: string;
+    projectName?: string;
+    projectTitle?: string;
+    reportTitle?: string;
+    dateRange?: string;
+    employer?: string;
+  };
 }
 
 // ── Construction Progress item — backend spreads the full ConstructionProgressItem
@@ -123,4 +146,6 @@ export interface MasterWeeklyReport {
   /** One entry per project that has a report for this week */
   reports: MasterProjectSummary[];
   aggregated: MasterAggregated;
+  /** Available cover images from all reports for selection */
+  availableCoverImages?: AvailableCoverImageInfo[];
 }

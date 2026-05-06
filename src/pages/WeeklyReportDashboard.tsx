@@ -617,12 +617,17 @@ const WeeklyReportDashboard = () => {
                         })
                       )
                     );
+                    // Get project info from first construction progress entry
+                    const firstProject = Object.values(transformedData.constructionProgress)[0];
+                    const projectName = firstProject?.projectInfo?.project || transformedData.metadata.folderName;
+                    const projectSubtitle = firstProject?.projectInfo?.subtitle || `Aggregated from ${transformedData.metadata.projectCount} project${transformedData.metadata.projectCount !== 1 ? 's' : ''}`;
+                    
                     const conProgData: ConstructionProgressData = {
                       projectInfo: {
-                        project: transformedData.metadata.folderName,
-                        subtitle: `Aggregated from ${transformedData.metadata.projectCount} project${transformedData.metadata.projectCount !== 1 ? 's' : ''}`,
-                        date: '',
-                        revision: '',
+                        project: projectName,
+                        subtitle: projectSubtitle,
+                        date: firstProject?.projectInfo?.date || '',
+                        revision: firstProject?.projectInfo?.revision || '',
                       },
                       items: allItems,
                     };

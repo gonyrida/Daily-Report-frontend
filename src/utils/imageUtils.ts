@@ -198,3 +198,190 @@ export const handleImageError = (
  * @returns Current timestamp in milliseconds
  */
 export const getCacheBustingTimestamp = (): number => Date.now();
+
+// ============================================================================
+// COVER IMAGE SELECTION & VALIDATION FOR MASTER REPORTS
+// ============================================================================
+
+/**
+ * Default placeholder images for master report covers
+ */
+export const DEFAULT_MASTER_COVER_IMAGES = {
+  placeholder: "/placeholder-construction.jpg",
+  generic: "/images/master-report-default.jpg",
+  banner: "/images/master-report-banner.jpg",
+};
+
+/**
+ * Exact values that are known-bad placeholders (checked with ===)
+ */
+const INVALID_IMAGE_EXACT = new Set([
+  "",
+  "null",
+  "undefined",
+  "placeholder",
+  "default",
+  "/placeholder-construction.jpg",
+]);
+
+/**
+ * Validates if an image URL is valid and not a placeholder
+ */
+export const isValidCoverImage = (imageUrl: string | null | undefined): boolean => {
+  if (!imageUrl) return false;
+
+  const trimmed = imageUrl.trim();
+  if (trimmed === "") return false;
+
+  // Reject known-bad placeholder values (exact match only, not substring)
+  if (INVALID_IMAGE_EXACT.has(trimmed.toLowerCase())) {
+    return false;
+  }
+  
+  // Must have valid image extension or be a data URL
+  const validExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+  const hasValidExtension = validExtensions.some(ext => trimmed.toLowerCase().endsWith(ext));
+  const isDataUrl = trimmed.startsWith("data:image/");
+  const isHttpUrl = trimmed.startsWith("http://") || trimmed.startsWith("https://");
+  const isRelativePath = trimmed.startsWith("/");
+  
+  return hasValidExtension || isDataUrl || isHttpUrl || isRelativePath;
+};
+
+/**
+ * Interface for report with cover image information
+ */
+export interface ReportWithCover {
+  projectId?: string;
+  projectName?: string;
+  status?: string;
+  coverImage?: string;
+  cover?: {
+    coverImage?: string;
+    projectName?: string;
+    projectTitle?: string;
+    employer?: string;
+  };
+  startDate?: string;
+  endDate?: string;
+  submittedAt?: string;
+  createdAt?: string;
+}
+
+/**
+ * Priority levels for cover image selection
+ */
+export type ImagePriority = "submitted" | "recent" | "any";
+
+/**
+ * Selects the best cover image from multiple reports based on priority strategy
+ * 
+ * Strategy:
+ * 1. First valid image from submitted reports (by submission date, most recent first)
+ * 2. First valid image from any report (by creation date, most recent first)
+ * 3. Default placeholder image
+ * 
+ * @param reports - Array of reports with cover image data
+ * @param priority - Selection priority strategy
+ * @returns Selected report with cover image data or null
+ */
+export const selectMasterCoverImage = (
+  reports: ReportWithCover[],
+  priority: ImagePriority = "submitted"
+): ReportWithCover | null => {
+  if (!reports || reports.length === 0) {
+    return null;
+  }
+
+  // Helper to extract cover image from report
+  const getCoverImage = (report: ReportWithCover): string | null => {
+    // Check both direct coverImage and nested cover.coverImage
+    const image = report.coverImage || report.cover?.coverImage;
+    return isValidCoverImage(image) ? image : null;
+  };
+
+  // Helper to parse date safely
+  const getDateValue = (dateStr?: string): number => {
+    if (!dateStr) return 0;
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? 0 : date.getTime();
+  };
+
+  // Strategy 1: Submitted reports first (sorted by submission date, most recent)
+  if (priority === "submitted" || priority === "any") {
+    const submittedReports = reports
+      .filter(r => r.status === "submitted" && getCoverImage(r))
+      .sort((a, b) => getDateValue(b.submittedAt) - getDateValue(a.submittedAt));
+    
+    if (submittedReports.length > 0) {
+      return submittedReports[0];
+    }
+  }
+
+  // Strategy 2: Any report with valid image (sorted by creation date, most recent)
+  const reportsWithImages = reports
+    .filter(r => getCoverImage(r))
+    .sort((a, b) => getDateValue(b.createdAt) - getDateValue(a.createdAt));
+  
+  if (reportsWithImages.length > 0) {
+    return reportsWithImages[0];
+  }
+
+  // Strategy 3: Return null (no valid report found)
+  return null;
+};
+
+/**
+ * Preloads an image to verify it loads successfully
+ * @param imageUrl - URL to preload
+ * @returns Promise that resolves to true if image loads, false otherwise
+ */
+export const preloadImage = (imageUrl: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (!imageUrl || imageUrl === DEFAULT_MASTER_COVER_IMAGES.placeholder) {
+      resolve(false);
+      return;
+    }
+
+    const img = new Image();
+    
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    
+    // Timeout after 5 seconds
+    setTimeout(() => resolve(false), 5000);
+    
+    img.src = imageUrl;
+  });
+};
+
+/**
+ * Validates and returns a verified cover image with fallback
+ * Attempts to preload the image and falls back if it fails
+ * 
+ * @param reports - Array of reports with cover image data
+ * @returns Promise resolving to valid cover image URL
+ */
+export const getVerifiedMasterCoverImage = async (
+  reports: ReportWithCover[]
+): Promise<string> => {
+  // Try primary selection
+  const primaryImage = selectMasterCoverImage(reports, "submitted");
+  const isPrimaryValid = await preloadImage(primaryImage);
+  
+  if (isPrimaryValid) {
+    return primaryImage;
+  }
+
+  // Try secondary selection (any valid image)
+  const secondaryImage = selectMasterCoverImage(reports, "any");
+  if (secondaryImage !== primaryImage) {
+    const isSecondaryValid = await preloadImage(secondaryImage);
+    if (isSecondaryValid) {
+      return secondaryImage;
+    }
+  }
+
+  // Return default placeholder
+  return DEFAULT_MASTER_COVER_IMAGES.placeholder;
+};
