@@ -748,15 +748,17 @@ const WeeklyReportDashboard = () => {
                         resourcesData={transformedData.resourcesData}
                         photosData={{ locations: transformedData.photosLocations }}
                         constructionIssues={transformedData.constructionIssues}
+                        qaqcData={transformedData.aggregatedQaqcData}
+                        setQaqcData={() => {}}
+                        hsesData={transformedData.aggregatedHsesData}
+                        setHsesData={() => {}}
                         showIntroduction={masterShowIntroduction}
                         setShowIntroduction={setMasterShowIntroduction}
                         activeTab={masterActiveTab}
                         setActiveTab={setMasterActiveTab}
                         setShowSecondNav={setMasterShowSecondNav}
                         sharedData={{
-                          // If a specific report is selected, use its introduction data (even if empty)
-                          // Otherwise fall back to aggregated data or default text
-                          projectOverview: selectedReportData 
+                          projectOverview: selectedReportData
                             ? (selectedReportData.sections?.introduction?.projectOverview ?? '')
                             : (transformedData.introduction.projectOverview || `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`),
                           designNConstruction: selectedReportData
@@ -764,7 +766,6 @@ const WeeklyReportDashboard = () => {
                             : (transformedData.introduction.designConstruction || `Aggregated data from ${transformedData.metadata.projectCount} projects`)
                         }}
                         introductionData={{
-                          // Use selected report data if available, otherwise use aggregated data
                           projectOverview: selectedReportData
                             ? (selectedReportData.sections?.introduction?.projectOverview ?? '')
                             : transformedData.introduction.projectOverview,

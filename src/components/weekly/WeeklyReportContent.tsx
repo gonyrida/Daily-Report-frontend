@@ -628,9 +628,46 @@ useEffect(() => {
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           8. CONSTRUCTION ISSUE
         </h2>
-        <div className="text-center py-12 text-muted-foreground">
-          Construction issues will be displayed here.
-        </div>
+        {isMasterMode ? (
+          constructionIssues && constructionIssues.length > 0 ? (
+            <div className="space-y-4 px-2">
+              {constructionIssues.map((issue, index) => (
+                <div key={issue.id || index} className="w-full bg-card border rounded-2xl border-muted-foreground/20">
+                  <div className="p-3 bg-blue-500 dark:bg-blue-600 text-sm font-bold tracking-wide text-white flex items-center gap-3 rounded-t-2xl">
+                    <span>ISSUE NO. <span className="text-xl ml-2">{issue.issueNumber ?? index + 1}</span></span>
+                    {issue._projectSource && (
+                      <span className="ml-auto text-xs font-normal opacity-90 bg-white/20 rounded px-2 py-0.5">
+                        {issue._projectSource}
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1">Site Location</p>
+                      <p className="text-foreground">{issue.location || <span className="italic text-muted-foreground">—</span>}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1">Problem / Description</p>
+                      <p className="text-foreground">{issue.problem || <span className="italic text-muted-foreground">—</span>}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1">Action By</p>
+                      <p className="text-foreground">{issue.actionBy || <span className="italic text-muted-foreground">—</span>}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground italic">
+              No construction issues reported across all projects for this week.
+            </div>
+          )
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            Construction issues will be displayed here.
+          </div>
+        )}
       </div>
 
       {/* Schedule Tab */}

@@ -1,7 +1,7 @@
 // src/utils/masterReportTransform.ts
 // Transform MasterWeeklyReport data into WeeklyReportContentProps format
 
-import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData } from '@/types/masterReport.types';
+import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData, MasterHses, MasterQaqcSection } from '@/types/masterReport.types';
 import { ActivityRow } from '@/types/activity.types';
 import { ProgressRow } from '@/types/progress.types';
 import { Resources, ManPowerEntry } from '@/types/resources.types';
@@ -112,7 +112,13 @@ export interface TransformedMasterData {
     projectOverview: string;
     designConstruction: string;
   };
-  
+
+  // Aggregated QAQC data in backend format (keyed by section: ncr, car, …)
+  aggregatedQaqcData: Record<string, MasterQaqcSection>;
+
+  // Aggregated HSES data combined from all project reports
+  aggregatedHsesData: MasterHses;
+
   // Full reports array for accessing individual report details
   reports: MasterProjectSummary[];
 }
@@ -394,6 +400,18 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
     designConstruction: latestReport?.introduction?.designNConstruction || '',
   };
   
+  // Expose aggregated QAQC data (backend format) so dashboard can pass it to WeeklyReportContent
+  const aggregatedQaqcData: Record<string, MasterQaqcSection> = aggregated.qaqcStatus || {};
+
+  // Expose aggregated HSES data
+  const aggregatedHsesData: MasterHses = aggregated.hses || {
+    training: [],
+    inspection: [],
+    permit: [],
+    firstAidAccident: '',
+    otherActivities: '',
+  };
+
   return {
     weeklyActivities,
     nextWeekPlan,
@@ -407,6 +425,8 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
     coverData,
     letterData,
     introduction,
+    aggregatedQaqcData,
+    aggregatedHsesData,
     reports: master.reports || [],
   };
 };

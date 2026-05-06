@@ -139,6 +139,59 @@ export interface MasterConstructionProgressItem extends ConstructionProgressItem
   projectSource: string;
 }
 
+// ── Aggregated QAQC item (single entry from any project) ──────────────────
+export interface MasterQaqcItem {
+  code?: string;
+  description?: string;
+  status?: string;
+  dateResponded?: string;
+  projectSource?: string;
+  [key: string]: unknown;
+}
+
+// ── Aggregated QAQC section (one per section key, e.g. "ncr", "car") ─────
+export interface MasterQaqcSection {
+  items: MasterQaqcItem[];
+  comments: string;
+}
+
+// ── Aggregated HSES record types ───────────────────────────────────────────
+export interface MasterHsesTraining {
+  typeOfTraining?: string;
+  date?: string;
+  venue?: string;
+  trainer?: string;
+  attendee?: string;
+  remarks?: string;
+  projectSource?: string;
+}
+
+export interface MasterHsesInspection {
+  typeOfInspection?: string;
+  date?: string;
+  inspector?: string;
+  remarks?: string;
+  projectSource?: string;
+}
+
+export interface MasterHsesPermit {
+  typeOfPermit?: string;
+  startDate?: string;
+  endDate?: string;
+  inspector?: string;
+  approver?: string;
+  remarks?: string;
+  projectSource?: string;
+}
+
+export interface MasterHses {
+  training: MasterHsesTraining[];
+  inspection: MasterHsesInspection[];
+  permit: MasterHsesPermit[];
+  firstAidAccident: string;
+  otherActivities: string;
+}
+
 // ── Full aggregated payload ────────────────────────────────────────────────
 export interface MasterAggregated {
   activities: {
@@ -160,6 +213,10 @@ export interface MasterAggregated {
     };
     items: MasterConstructionProgressItem[];
   }>;
+  /** QAQC items aggregated from all project reports, keyed by section (ncr, car, …) */
+  qaqcStatus?: Record<string, MasterQaqcSection>;
+  /** HSES records aggregated from all project reports */
+  hses?: MasterHses;
 }
 
 // ── Top-level master report shape (matches API response data) ─────────────
