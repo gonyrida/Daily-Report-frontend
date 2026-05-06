@@ -174,14 +174,15 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
     data.companyEmail1,
   ]);
 
-  // Always use today's date for report date
+  // Only set default report date if none provided
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    if (today !== letterData.reportDate) {
-      setLetterData((prev) => ({ ...prev, reportDate: today }));
-      onDataChange?.({ ...letterData, reportDate: today });
+    if (!data.reportDate) {
+      const today = new Date().toISOString().split("T")[0];
+      if (today !== letterData.reportDate) {
+        setLetterData((prev) => ({ ...prev, reportDate: today }));
+      }
     }
-  }, []);
+  }, [data.reportDate]);
 
   return (
     <div

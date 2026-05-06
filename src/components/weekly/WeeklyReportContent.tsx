@@ -473,9 +473,9 @@ useEffect(() => {
           </h2>
           <Introduction 
             projectLogo={coverData?.coverImage || projectLogo}
-            projectOverview={introductionData?.projectOverview || sharedData?.projectOverview || ""}
+            projectOverview={introductionData?.projectOverview ?? sharedData?.projectOverview ?? ""}
             setProjectOverview={() => {}}
-            designConstruction={introductionData?.designConstruction || sharedData?.designNConstruction || ""}
+            designConstruction={introductionData?.designConstruction ?? sharedData?.designNConstruction ?? ""}
             setDesignConstruction={() => {}}
             handleTextChange={() => {}}
             handleTabKey={() => {}}

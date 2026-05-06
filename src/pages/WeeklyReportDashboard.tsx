@@ -754,12 +754,23 @@ const WeeklyReportDashboard = () => {
                         setActiveTab={setMasterActiveTab}
                         setShowSecondNav={setMasterShowSecondNav}
                         sharedData={{
-                          projectOverview: selectedReportData?.sections?.introduction?.projectOverview || transformedData.introduction.projectOverview || `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`,
-                          designNConstruction: selectedReportData?.sections?.introduction?.designNConstruction || transformedData.introduction.designConstruction || `Aggregated data from ${transformedData.metadata.projectCount} projects`
+                          // If a specific report is selected, use its introduction data (even if empty)
+                          // Otherwise fall back to aggregated data or default text
+                          projectOverview: selectedReportData 
+                            ? (selectedReportData.sections?.introduction?.projectOverview ?? '')
+                            : (transformedData.introduction.projectOverview || `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`),
+                          designNConstruction: selectedReportData
+                            ? (selectedReportData.sections?.introduction?.designNConstruction ?? '')
+                            : (transformedData.introduction.designConstruction || `Aggregated data from ${transformedData.metadata.projectCount} projects`)
                         }}
                         introductionData={{
-                          projectOverview: selectedReportData?.sections?.introduction?.projectOverview || transformedData.introduction.projectOverview,
-                          designConstruction: selectedReportData?.sections?.introduction?.designNConstruction || transformedData.introduction.designConstruction,
+                          // Use selected report data if available, otherwise use aggregated data
+                          projectOverview: selectedReportData
+                            ? (selectedReportData.sections?.introduction?.projectOverview ?? '')
+                            : transformedData.introduction.projectOverview,
+                          designConstruction: selectedReportData
+                            ? (selectedReportData.sections?.introduction?.designNConstruction ?? '')
+                            : transformedData.introduction.designConstruction,
                         }}
                         onSelectReport={(reportId: string) => setSelectedReportId(reportId)}
                       />
