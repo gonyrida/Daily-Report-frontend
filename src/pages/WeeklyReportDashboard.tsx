@@ -10,6 +10,7 @@ import {
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
+import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
 import { Button } from "@/components/ui/button";
 import { transformMasterToReportData } from "@/utils/masterReportTransform";
 import { ConstructionProgressItem, ConstructionProgressData } from "@/types/constructionProgress";
@@ -41,7 +42,7 @@ import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { WeeklyReportSkeleton, SummaryCardSkeleton } from "@/components/WeeklyReportSkeleton";
-import { getWeeklyReports, getWeeklyReportsMeta, getCompanyWeeklyReports, deleteWeeklyReport } from "@/services/weeklyReportService";
+import { getWeeklyReports, getWeeklyReportsMeta, getCompanyWeeklyReports, deleteWeeklyReport, getWeeklyReportById } from "@/services/weeklyReportService";
 import { getProjectById } from "@/integrations/projectsApi";
 import type { WeeklyReport } from "@/types/weeklyReport.types";
 import {
@@ -416,6 +417,25 @@ const WeeklyReportDashboard = () => {
     // Tab state for master report
     const [masterActiveTab, setMasterActiveTab] = useState<TabType>('table-of-content');
     const [masterShowSecondNav, setMasterShowSecondNav] = useState(false);
+    const [masterShowIntroduction, setMasterShowIntroduction] = useState(false);
+    
+    // Selected report state for displaying specific report data in Cover/Letter/Construction tabs
+    const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+    const [selectedReportData, setSelectedReportData] = useState<WeeklyReport | null>(null);
+    
+    // Fetch selected report data when reportId changes
+    const { data: selectedReportQueryData } = useQuery({
+      queryKey: ['selectedReport', selectedReportId],
+      queryFn: () => selectedReportId ? getWeeklyReportById(selectedReportId) : Promise.resolve(null),
+      enabled: !!selectedReportId && reportType === 'master',
+    });
+    
+    // Update selectedReportData when query data changes
+    React.useEffect(() => {
+      if (selectedReportQueryData?.data) {
+        setSelectedReportData(selectedReportQueryData.data);
+      }
+    }, [selectedReportQueryData]);
 
     return (
       <SidebarProvider>
@@ -491,6 +511,7 @@ const WeeklyReportDashboard = () => {
                       onClick={() => {
                         setMasterActiveTab("table-of-content");
                         setMasterShowSecondNav(true);
+                        setMasterShowIntroduction(false);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
@@ -541,7 +562,7 @@ const WeeklyReportDashboard = () => {
                       >
                         <style>{`#master-second-nav-scroll::-webkit-scrollbar { display: none; }`}</style>
                         {[
-                          { id: 1, name: "Intro", tab: "table-of-content" },
+                          { id: 1, name: "Intro", tab: "introduction" },
                           { id: 2, name: "O.progress", tab: "overall-progress" },
                           { id: 3, name: "Activities", tab: "activities" },
                           { id: 4, name: "QAQC", tab: "qaqc-status" },
@@ -592,6 +613,27 @@ const WeeklyReportDashboard = () => {
                 <>
                   {/* Construction Progress Tab */}
                   {masterActiveTab === "construction-progress" && (() => {
+                    // If a specific report is selected, use its data
+                    if (selectedReportData?.sections?.constructionProgress) {
+                      const cpSection = selectedReportData.sections.constructionProgress;
+                      const conProgData: ConstructionProgressData = {
+                        projectInfo: {
+                          project: cpSection.projectInfo?.project || selectedReportData.projectName || transformedData.metadata.folderName,
+                          subtitle: cpSection.projectInfo?.subtitle || '',
+                          date: cpSection.projectInfo?.date || '',
+                          revision: cpSection.projectInfo?.revision || '',
+                        },
+                        items: cpSection.items || [],
+                      };
+                      return (
+                        <WeeklyReportConstructionProgress
+                          data={conProgData}
+                          isCreateNewMode={false}
+                        />
+                      );
+                    }
+                    
+                    // Otherwise use aggregated data
                     const cpEntries = Object.values(transformedData.constructionProgress);
                     if (cpEntries.length === 0) {
                       return (
@@ -639,27 +681,89 @@ const WeeklyReportDashboard = () => {
                     );
                   })()}
 
-                  {/* Other Tabs - Use WeeklyReportContent */}
-                  {masterActiveTab !== "construction-progress" && (
-                    <WeeklyReportContent
-                      mode="master"
-                      masterMetadata={transformedData.metadata}
-                      coverData={transformedData.coverData}
-                      weeklyActivities={transformedData.weeklyActivities}
-                      nextWeekPlan={transformedData.nextWeekPlan}
-                      overallProgressData={{ rows: transformedData.overallProgressRows, setRows: () => {}, updateRows: () => {}, addTitleRow: () => {}, addDetailRow: () => {} }}
-                      overallProgressRemark={transformedData.overallProgressRemark}
-                      resourcesData={transformedData.resourcesData}
-                      photosData={{ locations: transformedData.photosLocations }}
-                      constructionIssues={transformedData.constructionIssues}
-                      activeTab={masterActiveTab}
-                      setActiveTab={setMasterActiveTab}
-                      setShowSecondNav={() => {}}
-                      sharedData={{
-                        projectOverview: `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`,
-                        designNConstruction: `Aggregated data from ${transformedData.metadata.projectCount} projects`
-                      }}
-                    />
+                  {/* Letter Tab — rendered with the same layout as the single Report */}
+                  {masterActiveTab === "letter" && (
+                    <div className="bg-card rounded-lg border p-6">
+                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+                        LETTER OF SUBMITTAL
+                      </h2>
+                      <WeeklyReportLetter
+                        data={selectedReportData?.sections?.letter ? {
+                          weekNumber: selectedReportData.sections.letter.weekNumber || transformedData.metadata.weekNumber.toString(),
+                          dateRange: selectedReportData.sections.letter.dateRange || `Week ${transformedData.metadata.weekNumber}`,
+                          projectName: selectedReportData.sections.letter.projectName || transformedData.metadata.folderName,
+                          reportDate: selectedReportData.sections.letter.reportDate,
+                          recipientCompany: selectedReportData.sections.letter.recipientCompany,
+                          recipientLocation: selectedReportData.sections.letter.recipientLocation,
+                          recipientName: selectedReportData.sections.letter.recipientName,
+                          ccList: selectedReportData.sections.letter.ccList,
+                          letterBody: selectedReportData.sections.letter.letterBody,
+                          signatureImage: selectedReportData.sections.letter.signatureImage,
+                          signatoryName: selectedReportData.sections.letter.signatoryName,
+                          signatoryPosition: selectedReportData.sections.letter.signatoryPosition,
+                          constructorName: selectedReportData.sections.letter.constructorName,
+                          companyLocation: selectedReportData.sections.letter.companyLocation,
+                          companyPhone1: selectedReportData.sections.letter.companyPhone1,
+                          companyPhone2: selectedReportData.sections.letter.companyPhone2,
+                          companyEmail1: selectedReportData.sections.letter.companyEmail1,
+                          companyEmail2: selectedReportData.sections.letter.companyEmail2,
+                          refNoPrefix: selectedReportData.sections.letter.refNoPrefix,
+                        } : {
+                          weekNumber: transformedData.metadata.weekNumber.toString(),
+                          projectName: transformedData.metadata.folderName,
+                          dateRange: `Week ${transformedData.metadata.weekNumber}`,
+                        }}
+                        onDataChange={() => {}}
+                      />
+                    </div>
+                  )}
+
+                  {/* Cover tab (already fixed via MasterReportCover) and all content tabs
+                      (Intro, Overall Progress, Activities, QA/QC, HSES, Resource, Photos,
+                      Issues, Schedule) — single WeeklyReportContent instance with the
+                      standard Report outer container applied to every tab except Cover. */}
+                  {masterActiveTab !== "construction-progress" && masterActiveTab !== "letter" && (
+                    <div className={masterActiveTab !== "cover" ? "bg-card rounded-lg border p-6" : ""}>
+                      {/* Table of Content Header */}
+                      {masterActiveTab === "table-of-content" && (
+                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg text-foreground -mx-6 -mt-6 mb-6">
+                          TABLE OF CONTENT
+                        </h2>
+                      )}
+                      <WeeklyReportContent
+                        mode="master"
+                        masterMetadata={transformedData.metadata}
+                        coverData={selectedReportData?.sections?.cover ? {
+                          ...transformedData.coverData,
+                          projectName: selectedReportData.sections.cover.projectName || transformedData.coverData.projectName,
+                          projectTitle: selectedReportData.sections.cover.projectTitle || transformedData.coverData.projectTitle,
+                          dateRange: selectedReportData.sections.cover.dateRange || transformedData.coverData.dateRange,
+                          coverImage: selectedReportData.sections.cover.coverImage || transformedData.coverData.coverImage,
+                          employer: selectedReportData.sections.cover.employer || transformedData.coverData.employer,
+                        } : transformedData.coverData}
+                        weeklyActivities={transformedData.weeklyActivities}
+                        nextWeekPlan={transformedData.nextWeekPlan}
+                        overallProgressData={{ rows: transformedData.overallProgressRows, setRows: () => {}, updateRows: () => {}, addTitleRow: () => {}, addDetailRow: () => {} }}
+                        overallProgressRemark={transformedData.overallProgressRemark}
+                        resourcesData={transformedData.resourcesData}
+                        photosData={{ locations: transformedData.photosLocations }}
+                        constructionIssues={transformedData.constructionIssues}
+                        showIntroduction={masterShowIntroduction}
+                        setShowIntroduction={setMasterShowIntroduction}
+                        activeTab={masterActiveTab}
+                        setActiveTab={setMasterActiveTab}
+                        setShowSecondNav={setMasterShowSecondNav}
+                        sharedData={{
+                          projectOverview: selectedReportData?.sections?.introduction?.projectOverview || transformedData.introduction.projectOverview || `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`,
+                          designNConstruction: selectedReportData?.sections?.introduction?.designNConstruction || transformedData.introduction.designConstruction || `Aggregated data from ${transformedData.metadata.projectCount} projects`
+                        }}
+                        introductionData={{
+                          projectOverview: selectedReportData?.sections?.introduction?.projectOverview || transformedData.introduction.projectOverview,
+                          designConstruction: selectedReportData?.sections?.introduction?.designNConstruction || transformedData.introduction.designConstruction,
+                        }}
+                        onSelectReport={(reportId: string) => setSelectedReportId(reportId)}
+                      />
+                    </div>
                   )}
                 </>
               ) : (

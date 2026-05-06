@@ -8,7 +8,7 @@ export interface Section {
   title: string;
 }
 
-export type TabType = "construction-progress" | "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
+export type TabType = "construction-progress" | "cover" | "letter" | "table-of-content" | "introduction" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
 
 /**
  * Mode for WeeklyReportContent - 'single' for individual reports, 'master' for aggregated folder view
@@ -52,4 +52,13 @@ export interface WeeklyReportContentProps {
   coverData?: MasterReportCoverData;
   constructionIssues?: any[];
   setConstructionIssues?: (issues: any[]) => void;
+  
+  // Introduction data for master report
+  introductionData?: {
+    projectOverview: string;
+    designConstruction: string;
+  };
+  
+  // Callback when a specific report is selected from Cover tab
+  onSelectReport?: (reportId: string) => void;
 }

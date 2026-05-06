@@ -16,10 +16,12 @@ import MasterReportCoverSelector from "./MasterReportCoverSelector";
 
 interface MasterReportCoverProps {
   coverData: MasterReportCoverData;
+  onSelectReport?: (reportId: string) => void;
 }
 
 const MasterReportCover: React.FC<MasterReportCoverProps> = ({
   coverData,
+  onSelectReport,
 }) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === "dark";
@@ -44,10 +46,24 @@ const MasterReportCover: React.FC<MasterReportCoverProps> = ({
     setImageError(true);
   };
 
+  // Track selected report ID when choosing a cover image
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+
   // Handle image selection from selector
-  const handleSelectImage = (imageUrl: string) => {
+  const handleSelectImage = (imageUrl: string, reportId?: string) => {
     setSelectedCoverImage(constructImageUrl(imageUrl));
     setImageError(false);
+    if (reportId) {
+      setSelectedReportId(reportId);
+    }
+  };
+
+  // Handle final selection confirmation
+  const handleConfirmSelection = () => {
+    if (selectedReportId && onSelectReport) {
+      onSelectReport(selectedReportId);
+    }
+    setShowSelector(false);
   };
 
   return (
@@ -194,6 +210,7 @@ const MasterReportCover: React.FC<MasterReportCoverProps> = ({
             selectedImage={selectedCoverImage}
             onSelectImage={handleSelectImage}
             onClose={() => setShowSelector(false)}
+            onConfirm={handleConfirmSelection}
           />
         )}
 

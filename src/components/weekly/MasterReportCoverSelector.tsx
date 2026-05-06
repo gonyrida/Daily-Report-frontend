@@ -15,8 +15,9 @@ export interface AvailableCoverImage {
 interface MasterReportCoverSelectorProps {
   availableImages: AvailableCoverImage[];
   selectedImage: string;
-  onSelectImage: (coverImage: string) => void;
+  onSelectImage: (coverImage: string, reportId?: string) => void;
   onClose: () => void;
+  onConfirm?: () => void;
 }
 
 const MasterReportCoverSelector: React.FC<MasterReportCoverSelectorProps> = ({
@@ -24,6 +25,7 @@ const MasterReportCoverSelector: React.FC<MasterReportCoverSelectorProps> = ({
   selectedImage,
   onSelectImage,
   onClose,
+  onConfirm,
 }) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === "dark";
@@ -41,6 +43,9 @@ const MasterReportCoverSelector: React.FC<MasterReportCoverSelectorProps> = ({
   const [selectedIndex, setSelectedIndex] = useState<number>(
     validImages.findIndex(img => img.coverImage === selectedImage)
   );
+  
+  // Track selected report ID
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   
   // Get currently selected image
   const localSelection = selectedIndex >= 0 ? validImages[selectedIndex]?.coverImage : '';
@@ -85,7 +90,11 @@ const MasterReportCoverSelector: React.FC<MasterReportCoverSelectorProps> = ({
         <div className="p-6 overflow-y-auto max-h-[60vh]">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {validImages.map((image, index) => (
-              <div key={`${image.projectId}-${index}`} onClick={() => setSelectedIndex(index)} className={`relative cursor-pointer group rounded-xl overflow-hidden border-2 transition-all ${selectedIndex === index ? (isDark ? "border-blue-500 ring-2 ring-blue-500/30" : "border-blue-500 ring-2 ring-blue-500/20") : (isDark ? "border-slate-700 hover:border-slate-600" : "border-slate-200 hover:border-slate-300")}`}>
+              <div key={`${image.projectId}-${index}`} onClick={() => {
+                setSelectedIndex(index);
+                setSelectedReportId(image.reportId);
+                onSelectImage(image.coverImage, image.reportId);
+              }} className={`relative cursor-pointer group rounded-xl overflow-hidden border-2 transition-all ${selectedIndex === index ? (isDark ? "border-blue-500 ring-2 ring-blue-500/30" : "border-blue-500 ring-2 ring-blue-500/20") : (isDark ? "border-slate-700 hover:border-slate-600" : "border-slate-200 hover:border-slate-300")}`}>
                 <div className="aspect-video relative">
                   <img src={image.coverImage} alt={`Cover from ${image.projectName}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder-construction.jpg"; }} />
                   {selectedIndex === index && (
@@ -109,10 +118,14 @@ const MasterReportCoverSelector: React.FC<MasterReportCoverSelectorProps> = ({
         <div className={`flex items-center justify-end gap-3 p-6 border-t ${isDark ? "border-slate-700" : "border-slate-200"}`}>
           <button onClick={onClose} className={`px-4 py-2 rounded-xl font-medium ${isDark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"}`}>Cancel</button>
           <button onClick={() => { 
-            if (selectedIndex >= 0) {
-              onSelectImage(validImages[selectedIndex].coverImage);
+            if (onConfirm) {
+              onConfirm();
+            } else {
+              if (selectedIndex >= 0) {
+                onSelectImage(validImages[selectedIndex].coverImage, validImages[selectedIndex].reportId);
+              }
+              onClose();
             }
-            onClose(); 
           }} disabled={selectedIndex < 0} className={`px-6 py-2 rounded-xl font-medium ${selectedIndex >= 0 ? (isDark ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white") : (isDark ? "bg-slate-700 text-slate-500 cursor-not-allowed" : "bg-slate-200 text-slate-400 cursor-not-allowed")}`}>Use Selected Image</button>
         </div>
       </div>

@@ -88,6 +88,8 @@ export interface TransformedMasterData {
     projectInfo: {
       project: string;
       subtitle: string;
+      date?: string;
+      revision?: string;
     };
     items: MasterConstructionProgressItem[];
   }>;
@@ -104,6 +106,15 @@ export interface TransformedMasterData {
     recipientCompany: string;
     letterBody: string;
   };
+  
+  // Introduction data (from latest or selected weekly report)
+  introduction: {
+    projectOverview: string;
+    designConstruction: string;
+  };
+  
+  // Full reports array for accessing individual report details
+  reports: MasterProjectSummary[];
 }
 
 /**
@@ -369,6 +380,20 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
   // Build progress remark
   const overallProgressRemark = `Weighted Average: ${aggregated.progress.weighted.toFixed(1)}% | Total Manpower: ${totalManpower} | Activities: ${totalActivities} | Issues: ${totalIssues}`;
   
+  // Extract introduction data from the latest submitted report, or first available report
+  // Sort reports by submittedAt (most recent first), or by createdAt if not submitted
+  const sortedReports = [...reports].sort((a, b) => {
+    const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return dateB - dateA;
+  });
+  
+  const latestReport = sortedReports[0];
+  const introduction = {
+    projectOverview: latestReport?.introduction?.projectOverview || '',
+    designConstruction: latestReport?.introduction?.designNConstruction || '',
+  };
+  
   return {
     weeklyActivities,
     nextWeekPlan,
@@ -381,6 +406,8 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
     metadata,
     coverData,
     letterData,
+    introduction,
+    reports: master.reports || [],
   };
 };
 

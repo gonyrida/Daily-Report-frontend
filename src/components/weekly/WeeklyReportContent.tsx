@@ -58,7 +58,9 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   masterMetadata,
   coverData,
   constructionIssues,
-  setConstructionIssues
+  setConstructionIssues,
+  introductionData,
+  onSelectReport
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -446,17 +448,39 @@ useEffect(() => {
       {/* Cover Tab - only shown in master mode */}
       {isMasterMode && activeTab === "cover" && masterMetadata && (
         <div className="bg-card">
-          <MasterReportCover coverData={coverData || {
-            projectName: masterMetadata.folderName,
-            reportTitle: `Master Weekly Report - Week ${masterMetadata.weekNumber}`,
-            weekNumber: masterMetadata.weekNumber.toString(),
-            dateRange: `Week ${masterMetadata.weekNumber}`,
-            coverImage: DEFAULT_MASTER_COVER_IMAGES.placeholder,
-            clientLogo: '',
-            projectTitle: masterMetadata.folderName,
-            employer: 'Multiple Clients',
-            contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
-          }} />
+          <MasterReportCover 
+            coverData={coverData || {
+              projectName: masterMetadata.folderName,
+              reportTitle: `Master Weekly Report - Week ${masterMetadata.weekNumber}`,
+              weekNumber: masterMetadata.weekNumber.toString(),
+              dateRange: `Week ${masterMetadata.weekNumber}`,
+              coverImage: DEFAULT_MASTER_COVER_IMAGES.placeholder,
+              clientLogo: '',
+              projectTitle: masterMetadata.folderName,
+              employer: 'Multiple Clients',
+              contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+            }}
+            onSelectReport={onSelectReport}
+          />
+        </div>
+      )}
+
+      {/* Introduction Tab - only shown in master mode */}
+      {isMasterMode && activeTab === "introduction" && (
+        <div className="bg-card p-3">
+          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+            1. INTRODUCTION
+          </h2>
+          <Introduction 
+            projectLogo={coverData?.coverImage || projectLogo}
+            projectOverview={introductionData?.projectOverview || sharedData?.projectOverview || ""}
+            setProjectOverview={() => {}}
+            designConstruction={introductionData?.designConstruction || sharedData?.designNConstruction || ""}
+            setDesignConstruction={() => {}}
+            handleTextChange={() => {}}
+            handleTabKey={() => {}}
+            handleBold={() => {}}
+          />
         </div>
       )}
       
@@ -587,6 +611,9 @@ useEffect(() => {
 
       {/* Photos Tab */}
       <div style={{ display: activeTab === "photos" ? "block" : "none" }} className="bg-card p-3">
+        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+          7. SITE ACTIVITY PHOTOS
+        </h2>
         <SitePhotos
           data={photosData}
           onChange={setPhotosData}
