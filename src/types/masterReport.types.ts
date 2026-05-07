@@ -21,6 +21,7 @@ export interface PhotoLocation {
 
 // ── Activity item with an extra projectSource tag ─────────────────────────
 export interface MasterActivityItem {
+  id?: string; // Original ID from construction progress for proper ID display
   description: string;
   percent?: number;
   percentage?: string;

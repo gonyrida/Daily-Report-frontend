@@ -497,7 +497,7 @@ useEffect(() => {
           nextWeekPlan={currentNextWeekPlan}
           setNextWeekPlan={isEditable ? currentSetNextWeekPlan : undefined}
           reportId={reportId}
-          constructionProgressItems={constructionProgressItems}
+          constructionProgressItems={mode === 'master' ? Object.values(constructionProgress || {}).flatMap(cp => cp.items) : constructionProgressItems}
           mode={mode}
         />
       </div>
