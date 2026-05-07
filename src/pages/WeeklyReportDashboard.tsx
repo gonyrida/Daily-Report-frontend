@@ -748,6 +748,15 @@ const WeeklyReportDashboard = () => {
                         resourcesData={transformedData.resourcesData}
                         photosData={{ locations: transformedData.photosLocations }}
                         constructionIssues={transformedData.constructionIssues}
+                        constructionProgressItems={transformedData.constructionProgress}
+                        constructionProgress={(() => {
+                          console.log('🔍 Dashboard - constructionProgress from transformedData:', {
+                            constructionProgressKeys: Object.keys(transformedData.constructionProgress || {}),
+                            constructionProgressData: transformedData.constructionProgress,
+                            transformedDataKeys: Object.keys(transformedData)
+                          });
+                          return transformedData.constructionProgress;
+                        })()}
                         qaqcData={transformedData.aggregatedQaqcData}
                         setQaqcData={() => {}}
                         hsesData={transformedData.aggregatedHsesData}

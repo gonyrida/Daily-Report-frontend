@@ -8,6 +8,7 @@ import Resource from "./content/Resource";
 import SitePhotos from "./content/SitePhotos";
 import MasterReportBanner from "./MasterReportBanner";
 import MasterReportCover from "./MasterReportCover";
+import MasterOverallProgress from "./MasterOverallProgress";
 import { Section, TabType, WeeklyReportContentProps, WeeklyReportMode } from "@/types/weeklyReportContent.types";
 import { DEFAULT_MASTER_COVER_IMAGES } from "@/utils/imageUtils";
 import { QAQC_SECTIONS } from "@/constants/qaqcSections";
@@ -49,6 +50,7 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   onClearQaqcData,
   onClearHsesData,
   constructionProgressItems,
+  constructionProgress,
   resourcesData,
   setResourcesData,
   photosData,
@@ -685,17 +687,48 @@ useEffect(() => {
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
-        <OverallProgress
-          rows={visibleOverallRows}
-          setRows={isEditable ? setOverallRowsFromTable : undefined}
-          updateRows={isEditable ? setOverallRowsFromTable : undefined}
-          addTitleRow={() => {}}
-          addDetailRow={() => {}}
-          descriptionsReadOnly={!isEditable}
-          remark={overallProgressRemark}
-          setRemark={isEditable ? setOverallProgressRemark : undefined}
-          mode={mode}
-        />
+        {isMasterMode && masterMetadata && constructionProgress ? (
+          (() => {
+            console.log('🔍 WeeklyReportContent - Passing constructionProgress:', {
+              constructionProgressKeys: Object.keys(constructionProgress || {}),
+              constructionProgressData: constructionProgress,
+              masterMetadata: masterMetadata
+            });
+            return (
+              <MasterOverallProgress 
+                masterReport={{
+                  type: 'master',
+                  folder: {
+                    _id: masterMetadata.folderId || '',
+                    name: masterMetadata.folderName || '',
+                  },
+                  weekNumber: masterMetadata.weekNumber,
+                  reports: [], // Will be populated by the parent component
+                  aggregated: {
+                    activities: { weeklyActivities: [], nextWeekPlan: [] },
+                    manpower: { managementTotal: masterMetadata.totalManpower || 0, workingInteriorTotal: 0, workingMEPTotal: 0, grandTotal: masterMetadata.totalManpower || 0 },
+                    photos: {},
+                    progress: { weighted: masterMetadata.weightedProgress || 0, perProject: {} },
+                    issues: [],
+                    constructionProgress: constructionProgress,
+                  },
+                }}
+              />
+            );
+          })()
+        ) : (
+          <OverallProgress
+            rows={visibleOverallRows}
+            setRows={isEditable ? setOverallRowsFromTable : undefined}
+            updateRows={isEditable ? setOverallRowsFromTable : undefined}
+            addTitleRow={() => {}}
+            addDetailRow={() => {}}
+            descriptionsReadOnly={!isEditable}
+            remark={overallProgressRemark}
+            setRemark={isEditable ? setOverallProgressRemark : undefined}
+            mode={mode}
+          />
+        )}
       </div>
 
       {/* Table of Content Tab */}
