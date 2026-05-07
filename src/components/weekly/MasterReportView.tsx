@@ -39,6 +39,7 @@ import type {
   MasterIssueItem,
   PhotoLocation,
 } from '@/types/masterReport.types';
+import MasterQaqcSection from './MasterQaqcSection';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -680,6 +681,14 @@ const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
             count={report.aggregated.issues.length}
           >
             <IssuesSection issues={report.aggregated.issues} />
+          </SectionToggle>
+
+          {/* QAQC Status */}
+          <SectionToggle
+            title="QA/QC Status"
+            count={report.aggregated.qaqcStatus ? Object.values(report.aggregated.qaqcStatus).reduce((sum, section) => sum + section.items.length, 0) : 0}
+          >
+            <MasterQaqcSection qaqcData={report.aggregated.qaqcStatus || {}} />
           </SectionToggle>
 
           {/* Photos */}

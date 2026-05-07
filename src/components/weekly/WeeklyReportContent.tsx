@@ -9,6 +9,7 @@ import SitePhotos from "./content/SitePhotos";
 import MasterReportBanner from "./MasterReportBanner";
 import MasterReportCover from "./MasterReportCover";
 import MasterOverallProgress from "./MasterOverallProgress";
+import MasterQaqcSection from "./MasterQaqcSection";
 import { Section, TabType, WeeklyReportContentProps, WeeklyReportMode } from "@/types/weeklyReportContent.types";
 import { DEFAULT_MASTER_COVER_IMAGES } from "@/utils/imageUtils";
 import { QAQC_SECTIONS } from "@/constants/qaqcSections";
@@ -515,55 +516,59 @@ useEffect(() => {
             📝 Load Example Data
           </button> */}
         {/* </div> */}
-        <QaqcStatusNew 
-          sections={qaqcApiHook.filteredSections}
-          tableData={qaqcApiHook.tableData}
-          setTableData={(dataOrUpdater) => {
-            // Resolve functional updater before syncing to parent
-            const data = typeof dataOrUpdater === 'function'
-              ? dataOrUpdater(qaqcApiHook.tableData)
-              : dataOrUpdater;
+        {isMasterMode ? (
+          <MasterQaqcSection qaqcData={qaqcData || {}} />
+        ) : (
+          <QaqcStatusNew 
+            sections={qaqcApiHook.filteredSections}
+            tableData={qaqcApiHook.tableData}
+            setTableData={(dataOrUpdater) => {
+              // Resolve functional updater before syncing to parent
+              const data = typeof dataOrUpdater === 'function'
+                ? dataOrUpdater(qaqcApiHook.tableData)
+                : dataOrUpdater;
 
-            // Update hook state (tableData lives in useQaqcApi)
-            qaqcApiHook.setTableData(data);
+              // Update hook state (tableData lives in useQaqcApi)
+              qaqcApiHook.setTableData(data);
 
-            // Transform to backend format and sync to parent
-            if (!setQaqcData) return;
+              // Transform to backend format and sync to parent
+              if (!setQaqcData) return;
 
-            const backendData: any = {};
-            const sectionIdMap: Record<string, string> = {
-              "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
-              "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
-              "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
-            };
+              const backendData: any = {};
+              const sectionIdMap: Record<string, string> = {
+                "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
+                "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
+                "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
+              };
 
-            Object.entries(data).forEach(([sectionId, rows]) => {
-              const backendKey = sectionIdMap[sectionId];
-              if (backendKey) {
-                const nonEmptyRows = Array.isArray(rows) ? rows.filter(row =>
-                  row.code.trim() || row.description.trim() || row.status.trim() ||
-                  row.dateResponse.trim() || row.comment.trim()
-                ) : [];
+              Object.entries(data).forEach(([sectionId, rows]) => {
+                const backendKey = sectionIdMap[sectionId];
+                if (backendKey) {
+                  const nonEmptyRows = Array.isArray(rows) ? rows.filter(row =>
+                    row.code.trim() || row.description.trim() || row.status.trim() ||
+                    row.dateResponse.trim() || row.comment.trim()
+                  ) : [];
 
-                backendData[backendKey] = {
-                  items: nonEmptyRows.map(row => ({
-                    code: row.code,
-                    description: row.description,
-                    status: row.status,
-                    dateResponded: row.dateResponse
-                  })),
-                  comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
-                };
+                  backendData[backendKey] = {
+                    items: nonEmptyRows.map(row => ({
+                      code: row.code,
+                      description: row.description,
+                      status: row.status,
+                      dateResponded: row.dateResponse
+                    })),
+                    comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
+                  };
+                }
+              });
+
+              if (Object.keys(backendData).length > 0) {
+                setQaqcData(backendData);
               }
-            });
-
-            if (Object.keys(backendData).length > 0) {
-              setQaqcData(backendData);
-            }
-          }}
-          weeklyReportId={reportId}
-          initialQaqcData={qaqcData}
-        />
+            }}
+            weeklyReportId={reportId}
+            initialQaqcData={qaqcData}
+          />
+        )}
       </div>
 
       {/* HSES Tab */}
