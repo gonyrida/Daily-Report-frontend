@@ -16,8 +16,9 @@ function resolveRowType(id: string): 'title' | 'detail' | 'subDetail' | 'custom'
   if (!trimmed) return 'custom';
 
   // Strict roman numeral: only uppercase I, V, X, L, C, D, M in valid order.
+  // Must be at least 2 characters to avoid matching single letters like 'C'
   const ROMAN = /^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
-  if (trimmed.length > 0 && ROMAN.test(trimmed) && /[IVXLCDM]/.test(trimmed)) {
+  if (trimmed.length > 1 && ROMAN.test(trimmed) && /[IVXLCDM]/.test(trimmed)) {
     return 'title';
   }
 
@@ -59,12 +60,6 @@ function buildScopedSourceIds(items: ConstructionProgressItem[]): string[] {
 }
 
 export default function MasterOverallProgress({ masterReport }: MasterOverallProgressProps) {
-  // Debug: Log the received data
-  console.log('🔍 MasterOverallProgress - Received masterReport:', {
-    constructionProgressKeys: Object.keys(masterReport.aggregated.constructionProgress || {}),
-    constructionProgressData: masterReport.aggregated.constructionProgress,
-    reportsCount: masterReport.reports?.length || 0
-  });
 
   // Helper to extract percentage from ProgressData
   const extractPercentage = (progressData: ProgressData | number | undefined): number => {
@@ -94,6 +89,7 @@ export default function MasterOverallProgress({ masterReport }: MasterOverallPro
 
           const rowType = resolveRowType(rawId);
 
+          
           // Only allow: title (Roman numerals) and detail (pure integers) - same as constructionProgressToOverall.ts
           if (rowType === 'custom' || rowType === 'subDetail') return;
 
@@ -173,14 +169,16 @@ export default function MasterOverallProgress({ masterReport }: MasterOverallPro
         // New title resets BOTH child counters — the rules call for this.
         detailCount = 0;
         subDetailCount = 0;
-        return { ...row, displayIndex: `${toRoman(titleCount)}.` };
+        const displayIndex = `${toRoman(titleCount)}.`;
+        return { ...row, displayIndex };
       }
 
       if (row.rowType === "detail") {
         detailCount += 1;
         // New detail resets subDetail — sub-items belong to their nearest detail.
         subDetailCount = 0;
-        return { ...row, displayIndex: `${detailCount}.` };
+        const displayIndex = `${detailCount}.`;
+        return { ...row, displayIndex };
       }
 
       if (row.rowType === "subDetail") {
@@ -189,7 +187,8 @@ export default function MasterOverallProgress({ masterReport }: MasterOverallPro
         // one above everything), show it as "0.1", "0.2", … Clear signal that
         // it needs a parent.
         const parent = detailCount > 0 ? detailCount : 0;
-        return { ...row, displayIndex: `${parent}.${subDetailCount}` };
+        const displayIndex = `${parent}.${subDetailCount}`;
+        return { ...row, displayIndex };
       }
 
       // Unknown rowType — leave untouched.
