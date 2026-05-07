@@ -136,16 +136,87 @@ const Resource: React.FC<{
     // Handle initialResourcesData prop - convert to sections format when data is loaded
     // Only run once and don't overwrite aggregated data
     React.useEffect(() => {
-      if (
+      console.log('🔍 Resource useEffect triggered:', {
+        hasInitialData: !!initialResourcesData,
+        hasManPower: !!initialResourcesData?.manPower,
+        hasMaterial: !!initialResourcesData?.material,
+        hasMachinery: !!initialResourcesData?.machinery,
+        hasSetSections: !!setSections,
+        hasAppliedInitialData: hasAppliedInitialData.current,
+        useAggregatedData,
+        currentSectionsLength: sections?.length || 0,
+        currentMaterialSectionsLength: materialSections?.[0]?.subRows?.length || 0,
+        currentMachinerySectionsLength: machinerySections?.[0]?.subRows?.length || 0
+      });
+
+      // Process data if we have initial data but no sections yet, or if we haven't applied initial data yet
+      const shouldProcessData = (
         initialResourcesData?.manPower && 
         setSections && 
-        !hasAppliedInitialData.current &&
-        !useAggregatedData
-      ) {
+        !useAggregatedData &&
+        (
+          !hasAppliedInitialData.current || 
+          sections?.length === 0 || 
+          materialSections?.[0]?.subRows?.length === 0 || 
+          machinerySections?.[0]?.subRows?.length === 0
+        )
+      );
+
+      if (shouldProcessData) {
+        
+        // Transform and set manpower sections if available
+        if (initialResourcesData.manPower) {
+          console.log('🔍 Processing manpower data:', {
+            manPowerData: initialResourcesData.manPower,
+            managementTeam: initialResourcesData.manPower.managementTeam?.length || 0,
+            workingTeamInterior: initialResourcesData.manPower.workingTeamInterior?.length || 0,
+            workingTeamMEP: initialResourcesData.manPower.workingTeamMEP?.length || 0
+          });
+          
+          const transformedManpower = transformBackendToFrontendFormat(initialResourcesData.manPower);
+          console.log('🔍 Transformed manpower sections:', {
+            sectionsCount: transformedManpower.length,
+            sections: transformedManpower.map(s => ({
+              title: s.title,
+              subRowsCount: s.subRows?.length || 0
+            }))
+          });
+          setSections(transformedManpower);
+        }
+        
+        // Transform and set materials sections if available
+        if (initialResourcesData.material) {
+          console.log('🔍 Processing materials data:', {
+            materialsCount: initialResourcesData.material.length,
+            materialsSample: initialResourcesData.material.slice(0, 3)
+          });
+          
+          const transformedMaterials = transformMaterialsToFrontendFormat(initialResourcesData.material);
+          console.log('🔍 Transformed materials:', {
+            transformedCount: transformedMaterials.length,
+            transformedSample: transformedMaterials.slice(0, 2)
+          });
+          
+          setMaterialSections([{
+            title: "",
+            subtitle: "",
+            subRows: transformedMaterials
+          }]);
+        }
         
         // Also transform and set machinery sections if available
         if (initialResourcesData.machinery) {
+          console.log('🔍 Processing machinery data:', {
+            machineryCount: initialResourcesData.machinery.length,
+            machinerySample: initialResourcesData.machinery.slice(0, 3)
+          });
+          
           const transformedMachinery = transformMachineryToFrontendFormat(initialResourcesData.machinery);
+          console.log('🔍 Transformed machinery:', {
+            transformedCount: transformedMachinery.length,
+            transformedSample: transformedMachinery.slice(0, 2)
+          });
+          
           setMachinerySections([{
             title: "",
             subtitle: "",
@@ -154,6 +225,19 @@ const Resource: React.FC<{
         }
         
         hasAppliedInitialData.current = true;
+        console.log('✅ Resource data processing completed');
+      } else {
+        console.log('⚠️ Resource useEffect conditions not met:', {
+          hasManPower: !!initialResourcesData?.manPower,
+          hasSetSections: !!setSections,
+          hasAppliedInitialData: hasAppliedInitialData.current,
+          useAggregatedData,
+          shouldProcessData,
+          sectionsEmpty: sections?.length === 0,
+          materialSectionsEmpty: materialSections?.[0]?.subRows?.length === 0,
+          machinerySectionsEmpty: machinerySections?.[0]?.subRows?.length === 0,
+          anySectionEmpty: sections?.length === 0 || materialSections?.[0]?.subRows?.length === 0 || machinerySections?.[0]?.subRows?.length === 0
+        });
       }
     }, [initialResourcesData, setSections, useAggregatedData]);
 
@@ -228,6 +312,15 @@ const Resource: React.FC<{
 
         if (result.success && result.data) {
           console.log('✅ Aggregation success - raw data:', result.data);
+          console.log('🔍 Aggregation response structure:', {
+            hasManPower: !!result.data.manPower,
+            hasMaterial: !!result.data.material,
+            hasMachinery: !!result.data.machinery,
+            manPowerCount: result.data.manPower ? Object.keys(result.data.manPower).length : 0,
+            materialCount: result.data.material ? result.data.material.length : 0,
+            machineryCount: result.data.machinery ? result.data.machinery.length : 0,
+            dataKeys: Object.keys(result.data)
+          });
           
           // Transform manpower data - keep local to prevent parent state conflict
           if (result.data.manPower) {
@@ -244,12 +337,24 @@ const Resource: React.FC<{
           
           // Transform and set materials data
           if (result.data.material) {
+            console.log('🔍 Processing aggregated materials:', {
+              materialsCount: result.data.material.length,
+              materialsSample: result.data.material.slice(0, 2)
+            });
+            
             const transformedMaterials = transformMaterialsToFrontendFormat(result.data.material);
+            console.log('🔍 Setting material sections:', {
+              transformedCount: transformedMaterials.length,
+              firstRow: transformedMaterials[0]
+            });
+            
             setMaterialSections([{
               title: "",
               subtitle: "",
               subRows: transformedMaterials
             }]);
+          } else {
+            console.log('⚠️ No materials data in aggregation result:', result.data);
           }
           
           // Transform and set machinery data
@@ -333,6 +438,7 @@ const Resource: React.FC<{
             monthYearDisplay={monthYearDisplay || getDateDisplay()}
             dates={dates && dates.length > 0 && dates[0] !== "-" ? dates : getDates()}
             showTitles={true}
+            showUnit={false}
           />
         </div>
         <div id="section-6.3">
@@ -346,6 +452,7 @@ const Resource: React.FC<{
             monthYearDisplay={monthYearDisplay || getDateDisplay()}
             dates={dates && dates.length > 0 && dates[0] !== "-" ? dates : getDates()}
             showTitles={true}
+            showUnit={false}
           />
         </div>
       </div>

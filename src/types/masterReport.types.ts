@@ -40,12 +40,27 @@ export interface MasterIssueItem {
   projectSource: string;
 }
 
+// ── Per-day count shape shared by manpower team aggregation ───────────────
+export interface DailyDateTotals {
+  fri: number;
+  sat: number;
+  sun: number;
+  mon: number;
+  tue: number;
+  wed: number;
+  thu: number;
+}
+
 // ── Aggregated manpower totals ─────────────────────────────────────────────
 export interface AggregatedManpower {
   managementTotal: number;
   workingInteriorTotal: number;
   workingMEPTotal: number;
   grandTotal: number;
+  /** Per-day aggregated counts for each team (added in v2) */
+  managementDates?: DailyDateTotals;
+  workingInteriorDates?: DailyDateTotals;
+  workingMEPDates?: DailyDateTotals;
 }
 
 // ── Weighted progress result ───────────────────────────────────────────────
@@ -250,6 +265,10 @@ export interface MasterAggregated {
   qaqcStatus?: Record<string, MasterQaqcSection>;
   /** HSES records aggregated from all project reports */
   hses?: MasterHses;
+  /** Material delivery status aggregated from all project reports */
+  materials?: any[];
+  /** Machinery & equipment status aggregated from all project reports */
+  machinery?: any[];
 }
 
 // ── Top-level master report shape (matches API response data) ─────────────

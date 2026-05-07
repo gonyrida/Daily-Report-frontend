@@ -14,7 +14,8 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
   handleInputChange: passedHandleInputChange,
   removeSubRow: passedRemoveSubRow,
   monthYearDisplay: passedMonthYearDisplay,
-  dates: passedDates
+  dates: passedDates,
+  showUnit = false
 }) => {
   const [localSections, setLocalSections] = useState<Section[]>(passedSections || [
     {
@@ -215,6 +216,15 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
             >
               Description
             </th>
+            {showUnit && (
+              <th
+                rowSpan={3}
+                className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
+                style={{ verticalAlign: "middle" }}
+              >
+                Unit
+              </th>
+            )}
             <th
               colSpan={7}
               className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
@@ -293,6 +303,19 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
                       placeholder="Enter description"
                     />
                   </td>
+                  {showUnit && (
+                    <td className="border border-border px-4 py-2 text-center">
+                      <input
+                        type="text"
+                        value={row.unit || ''}
+                        onChange={(e) =>
+                          handleInputChange(sectionIndex, rowIndex, "unit", e.target.value)
+                        }
+                        className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
+                        placeholder="Unit"
+                      />
+                    </td>
+                  )}
                   {row.dailyData.map((value, dayIndex) => (
                     <td
                       key={dayIndex}
@@ -358,6 +381,11 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
             <td className="border border-border px-4 py-2 bg-blue-50 dark:bg-blue-900/20 font-bold">
               {getGrandTotal().description}
             </td>
+            {showUnit && (
+              <td className="border border-border px-4 py-2 bg-blue-50 dark:bg-blue-900/20 font-bold text-center">
+                -
+              </td>
+            )}
             {getGrandTotal().dailyData.map((value, dayIndex) => (
               <td
                 key={dayIndex}

@@ -130,22 +130,47 @@ export const transformBackendToFrontendFormat = (manPower: ManPowerTeams): Secti
  * Transform backend material data to frontend subRows format
  */
 export const transformMaterialsToFrontendFormat = (materials: MaterialEntry[]): SubRow[] => {
-  return materials?.map(entry => ({
-    description: entry.description,
-    unit: entry.unit,
-    dailyData: [
-      entry.date?.fri?.toString() || "0",
-      entry.date?.sat?.toString() || "0",
-      entry.date?.sun?.toString() || "0",
-      entry.date?.mon?.toString() || "0",
-      entry.date?.tue?.toString() || "0",
-      entry.date?.wed?.toString() || "0",
-      entry.date?.thu?.toString() || "0"
-    ],
-    previousWeek: entry.prevWeek?.toString() || "0",
-    thisWeek: entry.thisWeek?.toString() || "0",
-    upToThisWeek: entry.accumulated?.toString() || "0"
-  })) || [];
+  console.log('🔍 transformMaterialsToFrontendFormat input:', {
+    materialsCount: materials?.length || 0,
+    materialsSample: materials?.slice(0, 2) || [],
+    firstMaterialDate: materials?.[0]?.date
+  });
+  
+  const result = materials?.map(entry => {
+    const transformed = {
+      description: entry.description,
+      unit: entry.unit || '',
+      dailyData: [
+        entry.date?.fri?.toString() || "0",
+        entry.date?.sat?.toString() || "0",
+        entry.date?.sun?.toString() || "0",
+        entry.date?.mon?.toString() || "0",
+        entry.date?.tue?.toString() || "0",
+        entry.date?.wed?.toString() || "0",
+        entry.date?.thu?.toString() || "0"
+      ],
+      previousWeek: entry.prevWeek?.toString() || "0",
+      thisWeek: entry.thisWeek?.toString() || "0",
+      upToThisWeek: entry.accumulated?.toString() || "0"
+    };
+    
+    console.log('🔍 Transformed material entry:', {
+      description: entry.description,
+      originalDate: entry.date,
+      transformedDailyData: transformed.dailyData,
+      originalThisWeek: entry.thisWeek,
+      transformedThisWeek: transformed.thisWeek
+    });
+    
+    return transformed;
+  }) || [];
+  
+  console.log('🔍 transformMaterialsToFrontendFormat result:', {
+    resultCount: result.length,
+    resultSample: result.slice(0, 2)
+  });
+  
+  return result;
 };
 
 /**

@@ -772,7 +772,8 @@ const WeeklyReportDashboard = () => {
                             : (transformedData.introduction.projectOverview || `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`),
                           designNConstruction: selectedReportData
                             ? (selectedReportData.sections?.introduction?.designNConstruction ?? '')
-                            : (transformedData.introduction.designConstruction || `Aggregated data from ${transformedData.metadata.projectCount} projects`)
+                            : (transformedData.introduction.designConstruction || `Aggregated data from ${transformedData.metadata.projectCount} projects`),
+                          dateRange: transformedData.coverData.dateRange,
                         }}
                         introductionData={{
                           projectOverview: selectedReportData

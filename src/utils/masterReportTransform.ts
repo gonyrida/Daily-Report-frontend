@@ -186,11 +186,15 @@ const transformActivity = (item: MasterActivityItem): MasterActivityRow => {
 };
 
 /**
- * Create a ManPowerEntry from aggregated total
+ * Create a ManPowerEntry from aggregated total and optional per-day data
  */
-const createManPowerEntry = (total: number, description: string): ManPowerEntry => ({
+const createManPowerEntry = (
+  total: number,
+  description: string,
+  dates?: { fri: number; sat: number; sun: number; mon: number; tue: number; wed: number; thu: number }
+): ManPowerEntry => ({
   description,
-  date: { fri: 0, sat: 0, sun: 0, mon: 0, tue: 0, wed: 0, thu: 0 },
+  date: dates ?? { fri: 0, sat: 0, sun: 0, mon: 0, tue: 0, wed: 0, thu: 0 },
   prevWeek: 0,
   thisWeek: total,
   accumulated: total,
@@ -240,24 +244,6 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
       _projectId: report.projectId,
     })),
   ];
-  
-  // Transform resources - use aggregated totals
-  const resourcesData: Resources = {
-    manPower: {
-      dateRange: `Week ${weekNumber}`,
-      managementTeam: aggregated.manpower.managementTotal > 0 
-        ? [createManPowerEntry(aggregated.manpower.managementTotal, 'Management Team (Aggregated)')]
-        : [],
-      workingTeamInterior: aggregated.manpower.workingInteriorTotal > 0
-        ? [createManPowerEntry(aggregated.manpower.workingInteriorTotal, 'Working Team - Interior (Aggregated)')]
-        : [],
-      workingTeamMEP: aggregated.manpower.workingMEPTotal > 0
-        ? [createManPowerEntry(aggregated.manpower.workingMEPTotal, 'Working Team - MEP (Aggregated)')]
-        : [],
-    },
-    material: [], // Not aggregated in master report
-    machinery: [], // Not aggregated in master report
-  };
   
   // Transform photos - flatten and tag with project source
   const photosLocations: MasterPhotoLocation[] = Object.entries(aggregated.photos).flatMap(
@@ -358,6 +344,24 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
   const dateRange = minDate && maxDate
     ? `${formatDate(minDate)} ~ ${formatDate(maxDate)}`
     : `Week ${weekNumber}`;
+
+  // Transform resources - use aggregated totals with per-day breakdown
+  const resourcesData: Resources = {
+    manPower: {
+      dateRange,
+      managementTeam: aggregated.manpower.managementTotal > 0
+        ? [createManPowerEntry(aggregated.manpower.managementTotal, 'Management Team (Aggregated)', aggregated.manpower.managementDates)]
+        : [],
+      workingTeamInterior: aggregated.manpower.workingInteriorTotal > 0
+        ? [createManPowerEntry(aggregated.manpower.workingInteriorTotal, 'Working Team - Interior (Aggregated)', aggregated.manpower.workingInteriorDates)]
+        : [],
+      workingTeamMEP: aggregated.manpower.workingMEPTotal > 0
+        ? [createManPowerEntry(aggregated.manpower.workingMEPTotal, 'Working Team - MEP (Aggregated)', aggregated.manpower.workingMEPDates)]
+        : [],
+    },
+    material: aggregated.materials || [],
+    machinery: aggregated.machinery || [],
+  };
 
   // Select cover image using priority strategy
   // 1. Try submitted reports first, then any report with valid image

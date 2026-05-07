@@ -41,6 +41,7 @@ import type {
 } from '@/types/masterReport.types';
 import MasterQaqcSection from './MasterQaqcSection';
 import MasterHsePhotoSection from './MasterHsePhotoSection';
+import ResourceSection from './ResourceSection';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -717,6 +718,36 @@ const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
               <MasterHsePhotoSection hsePhotoReferences={report.aggregated.hses.hsePhotoReferences} />
             </SectionToggle>
           )}
+
+          {/* Resource Status */}
+          {(() => {
+            console.log('🚀 Rendering Resource Status section:', {
+              materialsCount: report.aggregated.materials?.length || 0,
+              machineryCount: report.aggregated.machinery?.length || 0,
+              totalCount: (report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0),
+              aggregatedKeys: Object.keys(report.aggregated)
+            });
+            return null;
+          })()}
+          <SectionToggle
+            title="Resource Status"
+            count={(report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0)}
+          >
+            {(() => {
+              console.log('🔍 MasterReportView resource data:', {
+                materialsCount: report.aggregated.materials?.length || 0,
+                machineryCount: report.aggregated.machinery?.length || 0,
+                materialsSample: report.aggregated.materials?.slice(0, 2),
+                machinerySample: report.aggregated.machinery?.slice(0, 2),
+                aggregatedKeys: Object.keys(report.aggregated)
+              });
+              return null;
+            })()}
+            <ResourceSection 
+              materials={report.aggregated.materials || []} 
+              machinery={report.aggregated.machinery || []} 
+            />
+          </SectionToggle>
 
           {/* Photos */}
           <SectionToggle

@@ -709,8 +709,24 @@ export const getMasterWeeklyReport = async (
   try {
     const params = new URLSearchParams({ folderId, weekNumber: weekNumber.toString() });
     const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/master?${params}`);
-    return handleApiResponse<MasterWeeklyReport>(response);
+    const result = await handleApiResponse<MasterWeeklyReport>(response);
+    
+    // Debug logging for resource data
+    if (result.success && result.data?.aggregated) {
+      console.log('🔍 API Response - Resource Data:', {
+        materialsCount: result.data.aggregated.materials?.length || 0,
+        machineryCount: result.data.aggregated.machinery?.length || 0,
+        materialsSample: result.data.aggregated.materials?.slice(0, 2),
+        machinerySample: result.data.aggregated.machinery?.slice(0, 2),
+        aggregatedKeys: Object.keys(result.data.aggregated)
+      });
+    } else {
+      console.log('🔍 API Response - No success or no aggregated data:', result);
+    }
+    
+    return result;
   } catch (error) {
+    console.error('🔍 API Error:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch master report'
