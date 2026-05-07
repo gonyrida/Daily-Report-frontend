@@ -75,7 +75,7 @@ export default function Entry({ entry, onUpdate, onDelete, entryNumber, onBulkUp
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {entry.slots.map((slot: any, idx: number) => (
-          <Slot key={`${entry.id}-${slot.id || idx}`} slot={slot} entryId={entry.id} slotIndex={idx} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onBulkUpload={onBulkUpload} />
+          <Slot key={slot.id || `${entry.id}-slot-${idx}`} slot={slot} entryId={entry.id} slotIndex={idx} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onBulkUpload={onBulkUpload} />
         ))}
       </div>
     </div>

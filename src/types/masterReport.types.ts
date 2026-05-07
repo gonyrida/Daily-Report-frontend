@@ -185,12 +185,44 @@ export interface MasterHsesPermit {
   projectSource?: string;
 }
 
+// ── HSE Photo Reference types (for aggregated images) ─────────────────────
+export interface MasterHsePhotoReference {
+  image: string;
+  caption: string;
+  projectSource: string;
+}
+
+export interface MasterHsePhotoSlot {
+  id?: string;
+  image: string;
+  caption: string;
+  projectSource?: string;
+}
+
+export interface MasterHsePhotoEntry {
+  id: string;
+  slots: MasterHsePhotoSlot[];
+}
+
+export interface MasterHsePhotoSection {
+  id: string;
+  title: string;
+  entries: MasterHsePhotoEntry[];
+}
+
+export interface MasterHsePhotoReferences {
+  hseToolboxMeeting: MasterHsePhotoSection[];
+  hseActivityPhotos: MasterHsePhotoSection[];
+}
+
 export interface MasterHses {
   training: MasterHsesTraining[];
   inspection: MasterHsesInspection[];
   permit: MasterHsesPermit[];
   firstAidAccident: string;
   otherActivities: string;
+  /** Aggregated HSE photo references from all project reports */
+  hsePhotoReferences?: MasterHsePhotoReferences;
 }
 
 // ── Full aggregated payload ────────────────────────────────────────────────

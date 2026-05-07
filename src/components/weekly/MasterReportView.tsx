@@ -40,6 +40,7 @@ import type {
   PhotoLocation,
 } from '@/types/masterReport.types';
 import MasterQaqcSection from './MasterQaqcSection';
+import MasterHsePhotoSection from './MasterHsePhotoSection';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -498,7 +499,7 @@ const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-full p-6 space-y-6">
+    <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
@@ -690,6 +691,32 @@ const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
           >
             <MasterQaqcSection qaqcData={report.aggregated.qaqcStatus || {}} />
           </SectionToggle>
+
+          {/* HSE Photo References */}
+          {(() => {
+            console.log('🔍 Frontend: Checking HSE Photo References:', {
+              hasAggregated: !!report.aggregated,
+              hasHses: !!report.aggregated?.hses,
+              hasPhotoReferences: !!report.aggregated?.hses?.hsePhotoReferences,
+              hsesData: report.aggregated?.hses,
+              photoReferences: report.aggregated?.hses?.hsePhotoReferences
+            });
+            return report.aggregated?.hses?.hsePhotoReferences;
+          })() && (
+            <SectionToggle
+              title="HSE Photo References"
+              count={
+                (report.aggregated.hses.hsePhotoReferences.hseToolboxMeeting?.reduce((sum, section) => 
+                  sum + section.entries?.reduce((entrySum, entry) => 
+                    entrySum + (entry.slots?.filter(slot => slot.image).length || 0), 0) || 0, 0) || 0) +
+                (report.aggregated.hses.hsePhotoReferences.hseActivityPhotos?.reduce((sum, section) => 
+                  sum + section.entries?.reduce((entrySum, entry) => 
+                    entrySum + (entry.slots?.filter(slot => slot.image).length || 0), 0) || 0, 0) || 0)
+              }
+            >
+              <MasterHsePhotoSection hsePhotoReferences={report.aggregated.hses.hsePhotoReferences} />
+            </SectionToggle>
+          )}
 
           {/* Photos */}
           <SectionToggle

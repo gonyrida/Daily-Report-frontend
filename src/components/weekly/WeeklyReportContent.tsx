@@ -693,34 +693,25 @@ useEffect(() => {
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
         {isMasterMode && masterMetadata && constructionProgress ? (
-          (() => {
-            console.log('🔍 WeeklyReportContent - Passing constructionProgress:', {
-              constructionProgressKeys: Object.keys(constructionProgress || {}),
-              constructionProgressData: constructionProgress,
-              masterMetadata: masterMetadata
-            });
-            return (
-              <MasterOverallProgress 
-                masterReport={{
-                  type: 'master',
-                  folder: {
-                    _id: masterMetadata.folderId || '',
-                    name: masterMetadata.folderName || '',
-                  },
-                  weekNumber: masterMetadata.weekNumber,
-                  reports: [], // Will be populated by the parent component
-                  aggregated: {
-                    activities: { weeklyActivities: [], nextWeekPlan: [] },
-                    manpower: { managementTotal: masterMetadata.totalManpower || 0, workingInteriorTotal: 0, workingMEPTotal: 0, grandTotal: masterMetadata.totalManpower || 0 },
-                    photos: {},
-                    progress: { weighted: masterMetadata.weightedProgress || 0, perProject: {} },
-                    issues: [],
-                    constructionProgress: constructionProgress,
-                  },
-                }}
-              />
-            );
-          })()
+          <MasterOverallProgress
+            masterReport={{
+              type: 'master',
+              folder: {
+                _id: masterMetadata.folderId || '',
+                name: masterMetadata.folderName || '',
+              },
+              weekNumber: masterMetadata.weekNumber,
+              reports: [],
+              aggregated: {
+                activities: { weeklyActivities: [], nextWeekPlan: [] },
+                manpower: { managementTotal: masterMetadata.totalManpower || 0, workingInteriorTotal: 0, workingMEPTotal: 0, grandTotal: masterMetadata.totalManpower || 0 },
+                photos: {},
+                progress: { weighted: masterMetadata.weightedProgress || 0, perProject: {} },
+                issues: [],
+                constructionProgress: constructionProgress,
+              },
+            }}
+          />
         ) : (
           <OverallProgress
             rows={visibleOverallRows}
