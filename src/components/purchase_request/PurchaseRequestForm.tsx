@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProfileContext } from '@/contexts/ProfileContext';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
 	DropdownMenu,
 	DropdownMenuContent,
@@ -69,6 +68,15 @@ const parseFileSize = (fileSize) => {
   }
 };
 
+const UNIT_OPTIONS = [
+  { value: 'pcs', label: 'Pieces' },
+  { value: 'kg', label: 'Kilograms' },
+  { value: 'meter', label: 'Meters' },
+  { value: 'liter', label: 'Liters' },
+  { value: 'box', label: 'Boxes' },
+  { value: 'pack', label: 'Packs' },
+];
+
 interface PurchaseRequestFormProps {
   mode: string;
   isOpen: boolean;
@@ -115,6 +123,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 	const [showPreview, setShowPreview] = useState(false);
 	const [previewUrl, setPreviewUrl] = useState('');
 	const [purposeOptions, setPurposeOptions] = useState([]);
+
+	const allUnitOptions = [...UNIT_OPTIONS, ...(customUnits || [])];
 
 	useEffect(() => {
 		if (projectData && projectData.length > 0) {
@@ -751,6 +761,21 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 		return `${wordResult} and ${centsStr}/100 Dollars`;
 	};
 
+	const getCurrentMaterialActual = () => {
+		const currentRequestTotal = formData.items.reduce(
+			(sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+		const currentMaterialActual = prSummaryData.reports.reduce((total, report) => {
+			// If this report is the one we are currently editing, use the live form data
+			if (formData._id && report._id === formData._id) {
+				return total;
+			}
+			return total + (report.grandTotal || 0);
+		}, 0);
+
+		return currentRequestTotal + currentMaterialActual;
+	};
+
 	const handleExport = async (mode: 'excel' | 'pdf') => {
 		setIsExporting(true);
 		// Clone materialsActual list
@@ -771,6 +796,14 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				requestDescription: formData.requestDescription,
 				requestRemarks: formData.requestRemarks
 			});
+		} else if (formData._id && requestsList.some((req: any) => req._id === formData._id)) {
+			const currentRequestIdx = requestsList.findIndex((req: any) => req._id === formData._id);
+			requestsList[currentRequestIdx] = {
+				...requestsList[currentRequestIdx],
+				requestDescription: formData.requestDescription,
+				requestRemarks: formData.requestRemarks,
+				grandTotal: formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+			}
 		}
 		try {
 			if (mode === 'excel') {
@@ -784,7 +817,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					summary: {
 						...prSummaryData.summary,
 						materialsActual: purposesList,
-						totalSpend: prSummaryData.summary.totalSpend + formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+						totalSpend: getCurrentMaterialActual()
 					}
 				});
 			} else {
@@ -797,7 +830,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 					reports: requestsList,
 					summary: {
 						...prSummaryData.summary,
-						materialsActual: purposesList
+						materialsActual: purposesList,
+						totalSpend: getCurrentMaterialActual()
 					}
 				});
 			}
@@ -827,6 +861,12 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				requestDescription: formData.requestDescription,
 				requestRemarks: formData.requestRemarks
 			});
+		} else if (formData._id && requestsList.some((req: any) => req._id === formData._id)) {
+			const currentRequestIdx = requestsList.findIndex((req: any) => req._id === formData._id);
+			requestsList[currentRequestIdx] = {
+				...requestsList[currentRequestIdx],
+				grandTotal: formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+			}
 		}
 		try {
 			const url = await exportPurchaseRequestPDF({
@@ -837,7 +877,8 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 				reports: requestsList,
 				summary: {
 					...prSummaryData.summary,
-					materialsActual: purposesList
+					materialsActual: purposesList,
+					totalSpend: getCurrentMaterialActual()
 				}
 			}, true);
 			setPreviewUrl(url);
@@ -1500,10 +1541,16 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 							<div className="grid grid-cols-2 gap-4">
 								<div className="space-y-2">
 									<label className="text-sm font-medium">Unit</label>
-									<Input
+									<CreatableCombobox
+										options={allUnitOptions}
 										value={newItem.unit}
-										onChange={(e) => setNewItem({...newItem, unit: e.target.value})}
-										placeholder="e.g., pcs, kg, m"
+										onChange={(value) => setNewItem({...newItem, unit: value})}
+										onCreate={(newUnit) => {
+											setCustomUnits(prev => [...prev, { value: newUnit, label: newUnit }]);
+											setNewItem({...newItem, unit: newUnit});
+										}}
+										placeholder="Select unit..."
+										width="w-[178px]"
 									/>
 								</div>
 								<div className="space-y-2">

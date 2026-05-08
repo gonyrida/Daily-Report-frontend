@@ -828,13 +828,7 @@ const PurchaseRequest = ({onRefresh}) => {
                             if (request) handleEditRequest(request);
                           }
                         }}
-                        disabled={selectedRequests.length !== 1 || (() => {
-                          if (selectedRequests.length === 1) {
-                            const request = requests.find(r => r.id === selectedRequests[0] || r._id === selectedRequests[0]);
-                            return request?.approvalWorkflow?.some(step => step.status === 'approved' || step.status === 'rejected') || false;
-                          }
-                          return false;
-                        })()}
+                        disabled={canAct(requests) || selectedRequests.length === 0}
                       >
                         Edit Request
                       </Button>
@@ -931,8 +925,6 @@ const PurchaseRequest = ({onRefresh}) => {
                                 <SelectItem value="__all__">All Status</SelectItem>
                                 <SelectItem value="draft">Draft</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="checked">Checked</SelectItem>
-                                <SelectItem value="verified">Verified</SelectItem>
                                 <SelectItem value="approved">Approved</SelectItem>
                                 <SelectItem value="rejected">Rejected</SelectItem>
                                 <SelectItem value="revised">Revised</SelectItem>

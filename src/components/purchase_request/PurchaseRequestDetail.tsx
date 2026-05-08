@@ -346,7 +346,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                   </div>
                   <div>
                     <label className="text-sm font-medium text-green-700">Due Date</label>
-                    <p className="text-sm">{new Date(selectedRequest.dueDate).toLocaleString()}</p>
+                    <p className="text-sm">{new Date(selectedRequest.dueDate).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
