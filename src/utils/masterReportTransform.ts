@@ -241,15 +241,23 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
       }))
   );
   
-  // Transform issues with project attribution
-  const constructionIssues: MasterConstructionIssue[] = aggregated.issues.map((issue, index): MasterConstructionIssue => ({
-    id: crypto.randomUUID(),
-    issueNumber: typeof issue.no === 'number' ? issue.no : (parseInt(issue.no as string) || index + 1),
-    location: issue.location || '',
-    problem: issue.problem || '',
-    actionBy: issue.actionBy || '',
-    _projectSource: issue.projectSource,
-  }));
+  // Transform issues with project attribution.
+  // Filter out empty placeholders first so numbering is globally continuous.
+  const constructionIssues: MasterConstructionIssue[] = aggregated.issues
+    .filter(issue =>
+      (issue.location || '').trim() ||
+      (issue.problem  || '').trim() ||
+      (issue.actionBy || '').trim()
+    )
+    .map((issue, index): MasterConstructionIssue => ({
+      id: crypto.randomUUID(),
+      issueNumber: index + 1,
+      location: issue.location || '',
+      problem:  issue.problem  || '',
+      actionBy: issue.actionBy || '',
+      photo:    issue.photo    || null,
+      _projectSource: issue.projectSource,
+    }));
   
   // Build metadata
   const metadata: MasterReportMetadata = {
