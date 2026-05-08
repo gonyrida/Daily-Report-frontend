@@ -627,6 +627,7 @@ useEffect(() => {
           isEditing={true}
           reportId={reportId}
           sharedData={sharedData}
+          isMasterMode={isMasterMode}
         />
       </div>
 
