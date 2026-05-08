@@ -25,8 +25,7 @@ import { ConstructionProgressData } from "@/types/constructionProgress";
 import { computeAllAmounts } from "@/utils/calculationEngine";
 import { UploadCloud } from "lucide-react";
 import { getProjectById } from "@/integrations/projectsApi";
-import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
-import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
+import { uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
 import { transformResourcesToExcelFormat, transformHSEToExcelFormat } from "@/utils/resourceDataTransform";
@@ -155,7 +154,6 @@ const WeeklyReport = () => {
     | "resource"
     | "photos"
     | "issues"
-    | "schedule"
   >("construction-progress");
 
 
@@ -184,7 +182,6 @@ const WeeklyReport = () => {
     { id: 6, name: "Resources", href: "#resources-status" },
     { id: 7, name: "Photos", href: "#site-activity-photos" },
     { id: 8, name: "Issues", href: "#construction-issue" },
-    { id: 9, name: "Schedule", href: "#master-schedule" },
   ];
 
   // Shared data state between tabs
@@ -235,13 +232,7 @@ const WeeklyReport = () => {
   // Construction Progress hook - use this as the single source of truth
   const constructionProgressHook = useConstructionProgress({ reportId: currentReportId });
 
-  // Schedule sections state
-  const [scheduleSections, setScheduleSections] = useState([
-    { id: crypto.randomUUID(), title: "Master Schedule", entries: [] }
-  ]);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
-  const [isDragOver, setIsDragOver] = useState(false);
 
   // Save, Preview, Export states
   const [isSaving, setIsSaving] = useState(false);
@@ -294,9 +285,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
   // NEW: Add Issues state to WeeklyReport page (like other sections)
   const [issuesData, setIssuesData] = useState<any>(null);
-
-  // NEW: Add Schedule state to WeeklyReport page (like other sections)
-  const [scheduleData, setScheduleData] = useState<any>(null);
 
   // NEW: Add Resources state to WeeklyReport page (for rolling total logic)
   const [resourcesData, setResourcesData] = useState<any>(null);
@@ -379,31 +367,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     }
   }, [constructionProgressHook.constructionData?.projectInfo?.project, sharedData.projectName]);
 
-  // Load master schedule data when reportId changes or component mounts
-  useEffect(() => {
-    const loadMasterSchedule = async () => {
-      if (currentReportId) {
-        try {
-          const response = await getWeeklyReportById(currentReportId);
-          if (response.success && response.data) {
-            const report = response.data;
-            if (report.sections?.masterSchedule) {
-              setScheduleSections([{
-                id: crypto.randomUUID(),
-                title: "Master Schedule",
-                entries: report.sections.masterSchedule
-              }]);
-            }
-          }
-        } catch (error) {
-          console.error('Error loading master schedule:', error);
-        }
-      }
-    };
-
-    loadMasterSchedule();
-  }, [currentReportId]); // Reload when currentReportId changes
-
   // Load existing report data when reportId is present
   useEffect(() => {
     const loadExistingReport = async () => {
@@ -473,14 +436,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               setNextWeekPlan([]);
             }
 
-            // Load master schedule data
-            if (report.sections?.masterSchedule) {
-              setScheduleSections([{
-                id: crypto.randomUUID(),
-                title: "Master Schedule",
-                entries: report.sections.masterSchedule
-              }]);
-            }
             // Load QAQC data using transform function (no API call)
             if (report.sections?.qaqcStatus) {
                 const transformedQaqcData = transformQaqcData(report.sections.qaqcStatus, [
@@ -585,34 +540,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               // Create empty Issues structure if none exists
               setIssuesData([]);
               issuesHook.setIssuesData([{ id: crypto.randomUUID(), issueNumber: 1, location: "", problem: "", actionBy: "", photo: null }]);
-            }
-
-            // Load Schedule data
-            if (report.sections?.masterSchedule) {
-              setScheduleData(report.sections.masterSchedule);
-              // Also update the scheduleSections state to match loaded data
-              if (report.sections.masterSchedule.length > 0) {
-                const convertedSchedule = report.sections.masterSchedule.map(item => ({
-                  id: item.id,
-                  type: item.type,
-                  file: item.fileData ? new File([item.fileData], item.fileName || "file") : null,
-                  caption: item.caption || item.fileName || "",
-                  supabaseUrl: item.supabaseUrl,
-                  supabasePath: item.supabasePath,
-                  fileName: item.fileName,
-                  fileSize: item.fileSize,
-                  fileType: item.fileType,
-                  convertedImages: item.convertedImages
-                }));
-                setScheduleSections([{
-                  id: crypto.randomUUID(),
-                  title: "Master Schedule",
-                  entries: convertedSchedule
-                }]);
-              }
-            } else {
-              // Create empty Schedule structure if none exists
-              setScheduleData([]);
             }
 
             // Load Resources data (without rolling total - for viewing existing report)
@@ -1413,30 +1340,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       // Convert Issues data to backend format
       let issuesDataForSave = [];
 
-      // Convert Schedule data to backend format using Supabase
-      let scheduleDataForSave = [];
-
-      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
-        // Filter out empty entries before conversion
-        const validEntries = scheduleSections[0].entries.filter(entry =>
-          entry.title || entry.file || entry.fileName || entry.supabaseUrl
-        );
-
-        if (validEntries.length > 0) {
-          // Convert entries to Supabase URLs
-          scheduleDataForSave = await convertScheduleEntriesToSupabase(
-            validEntries,
-            currentReportId || 'temp-report-id'
-          );
-
-          // Remove file objects that shouldn't be sent to backend
-          scheduleDataForSave = scheduleDataForSave.map(entry => {
-            const { file, ...entryWithoutFile } = entry;
-            return entryWithoutFile;
-          });
-        }
-      }
-
       if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
         // Convert frontend format to backend format with base64 images
         issuesDataForSave = await Promise.all(
@@ -1524,8 +1427,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           photos: photosDataForSave,
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
-          // NEW: Add Schedule section to save payload
-          masterSchedule: scheduleDataForSave,
           // NEW: Add Construction Progress section to save payload with rolling total logic for submitted reports
           constructionProgress: (() => {
             const data = constructionProgressHook.constructionData;
@@ -1832,30 +1733,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       // Convert Issues data to backend format
       let issuesDataForSave = [];
 
-      // Convert Schedule data to backend format using Supabase
-      let scheduleDataForSave = [];
-
-      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
-        // Filter out empty entries before conversion
-        const validEntries = scheduleSections[0].entries.filter(entry =>
-          entry.title || entry.file || entry.fileName || entry.supabaseUrl
-        );
-
-        if (validEntries.length > 0) {
-          // Convert entries to Supabase URLs
-          scheduleDataForSave = await convertScheduleEntriesToSupabase(
-            validEntries,
-            currentReportId || 'temp-report-id'
-          );
-
-          // Remove file objects that shouldn't be sent to backend
-          scheduleDataForSave = scheduleDataForSave.map(entry => {
-            const { file, ...entryWithoutFile } = entry;
-            return entryWithoutFile;
-          });
-        }
-      }
-
       if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
         // Convert frontend format to backend format with base64 images
         issuesDataForSave = await Promise.all(
@@ -1944,8 +1821,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           photos: photosDataForSave,
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
-          // NEW: Add Schedule section to save payload
-          masterSchedule: scheduleDataForSave,
           // NEW: Add Construction Progress section to save payload
           // For drafts: save data as-is without rolling total logic
           // For submitted reports: apply rolling total logic (copy upToThisWeek to previousWeek and reset This Week)
@@ -2073,18 +1948,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       // Log specific validation errors
       if (error.message && error.message.includes('Validation failed')) {
         console.error('Validation error - checking data structure...');
-
-        // Check each section for potential issues
-        if (reportData.sections?.masterSchedule) {
-          // Validate each master schedule entry
-          reportData.sections.masterSchedule.forEach((entry, index) => {
-            if (!entry.id) console.error(`Entry ${index}: Missing id`);
-            if (!entry.type) console.error(`Entry ${index}: Missing type`);
-            if (!entry.title) console.error(`Entry ${index}: Missing title`);
-            if (!entry.date) console.error(`Entry ${index}: Missing date`);
-            if (!entry.fileName) console.error(`Entry ${index}: Missing fileName`);
-          });
-        }
 
         // Check other required fields
         if (!reportData.projectName) console.error('Missing projectName');
@@ -2323,14 +2186,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
-        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
-          type: e.type,
-          supabaseUrl: e.supabaseUrl,
-          caption: e.caption,
-          fileName: e.fileName,
-          fileType: e.fileType,
-          convertedImages: e.convertedImages,
-        })),
       });
 
       await exportWeeklyReportToPdf(exportData, filename);
@@ -2479,14 +2334,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
-        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
-          type: e.type,
-          supabaseUrl: e.supabaseUrl,
-          caption: e.caption,
-          fileName: e.fileName,
-          fileType: e.fileType,
-          convertedImages: e.convertedImages,
-        })),
         // Pass actual QAQC data — handles both formats:
         // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
         // 2. Frontend TableData format (after DB load): { '4.1': [rows], ... }
@@ -2576,81 +2423,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     } finally {
       setIsExporting(false);
     }
-  };
-
-  // Schedule upload functionality
-  const handleScheduleUpload = (files: FileList | null) => {
-    if (!files) return;
-    const validFiles = Array.from(files).filter((f) =>
-      f.type.startsWith("image/") || f.type === "application/pdf"
-    );
-    if (validFiles.length === 0) {
-      toast({ description: "No valid image or PDF files selected." });
-      return;
-    }
-
-    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-    const allowed = validFiles.filter((f) => f.size <= MAX_SIZE);
-    const rejectedCount = validFiles.length - allowed.length;
-
-    if (allowed.length === 0) {
-      toast({ description: "All selected files exceed the 10MB limit and were rejected." });
-      return;
-    }
-
-    // Create new entries for uploaded files (1 file per entry for full width display)
-    const newEntries: any[] = [];
-    for (const file of allowed) {
-      newEntries.push({
-        id: crypto.randomUUID(),
-        file: file,
-        type: file.type.startsWith("image/") ? "image" : "pdf",
-        caption: ""
-      });
-    }
-
-    // Update the first schedule section with new entries
-    const updatedSections = [...scheduleSections];
-    updatedSections[0] = {
-      ...updatedSections[0],
-      entries: [...updatedSections[0].entries, ...newEntries]
-    };
-    setScheduleSections(updatedSections);
-
-    toast({
-      title: `${allowed.length} schedule file(s) uploaded`,
-      description: `${newEntries.length} new entr${newEntries.length !== 1 ? "ies" : "y"} created.${rejectedCount ? ` ${rejectedCount} file(s) were too large and skipped.` : ""}`,
-    });
-
-    // Clear input
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const onScheduleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleScheduleUpload(e.target.files);
-    e.currentTarget.value = "";
-  };
-
-  // Drag and drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const files = e.dataTransfer.files;
-    handleScheduleUpload(files);
   };
 
   // Pre-compute overallProgress data to prevent race condition
@@ -2807,8 +2579,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               activeTab === "qaqc-status" ||
               activeTab === "resource" ||
               activeTab === "photos" ||
-              activeTab === "issues" ||
-              activeTab === "schedule") &&
+              activeTab === "issues") &&
               showSecondNav && (
                 <div className="w-full px-2 sm:px-4 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
                   <div className="relative flex items-center gap-1">
@@ -2858,8 +2629,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                           (section.id === 5 && activeTab === "hses") ||
                           (section.id === 6 && activeTab === "resource") ||
                           (section.id === 7 && activeTab === "photos") ||
-                          (section.id === 8 && activeTab === "issues") ||
-                          (section.id === 9 && activeTab === "schedule");
+                          (section.id === 8 && activeTab === "issues");
 
                         return (
                           <Button
@@ -2904,11 +2674,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                               } else if (section.id === 8) {
                                 setShowIntroduction(false);
                                 setActiveTab("issues");
-                                setShowSecondNav(true);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              } else if (section.id === 9) {
-                                setShowIntroduction(false);
-                                setActiveTab("schedule");
                                 setShowSecondNav(true);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               } else {
@@ -3244,32 +3009,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               </>
             )}
 
-            {activeTab === "schedule" && (
-              <>
-                <div className="bg-card rounded-lg border p-6">
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                    <div className="mb-6">
-                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
-                    </div>
-
-                    {/* New Supabase Master Schedule Component */}
-                    <MasterScheduleSupabase
-                      entries={scheduleSections[0].entries}
-                      onChange={(entries) => {
-                        const updatedSections = [...scheduleSections];
-                        updatedSections[0] = {
-                          ...updatedSections[0],
-                          entries: entries
-                        };
-                        setScheduleSections(updatedSections);
-                      }}
-                      reportId={currentReportId || undefined}
-                      disabled={isSaving}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
           </main>
 
           {/* Action Buttons */}

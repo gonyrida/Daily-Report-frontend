@@ -702,6 +702,16 @@ export const createReportWithImages = async (
  * Fetch the dynamically aggregated master report for a folder + week.
  * Calls GET /api/weekly-reports/master?folderId=xxx&weekNumber=xx
  */
+export const getFolderMasterSchedule = async (folderId: string): Promise<ApiResponse<MasterScheduleEntry[]>> => {
+  const response = await apiGet(`/folders/${folderId}/master-schedule`);
+  return handleApiResponse<MasterScheduleEntry[]>(response);
+};
+
+export const updateFolderMasterSchedule = async (folderId: string, entries: MasterScheduleEntry[]): Promise<ApiResponse<MasterScheduleEntry[]>> => {
+  const response = await apiPatch(`/folders/${folderId}/master-schedule`, { masterSchedule: entries });
+  return handleApiResponse<MasterScheduleEntry[]>(response);
+};
+
 export const getMasterWeeklyReport = async (
   folderId: string,
   weekNumber: number

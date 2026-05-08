@@ -11,11 +11,13 @@ import HierarchicalSidebar from "@/components/HierarchicalSidebar";
 import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
+import { MasterScheduleSupabase } from "@/components/weekly/MasterScheduleSupabase";
 import { Button } from "@/components/ui/button";
 import { transformMasterToReportData } from "@/utils/masterReportTransform";
 import { ConstructionProgressItem, ConstructionProgressData } from "@/types/constructionProgress";
 import { MasterConstructionProgressItem } from "@/types/masterReport.types";
-import { getMasterWeeklyReport } from "@/services/weeklyReportService";
+import { getMasterWeeklyReport, getFolderMasterSchedule, updateFolderMasterSchedule } from "@/services/weeklyReportService";
+import type { MasterScheduleEntry } from "@/types/weeklyReport.types";
 import { TabType } from "@/types/weeklyReportContent.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -418,6 +420,19 @@ const WeeklyReportDashboard = () => {
     const [masterActiveTab, setMasterActiveTab] = useState<TabType>('table-of-content');
     const [masterShowSecondNav, setMasterShowSecondNav] = useState(false);
     const [masterShowIntroduction, setMasterShowIntroduction] = useState(false);
+
+    // Master schedule state (folder-owned, not aggregated)
+    const [masterScheduleEntries, setMasterScheduleEntries] = useState<MasterScheduleEntry[]>([]);
+    const [isScheduleSaving, setIsScheduleSaving] = useState(false);
+
+    React.useEffect(() => {
+      if (!folderId) return;
+      getFolderMasterSchedule(folderId).then((result) => {
+        if (result.success && Array.isArray(result.data)) {
+          setMasterScheduleEntries(result.data);
+        }
+      });
+    }, [folderId]);
     
     // Selected report state for displaying specific report data in Cover/Letter/Construction tabs
     const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -718,11 +733,33 @@ const WeeklyReportDashboard = () => {
                     </div>
                   )}
 
+                  {/* Master Schedule Tab — folder-owned, not aggregated */}
+                  {masterActiveTab === "schedule" && (
+                    <div className="bg-card rounded-lg border p-6">
+                      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+                          9. Master Schedule
+                        </h2>
+                        <MasterScheduleSupabase
+                          entries={masterScheduleEntries}
+                          onChange={async (entries) => {
+                            setMasterScheduleEntries(entries);
+                            if (!folderId) return;
+                            setIsScheduleSaving(true);
+                            await updateFolderMasterSchedule(folderId, entries).catch(() => {});
+                            setIsScheduleSaving(false);
+                          }}
+                          disabled={isScheduleSaving}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Cover tab (already fixed via MasterReportCover) and all content tabs
                       (Intro, Overall Progress, Activities, QA/QC, HSES, Resource, Photos,
-                      Issues, Schedule) — single WeeklyReportContent instance with the
+                      Issues) — single WeeklyReportContent instance with the
                       standard Report outer container applied to every tab except Cover. */}
-                  {masterActiveTab !== "construction-progress" && masterActiveTab !== "letter" && (
+                  {masterActiveTab !== "construction-progress" && masterActiveTab !== "letter" && masterActiveTab !== "schedule" && (
                     <div className={masterActiveTab !== "cover" ? "bg-card rounded-lg border p-6" : ""}>
                       {/* Table of Content Header */}
                       {masterActiveTab === "table-of-content" && (

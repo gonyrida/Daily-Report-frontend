@@ -663,16 +663,6 @@ useEffect(() => {
         )}
       </div>
 
-      {/* Schedule Tab */}
-      <div style={{ display: activeTab === "schedule" ? "block" : "none" }} className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
-          9. MASTER SCHEDULE
-        </h2>
-        <div className="text-center py-12 text-muted-foreground">
-          Master schedule content will be displayed here.
-        </div>
-      </div>
-
       {/* Overall Progress Tab */}
       <div style={{ display: activeTab === "overall-progress" ? "block" : "none" }} className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -800,11 +790,6 @@ useEffect(() => {
             <li className="text-primary dark:text-primary">
               <a href="#issues" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("issues"); if (setShowSecondNav) setShowSecondNav(true); }}>
                 CONSTRUCTION ISSUE
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a href="#schedule" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("schedule"); if (setShowSecondNav) setShowSecondNav(true); }}>
-                MASTER SCHEDULE
               </a>
             </li>
           </ol>
