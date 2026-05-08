@@ -4,7 +4,7 @@
 import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData, MasterHses, MasterQaqcSection } from '@/types/masterReport.types';
 import { ActivityRow } from '@/types/activity.types';
 import { ProgressRow } from '@/types/progress.types';
-import { Resources, ManPowerEntry } from '@/types/resources.types';
+import { Resources } from '@/types/resources.types';
 
 /**
  * Calculate indentation level based on ID pattern (copied from constructionProgressToActivities.ts)
@@ -186,21 +186,6 @@ const transformActivity = (item: MasterActivityItem): MasterActivityRow => {
 };
 
 /**
- * Create a ManPowerEntry from aggregated total and optional per-day data
- */
-const createManPowerEntry = (
-  total: number,
-  description: string,
-  dates?: { fri: number; sat: number; sun: number; mon: number; tue: number; wed: number; thu: number }
-): ManPowerEntry => ({
-  description,
-  date: dates ?? { fri: 0, sat: 0, sun: 0, mon: 0, tue: 0, wed: 0, thu: 0 },
-  prevWeek: 0,
-  thisWeek: total,
-  accumulated: total,
-});
-
-/**
  * Transform MasterWeeklyReport into format usable by WeeklyReportContent
  */
 export const transformMasterToReportData = (master: MasterWeeklyReport & { availableCoverImages?: any[] }): TransformedMasterData => {
@@ -345,22 +330,17 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
     ? `${formatDate(minDate)} ~ ${formatDate(maxDate)}`
     : `Week ${weekNumber}`;
 
-  // Transform resources - use aggregated totals with per-day breakdown
+  // Transform resources - use per-description merged arrays from backend
+  const backendResources = aggregated.resources;
   const resourcesData: Resources = {
     manPower: {
       dateRange,
-      managementTeam: aggregated.manpower.managementTotal > 0
-        ? [createManPowerEntry(aggregated.manpower.managementTotal, 'Management Team (Aggregated)', aggregated.manpower.managementDates)]
-        : [],
-      workingTeamInterior: aggregated.manpower.workingInteriorTotal > 0
-        ? [createManPowerEntry(aggregated.manpower.workingInteriorTotal, 'Working Team - Interior (Aggregated)', aggregated.manpower.workingInteriorDates)]
-        : [],
-      workingTeamMEP: aggregated.manpower.workingMEPTotal > 0
-        ? [createManPowerEntry(aggregated.manpower.workingMEPTotal, 'Working Team - MEP (Aggregated)', aggregated.manpower.workingMEPDates)]
-        : [],
+      managementTeam:      backendResources?.manPower?.managementTeam      ?? [],
+      workingTeamInterior: backendResources?.manPower?.workingTeamInterior  ?? [],
+      workingTeamMEP:      backendResources?.manPower?.workingTeamMEP       ?? [],
     },
-    material: aggregated.materials || [],
-    machinery: aggregated.machinery || [],
+    material:  backendResources?.material  ?? [],
+    machinery: backendResources?.machinery ?? [],
   };
 
   // Select cover image using priority strategy

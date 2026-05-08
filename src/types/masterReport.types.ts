@@ -269,6 +269,16 @@ export interface MasterAggregated {
   materials?: any[];
   /** Machinery & equipment status aggregated from all project reports */
   machinery?: any[];
+  /** Resources merged by description from all project reports */
+  resources?: {
+    manPower: {
+      managementTeam: import('./resources.types').ManPowerEntry[];
+      workingTeamInterior: import('./resources.types').ManPowerEntry[];
+      workingTeamMEP: import('./resources.types').ManPowerEntry[];
+    };
+    material: import('./resources.types').MaterialEntry[];
+    machinery: import('./resources.types').MachineryEntry[];
+  };
 }
 
 // ── Top-level master report shape (matches API response data) ─────────────
