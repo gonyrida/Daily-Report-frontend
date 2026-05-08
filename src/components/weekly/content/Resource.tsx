@@ -100,7 +100,12 @@ const Resource: React.FC<{
     // Get transformed payload for backend API calls
     const getTransformedResources = (): Resources => {
       if (sections) {
-        return transformResourceDataToNewPayload(sections, sharedData?.dateRange);
+        return transformResourceDataToNewPayload(
+          sections, 
+          sharedData?.dateRange,
+          materialSections,
+          machinerySections
+        );
       }
       // Return empty structure if no sections
       return {
