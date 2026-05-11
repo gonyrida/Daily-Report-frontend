@@ -631,23 +631,23 @@ function buildQAQC(data: WeeklyReportExportData): any[] {
 
     const table = mkTable(
       [
-        { text: "Code",        w: 125 },
-        { text: "Description", w: 200 },
-        { text: def.col3,      w: 75  },
-        { text: def.col4,      w: 75  },
+        { text: "Code",        w: 125  },
+        { text: "Description", w: "*"  },
+        { text: def.col3,      w: 75   },
+        { text: def.col4,      w: 75   },
       ],
       dataRows,
       { hFill: SEC_FILL, altRows: false },
     );
 
-    // Comments row - match Excel style: "Comments:" bold+underline, then value
+    // Comments row - "Comments:" bold only, no underline
     const comments = sec?.comments ?? "";
     const commentsRow = {
       table: {
         widths: ["*"],
         body: [[{
           text: [
-            { text: "Comments: ", bold: true, decoration: "underline" },
+            { text: "Comments: ", bold: true },
             { text: comments }
           ],
           style: "tblCell",
