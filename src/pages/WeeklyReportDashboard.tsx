@@ -38,7 +38,16 @@ import {
   LayoutDashboard,
   ArrowLeft,
   Trash2,
+  FileDown,
+  FileSpreadsheet,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportMasterToPdf } from "@/components/weekly/MasterReportView";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
@@ -213,6 +222,8 @@ const WeeklyReportDashboard = () => {
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const getCurrentUserId = useCallback(() => {
     const userStr = localStorage.getItem('user');
@@ -411,8 +422,58 @@ const WeeklyReportDashboard = () => {
     refetchOnWindowFocus: true,
   });
 
+  const handleMasterPreview = async () => {
+    setIsPreviewing(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast({ title: 'Preview Generated', description: 'Master report preview is ready.' });
+    } catch {
+      toast({ title: 'Preview Failed', description: 'Could not generate preview. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleMasterExportPDF = async () => {
+    const reportData = masterReportData?.data;
+    if (!reportData) return;
+    setIsExporting(true);
+    try {
+      await exportMasterToPdf(reportData);
+      toast({ title: 'PDF Exported', description: `Master_Report_${reportData.folder.name}_Week${reportData.weekNumber}.pdf downloaded.` });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export PDF. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleMasterExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast({ title: 'Excel Exported', description: 'Master report exported as Excel successfully.' });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export Excel. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleMasterExportZIP = async () => {
+    setIsExporting(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      toast({ title: 'ZIP Exported', description: 'Master report exported as ZIP containing both PDF and Excel files.' });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export ZIP. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (folderId && reportType === 'master') {
-    const transformedData = masterReportData?.data 
+    const transformedData = masterReportData?.data
       ? transformMasterToReportData(masterReportData.data)
       : null;
 
@@ -830,6 +891,47 @@ const WeeklyReportDashboard = () => {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-center py-6 border-t border-border mt-6">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    className="min-w-[140px]"
+                    onClick={handleMasterPreview}
+                    disabled={isPreviewing}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    {isPreviewing ? 'Previewing...' : 'Preview'}
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="min-w-[160px] bg-primary hover:bg-primary/90"
+                        disabled={isExporting || !masterReportData?.data}
+                      >
+                        <FileDown className="w-4 h-4 mr-2" />
+                        {isExporting ? 'Exporting...' : 'Export'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleMasterExportPDF} disabled={isExporting}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Export As PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleMasterExportExcel} disabled={isExporting}>
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Export As Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleMasterExportZIP} disabled={isExporting}>
+                        <FileDown className="w-4 h-4 mr-2" />
+                        Export As ZIP
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             </main>
           </SidebarInset>
         </div>

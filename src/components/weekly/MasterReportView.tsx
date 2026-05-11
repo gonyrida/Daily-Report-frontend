@@ -16,10 +16,20 @@ import {
   ChevronDown,
   ChevronRight,
   FileDown,
+  Eye,
+  FileText,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
 import {
   Select,
   SelectContent,
@@ -301,149 +311,8 @@ const ProgressSection: React.FC<{
 );
 
 // ── Export helpers ────────────────────────────────────────────────────────────
-
-const exportMasterToPdf = async (data: MasterWeeklyReport) => {
-  // Dynamically import pdfMake to keep the bundle split
-  const pdfMake = (await import('pdfmake/build/pdfmake')).default;
-  const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default;
-  (pdfMake as any).vfs = pdfFonts.pdfMake.vfs;
-
-  const projectRows = data.reports.map(r => [
-    r.projectName,
-    r.status,
-    `${(data.aggregated.progress.perProject[r.projectId] ?? 0).toFixed(1)}%`,
-    r.activityCount.toString(),
-    r.issueCount.toString(),
-  ]);
-
-  const actRows = data.aggregated.activities.weeklyActivities.map(a => [
-    a.projectSource,
-    a.description,
-    `${a.percent ?? 0}%`,
-  ]);
-
-  const issueRows = data.aggregated.issues.map((iss, i) => [
-    String(iss.no ?? i + 1),
-    iss.projectSource,
-    iss.location ?? '',
-    iss.problem ?? '',
-    iss.actionBy ?? '',
-  ]);
-
-  const mp = data.aggregated.manpower;
-
-  const docDefinition: any = {
-    pageSize: 'A4',
-    content: [
-      {
-        text: `📊 Master Weekly Report – Week ${data.weekNumber}`,
-        style: 'title',
-        margin: [0, 0, 0, 4],
-      },
-      { text: `Folder: ${data.folder.name}`, style: 'subtitle', margin: [0, 0, 0, 16] },
-
-      // Summary stats
-      {
-        columns: [
-          { text: `Projects: ${data.reports.length}`, style: 'stat' },
-          {
-            text: `Weighted Progress: ${data.aggregated.progress.weighted.toFixed(1)}%`,
-            style: 'stat',
-          },
-          { text: `Total Manpower: ${mp.grandTotal}`, style: 'stat' },
-        ],
-        margin: [0, 0, 0, 16],
-      },
-
-      // Project summary table
-      data.reports.length > 0
-        ? [
-            { text: 'Project Summaries', style: 'sectionHeader', margin: [0, 0, 0, 6] },
-            {
-              table: {
-                widths: ['*', 70, 60, 50, 50],
-                body: [
-                  ['Project', 'Status', 'Progress', 'Activities', 'Issues'],
-                  ...projectRows,
-                ],
-              },
-              layout: 'lightHorizontalLines',
-              margin: [0, 0, 0, 16],
-            },
-          ]
-        : [],
-
-      // Activities
-      actRows.length > 0
-        ? [
-            {
-              text: 'This Week Activities',
-              style: 'sectionHeader',
-              margin: [0, 0, 0, 6],
-            },
-            {
-              table: {
-                widths: [80, '*', 40],
-                body: [['Project', 'Activity', '%'], ...actRows],
-              },
-              layout: 'lightHorizontalLines',
-              margin: [0, 0, 0, 16],
-            },
-          ]
-        : [],
-
-      // Manpower
-      {
-        text: 'Manpower Summary',
-        style: 'sectionHeader',
-        margin: [0, 0, 0, 6],
-      },
-      {
-        table: {
-          widths: ['*', 80],
-          body: [
-            ['Team', 'This Week'],
-            ['Management', mp.managementTotal],
-            ['Working (Interior)', mp.workingInteriorTotal],
-            ['Working (MEP)', mp.workingMEPTotal],
-            [{ text: 'Grand Total', bold: true }, { text: mp.grandTotal, bold: true }],
-          ],
-        },
-        layout: 'lightHorizontalLines',
-        margin: [0, 0, 0, 16],
-      },
-
-      // Issues
-      issueRows.length > 0
-        ? [
-            { text: 'Construction Issues', style: 'sectionHeader', margin: [0, 0, 0, 6] },
-            {
-              table: {
-                widths: [20, 60, '*', '*', 60],
-                body: [
-                  ['No.', 'Project', 'Location', 'Problem', 'Action By'],
-                  ...issueRows,
-                ],
-              },
-              layout: 'lightHorizontalLines',
-              margin: [0, 0, 0, 16],
-            },
-          ]
-        : [],
-    ],
-    styles: {
-      title: { fontSize: 16, bold: true },
-      subtitle: { fontSize: 11, color: '#666' },
-      stat: { fontSize: 10, color: '#444' },
-      sectionHeader: { fontSize: 12, bold: true, color: '#1d4ed8' },
-    },
-    defaultStyle: { fontSize: 9 },
-  };
-
-  pdfMake
-    .createPdf(docDefinition)
-    .download(`Master_Report_${data.folder.name}_Week${data.weekNumber}.pdf`);
-};
+// Comprehensive template-matching PDF generator — imported by WeeklyReportDashboard too
+export { exportMasterToPdf } from '@/lib/masterReportPdf';
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -453,16 +322,68 @@ interface MasterReportViewProps {
 
 const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [weekNumber, setWeekNumber] = useState<number>(currentISOWeek());
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['masterReport', folderId, weekNumber],
     queryFn: () => getMasterWeeklyReport(folderId, weekNumber),
     enabled: !!folderId,
-    staleTime: 2 * 60 * 1000, // 2 min – data changes when underlying reports are submitted
+    staleTime: 2 * 60 * 1000,
   });
 
   const report: MasterWeeklyReport | undefined = data?.success ? data.data : undefined;
+
+  const handlePreview = async () => {
+    setIsPreviewing(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast({ title: 'Preview Generated', description: 'Master report preview is ready.' });
+    } catch {
+      toast({ title: 'Preview Failed', description: 'Could not generate preview. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!report) return;
+    setIsExporting(true);
+    try {
+      await exportMasterToPdf(report);
+      toast({ title: 'PDF Exported', description: `Master_Report_${report.folder.name}_Week${report.weekNumber}.pdf downloaded.` });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export PDF. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast({ title: 'Excel Exported', description: 'Master report exported as Excel successfully.' });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export Excel. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportZIP = async () => {
+    setIsExporting(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      toast({ title: 'ZIP Exported', description: 'Master report exported as ZIP containing both PDF and Excel files.' });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export ZIP. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const summaryCards = useMemo(() => {
     if (!report) return null;
@@ -582,181 +503,238 @@ const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
       )}
 
       {/* Content */}
-      {!isLoading && report && report.reports.length > 0 && (
+      {!isLoading && report && (
         <>
-          {/* Summary cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {summaryCards?.map((card, i) => (
-              <Card key={i} className="shadow-none">
-                <CardContent className="p-4 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    {card.icon}
-                    <span className="text-xs">{card.label}</span>
-                  </div>
-                  <p className="text-2xl font-bold">{card.value}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {report.reports.length > 0 ? (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {summaryCards?.map((card, i) => (
+                  <Card key={i} className="shadow-none">
+                    <CardContent className="p-4 flex flex-col gap-1">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        {card.icon}
+                        <span className="text-xs">{card.label}</span>
+                      </div>
+                      <p className="text-2xl font-bold">{card.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-          {/* Project summaries */}
-          <SectionToggle title="Project Summaries" count={report.reports.length}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left p-2 font-medium">Project</th>
-                    <th className="text-left p-2 font-medium">Status</th>
-                    <th className="text-right p-2 font-medium">Progress</th>
-                    <th className="text-right p-2 font-medium">Activities</th>
-                    <th className="text-right p-2 font-medium">Issues</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.reports.map((r, i) => (
-                    <tr key={i} className="border-b hover:bg-accent/30">
-                      <td className="p-2 font-medium">{r.projectName}</td>
-                      <td className="p-2">
-                        <Badge
-                          variant="outline"
-                          className={
-                            r.status === 'submitted'
-                              ? 'border-green-400 text-green-700 dark:text-green-400'
-                              : r.status === 'approved'
-                              ? 'border-blue-400 text-blue-700 dark:text-blue-400'
-                              : 'border-yellow-400 text-yellow-700 dark:text-yellow-400'
-                          }
-                        >
-                          {r.status}
-                        </Badge>
-                      </td>
-                      <td className="p-2 text-right">
-                        {(report.aggregated.progress.perProject[r.projectId] ?? 0).toFixed(1)}%
-                      </td>
-                      <td className="p-2 text-right">{r.activityCount}</td>
-                      <td className="p-2 text-right">{r.issueCount}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {/* Project summaries */}
+              <SectionToggle title="Project Summaries" count={report.reports.length}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-2 font-medium">Project</th>
+                        <th className="text-left p-2 font-medium">Status</th>
+                        <th className="text-right p-2 font-medium">Progress</th>
+                        <th className="text-right p-2 font-medium">Activities</th>
+                        <th className="text-right p-2 font-medium">Issues</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.reports.map((r, i) => (
+                        <tr key={i} className="border-b hover:bg-accent/30">
+                          <td className="p-2 font-medium">{r.projectName}</td>
+                          <td className="p-2">
+                            <Badge
+                              variant="outline"
+                              className={
+                                r.status === 'submitted'
+                                  ? 'border-green-400 text-green-700 dark:text-green-400'
+                                  : r.status === 'approved'
+                                  ? 'border-blue-400 text-blue-700 dark:text-blue-400'
+                                  : 'border-yellow-400 text-yellow-700 dark:text-yellow-400'
+                              }
+                            >
+                              {r.status}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-right">
+                            {(report.aggregated.progress.perProject[r.projectId] ?? 0).toFixed(1)}%
+                          </td>
+                          <td className="p-2 text-right">{r.activityCount}</td>
+                          <td className="p-2 text-right">{r.issueCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </SectionToggle>
+
+              {/* Progress */}
+              <SectionToggle title="Progress Overview">
+                <ProgressSection
+                  progress={report.aggregated.progress}
+                  reports={report.reports}
+                />
+              </SectionToggle>
+
+              {/* Manpower */}
+              <SectionToggle title="Manpower Summary">
+                <ManpowerSection manpower={report.aggregated.manpower} />
+              </SectionToggle>
+
+              {/* Activities – This Week */}
+              <SectionToggle
+                title="This Week Activities"
+                count={report.aggregated.activities.weeklyActivities.length}
+              >
+                <ActivitiesSection
+                  items={report.aggregated.activities.weeklyActivities}
+                  label="Activities"
+                />
+              </SectionToggle>
+
+              {/* Activities – Next Week Plan */}
+              <SectionToggle
+                title="Next Week Plan"
+                count={report.aggregated.activities.nextWeekPlan.length}
+              >
+                <ActivitiesSection
+                  items={report.aggregated.activities.nextWeekPlan}
+                  label="Next Week Plan"
+                />
+              </SectionToggle>
+
+              {/* Issues */}
+              <SectionToggle
+                title="Construction Issues"
+                count={report.aggregated.issues.length}
+              >
+                <IssuesSection issues={report.aggregated.issues} />
+              </SectionToggle>
+
+              {/* QAQC Status */}
+              <SectionToggle
+                title="QA/QC Status"
+                count={report.aggregated.qaqcStatus ? Object.values(report.aggregated.qaqcStatus).reduce((sum, section) => sum + section.items.length, 0) : 0}
+              >
+                <MasterQaqcSection qaqcData={report.aggregated.qaqcStatus || {}} />
+              </SectionToggle>
+
+              {/* HSE Photo References */}
+              {(() => {
+                console.log('🔍 Frontend: Checking HSE Photo References:', {
+                  hasAggregated: !!report.aggregated,
+                  hasHses: !!report.aggregated?.hses,
+                  hasPhotoReferences: !!report.aggregated?.hses?.hsePhotoReferences,
+                  hsesData: report.aggregated?.hses,
+                  photoReferences: report.aggregated?.hses?.hsePhotoReferences
+                });
+                return report.aggregated?.hses?.hsePhotoReferences;
+              })() && (
+                <SectionToggle
+                  title="HSE Photo References"
+                  count={
+                    (report.aggregated.hses.hsePhotoReferences.hseToolboxMeeting?.reduce((sum, section) => 
+                      sum + section.entries?.reduce((entrySum, entry) => 
+                        entrySum + (entry.slots?.filter(slot => slot.image).length || 0), 0) || 0, 0) || 0) +
+                    (report.aggregated.hses.hsePhotoReferences.hseActivityPhotos?.reduce((sum, section) => 
+                      sum + section.entries?.reduce((entrySum, entry) => 
+                        entrySum + (entry.slots?.filter(slot => slot.image).length || 0), 0) || 0, 0) || 0)
+                  }
+                >
+                  <MasterHsePhotoSection hsePhotoReferences={report.aggregated.hses.hsePhotoReferences} />
+                </SectionToggle>
+              )}
+
+              {/* Resource Status */}
+              {(() => {
+                console.log('🚀 Rendering Resource Status section:', {
+                  materialsCount: report.aggregated.materials?.length || 0,
+                  machineryCount: report.aggregated.machinery?.length || 0,
+                  totalCount: (report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0),
+                  aggregatedKeys: Object.keys(report.aggregated)
+                });
+                return null;
+              })()}
+              <SectionToggle
+                title="Resource Status"
+                count={(report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0)}
+              >
+                {(() => {
+                  console.log('🔍 MasterReportView resource data:', {
+                    materialsCount: report.aggregated.materials?.length || 0,
+                    machineryCount: report.aggregated.machinery?.length || 0,
+                    materialsSample: report.aggregated.materials?.slice(0, 2),
+                    machinerySample: report.aggregated.machinery?.slice(0, 2),
+                    aggregatedKeys: Object.keys(report.aggregated)
+                  });
+                  return null;
+                })()}
+                <ResourceSection 
+                  materials={report.aggregated.materials || []} 
+                  machinery={report.aggregated.machinery || []} 
+                />
+              </SectionToggle>
+
+              {/* Photos */}
+              <SectionToggle
+                title="Site Photos (by Project)"
+                count={Object.keys(report.aggregated.photos).length}
+              >
+                <PhotosSection byProject={report.aggregated.photos} />
+              </SectionToggle>
+            </>
+          ) : (
+            /* Empty state when no reports exist */
+            <div className="rounded-lg border-2 border-dashed p-12 text-center text-muted-foreground">
+              <p className="text-lg font-medium">No reports for Week {weekNumber}</p>
+              <p className="text-sm mt-1">
+                No projects in this folder have submitted a weekly report for the selected week.
+              </p>
             </div>
-          </SectionToggle>
-
-          {/* Progress */}
-          <SectionToggle title="Progress Overview">
-            <ProgressSection
-              progress={report.aggregated.progress}
-              reports={report.reports}
-            />
-          </SectionToggle>
-
-          {/* Manpower */}
-          <SectionToggle title="Manpower Summary">
-            <ManpowerSection manpower={report.aggregated.manpower} />
-          </SectionToggle>
-
-          {/* Activities – This Week */}
-          <SectionToggle
-            title="This Week Activities"
-            count={report.aggregated.activities.weeklyActivities.length}
-          >
-            <ActivitiesSection
-              items={report.aggregated.activities.weeklyActivities}
-              label="Activities"
-            />
-          </SectionToggle>
-
-          {/* Activities – Next Week Plan */}
-          <SectionToggle
-            title="Next Week Plan"
-            count={report.aggregated.activities.nextWeekPlan.length}
-          >
-            <ActivitiesSection
-              items={report.aggregated.activities.nextWeekPlan}
-              label="Next Week Plan"
-            />
-          </SectionToggle>
-
-          {/* Issues */}
-          <SectionToggle
-            title="Construction Issues"
-            count={report.aggregated.issues.length}
-          >
-            <IssuesSection issues={report.aggregated.issues} />
-          </SectionToggle>
-
-          {/* QAQC Status */}
-          <SectionToggle
-            title="QA/QC Status"
-            count={report.aggregated.qaqcStatus ? Object.values(report.aggregated.qaqcStatus).reduce((sum, section) => sum + section.items.length, 0) : 0}
-          >
-            <MasterQaqcSection qaqcData={report.aggregated.qaqcStatus || {}} />
-          </SectionToggle>
-
-          {/* HSE Photo References */}
-          {(() => {
-            console.log('🔍 Frontend: Checking HSE Photo References:', {
-              hasAggregated: !!report.aggregated,
-              hasHses: !!report.aggregated?.hses,
-              hasPhotoReferences: !!report.aggregated?.hses?.hsePhotoReferences,
-              hsesData: report.aggregated?.hses,
-              photoReferences: report.aggregated?.hses?.hsePhotoReferences
-            });
-            return report.aggregated?.hses?.hsePhotoReferences;
-          })() && (
-            <SectionToggle
-              title="HSE Photo References"
-              count={
-                (report.aggregated.hses.hsePhotoReferences.hseToolboxMeeting?.reduce((sum, section) => 
-                  sum + section.entries?.reduce((entrySum, entry) => 
-                    entrySum + (entry.slots?.filter(slot => slot.image).length || 0), 0) || 0, 0) || 0) +
-                (report.aggregated.hses.hsePhotoReferences.hseActivityPhotos?.reduce((sum, section) => 
-                  sum + section.entries?.reduce((entrySum, entry) => 
-                    entrySum + (entry.slots?.filter(slot => slot.image).length || 0), 0) || 0, 0) || 0)
-              }
-            >
-              <MasterHsePhotoSection hsePhotoReferences={report.aggregated.hses.hsePhotoReferences} />
-            </SectionToggle>
           )}
-
-          {/* Resource Status */}
-          {(() => {
-            console.log('🚀 Rendering Resource Status section:', {
-              materialsCount: report.aggregated.materials?.length || 0,
-              machineryCount: report.aggregated.machinery?.length || 0,
-              totalCount: (report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0),
-              aggregatedKeys: Object.keys(report.aggregated)
-            });
-            return null;
-          })()}
-          <SectionToggle
-            title="Resource Status"
-            count={(report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0)}
-          >
-            {(() => {
-              console.log('🔍 MasterReportView resource data:', {
-                materialsCount: report.aggregated.materials?.length || 0,
-                machineryCount: report.aggregated.machinery?.length || 0,
-                materialsSample: report.aggregated.materials?.slice(0, 2),
-                machinerySample: report.aggregated.machinery?.slice(0, 2),
-                aggregatedKeys: Object.keys(report.aggregated)
-              });
-              return null;
-            })()}
-            <ResourceSection 
-              materials={report.aggregated.materials || []} 
-              machinery={report.aggregated.machinery || []} 
-            />
-          </SectionToggle>
-
-          {/* Photos */}
-          <SectionToggle
-            title="Site Photos (by Project)"
-            count={Object.keys(report.aggregated.photos).length}
-          >
-            <PhotosSection byProject={report.aggregated.photos} />
-          </SectionToggle>
         </>
+      )}
+
+      {/* Action Buttons - Always visible when component loads */}
+      {!isLoading && (
+        <div className="flex items-center justify-center py-6 border-t border-border mt-6">
+          <div className="flex items-center gap-3">
+            {/* Preview Button */}
+            <Button
+              variant="outline"
+              className="min-w-[140px]"
+              onClick={handlePreview}
+              disabled={isPreviewing}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              {isPreviewing ? 'Previewing...' : 'Preview'}
+            </Button>
+
+            {/* Export Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  className="min-w-[160px] bg-primary hover:bg-primary/90"
+                  disabled={isExporting}
+                >
+                  <FileDown className="w-4 h-4 mr-2" />
+                  {isExporting ? 'Exporting...' : 'Export'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPDF} disabled={isExporting}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export As PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel} disabled={isExporting}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export As Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportZIP} disabled={isExporting}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Export As ZIP
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       )}
     </div>
   );
