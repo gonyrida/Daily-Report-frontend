@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -40,6 +40,7 @@ import {
   Trash2,
   FileDown,
   FileSpreadsheet,
+  FolderOpen,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -55,7 +56,9 @@ import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { WeeklyReportSkeleton, SummaryCardSkeleton } from "@/components/WeeklyReportSkeleton";
 import { getWeeklyReports, getWeeklyReportsMeta, getCompanyWeeklyReports, deleteWeeklyReport, getWeeklyReportById } from "@/services/weeklyReportService";
-import { getProjectById } from "@/integrations/projectsApi";
+import { getProjectById, type Project } from "@/integrations/projectsApi";
+import { getFoldersWithProjects, type Folder } from "@/integrations/foldersApi";
+import { folderEvents, projectEvents } from "@/utils/eventEmitter";
 import type { WeeklyReport } from "@/types/weeklyReport.types";
 import {
   AlertDialog,
@@ -226,6 +229,11 @@ const WeeklyReportDashboard = () => {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
+  // Folder/project hierarchy for the landing view
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [rootProjects, setRootProjects] = useState<Project[]>([]);
+  const [isFoldersLoading, setIsFoldersLoading] = useState(true);
+
   const getCurrentUserId = useCallback(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
@@ -238,6 +246,43 @@ const WeeklyReportDashboard = () => {
     }
     return null;
   }, []);
+
+  const loadFoldersWithProjects = useCallback(async () => {
+    try {
+      setIsFoldersLoading(true);
+      const response = await getFoldersWithProjects();
+      if (response.success) {
+        setFolders(response.data as Folder[]);
+        setRootProjects(response.rootProjects || []);
+      }
+    } catch (error) {
+      console.error("Failed to load folders:", error);
+    } finally {
+      setIsFoldersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFoldersWithProjects();
+  }, [loadFoldersWithProjects]);
+
+  useEffect(() => {
+    const handleChange = () => loadFoldersWithProjects();
+    folderEvents.on('folderCreated', handleChange);
+    folderEvents.on('folderUpdated', handleChange);
+    folderEvents.on('folderDeleted', handleChange);
+    projectEvents.on('projectAdded', handleChange);
+    projectEvents.on('projectUpdated', handleChange);
+    projectEvents.on('projectDeleted', handleChange);
+    return () => {
+      folderEvents.off('folderCreated', handleChange);
+      folderEvents.off('folderUpdated', handleChange);
+      folderEvents.off('folderDeleted', handleChange);
+      projectEvents.off('projectAdded', handleChange);
+      projectEvents.off('projectUpdated', handleChange);
+      projectEvents.off('projectDeleted', handleChange);
+    };
+  }, [loadFoldersWithProjects]);
 
   // Parallel data fetching with React Query
   const currentUserId = getCurrentUserId();
@@ -411,6 +456,14 @@ const WeeklyReportDashboard = () => {
   
   const weeklyTotal = weeklyReports.filter(r => r.status === 'submitted').length;
   const lastSubmitted = getLastSubmittedThisMonth(filteredReports, getCurrentUserId());
+
+  // Sum of all project.weeklyReportCount values within a folder
+  const getFolderReportCount = (folder: Folder): number => {
+    if (folder.projects && folder.projects.length > 0) {
+      return folder.projects.reduce((sum, p) => sum + (p.weeklyReportCount || 0), 0);
+    }
+    return folder.weeklyReportCount || folder.reportCount || 0;
+  };
 
   // ── Master Report mode ──────────────────────────────────────────────────
   // When ?folderId=xxx&type=master is present, render the folder-level
@@ -946,6 +999,163 @@ const WeeklyReportDashboard = () => {
     );
   }
 
+  // ── Landing view — no projectId and not a master report ─────────────────
+  // Mirrors the sidebar's Weekly Report section as a visual card hierarchy.
+  if (!projectId) {
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <HierarchicalSidebar />
+          <SidebarInset>
+            <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+                <h1 className="text-lg font-semibold">Weekly Reports</h1>
+              </div>
+              <div className="flex items-center gap-4">
+                <ThemeToggle />
+                <ProfileIcon />
+              </div>
+            </header>
+
+            <main className="flex-1 space-y-6 p-6">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold tracking-tight">Weekly Reports</h2>
+                <p className="text-muted-foreground">
+                  Select a folder to view its master report, or pick a project to view its reports.
+                </p>
+              </div>
+
+              {isFoldersLoading ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                  <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>
+                  <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>
+                  <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>
+                </div>
+              ) : (
+                <>
+                  {/* Folders — each navigates to the master report, exactly like the sidebar */}
+                  {folders.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FolderOpen className="h-5 w-5" />
+                        Folders
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                        {folders.map((folder) => (
+                          <Card
+                            key={folder._id}
+                            className="cursor-pointer hover:shadow-md transition-shadow"
+                            onClick={() =>
+                              navigate(`/weekly-reports?folderId=${folder._id}&type=master`)
+                            }
+                          >
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center gap-2">
+                                <FolderOpen className="h-5 w-5 text-primary flex-shrink-0" />
+                                <CardTitle className="text-base leading-tight">{folder.name}</CardTitle>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="flex items-center justify-between text-sm mb-2">
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Total Reports
+                                </span>
+                                <Badge variant="secondary">{getFolderReportCount(folder)}</Badge>
+                              </div>
+                              {/* Project list inside the folder — each navigates exactly like the sidebar */}
+                              {folder.projects && folder.projects.length > 0 && (
+                                <div className="space-y-1 border-t pt-2 mt-2">
+                                  {folder.projects.map((project) => (
+                                    <button
+                                      key={project._id}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(
+                                          `/weekly-reports?projectId=${encodeURIComponent(project._id)}`
+                                        );
+                                      }}
+                                      className="w-full flex items-center justify-between px-2 py-1 text-xs rounded hover:bg-muted transition-colors text-left"
+                                    >
+                                      <span className="text-muted-foreground truncate flex-1">
+                                        {project.name}
+                                      </span>
+                                      <Badge variant="outline" className="ml-2 text-xs flex-shrink-0">
+                                        {project.weeklyReportCount ?? 0}
+                                      </Badge>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Root projects (no folder) — navigate exactly like the sidebar */}
+                  {rootProjects.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Projects (No Folder)
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                        {rootProjects.map((project) => (
+                          <Card
+                            key={project._id}
+                            className="cursor-pointer hover:shadow-md transition-shadow"
+                            onClick={() =>
+                              navigate(`/weekly-reports?projectId=${encodeURIComponent(project._id)}`)
+                            }
+                          >
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                                <CardTitle className="text-base leading-tight">{project.name}</CardTitle>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground flex items-center gap-2">
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Total Reports
+                                </span>
+                                <Badge variant="secondary">{project.weeklyReportCount ?? 0}</Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {folders.length === 0 && rootProjects.length === 0 && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center py-8">
+                          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">No Projects Found</h3>
+                          <p className="text-muted-foreground">
+                            Create a project in the sidebar to start managing weekly reports.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  // ── Project-specific view — ?projectId=xxx ────────────────────────────
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -1008,7 +1218,7 @@ const WeeklyReportDashboard = () => {
             )}
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
               {isLoading ? (
                 <>
                   <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>

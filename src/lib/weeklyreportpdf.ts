@@ -55,7 +55,7 @@ const LOC_FILL   = "#D6DCE4"; // Site photo location banner
 const secBanner = (title: string, mt = 0): any => ({
   table: { widths: ["*"], body: [[{ text: title, style: "secBanner", fillColor: SEC_FILL }]] },
   layout: { defaultBorder: false },
-  margin: [0, mt, 0, 14],
+  margin: [15, mt, 0, 14],
 });
 
 const subHdr = (text: string, mt = 8): any => ({
@@ -236,22 +236,22 @@ function buildLetter(data: WeeklyReportExportData, sig?: string): any[] {
       },
     ],
     [
-      { text: "Att.", style: "ltBold" },
-      { text: ":",    style: "ltBold" },
-      { text: attTo,  style: "ltBold" },
+      { text: "Att.", style: "ltBold", margin: [0, 4, 0, 0] },
+      { text: ":",    style: "ltBold",  margin: [0, 4, 0, 0] },
+      { text: attTo,  style: "ltBold",  margin: [0, 4, 0, 0] },
     ],
   ];
   ccLines.forEach((cc, i) => {
     toBody.push([
-      { text: i === 0 ? "CC" : "", style: "ltBold" },
-      { text: ":",                  style: "ltBold" },
-      { text: cc,                   style: "ltBold" },
+      { text: i === 0 ? "CC" : "", style: "ltBold", margin: [0, 4, 0, 0] },
+      { text: ":",                  style: "ltBold",  margin: [0, 4, 0, 0] },
+      { text: cc,                   style: "ltBold",  margin: [0, 4, 0, 0] },
     ]);
   });
 
   const sigBlock: any[] = [];
   if (sig) {
-    sigBlock.push({ image: sig, width: 130, margin: [0, 4, 0, 4] });
+    sigBlock.push({ image: sig, width: 130, margin: [12, 4, 0, 4] });
   } else {
     sigBlock.push({
       canvas: [{ type: "rect", x: 0, y: 0, w: 140, h: 55, r: 2, lineWidth: 0.5, lineColor: "#CCCCCC", dash: { length: 4 } }],
@@ -264,7 +264,7 @@ function buildLetter(data: WeeklyReportExportData, sig?: string): any[] {
     {
       table: { widths: ["*"], body: [[{ text: `LETTER FOR WEEKLY PROGRESS REPORT   No. ${s(data.weekNumber)}`, style: "ltBanner", fillColor: LTR_FILL }]] },
       layout: { defaultBorder: false },
-      margin: [0, 0, 0, 14],
+      margin: [15, -8, 10, 0],
     },
     {
       table: {
@@ -275,12 +275,12 @@ function buildLetter(data: WeeklyReportExportData, sig?: string): any[] {
         ],
       },
       layout: { defaultBorder: false },
-      margin: [0, 0, 0, 10],
+      margin: [12, 12, 10, 0],
     },
-    { table: { widths: [42, 6, "*"], body: toBody }, layout: { defaultBorder: false }, margin: [0, 0, 0, 16] },
-    { text: "Dear Sir,", style: "ltBody", bold: true, margin: [0, 0, 0, 8] },
-    { text: bodyText, style: "ltBody", margin: [0, 0, 0, 20] },
-    { text: "Sincerely Yours,", style: "ltBody", margin: [0, 0, 0, 50] },
+    { table: { widths: [42, 6, "*"], body: toBody }, layout: { defaultBorder: false }, margin: [12, 30, 10, 16] },
+    { text: "Dear Sir,", style: "ltBody", bold: true, margin: [12, 0, 10, 0] },
+    { text: bodyText, style: "ltBody", margin: [12, 0, 10, 20] },
+    { text: "Sincerely Yours,", style: "ltBody", margin: [12, 0, 10, 10] },
     ...sigBlock,
     {
       stack: [
@@ -290,15 +290,17 @@ function buildLetter(data: WeeklyReportExportData, sig?: string): any[] {
             { text: "  |  Project Manager", bold: true },
           ],
           style: "sigLine",
+          margin: [12, 0, 0, 0],
         },
-        { text: s(data.contractor), style: "sigLine", bold: true, margin: [0, 0, 0, 15] },
-        ...(data.companyLocation ? [{ text: s(data.companyLocation), style: "sigContact", margin: [0, 0, 0, 15] }] : []),
+        { text: s(data.contractor), style: "sigLine", bold: true, margin: [12, 0, 0, 15] },
+        ...(data.companyLocation ? [{ text: s(data.companyLocation), style: "sigContact", margin: [12, 0, 0, 15] }] : []),
         {
-          text: [s(data.companyPhone1), data.companyPhone2 ? `  |  ${s(data.companyPhone2)}` : ""].join(""),
+          text: [s(data.companyPhone1), data.companyPhone2 ? `  | M +855 (0) ${s(data.companyPhone2)}` : ""].join(""),
           style: "sigContact",
+          margin: [12, 0, 0, 0]
         },
-        ...(data.companyEmail1 ? [{ text: s(data.companyEmail1), style: "sigContact" }] : []),
-        ...(data.companyEmail2 ? [{ text: s(data.companyEmail2), style: "sigContact" }] : []),
+        ...(data.companyEmail1 ? [{ text: s(data.companyEmail1), style: "sigContact", margin: [12, 0, 0, 0] }] : []),
+        ...(data.companyEmail2 ? [{ text: s(data.companyEmail2), style: "sigContact", margin: [12, 0, 0, 0] }] : []),
       ],
     },
   ];
@@ -341,12 +343,12 @@ function buildTOC(): any[] {
   ];
 
   return [
-    secBanner("TABLE OF CONTENTS"),
+    secBanner("TABLE OF CONTENTS*"),
     {
       stack: items.map(it => ({
         text: it.text,
         style: it.sub ? "tocSub" : "tocMajor",
-        margin: [it.sub ? 20 : 0, 3, 0, 3],
+        margin: it.sub ? [46, 3, 0, 3] : [34, 3, 0, 3]
       })),
     },
   ];
@@ -354,14 +356,14 @@ function buildTOC(): any[] {
 
 // ── Introduction ──────────────────────────────────────────────────────────────
 function buildIntro(data: WeeklyReportExportData, coverImg?: string): any[] {
-  const items: any[] = [secBanner("1.  INTRODUCTION")];
+  const items: any[] = [secBanner("1. INTRODUCTION")];
   items.push(subHdr("Project Overview", 0));
-  items[items.length - 1].margin = [0, 0, 0, 8];
-  items.push({ text: s(data.projectOverview) || "—", style: "bodyText" });
+  items[items.length - 1].margin = [25, 0, 0, 8];
+  items.push({ text: s(data.projectOverview) || "—", style: "bodyText", margin: [25, 0, 0, 0] });
   if (data.designConstruction) {
     items.push(subHdr("Design & Construction"));
-    items[items.length - 1].margin = [0, 0, 0, 8];
-    items.push({ text: data.designConstruction, style: "bodyText" });
+    items[items.length - 1].margin = [25, 8, 0, 8];
+    items.push({ text: data.designConstruction, style: "bodyText", margin: [25, 0, 0, 0] });
   }
   if (data.designList?.length) {
     items.push({
@@ -563,7 +565,7 @@ function buildQAQC(data: WeeklyReportExportData): any[] {
 
   // Main section header - force new page
   items.push(secBanner("4.  QA/QC STATUS"));
-  items[0].pageBreak = 'before';
+  // items[0].pageBreak = 'before';
 
   QAQC_DEFS.forEach((def, index) => {
     // Repeat header banner every 3 sections (new page indicator)
@@ -1710,15 +1712,15 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
       pageHdrRight: { fontSize: 9, color: "#4B5563" },
       pageFooter:   { fontSize: 8, color: "#6B7280" },
       // Section chrome
-      secBanner: { fontSize: 12, bold: true, color: "#000000", margin: [5, 5, 5, 5] },
-      subHdr:    { fontSize: 13, bold: true, color: "#000000" },
+      secBanner: { fontSize: 12, bold: true, color: "#000000", margin: [-2, -2, 0, -2] },
+      subHdr:    { fontSize: 10, bold: true, color: "#000000" },
       // Letter
-      ltBanner:      { fontSize: 15, bold: true, color: "#FFFFFF", margin: [0, 0, 0, 0] },
+      ltBanner:      { fontSize: 17, bold: true, color: "#FFFFFF", margin: [0, -2, 0, -2] },
       ltLabel:       { fontSize: 11, bold: true },
       ltBold:        { fontSize: 11, bold: true },
       ltValue:       { fontSize: 11 },
       ltBody:        { fontSize: 11, lineHeight: 1.4 },
-      sigLine:       { fontSize: 12, color: "#000000" },
+      sigLine:       { fontSize: 11, color: "#000000" },
       sigContact:    { fontSize: 11, color: "#000000" },
       sigPlaceholder:{ fontSize: 9, color: "#9CA3AF", italics: true, alignment: "center" },
       // TOC
@@ -1729,7 +1731,7 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
       tblCell:     { fontSize: 9, margin: [2, 2, 2, 2] },
       qaqcSubTitle:{ fontSize: 10, margin: [4, 4, 4, 4] },
       // Body
-      bodyText: { fontSize: 10, lineHeight: 1.35 },
+      bodyText: { fontSize: 9, lineHeight: 1.35 },
       // Photos
       photoLocBanner: { fontSize: 11, bold: true, alignment: "center", margin: [4, 4, 4, 4] },
       photoSecTitle:  { fontSize: 10, bold: true },

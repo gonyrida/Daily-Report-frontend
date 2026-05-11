@@ -105,9 +105,10 @@ const ReportDashboard: React.FC = () => {
           {
             name: "Weekly Report", 
             icon: <BarChart3 className="h-6 w-6" />,
-            description: "Weekly summaries and project's progress",
+            description: `Weekly summaries and project's progress (${folderCount} folders)`,
             path: "/weekly-report-projects",
             count: weeklyReports.length,
+            folderCount: folderCount,
             lastReportDate: weeklyReports.length > 0 
               ? weeklyReports[0]?.reportDate
               : undefined
@@ -229,10 +230,10 @@ const ReportDashboard: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground flex items-center gap-2">
                             <FolderOpen className="h-4 w-4" />
-                            Total Projects
+                            {reportType.name === "Weekly Report" ? "Total Folder" : "Total Projects"}
                           </span>
                           <Badge variant="secondary" className="font-semibold">
-                            {reportType.count}
+                            {reportType.name === "Weekly Report" ? reportType.folderCount ?? 0 : reportType.count}
                           </Badge>
                         </div>
                         

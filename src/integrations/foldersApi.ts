@@ -13,6 +13,8 @@ export interface Folder {
   companyId: string;
   reportCount: number;
   lastReportDate?: string;
+  weeklyReportCount?: number;
+  lastWeeklyReportDate?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

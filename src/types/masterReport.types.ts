@@ -120,6 +120,7 @@ export interface MasterProjectSummary {
     reportTitle?: string;
     dateRange?: string;
     employer?: string;
+    clientLogo?: string;
   };
   /** Introduction data including project overview and design construction */
   introduction?: {
