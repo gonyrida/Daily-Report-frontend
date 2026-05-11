@@ -2042,13 +2042,128 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
   const handlePreview = async () => {
     setIsPreviewing(true);
     try {
-      // TODO: Implement preview functionality
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate preview
+      const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.pdf`;
+
+      const issuesWithBase64Photos = await Promise.all(
+        issuesHook.issuesData.map(async (issue) => {
+          let photo: string | undefined;
+          if (issue.photo instanceof File) {
+            photo = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(issue.photo as File);
+            });
+          } else if (typeof issue.photo === 'string') {
+            photo = issue.photo;
+          }
+          return { ...issue, photo };
+        })
+      );
+
+      const dateParts = sharedData.dateRange?.split(' ~ ') || [];
+      const exportData = await buildWeeklyReportExportData({
+        coverData: {
+          weekNumber: sharedData.weekNumber,
+          reportDateFrom: dateParts[0],
+          reportDateTo: dateParts[1],
+          projectTitle: sharedData.projectName,
+          employer: sharedData.employer || 'Client Name',
+          contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+          coverImage: sharedData.coverImage,
+          clientLogo: sharedData.clientLogo,
+          signatureImage: sharedData.signatureImage || '/cacpm_logo.png',
+          refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+          letterDate: new Date().toISOString().split('T')[0],
+          projectManager: sharedData.signatoryName || 'Project Manager',
+          companyLocation: sharedData.companyLocation || 'Phnom Penh, Cambodia',
+          companyPhone1: sharedData.companyPhone1 || '+855 23 123 456',
+          companyPhone2: sharedData.companyPhone2 || '+855 23 789 012',
+          companyEmail1: sharedData.companyEmail1 || 'info@cacpm.com',
+          companyEmail2: sharedData.companyEmail2,
+          recipientCompany: sharedData.recipientCompany || sharedData.employer || 'Client Organization',
+          recipientLocation: sharedData.recipientLocation || 'Phnom Penh, Cambodia',
+          toName: sharedData.recipientName || 'Project Manager',
+          attName: sharedData.recipientName || 'Project Manager',
+          ccLines: sharedData.ccList || [],
+        },
+        projectOverview: sharedData.projectOverview || '',
+        designConstruction: sharedData.designNConstruction || '',
+        designList: [],
+        overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
+        overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
+        constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
+        conProgressProject: sharedData.projectName,
+        conProgressDate: dateParts[0],
+        nwdpItems: (() => {
+          const constructionItems = constructionProgressHook.constructionData?.items || [];
+          const weeklySource = mergeConstructionIntoActivityRows(constructionItems, weeklyActivities || [], 'weekly');
+          const nextSource = mergeConstructionIntoActivityRows(constructionItems, nextWeekPlan || [], 'next');
+          return weeklySource.map((weekRow, i) => ({
+            sourceId: weekRow.displayId || weekRow.sourceId || '',
+            id: weekRow.displayId || weekRow.sourceId || '',
+            workDoneLabel: weekRow.description,
+            workDonePct: weekRow.percent,
+            nextWeekLabel: nextSource[i]?.description,
+            nextWeekPct: nextSource[i]?.percent,
+            indentLevel: weekRow.indentLevel ?? 0,
+          })).filter(item =>
+            item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
+          );
+        })(),
+        constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
+          number: i + 1,
+          siteLocation: issue.location,
+          problemDescription: issue.problem,
+          actionBy: issue.actionBy,
+          photo: issue.photo,
+        })),
+        qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => {
+          const isBackendFormat = value && typeof value === 'object' && !Array.isArray(value) && 'items' in value;
+          const rawItems = isBackendFormat ? (value.items || []) : (Array.isArray(value) ? value : []);
+          const items = rawItems.map((item: any) => ({
+            ...item,
+            dateResponse: item.dateResponse || item.dateResponded || '',
+          }));
+          const comments = isBackendFormat
+            ? (value.comments || '')
+            : (Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '');
+          return { sectionTitle: key, items, comments };
+        }) : [],
+        ...transformHSEToExcelFormat(hsesData),
+        ...transformResourcesToExcelFormat(resourcesData),
+        sitePhotoCaptions: (() => {
+          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          const result: any[] = [];
+          siteActivitiesSections.forEach((section: any) => {
+            if (section.entries && section.entries.length > 0) {
+              section.entries.forEach((entry: any) => {
+                if (entry.slots && entry.slots.length > 0) {
+                  for (let i = 0; i < entry.slots.length; i += 2) {
+                    const slot1 = entry.slots[i];
+                    const slot2 = entry.slots[i + 1];
+                    result.push({
+                      siteLocation: section.title || 'Site Location',
+                      caption1: slot1?.caption || '',
+                      caption2: slot2?.caption || '',
+                      image1: slot1?.image,
+                      image2: slot2?.image,
+                    });
+                  }
+                }
+              });
+            }
+          });
+          return result;
+        })(),
+      });
+
+      await exportWeeklyReportToPdf(exportData, filename, 'preview');
       toast({
-        title: "Preview Generated",
-        description: "Weekly report preview is ready.",
+        title: "Preview Opened",
+        description: "Weekly report preview opened in a new tab.",
       });
     } catch (error) {
+      console.error('Preview error:', error);
       toast({
         title: "Preview Failed",
         description: "Could not generate preview. Please try again.",

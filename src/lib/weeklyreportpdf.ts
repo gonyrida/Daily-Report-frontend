@@ -1562,7 +1562,7 @@ async function loadAllImages(data: WeeklyReportExportData): Promise<{
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
-export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, filename = "WeeklyReport.pdf") {
+export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, filename = "WeeklyReport.pdf", mode: 'download' | 'preview' = 'download') {
   const { companyLogo, clientLogo, signatureImage, coverImage, sitePhotos, issuePhotos, hsePhotos, scheduleImages } = await loadAllImages(data);
 
   const projectTitles = [data.projectTitle, data.projectSubtitle, data.projectSubtitle2].filter(Boolean);
@@ -1739,5 +1739,9 @@ export async function exportWeeklyReportToPdf(data: WeeklyReportExportData, file
     defaultStyle: { font: "Roboto" },
   };
 
-  pdfMake.createPdf(docDefinition).download(filename);
+  if (mode === 'preview') {
+    pdfMake.createPdf(docDefinition).open();
+  } else {
+    pdfMake.createPdf(docDefinition).download(filename);
+  }
 }
