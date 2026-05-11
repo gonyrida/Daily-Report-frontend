@@ -1109,7 +1109,7 @@ async function loadAllImages(data: MasterWeeklyReport): Promise<{
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
-export async function exportMasterToPdf(data: MasterWeeklyReport, filename = "MasterWeeklyReport.pdf"): Promise<void> {
+export async function exportMasterToPdf(data: MasterWeeklyReport, filename = "MasterWeeklyReport.pdf", mode: 'download' | 'preview' = 'download'): Promise<void> {
   const { companyLogo, sitePhotos, issuePhotos, hsePhotos } = await loadAllImages(data);
 
   const content: any[] = [
@@ -1164,5 +1164,9 @@ export async function exportMasterToPdf(data: MasterWeeklyReport, filename = "Ma
     defaultStyle: { font: "Roboto" },
   };
 
-  pdfMake.createPdf(docDefinition).download(filename);
+  if (mode === 'preview') {
+    pdfMake.createPdf(docDefinition).open();
+  } else {
+    pdfMake.createPdf(docDefinition).download(filename);
+  }
 }

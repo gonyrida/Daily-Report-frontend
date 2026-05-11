@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { exportMasterToPdf } from "@/components/weekly/MasterReportView";
+import { exportMasterReportToExcel } from "@/lib/masterReportExcel";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
@@ -423,11 +424,14 @@ const WeeklyReportDashboard = () => {
   });
 
   const handleMasterPreview = async () => {
+    const reportData = masterReportData?.data;
+    if (!reportData) return;
     setIsPreviewing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      toast({ title: 'Preview Generated', description: 'Master report preview is ready.' });
-    } catch {
+      await exportMasterToPdf(reportData, 'MasterWeeklyReport.pdf', 'preview');
+      toast({ title: 'Preview Opened', description: 'Master report preview opened in a new tab.' });
+    } catch (err) {
+      console.error('Master preview error:', err);
       toast({ title: 'Preview Failed', description: 'Could not generate preview. Please try again.', variant: 'destructive' });
     } finally {
       setIsPreviewing(false);
@@ -449,11 +453,14 @@ const WeeklyReportDashboard = () => {
   };
 
   const handleMasterExportExcel = async () => {
+    const reportData = masterReportData?.data;
+    if (!reportData) return;
     setIsExporting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await exportMasterReportToExcel(reportData);
       toast({ title: 'Excel Exported', description: 'Master report exported as Excel successfully.' });
-    } catch {
+    } catch (err) {
+      console.error('Master Excel export error:', err);
       toast({ title: 'Export Failed', description: 'Could not export Excel. Please try again.', variant: 'destructive' });
     } finally {
       setIsExporting(false);
