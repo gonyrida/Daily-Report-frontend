@@ -514,6 +514,8 @@ const DailyReport = () => {
   };
 
   // Resources
+  const [firstSectionTitle, setFirstSectionTitle] = useState("Management Team");
+  const [secondSectionTitle, setSecondSectionTitle] = useState("Site Team");
   const [managementTeam, setManagementTeam] = useState<ResourceRow[]>([]);
   const [workingTeamInterior, setWorkingTeam] = useState<ResourceRow[]>([]);
   const [interiorTeam, setInteriorTeam] = useState<ResourceRow[]>([]);
@@ -1001,6 +1003,7 @@ const DailyReport = () => {
                 setCurrentPeriod(projectRecentReport.currentPeriod || "AM");
                 setActivityToday(projectRecentReport.activityToday || "");
                 setWorkPlanNextDay(projectRecentReport.workPlanNextDay || "");
+                setFirstSectionTitle(projectRecentReport.firstSectionTitle || "Management Team");
                 setManagementTeam(
                   ensureRowIds(projectRecentReport.managementTeam || []).map(
                     (item) => ({
@@ -1011,6 +1014,7 @@ const DailyReport = () => {
                     })
                   )
                 );
+                setSecondSectionTitle(projectRecentReport.secondSectionTitle || "Site Team");
                 setWorkingTeam(
                   ensureRowIds(projectRecentReport.workingTeam || [])
                 );
@@ -1237,7 +1241,9 @@ const DailyReport = () => {
             }
             setActivityToday(dbReport.activityToday || "");
             setWorkPlanNextDay(dbReport.workPlanNextDay || "");
+            setFirstSectionTitle(dbReport.firstSectionTitle || "Management Team");
             setManagementTeam(ensureRowIds(dbReport.managementTeam || []));
+            setSecondSectionTitle(dbReport.secondSectionTitle || "Site Team");
             setWorkingTeam(ensureRowIds(dbReport.workingTeam || []));
 
             // Handle interior and MEP team migration
@@ -2386,7 +2392,9 @@ const DailyReport = () => {
 
       const cleanedData = {
         ...rawData,
+        firstSectionTitle: firstSectionTitle,
         managementTeam: cleanResourceRows(rawData.managementTeam),
+        secondSectionTitle: secondSectionTitle,
         workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior), // ✅ correct
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP), // ✅ correct
         materials: cleanResourceRows(rawData.materials),
@@ -2594,7 +2602,9 @@ const DailyReport = () => {
         tempPM,
         activityToday,
         workPlanNextDay,
+        firstSectionTitle: firstSectionTitle,
         managementTeam,
+        secondSectionTitle: secondSectionTitle,
         workingTeamInterior: interiorTeam,
         workingTeamMEP: mepTeam,
         materials,
@@ -2770,7 +2780,9 @@ const DailyReport = () => {
           tempPM,
           activityToday,
           workPlanNextDay,
+          firstSectionTitle: firstSectionTitle,
           managementTeam,
+          secondSectionTitle: secondSectionTitle,
           workingTeamInterior: interiorTeam,
           workingTeamMEP: mepTeam,
           materials,
@@ -2925,7 +2937,9 @@ const DailyReport = () => {
           tempPM,
           activityToday,
           workPlanNextDay,
+          firstSectionTitle: firstSectionTitle,
           managementTeam,
+          secondSectionTitle: secondSectionTitle,
           workingTeamInterior: interiorTeam,
           workingTeamMEP: mepTeam,
           materials,
@@ -3118,7 +3132,9 @@ const DailyReport = () => {
         tempPM,
         activityToday,
         workPlanNextDay,
+        firstSectionTitle: firstSectionTitle,
         managementTeam,
+        secondSectionTitle: secondSectionTitle,
         workingTeamInterior: interiorTeam,
         workingTeamMEP: mepTeam,
         materials,
@@ -3412,7 +3428,9 @@ const DailyReport = () => {
       // REPLACE cleanedData (lines 2987-2994):
       const cleanedData = {
         ...rawData,
+        firstSectionTitle: firstSectionTitle,
         managementTeam: cleanResourceRows(rawData.managementTeam),
+        secondSectionTitle: secondSectionTitle,
         workingTeamInterior: cleanResourceRows(rawData.workingTeamInterior),
         workingTeamMEP: cleanResourceRows(rawData.workingTeamMEP),
         materials: cleanResourceRows(rawData.materials),
@@ -3709,6 +3727,10 @@ const DailyReport = () => {
                         setMaterials={setMaterials}
                         machinery={machinery}
                         setMachinery={setMachinery}
+                        firstSectionTitle={firstSectionTitle}
+                        setFirstSectionTitle={(title) => setFirstSectionTitle(title)}
+                        secondSectionTitle={secondSectionTitle}
+                        setSecondSectionTitle={(title) => setSecondSectionTitle(title)}
                       />
 
                       <ReportActions

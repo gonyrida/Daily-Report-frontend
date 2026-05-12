@@ -3,9 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  apiPost,
+  apiDelete,
   apiGet,
-  apiPut
 } from '@/lib/apiFetch';
 import { 
   SidebarTrigger, 
@@ -34,6 +33,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import ConfirmationModal from '@/components/purchase_request/ConfirmationModal';
+import { API_BASE_URL } from '@/config/api';
 
 interface PurchaseRequest {
   groupId?: string;
@@ -121,6 +122,8 @@ const PurchaseRequest = ({onRefresh}) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [mode, setMode] = useState('create');
   const [showModal, setShowModal] = useState(false);
+  const [showDeletionModal, setShowDeletionModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch pending approvals function
   const fetchPendingApprovals = async () => {
@@ -591,20 +594,36 @@ const PurchaseRequest = ({onRefresh}) => {
 
   const refreshRequests = async () => {
     try {
-      const params = new URLSearchParams();
-      params.set('page', '1');
-      params.set('limit', pagination.limit.toString());
-      if (statusFilter) params.set('status', statusFilter);
-      if (projectFilter) params.set('subProject', projectFilter);
-      if (purposeFilter) params.set('purpose', purposeFilter);
+      //Set params for my-requets tab
+      const myRequestsParams = new URLSearchParams();
+      myRequestsParams.set('page', '1');
+      myRequestsParams.set('limit', pagination.limit.toString());
+      if (statusFilter) myRequestsParams.set('status', statusFilter);
+      if (projectFilter) myRequestsParams.set('subProject', projectFilter);
+      if (purposeFilter) myRequestsParams.set('purpose', purposeFilter);
+      //Set params for all-mrs tab
+      const allMRsParams = new URLSearchParams();
+      allMRsParams.set('page', allRequestsPagination.page.toString());
+      allMRsParams.set('limit', allRequestsPagination.limit.toString());
+      if (allStatusFilter) allMRsParams.set('status', allStatusFilter);
+      if (allProjectFilter) allMRsParams.set('subProject', allProjectFilter);
+      if (allPurposeFilter) allMRsParams.set('purpose', allPurposeFilter);
+      if (allRequesterFilter) allMRsParams.set('requester', allRequesterFilter);
       
-      const endpoint = `/purchase-requests/my-requests?${params.toString()}`;
-      const response = await apiGet(endpoint);
-      const result = await response.json();
-      if (result.success) {
-        setRequests(result.data);
-        if (result.pagination) {
-          setPagination(result.pagination);
+      const myRequetsEndpoint = `/purchase-requests/my-requests?${myRequestsParams.toString()}`;
+      const allMRsEndpoint = `/purchase-requests?${allMRsParams.toString()}`;
+      const myRequestResponse = await apiGet(myRequetsEndpoint);
+      const allMRsResponse = await apiGet(allMRsEndpoint);
+      const myRequestResult = await myRequestResponse.json();
+      const allMRsResult = await allMRsResponse.json();
+      
+      if (myRequestResult.success && allMRsResult.success) {
+        setRequests(myRequestResult.data);
+        setAllRequests(allMRsResult.data);
+        if (myRequestResult.pagination) {
+          setPagination(myRequestResult.pagination);
+        } else if (allMRsResult.pagination) {
+          setAllRequestsPagination(allMRsResult.pagination);
         }
       }
     } catch (error) {
@@ -681,6 +700,56 @@ const PurchaseRequest = ({onRefresh}) => {
     }
   };
 
+  const handleDeleteRequest = async () => {
+    let response = null;
+    let result = null;
+    // if selectedRequests has only 1 request
+    if (selectedRequests.length === 1) {
+      response = await apiDelete(`/purchase-requests/${selectedRequests[0]}`);
+      result = await response.json();
+    }
+    // if selectedRequests has more than 1 requests 
+    else if (selectedRequests.length > 1) {
+      response = await fetch(`${API_BASE_URL}/purchase-requests/bulk`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ids: selectedRequests
+        }),
+        credentials: "include",
+      });
+      result = await response.json();
+    }
+    if (result.success) {
+      toast({
+        title: "Success",
+        description: result.message || "Request deleted successfully"
+      });
+      // Refresh the requests list
+      refreshRequests();
+      setSelectedRequests([]);
+    } else {
+      toast({
+        title: "Error",
+        description: result.message || "Failed to delete request"
+      });
+    }
+  };
+
+  const canAct = (reqs: Array<any>) => {
+    const filteredRequests = reqs.filter(request => selectedRequests.includes(request._id));
+    const allRequestsStatus = filteredRequests.some(request => request.status === "revised" || request.status === "rejected" || request.status === "approved");
+    if (!allRequestsStatus) {
+      const allStepsStatus = filteredRequests.some(request => 
+        request.approvalWorkflow.some(step => step.status === "approved")
+      );
+      return allStepsStatus;
+    }
+    return allRequestsStatus;
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -724,9 +793,7 @@ const PurchaseRequest = ({onRefresh}) => {
                     {profile?.role === 'approver' || profile?.role === 'admin' ? (
                       <TabsTrigger value="project-management">Project Management</TabsTrigger>
                     ) : null}
-                    {profile?.role === 'approver' || profile?.role === 'admin' ? (
-                      <TabsTrigger value="material-master">Material Master</TabsTrigger>
-                    ) : null}
+                    <TabsTrigger value="material-master">Material Master</TabsTrigger>
                   </TabsList>
                   <TabsContent value="my-requests" className="space-y-6">
                     {/* Button Row */}
@@ -782,6 +849,13 @@ const PurchaseRequest = ({onRefresh}) => {
                         disabled={selectedRequests.length !== 1}
                       >
                         Revise Request
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setShowDeletionModal(true)}
+                        disabled={canAct(requests) || selectedRequests.length === 0}
+                      >
+                        Delete Request
                       </Button>
                       <Button 
                         variant="outline" 
@@ -1078,6 +1152,19 @@ const PurchaseRequest = ({onRefresh}) => {
                     isLoading={loadingRequest}
                   />
 
+                  <ConfirmationModal
+                    isOpen={showDeletionModal}
+                    onClose={() => setShowDeletionModal(false)}
+                    onConfirm={() => {
+                      setShowDeletionModal(false);
+                      handleDeleteRequest();
+                    }}
+                    title="Confirm Deletion"
+                    message={`Are you sure you want to delete ${selectedRequests.length} purchase request(s)?`}
+                    confirmText="Delete Request"
+                    isLoading={isDeleting}
+                  />
+
                   {/* All Related MRs */}
                   <TabsContent value="all-mrs" className="space-y-6">
                     {/* All Request List */}
@@ -1094,6 +1181,15 @@ const PurchaseRequest = ({onRefresh}) => {
                             >
                               {loadingRequests ? 'Refreshing...' : 'Refresh'}
                             </Button>
+                            {profile.role === "admin" && (
+                              <Button
+                                variant='destructive'
+                                onClick={() => setShowDeletionModal(true)}
+                                disabled={selectedRequests.length === 0 || profile.role !== "admin"}
+                              >
+                                Delete
+                              </Button>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-4">
                             {/* Status Filter */}
@@ -1175,6 +1271,22 @@ const PurchaseRequest = ({onRefresh}) => {
                           <table className="w-full border-collapse border">
                             <thead>
                               <tr className="bg-muted">
+                                {profile.role === "admin" && (
+                                  <th className="text-left p-3 font-medium">
+                                    <input
+                                      type="checkbox"
+                                      className="w-4 h-4 cursor-pointer"
+                                      checked={selectedRequests.length === allRequests.length && allRequests.length > 0}
+                                      onChange={e => {
+                                        if (e.target.checked) {
+                                          setSelectedRequests(allRequests.map(r => r.id || r._id));
+                                        } else {
+                                          setSelectedRequests([]);
+                                        }
+                                      }}
+                                    />
+                                  </th>
+                                )}
                                 <th className="text-left p-3 font-medium">Request ID</th>
                                 <th className="text-left p-3 font-medium">Project</th>
                                 <th className="text-left p-3 font-medium">Requester</th>
@@ -1199,55 +1311,86 @@ const PurchaseRequest = ({onRefresh}) => {
                                 </div>
                               ) : (
                                 <>
-                                  {allRequests.map((request) => (
-                                    <tr 
-                                      key={request.id} 
-                                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
-                                      onClick={() => handleViewDetails(request)}
-                                    >
-                                      <td className="p-3 font-medium">{request.label}</td>
-                                      <td className="p-3">{request.projectName}</td>
-                                      <td className="p-3">{request.requesterName}</td>
-                                      <td className="p-3">
-                                        <div className="flex gap-1 flex-wrap">
-                                          {request.categories.admin && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 dark:border dark:border-blue-700">Admin</span>
-                                          )}
-                                          {request.categories.construction && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 dark:border dark:border-orange-700">Construction</span>
-                                          )}
-                                          {request.categories.material && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 dark:border dark:border-green-700">Material</span>
-                                          )}
-                                          {request.categories.services && (
-                                            <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 dark:border dark:border-purple-700">Services</span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="p-3">{request.purpose}</td>
-                                      <td className="p-3">
-                                        <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                                          {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
-                                        </span>
-                                      </td>
-                                      <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
-                                      <td className="p-3">
-                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                          request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                          request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
-                                          request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
-                                          request.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                                          request.status === 'revised' ? 'bg-blue-100 text-blue-800' :
-                                          'bg-red-100 text-red-800'
-                                        }`}>
-                                          {getPendingStatusText(request)}
-                                        </span>
-                                      </td>
-                                      <td className="p-3">{computeStage(request)}</td>
-                                      <td className="p-3">{new Date(request.createdAt).toLocaleString()}</td>
-                                    </tr>
-                                  ))}
+                                  {allRequests.map((request) => {
+                                    const isSelected = selectedRequests.includes(request.id || request._id);
+                                    const requestId = request.id || request._id;
+                                    
+                                    return (
+                                      <tr 
+                                        key={requestId} 
+                                        className={`border-b cursor-pointer transition-colors ${
+                                          isSelected 
+                                            ? 'bg-blue-100 dark:bg-blue-900/30 dark:border-l-4 dark:border-l-blue-400' 
+                                            : 'hover:bg-muted/30 dark:hover:bg-muted/20'
+                                        }`}
+                                        onClick={(e) => {
+                                          // If clicking checkbox, don't toggle
+                                          if (e.target instanceof HTMLInputElement) return;
+                                          // Optional: row click opens details
+                                          handleViewDetails(request);
+                                        }}
+                                      >
+                                        {profile.role === "admin" && (
+                                          <td className="p-3">
+                                            <input
+                                              type="checkbox"
+                                              className="w-4 h-4 cursor-pointer"
+                                              checked={isSelected}
+                                              onChange={e => {
+                                                e.stopPropagation();
+                                                if (e.target.checked) {
+                                                  setSelectedRequests([...selectedRequests, requestId]);
+                                                } else {
+                                                  setSelectedRequests(selectedRequests.filter(id => id !== requestId));
+                                                }
+                                              }}
+                                            />
+                                          </td>
+                                        )}
+                                        <td className="p-3 font-medium">{request.label}</td>
+                                        <td className="p-3">{request.projectName}</td>
+                                        <td className="p-3">{request.requesterName}</td>
+                                        <td className="p-3">
+                                          <div className="flex gap-1 flex-wrap">
+                                            {request.categories.admin && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 dark:border dark:border-blue-700">Admin</span>
+                                            )}
+                                            {request.categories.construction && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 dark:border dark:border-orange-700">Construction</span>
+                                            )}
+                                            {request.categories.material && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 dark:border dark:border-green-700">Material</span>
+                                            )}
+                                            {request.categories.services && (
+                                              <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 dark:border dark:border-purple-700">Services</span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="p-3">{request.purpose}</td>
+                                        <td className="p-3">
+                                          <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                            {request.items.length} {request.items.length === 1 ? 'Item' : 'Items'}
+                                          </span>
+                                        </td>
+                                        <td className="p-3 font-medium">${request.grandTotal?.toFixed(2) || '0.00'}</td>
+                                        <td className="p-3">
+                                          <span className={`px-2 py-1 rounded-full text-xs ${
+                                            request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            request.status === 'checked' ? 'bg-blue-100 text-blue-800' :
+                                            request.status === 'verified' ? 'bg-purple-100 text-purple-800' :
+                                            request.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                                            request.status === 'revised' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-red-100 text-red-800'
+                                          }`}>
+                                            {getPendingStatusText(request)}
+                                          </span>
+                                        </td>
+                                        <td className="p-3">{computeStage(request)}</td>
+                                        <td className="p-3">{new Date(request.createdAt).toLocaleString()}</td>
+                                      </tr>
+                                    )
+                                  })}
                                 </>
                               )}
                             </tbody>
@@ -1359,11 +1502,9 @@ const PurchaseRequest = ({onRefresh}) => {
                       />
                     </TabsContent>
                   ) : null}
-                  {profile?.role === 'approver' || profile?.role === 'admin' ? (
-                    <TabsContent value="material-master" className="space-y-6">
-                      <MasterMaterials/>
-                    </TabsContent>
-                  ) : null}
+                  <TabsContent value="material-master" className="space-y-6">
+                    <MasterMaterials/>
+                  </TabsContent>
                 </Tabs>
               </div>
             </div>

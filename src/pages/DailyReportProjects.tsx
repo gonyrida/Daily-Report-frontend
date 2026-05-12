@@ -692,7 +692,7 @@ const DailyReportProjects: React.FC = () => {
                       <Card 
                         key={project._id}
                         className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] group"
-                        onClick={() => navigate(`/dashboard?project=${encodeURIComponent(project.name)}&folder=${encodeURIComponent(folder._id)}&folderName=${encodeURIComponent(folder.name)}`)}
+                        onClick={() => navigate(`/dashboard?projectId=${encodeURIComponent(project._id)}`)}
                       >
                         <CardHeader className="pb-4">
                           <div className="flex items-center justify-between">

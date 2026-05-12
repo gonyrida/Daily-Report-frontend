@@ -24,7 +24,7 @@ import { useProfileContext } from "@/contexts/ProfileContext";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  // password: z.string().min(1, "Password is required"),
+  password: z.string().min(1, "Password is required"),
   rememberMe: z.boolean().optional(),
 });
 
@@ -97,8 +97,8 @@ const Login = () => {
     setError(null);
 
     try {
-      // const result = await loginUser(data.email, data.password);
-      const result = await loginUser(data.email);
+      const result = await loginUser(data.email, data.password);
+      // const result = await loginUser(data.email);
 
       if (!result.success) {
         throw new Error(result.message || "Login failed");
@@ -176,7 +176,7 @@ const Login = () => {
             </div>
 
             {/* Password field - commented out for email-only authentication */}
-            {/* <div className="space-y-2">
+            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
@@ -209,7 +209,7 @@ const Login = () => {
                   {errors.password.message}
                 </p>
               )}
-            </div> */}
+            </div>
 
             <div className="flex items-center space-x-2">
               <Checkbox

@@ -762,10 +762,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                   <SidebarMenu>
                     <Collapsible open={adminMenuOpen} onOpenChange={setAdminMenuOpen}>
                       <CollapsibleTrigger asChild>
-                        <SidebarMenuButton 
-                          className="w-full justify-between px-4 py-2 font-medium"
-                          onClick={() => navigate('/admin')}
-                        >
+                        <SidebarMenuButton className="w-full justify-between px-4 py-2 font-medium">
                           <span 
                             className="flex items-center gap-2 flex-1"
                             onClick={(e) => {
@@ -776,11 +773,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                             <UserCheck className="h-4 w-4" />
                             <span>Admin Dashboard</span>
                           </span>
-                          {adminMenuOpen ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
+                          <div className="flex items-center gap-1">
+                            {adminMenuOpen ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </div>
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
