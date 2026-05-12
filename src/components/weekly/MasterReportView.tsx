@@ -617,16 +617,7 @@ const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
               </SectionToggle>
 
               {/* HSE Photo References */}
-              {(() => {
-                console.log('🔍 Frontend: Checking HSE Photo References:', {
-                  hasAggregated: !!report.aggregated,
-                  hasHses: !!report.aggregated?.hses,
-                  hasPhotoReferences: !!report.aggregated?.hses?.hsePhotoReferences,
-                  hsesData: report.aggregated?.hses,
-                  photoReferences: report.aggregated?.hses?.hsePhotoReferences
-                });
-                return report.aggregated?.hses?.hsePhotoReferences;
-              })() && (
+              {report.aggregated?.hses?.hsePhotoReferences && (
                 <SectionToggle
                   title="HSE Photo References"
                   count={
@@ -643,30 +634,11 @@ const MasterReportView: React.FC<MasterReportViewProps> = ({ folderId }) => {
               )}
 
               {/* Resource Status */}
-              {(() => {
-                console.log('🚀 Rendering Resource Status section:', {
-                  materialsCount: report.aggregated.materials?.length || 0,
-                  machineryCount: report.aggregated.machinery?.length || 0,
-                  totalCount: (report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0),
-                  aggregatedKeys: Object.keys(report.aggregated)
-                });
-                return null;
-              })()}
               <SectionToggle
                 title="Resource Status"
                 count={(report.aggregated.materials?.length || 0) + (report.aggregated.machinery?.length || 0)}
               >
-                {(() => {
-                  console.log('🔍 MasterReportView resource data:', {
-                    materialsCount: report.aggregated.materials?.length || 0,
-                    machineryCount: report.aggregated.machinery?.length || 0,
-                    materialsSample: report.aggregated.materials?.slice(0, 2),
-                    machinerySample: report.aggregated.machinery?.slice(0, 2),
-                    aggregatedKeys: Object.keys(report.aggregated)
-                  });
-                  return null;
-                })()}
-                <ResourceSection 
+                <ResourceSection
                   materials={report.aggregated.materials || []} 
                   machinery={report.aggregated.machinery || []} 
                 />

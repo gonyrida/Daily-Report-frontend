@@ -352,18 +352,14 @@ useEffect(() => {
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
     if (onClearQaqcData) {
-      onClearQaqcData(() => {
-        console.log('QAQC data cleared');
-      });
+      onClearQaqcData(() => {});
     }
   }, [onClearQaqcData]);
 
   // Expose clearHsesData function to parent for successful submit cleanup
   useEffect(() => {
     if (onClearHsesData) {
-      onClearHsesData(() => {
-        console.log('HSES data cleared');
-      });
+      onClearHsesData(() => {});
     }
   }, [onClearHsesData]);
 
@@ -374,29 +370,6 @@ useEffect(() => {
     if (setShowSecondNav) setShowSecondNav(true);
   };
 
-  // Log QAQC data when tab is clicked
-  useEffect(() => {
-    if (activeTab === "qaqc-status") {
-      console.log("🔍 QAQC TAB CLICKED - Data Debug:");
-      console.log("  - qaqcData (from parent/DB):", qaqcData);
-      console.log("  - qaqcApiHook.tableData:", qaqcApiHook.tableData);
-      console.log("  - qaqcData keys:", qaqcData ? Object.keys(qaqcData) : "null");
-      console.log("  - Has database data?:", qaqcData && Object.keys(qaqcData).length > 0);
-
-      // Detailed inspection of first section
-      if (qaqcData && qaqcData['4.1']) {
-        console.log("  - Section 4.1 rows:", qaqcData['4.1']);
-        console.log("  - First row code:", qaqcData['4.1'][0]?.code);
-        console.log("  - First row description:", qaqcData['4.1'][0]?.description?.substring(0, 30));
-      }
-
-      // Check if data appears to be from database
-      const hasAnyRows = qaqcApiHook.tableData && Object.values(qaqcApiHook.tableData).some(
-        (rows: any) => rows && rows.length > 0 && rows.some((r: any) => r.code || r.description)
-      );
-      console.log("  - Table has row data?:", hasAnyRows);
-    }
-  }, [activeTab, qaqcData, qaqcApiHook.tableData]);
 
   if (showIntroduction) {
     return (

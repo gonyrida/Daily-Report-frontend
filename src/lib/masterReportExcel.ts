@@ -668,7 +668,6 @@ async function buildIntro(workbook: ExcelJS.Workbook, data: MasterWeeklyReport) 
 
   // Cover image
   const coverImg = data.availableCoverImages?.[0]?.coverImage || intro?.coverImage || data.reports?.[0]?.cover?.coverImage;
-  console.log("have cover image?", !!coverImg);
   if (coverImg) {
     r = Math.max(r, 10);
     const imageRow = r - 1;

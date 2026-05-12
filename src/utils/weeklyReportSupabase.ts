@@ -25,19 +25,15 @@ export const uploadScheduleFileToSupabase = async (
   entryType: 'document' | 'image' | 'chart' = 'document'
 ): Promise<WeeklyReportUploadResult> => {
   try {
-    console.log('DEBUG: Starting Supabase upload for file:', file.name, 'reportId:', reportId);
-    
     // Handle temporary report IDs for new reports
     const folderId = reportId.startsWith('temp-') ? 'temp-uploads' : reportId;
-    
+
     // Create organized folder structure
     const folderPath = `weekly-reports/${folderId}/master-schedule`;
     const timestamp = Date.now();
     const fileExt = file.name.split('.').pop();
     const fileName = `${entryType}-${timestamp}.${fileExt}`;
     const filePath = `${folderPath}/${fileName}`;
-
-    console.log('DEBUG: Upload path:', filePath);
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
@@ -47,8 +43,6 @@ export const uploadScheduleFileToSupabase = async (
         upsert: false,
         contentType: file.type
       });
-
-    console.log('DEBUG: Supabase upload result:', { data, error });
 
     if (error) {
       console.error('Supabase upload error:', error);
@@ -62,8 +56,6 @@ export const uploadScheduleFileToSupabase = async (
     const { data: { publicUrl } } = supabase.storage
       .from('weekly-reports')
       .getPublicUrl(data.path);
-
-    console.log('DEBUG: Supabase public URL:', publicUrl);
 
     return {
       success: true,
@@ -154,7 +146,6 @@ export const convertScheduleEntriesToSupabase = async (
   for (const entry of entries) {
     // Skip entries that are completely empty (no file, no data)
     if (!entry.file && !entry.fileName && !entry.supabaseUrl) {
-      console.log('DEBUG: Skipping empty entry:', entry);
       continue;
     }
 
@@ -169,7 +160,6 @@ export const convertScheduleEntriesToSupabase = async (
 
     // Handle file upload if File object exists
     if (entry.file && entry.file instanceof File) {
-      console.log('DEBUG: Converting entry with File object:', entry.fileName);
       const uploadResult = await uploadScheduleFileToSupabase(
         entry.file,
         reportId,
@@ -196,7 +186,6 @@ export const convertScheduleEntriesToSupabase = async (
       }
     } else if (entry.supabaseUrl && entry.supabasePath) {
       // Entry already has Supabase URLs, keep as-is
-      console.log('DEBUG: Converting entry with existing Supabase URLs:', entry.fileName);
       convertedEntry.supabaseUrl = entry.supabaseUrl;
       convertedEntry.supabasePath = entry.supabasePath;
       convertedEntry.fileData = entry.fileData;

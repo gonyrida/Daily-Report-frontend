@@ -45,20 +45,6 @@ const handleApiResponse = async <T>(response: Response): Promise<ApiResponse<T>>
     if (!response.ok) {
       const errorMessage = data?.message || data?.error || `HTTP ${response.status}: ${response.statusText}`;
       console.error('API Error:', { status: response.status, message: errorMessage, data });
-      // Log detailed validation errors - check multiple possible locations
-      console.error('🔍 Full response data:', JSON.stringify(data, null, 2));
-      if (data?.data && typeof data.data === 'object') {
-        console.error('🔍 Detailed validation errors (data.data):', JSON.stringify(data.data, null, 2));
-      }
-      if (data?.errors && Array.isArray(data.errors)) {
-        console.error('🔍 Validation errors (data.errors):', JSON.stringify(data.errors, null, 2));
-      }
-      if (data?.validationErrors) {
-        console.error('🔍 Validation errors (data.validationErrors):', JSON.stringify(data.validationErrors, null, 2));
-      }
-      if (data?.details) {
-        console.error('🔍 Error details (data.details):', JSON.stringify(data.details, null, 2));
-      }
       return {
         success: false,
         error: errorMessage
@@ -720,23 +706,9 @@ export const getMasterWeeklyReport = async (
     const params = new URLSearchParams({ folderId, weekNumber: weekNumber.toString() });
     const response = await apiGet(`${WEEKLY_REPORTS_BASE_URL}/master?${params}`);
     const result = await handleApiResponse<MasterWeeklyReport>(response);
-    
-    // Debug logging for resource data
-    if (result.success && result.data?.aggregated) {
-      console.log('🔍 API Response - Resource Data:', {
-        materialsCount: result.data.aggregated.materials?.length || 0,
-        machineryCount: result.data.aggregated.machinery?.length || 0,
-        materialsSample: result.data.aggregated.materials?.slice(0, 2),
-        machinerySample: result.data.aggregated.machinery?.slice(0, 2),
-        aggregatedKeys: Object.keys(result.data.aggregated)
-      });
-    } else {
-      console.log('🔍 API Response - No success or no aggregated data:', result);
-    }
-    
     return result;
   } catch (error) {
-    console.error('🔍 API Error:', error);
+    console.error('API Error fetching master report:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch master report'

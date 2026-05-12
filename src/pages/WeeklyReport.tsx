@@ -716,13 +716,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             }
           }
         } catch (error) {
-          console.error('🔍 FRONTEND Error loading report:', error);
-          console.error('🔍 FRONTEND Error details:', {
-            message: error.message,
-            stack: error.stack,
-            currentReportId,
-            timestamp: new Date().toISOString()
-          });
+          console.error('Error loading report:', error);
           toast({
             title: "Error",
             description: "Failed to load existing report.",
@@ -1943,19 +1937,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       }
     } catch (error) {
       console.error('Save error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-
-      // Log specific validation errors
-      if (error.message && error.message.includes('Validation failed')) {
-        console.error('Validation error - checking data structure...');
-
-        // Check other required fields
-        if (!reportData.projectName) console.error('Missing projectName');
-        if (!reportData.weekNumber) console.error('Missing weekNumber');
-        if (!reportData.startDate) console.error('Missing startDate');
-        if (!reportData.endDate) console.error('Missing endDate');
-      }
-
       // Re-throw the error for the calling function to handle
       throw error;
     }
@@ -2196,14 +2177,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         })
       );
 
-      // Debug resources data before export
-      console.log("[WeeklyReport Export] resourcesData:", resourcesData);
-      console.log("[WeeklyReport Export] manPower keys:", resourcesData?.manPower ? Object.keys(resourcesData.manPower) : 'null');
-      console.log("[WeeklyReport Export] managementTeam:", resourcesData?.manPower?.managementTeam);
-      console.log("[WeeklyReport Export] workingTeamInterior:", resourcesData?.manPower?.workingTeamInterior);
-      console.log("[WeeklyReport Export] workingTeamMEP:", resourcesData?.manPower?.workingTeamMEP);
       const transformedResources = transformResourcesToExcelFormat(resourcesData);
-      console.log("[WeeklyReport Export] transformedResources:", transformedResources);
 
       // Create export data with converted photos
       const dateParts = sharedData.dateRange?.split(' ~ ') || [];
@@ -2327,21 +2301,12 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       // Generate filename with project name and week number
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.xlsx`;
 
-      // Validate required data before processing
-      if (!sharedData.weekNumber) {
-        console.warn('Week number is missing, using default');
-      }
-      if (!sharedData.projectName) {
-        console.warn('Project name is missing, using default');
-      }
-
       // Convert File objects to base64 for construction issues with error handling
       const issuesWithBase64Photos = await Promise.all(
         issuesHook.issuesData.map(async (issue, index) => {
           try {
             let photo: string | undefined;
             if (issue.photo instanceof File) {
-              console.log(`Converting photo ${index + 1} to base64...`);
               photo = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => {
@@ -2355,10 +2320,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                 reader.onerror = () => reject(new Error('FileReader error'));
                 reader.readAsDataURL(issue.photo as File);
               });
-              console.log(`Photo ${index + 1} converted successfully`);
             } else if (typeof issue.photo === 'string') {
               photo = issue.photo;
-              console.log(`Photo ${index + 1} is already a string`);
             }
             return { ...issue, photo };
           } catch (photoError) {
@@ -2467,11 +2430,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       });
 
 
-      // Validate export data
-      if (!exportData.weekNumber) {
-        console.warn('Week number is still missing in export data');
-      }
-
       // Export to Excel using ExcelJS
       await exportWeeklyReportToExcel(exportData, filename);
 
@@ -2507,7 +2465,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             variant="outline"
             size="sm"
             onClick={() => {
-              console.log('Retrying Excel export...');
               handleExportExcel();
             }}
           >
