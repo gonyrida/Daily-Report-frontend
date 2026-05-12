@@ -907,12 +907,6 @@ function buildResources(data: WeeklyReportExportData): any[] {
   const materialRows = data.materialRows ?? [];
   const equipmentRows = data.equipmentRows ?? [];
 
-  // Debug logging
-  console.log("[PDF Resources] manpowerRows:", manpowerRows.length, manpowerRows);
-  console.log("[PDF Resources] materialRows:", materialRows.length, materialRows);
-  console.log("[PDF Resources] equipmentRows:", equipmentRows.length, equipmentRows);
-  console.log("[PDF Resources] weekDates:", dates);
-
   // Helper to get daily array from various field names (like Excel)
   const pickDailyArray = (row: any): any[] => {
     if (Array.isArray(row?.dailyData)) return row.dailyData;

@@ -170,12 +170,6 @@ export const transformBackendToFrontendFormat = (manPower: ManPowerTeams): Secti
  * Transform backend material data to frontend subRows format
  */
 export const transformMaterialsToFrontendFormat = (materials: MaterialEntry[]): SubRow[] => {
-  console.log('🔍 transformMaterialsToFrontendFormat input:', {
-    materialsCount: materials?.length || 0,
-    materialsSample: materials?.slice(0, 2) || [],
-    firstMaterialDate: materials?.[0]?.date
-  });
-  
   const result = materials?.map(entry => {
     // Use empty string (not "0") for daily cells that have no real data.
     // Materials store thisWeek independently — forcing "0" in daily columns
@@ -199,23 +193,9 @@ export const transformMaterialsToFrontendFormat = (materials: MaterialEntry[]): 
       thisWeek: entry.thisWeek?.toString() || "0",
       upToThisWeek: entry.accumulated?.toString() || "0"
     };
-    
-    console.log('🔍 Transformed material entry:', {
-      description: entry.description,
-      originalDate: entry.date,
-      transformedDailyData: transformed.dailyData,
-      originalThisWeek: entry.thisWeek,
-      transformedThisWeek: transformed.thisWeek
-    });
-    
     return transformed;
   }) || [];
-  
-  console.log('🔍 transformMaterialsToFrontendFormat result:', {
-    resultCount: result.length,
-    resultSample: result.slice(0, 2)
-  });
-  
+
   return result;
 };
 

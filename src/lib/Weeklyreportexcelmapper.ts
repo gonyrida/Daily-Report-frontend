@@ -31,9 +31,7 @@ async function processImage(img: unknown): Promise<string | undefined> {
   if (img instanceof File || (typeof img === 'object' && img !== null && 'size' in img && 'type' in img)) {
     try {
       const file = img as File;
-      console.log(`Converting File to base64: ${file.name}, size: ${file.size}`);
       const base64 = await fileToBase64(file);
-      console.log(`File converted successfully, base64 length: ${base64.length}`);
       return base64;
     } catch (err) {
       console.error('Failed to convert File to base64:', err);
@@ -567,11 +565,6 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
         // Process images - convert File objects to base64
         const processedImg1 = await processImage(e.image1);
         const processedImg2 = await processImage(e.image2);
-
-        console.log(`SitePhoto ${i} processed:`, {
-          hasImage1: !!processedImg1,
-          hasImage2: !!processedImg2,
-        });
 
         return {
           siteLocation: e.siteLocation ?? e.location,

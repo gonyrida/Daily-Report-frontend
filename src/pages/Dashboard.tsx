@@ -515,7 +515,7 @@ const Dashboard = () => {
             )}
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -569,7 +569,7 @@ const Dashboard = () => {
                   </p>
                 </CardContent>
               </Card>
-            </div>
+            </div> */}
             {/* Tabs */}
             <div className="mb-6">
               <div className="border-b border-gray-200">

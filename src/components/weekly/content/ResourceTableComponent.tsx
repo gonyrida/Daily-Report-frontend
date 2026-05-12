@@ -70,7 +70,7 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
       const sectionsJson = JSON.stringify(passedSections);
       
       if (hasData && sectionsJson !== prevSectionsRef.current) {
-        console.log('🔄 ResourceTableComponent syncing passedSections:', passedSections);
+        // console.log('🔄 ResourceTableComponent syncing passedSections:', passedSections);
         setLocalSections(passedSections);
         prevSectionsRef.current = sectionsJson;
       }
