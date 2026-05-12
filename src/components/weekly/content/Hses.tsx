@@ -5,15 +5,89 @@ import { createReferenceSection } from "@/utils/referenceHelpers";
 import { HsesData, HsesProps } from "@/types/hses.types";
 import { createHSESections, createHSEActivityPhotoSections } from "@/utils/hseSectionUtils";
 import { defaultHsesData } from "@/hooks/useHsesData";
+import { RefreshCw, ImageIcon } from "lucide-react";
+import { updateReportImages, previewAggregatedImages } from "@/services/weeklyReportService";
 
-const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
+const Hses: React.FC<HsesProps & { 
+  sharedData?: any;
+  reportId?: string;
+}> = ({ data, onChange, isEditing = false, sharedData, reportId }) => {
   
   const hsesData = data || defaultHsesData;
-
+  const [isAggregating, setIsAggregating] = React.useState(false);
 
   const updateData = (section: keyof HsesData, value: any) => {
     const newData = { ...hsesData, [section]: value };
     onChange?.(newData);
+  };
+
+  const handleAggregateImages = async () => {
+    // Check if we have the required data
+    if (!sharedData?.dateRange || (!sharedData?.projectId && !sharedData?.projectName)) {
+      alert('Project and date range are required for image aggregation');
+      return;
+    }
+
+    setIsAggregating(true);
+    try {
+      // Parse date range "DD-MMM-YY ~ DD-MMM-YY"
+      const dateRangeStr = sharedData.dateRange.trim().replace(/\s*~\s*/, '~');
+      const [startDateStr, endDateStr] = dateRangeStr.split('~');
+
+      const parseDate = (dateStr: string) => {
+        const cleanDateStr = dateStr.trim();
+        const [day, month, year] = cleanDateStr.split('-');
+        const monthMap: { [key: string]: string } = {
+          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+          'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        const fullYear = `20${year}`;
+        return `${fullYear}-${monthMap[month]}-${day.padStart(2, '0')}`;
+      };
+
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
+
+      if (reportId) {
+        // Saved report: Update directly in database
+        const result = await updateReportImages(reportId, { maxImagesPerReport: 2 });
+        
+        if (result.success && result.data) {
+          const newHsesData = {
+            ...hsesData,
+            hsePhotoReferences: result.data.sections?.hses?.hsePhotoReferences
+          };
+          onChange?.(newHsesData);
+          alert(`✅ Successfully aggregated ${result.aggregated?.hsePhotoCount || 0} HSE photos from ${result.aggregated?.dailyReportCount || 0} daily reports`);
+        } else {
+          alert(`Aggregation failed: ${result.error}`);
+        }
+      } else {
+        // Unsaved report: Preview and update local state only
+        const projectIdentifier = sharedData.projectId || sharedData.projectName;
+        const result = await previewAggregatedImages(
+          projectIdentifier,
+          startDate,
+          endDate,
+          { useProjectId: !!sharedData.projectId, maxImagesPerReport: 2 }
+        );
+
+        if (result.success && result.data) {
+          const newHsesData = {
+            ...hsesData,
+            hsePhotoReferences: result.data.hsePhotoReferences
+          };
+          onChange?.(newHsesData);
+          alert(`✅ Preview: ${result.data.hsePhotoCount || 0} HSE photos from ${result.data.dailyReportCount || 0} daily reports. Will be saved when you save the report.`);
+        } else {
+          alert(`Aggregation failed: ${result.error}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error aggregating images:', error);
+    } finally {
+      setIsAggregating(false);
+    }
   };
 
   return (
@@ -163,11 +237,25 @@ const Hses: React.FC<HsesProps> = ({ data, onChange, isEditing = false }) => {
 
       {/* 5.6 HSES Photo Reference */}
       <div className="section-card p-4 sm:p-6 space-y-6">
-        <h4 className="text-sm sm:text-md font-medium text-foreground mb-3 flex flex-col items-start gap-1">
-          <span className="flex items-center gap-2">
-            <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">5.6</span> HSES Photo Reference
-          </span>
-        </h4>
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="text-sm sm:text-md font-medium text-foreground flex flex-col items-start gap-1">
+            <span className="flex items-center gap-2">
+              <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">5.6</span> 
+              HSES Photo Reference
+            </span>
+          </h4>
+          
+          <button
+            onClick={handleAggregateImages}
+            disabled={isAggregating || !sharedData?.dateRange || (!sharedData?.projectId && !sharedData?.projectName)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title={!sharedData?.dateRange || (!sharedData?.projectId && !sharedData?.projectName) ? "Project and date range are required" : reportId ? "Aggregate images from daily reports" : "Preview images (will save when report is saved)"}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${isAggregating ? 'animate-spin' : ''}`} />
+            {isAggregating ? 'Aggregating...' : reportId ? 'Aggregate Images' : 'Preview Images'}
+          </button>
+        </div>
         <ReferenceSection
           sections={hsesData.hsePhotoReferences?.hseToolboxMeeting?.length > 0 ? hsesData.hsePhotoReferences.hseToolboxMeeting : createHSESections()}
           setSections={(sections) => updateData("hsePhotoReferences", { ...hsesData.hsePhotoReferences, hseToolboxMeeting: sections })}

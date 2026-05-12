@@ -69,31 +69,56 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
     signatureImage: data.signatureImage || "",
     signatoryName: data.signatoryName || "",
     signatoryPosition: data.signatoryPosition || "Project Manager",
-    constructorName:
-      "Cambodian Advanced Construction Project Management (CACPM)",
-    companyLocation:
-      "8th floor, K1 Tower, No.148, Mao Tse Toung Blvd (245),Sangkat Toul Tumpong II, Khan Chamkamom, Phnom Penh, Cambodia",
-    companyPhone1: "T +855 (0) 23 964 417~8",
+    constructorName: data.constructorName || "Cambodian Advanced Construction Project Management (CACPM)",
+    companyLocation: data.companyLocation || "8th floor, K1 Tower, No.148, Mao Tse Toung Blvd (245),Sangkat Toul Tumpong II, Khan Chamkamom, Phnom Penh, Cambodia",
+    companyPhone1: data.companyPhone1 || "T +855 (0) 23 964 417~8",
     companyPhone2: data.companyPhone2 || "",
     companyEmail1: data.companyEmail1 || "",
-    companyEmail2: "www.cambodiacpm.com",
+    companyEmail2: data.companyEmail2 || "www.cambodiacpm.com",
     refNoPrefix: data.refNoPrefix || "ICT-CPM-WRP",
   });
-  useEffect(() => {
-    // Parse date range to get start and end dates
-    let dateRangeText = letterData.dateRange;
-    if (letterData.dateRange && letterData.dateRange.includes("~")) {
-      const dates = letterData.dateRange.split("~");
-      if (dates.length === 2) {
-        dateRangeText = `from ${dates[0].trim()} to ${dates[1].trim()}`;
-      }
-    }
 
-    const generatedBody = `Dear Sir,<br>We are pleased to submit Weekly Progress Report No-${letterData.weekNumber} ${dateRangeText} for ${letterData.projectName}.<br><br>Sincerely Yours,`;
-    if (generatedBody !== letterData.letterBody) {
+  // Sync with parent data changes (when selected report changes)
+  useEffect(() => {
+    setLetterData({
+      weekNumber: data.weekNumber || "",
+      dateRange: data.dateRange || "",
+      projectName: data.projectName || "",
+      reportDate: data.reportDate ? formatDateToYYYYMMDD(data.reportDate) : new Date().toISOString().split("T")[0],
+      recipientCompany: data.recipientCompany || "",
+      recipientLocation: data.recipientLocation || "",
+      recipientName: data.recipientName || "",
+      ccList: data.ccList || [""],
+      letterBody: data.letterBody || "",
+      signatureImage: data.signatureImage || "",
+      signatoryName: data.signatoryName || "",
+      signatoryPosition: data.signatoryPosition || "Project Manager",
+      constructorName: data.constructorName || "Cambodian Advanced Construction Project Management (CACPM)",
+      companyLocation: data.companyLocation || "8th floor, K1 Tower, No.148, Mao Tse Toung Blvd (245),Sangkat Toul Tumpong II, Khan Chamkamom, Phnom Penh, Cambodia",
+      companyPhone1: data.companyPhone1 || "T +855 (0) 23 964 417~8",
+      companyPhone2: data.companyPhone2 || "",
+      companyEmail1: data.companyEmail1 || "",
+      companyEmail2: data.companyEmail2 || "www.cambodiacpm.com",
+      refNoPrefix: data.refNoPrefix || "ICT-CPM-WRP",
+    });
+  }, [data]);
+
+  useEffect(() => {
+    // Only auto-generate letter body if it's empty and we have the required fields
+    if (!letterData.letterBody || letterData.letterBody === '') {
+      // Parse date range to get start and end dates
+      let dateRangeText = letterData.dateRange;
+      if (letterData.dateRange && letterData.dateRange.includes("~")) {
+        const dates = letterData.dateRange.split("~");
+        if (dates.length === 2) {
+          dateRangeText = `from ${dates[0].trim()} to ${dates[1].trim()}`;
+        }
+      }
+
+      const generatedBody = `Dear Sir,<br>We are pleased to submit Weekly Progress Report No-${letterData.weekNumber} ${dateRangeText} for ${letterData.projectName}.<br><br>Sincerely Yours,`;
       setLetterData((prev) => ({ ...prev, letterBody: generatedBody }));
     }
-  }, [letterData.weekNumber, letterData.dateRange, letterData.projectName]);
+  }, [letterData.weekNumber, letterData.dateRange, letterData.projectName, letterData.letterBody]);
 
   const handleCCChange = (index: number, value: string) => {
     const updatedCCList = [...letterData.ccList];
@@ -149,14 +174,15 @@ const WeeklyReportLetter: React.FC<WeeklyReportLetterProps> = ({
     data.companyEmail1,
   ]);
 
-  // Always use today's date for report date
+  // Only set default report date if none provided
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    if (today !== letterData.reportDate) {
-      setLetterData((prev) => ({ ...prev, reportDate: today }));
-      onDataChange?.({ ...letterData, reportDate: today });
+    if (!data.reportDate) {
+      const today = new Date().toISOString().split("T")[0];
+      if (today !== letterData.reportDate) {
+        setLetterData((prev) => ({ ...prev, reportDate: today }));
+      }
     }
-  }, []);
+  }, [data.reportDate]);
 
   return (
     <div

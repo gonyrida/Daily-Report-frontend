@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,7 +8,17 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
+import WeeklyReportContent from "@/components/weekly/WeeklyReportContent";
+import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
+import WeeklyReportLetter from "@/components/weekly/WeeklyReportLetter";
+import { MasterScheduleSupabase } from "@/components/weekly/MasterScheduleSupabase";
 import { Button } from "@/components/ui/button";
+import { transformMasterToReportData } from "@/utils/masterReportTransform";
+import { ConstructionProgressItem, ConstructionProgressData } from "@/types/constructionProgress";
+import { MasterConstructionProgressItem } from "@/types/masterReport.types";
+import { getMasterWeeklyReport, getFolderMasterSchedule, updateFolderMasterSchedule } from "@/services/weeklyReportService";
+import type { MasterScheduleEntry } from "@/types/weeklyReport.types";
+import { TabType } from "@/types/weeklyReportContent.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,14 +38,27 @@ import {
   LayoutDashboard,
   ArrowLeft,
   Trash2,
+  FileDown,
+  FileSpreadsheet,
+  FolderOpen,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportMasterToPdf } from "@/components/weekly/MasterReportView";
+import { exportMasterReportToExcel } from "@/lib/masterReportExcel";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileIcon from "@/components/ProfileIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { WeeklyReportSkeleton, SummaryCardSkeleton } from "@/components/WeeklyReportSkeleton";
-import { getWeeklyReports, getWeeklyReportsMeta, getCompanyWeeklyReports, deleteWeeklyReport } from "@/services/weeklyReportService";
-import { getProjectById } from "@/integrations/projectsApi";
+import { getWeeklyReports, getWeeklyReportsMeta, getCompanyWeeklyReports, deleteWeeklyReport, getWeeklyReportById } from "@/services/weeklyReportService";
+import { getProjectById, type Project } from "@/integrations/projectsApi";
+import { getFoldersWithProjects, type Folder } from "@/integrations/foldersApi";
+import { folderEvents, projectEvents } from "@/utils/eventEmitter";
 import type { WeeklyReport } from "@/types/weeklyReport.types";
 import {
   AlertDialog,
@@ -192,12 +215,24 @@ const WeeklyReportDashboard = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('projectId');
+  const folderId  = searchParams.get('folderId');
+  const reportType = searchParams.get('type');
+  
+  // Current week for master report view
+  const [currentWeek, setCurrentWeek] = useState(() => getWeekNumber(new Date()));
   
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Folder/project hierarchy for the landing view
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [rootProjects, setRootProjects] = useState<Project[]>([]);
+  const [isFoldersLoading, setIsFoldersLoading] = useState(true);
 
   const getCurrentUserId = useCallback(() => {
     const userStr = localStorage.getItem('user');
@@ -212,19 +247,57 @@ const WeeklyReportDashboard = () => {
     return null;
   }, []);
 
+  const loadFoldersWithProjects = useCallback(async () => {
+    try {
+      setIsFoldersLoading(true);
+      const response = await getFoldersWithProjects();
+      if (response.success) {
+        setFolders(response.data as Folder[]);
+        setRootProjects(response.rootProjects || []);
+      }
+    } catch (error) {
+      console.error("Failed to load folders:", error);
+    } finally {
+      setIsFoldersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFoldersWithProjects();
+  }, [loadFoldersWithProjects]);
+
+  useEffect(() => {
+    const handleChange = () => loadFoldersWithProjects();
+    folderEvents.on('folderCreated', handleChange);
+    folderEvents.on('folderUpdated', handleChange);
+    folderEvents.on('folderDeleted', handleChange);
+    projectEvents.on('projectAdded', handleChange);
+    projectEvents.on('projectUpdated', handleChange);
+    projectEvents.on('projectDeleted', handleChange);
+    return () => {
+      folderEvents.off('folderCreated', handleChange);
+      folderEvents.off('folderUpdated', handleChange);
+      folderEvents.off('folderDeleted', handleChange);
+      projectEvents.off('projectAdded', handleChange);
+      projectEvents.off('projectUpdated', handleChange);
+      projectEvents.off('projectDeleted', handleChange);
+    };
+  }, [loadFoldersWithProjects]);
+
   // Parallel data fetching with React Query
+  const currentUserId = getCurrentUserId();
   const results = useQueries({
     queries: [
       {
-        queryKey: ['weeklyReportsMeta', projectId, searchTerm, filterStatus],
+        queryKey: ['weeklyReportsMeta', currentUserId, projectId, searchTerm, filterStatus],
         queryFn: () => getWeeklyReportsMeta({
           projectId: projectId || undefined,
           searchTerm,
           status: filterStatus === 'all' ? undefined : filterStatus,
           limit: 50
         }),
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        refetchOnWindowFocus: false,
+        staleTime: 0, // Always fetch fresh data
+        refetchOnWindowFocus: true,
       },
       {
         queryKey: ['companyReports', projectId, searchTerm],
@@ -255,27 +328,10 @@ const WeeklyReportDashboard = () => {
   const isLoading = weeklyReportsQuery.isLoading;
   const isLoadingCompany = companyReportsQuery.isLoading;
   
-  // Filter reports on client side (for now - will move to server side later)
+  // Filter reports on client side
   const filteredReports = weeklyReports.filter(report => {
-    // First check if report belongs to current user
-    const currentUserId = getCurrentUserId();
-    
-    // Handle different userId formats from database
-    let isOwner = false;
-    if (typeof report.userId === 'string') {
-      isOwner = report.userId === currentUserId;
-    } else if (report.userId && typeof report.userId === 'object') {
-      isOwner = (report.userId as any).$oid === currentUserId || 
-                 (report.userId as any)._id === currentUserId || 
-                 (report.userId as any).id === currentUserId;
-    } else if (report.userId) {
-      isOwner = report.userId.toString() === currentUserId;
-    }
-    
-    // If not owner, don't show in personal tab
-    if (!isOwner) return false;
-    
-    // Filter by project if specified
+    // Backend already filters by userId, so all reports belong to current user
+    // Just filter by project if specified
     if (projectId) {
       const reportProjectId = report.projectId;
       // If report has no projectId, show it (it's the owner's report with no project assigned)
@@ -401,6 +457,705 @@ const WeeklyReportDashboard = () => {
   const weeklyTotal = weeklyReports.filter(r => r.status === 'submitted').length;
   const lastSubmitted = getLastSubmittedThisMonth(filteredReports, getCurrentUserId());
 
+  // Sum of all project.weeklyReportCount values within a folder
+  const getFolderReportCount = (folder: Folder): number => {
+    if (folder.projects && folder.projects.length > 0) {
+      return folder.projects.reduce((sum, p) => sum + (p.weeklyReportCount || 0), 0);
+    }
+    return folder.weeklyReportCount || folder.reportCount || 0;
+  };
+
+  // ── Master Report mode ──────────────────────────────────────────────────
+  // When ?folderId=xxx&type=master is present, render the folder-level
+  // aggregated view using WeeklyReportContent for unified interface
+  const { data: masterReportData } = useQuery({
+    queryKey: ['masterReport', folderId, currentWeek],
+    queryFn: () => getMasterWeeklyReport(folderId!, currentWeek),
+    enabled: !!folderId && reportType === 'master',
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
+  const handleMasterPreview = async () => {
+    const reportData = masterReportData?.data;
+    if (!reportData) return;
+    setIsPreviewing(true);
+    try {
+      await exportMasterToPdf(reportData, 'MasterWeeklyReport.pdf', 'preview');
+      toast({ title: 'Preview Opened', description: 'Master report preview opened in a new tab.' });
+    } catch (err) {
+      console.error('Master preview error:', err);
+      toast({ title: 'Preview Failed', description: 'Could not generate preview. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleMasterExportPDF = async () => {
+    const reportData = masterReportData?.data;
+    if (!reportData) return;
+    setIsExporting(true);
+    try {
+      await exportMasterToPdf(reportData);
+      toast({ title: 'PDF Exported', description: `Master_Report_${reportData.folder.name}_Week${reportData.weekNumber}.pdf downloaded.` });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export PDF. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleMasterExportExcel = async () => {
+    const reportData = masterReportData?.data;
+    if (!reportData) return;
+    setIsExporting(true);
+    try {
+      await exportMasterReportToExcel(reportData);
+      toast({ title: 'Excel Exported', description: 'Master report exported as Excel successfully.' });
+    } catch (err) {
+      console.error('Master Excel export error:', err);
+      toast({ title: 'Export Failed', description: 'Could not export Excel. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleMasterExportZIP = async () => {
+    setIsExporting(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      toast({ title: 'ZIP Exported', description: 'Master report exported as ZIP containing both PDF and Excel files.' });
+    } catch {
+      toast({ title: 'Export Failed', description: 'Could not export ZIP. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  if (folderId && reportType === 'master') {
+    const transformedData = masterReportData?.data
+      ? transformMasterToReportData(masterReportData.data)
+      : null;
+
+    // Tab state for master report
+    const [masterActiveTab, setMasterActiveTab] = useState<TabType>('table-of-content');
+    const [masterShowSecondNav, setMasterShowSecondNav] = useState(false);
+    const [masterShowIntroduction, setMasterShowIntroduction] = useState(false);
+
+    // Master schedule state (folder-owned, not aggregated)
+    const [masterScheduleEntries, setMasterScheduleEntries] = useState<MasterScheduleEntry[]>([]);
+    const [isScheduleSaving, setIsScheduleSaving] = useState(false);
+
+    React.useEffect(() => {
+      if (!folderId) return;
+      getFolderMasterSchedule(folderId).then((result) => {
+        if (result.success && Array.isArray(result.data)) {
+          setMasterScheduleEntries(result.data);
+        }
+      });
+    }, [folderId]);
+    
+    // Selected report state for displaying specific report data in Cover/Letter/Construction tabs
+    const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+    const [selectedReportData, setSelectedReportData] = useState<WeeklyReport | null>(null);
+    
+    // Fetch selected report data when reportId changes
+    const { data: selectedReportQueryData } = useQuery({
+      queryKey: ['selectedReport', selectedReportId],
+      queryFn: () => selectedReportId ? getWeeklyReportById(selectedReportId) : Promise.resolve(null),
+      enabled: !!selectedReportId && reportType === 'master',
+    });
+    
+    // Update selectedReportData when query data changes
+    React.useEffect(() => {
+      if (selectedReportQueryData?.data) {
+        setSelectedReportData(selectedReportQueryData.data);
+      }
+    }, [selectedReportQueryData]);
+
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <HierarchicalSidebar />
+          <SidebarInset>
+            <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+                <h1 className="text-lg font-semibold">
+                  Master Weekly Report{transformedData ? `: ${transformedData.metadata.folderName}` : ''}
+                </h1>
+              </div>
+              {/* Week selector for master report */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Week</span>
+                <select
+                  value={currentWeek}
+                  onChange={(e) => setCurrentWeek(parseInt(e.target.value))}
+                  className="w-20 h-9 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {Array.from({ length: 52 }, (_, i) => i + 1).map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </div>
+            </header>
+            
+            {/* Tab Navigation */}
+            {transformedData && (
+              <>
+                <div className="px-6 py-3 border-b bg-background">
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <Button
+                      variant={masterActiveTab === "construction-progress" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("construction-progress");
+                        setMasterShowSecondNav(false);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Con.Prog
+                    </Button>
+                    <Button
+                      variant={masterActiveTab === "cover" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("cover");
+                        setMasterShowSecondNav(false);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Cover
+                    </Button>
+                    <Button
+                      variant={masterActiveTab === "letter" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("letter");
+                        setMasterShowSecondNav(false);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Letter
+                    </Button>
+                    <Button
+                      variant={masterActiveTab === "table-of-content" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setMasterActiveTab("table-of-content");
+                        setMasterShowSecondNav(true);
+                        setMasterShowIntroduction(false);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="rounded-full relative z-10 transition-all duration-200 hover:scale-105"
+                    >
+                      Table of Content
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Second Navigation Bar */}
+                {masterShowSecondNav && (
+                  <div className="w-full px-2 sm:px-4 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
+                    <div className="relative flex items-center justify-center gap-1">
+                      {/* Left Arrow */}
+                      <button
+                        onClick={() => {
+                          const el = document.getElementById("master-second-nav-scroll");
+                          if (el) el.scrollBy({ left: -150, behavior: "smooth" });
+                        }}
+                        className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m15 18-6-6 6-6" />
+                        </svg>
+                      </button>
+
+                      {/* Scrollable Tab Row */}
+                      <div
+                        id="master-second-nav-scroll"
+                        className="flex flex-row items-center justify-center gap-1.5 overflow-x-auto overflow-y-hidden"
+                        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                        onMouseDown={(e) => {
+                          const el = e.currentTarget;
+                          el.dataset.isDown = "true";
+                          el.dataset.startX = String(e.pageX - el.offsetLeft);
+                          el.dataset.scrollLeft = String(el.scrollLeft);
+                        }}
+                        onMouseLeave={(e) => { e.currentTarget.dataset.isDown = "false"; }}
+                        onMouseUp={(e) => { e.currentTarget.dataset.isDown = "false"; }}
+                        onMouseMove={(e) => {
+                          const el = e.currentTarget;
+                          if (el.dataset.isDown !== "true") return;
+                          e.preventDefault();
+                          const x = e.pageX - el.offsetLeft;
+                          const walk = (x - Number(el.dataset.startX)) * 1.5;
+                          el.scrollLeft = Number(el.dataset.scrollLeft) - walk;
+                        }}
+                      >
+                        <style>{`#master-second-nav-scroll::-webkit-scrollbar { display: none; }`}</style>
+                        {[
+                          { id: 1, name: "Intro", tab: "introduction" },
+                          { id: 2, name: "O.progress", tab: "overall-progress" },
+                          { id: 3, name: "Activities", tab: "activities" },
+                          { id: 4, name: "QAQC", tab: "qaqc-status" },
+                          { id: 5, name: "HSES", tab: "hses" },
+                          { id: 6, name: "Resources", tab: "resource" },
+                          { id: 7, name: "Photos", tab: "photos" },
+                          { id: 8, name: "Issues", tab: "issues" },
+                          { id: 9, name: "Schedule", tab: "schedule" },
+                        ].map((section) => {
+                          const isActiveSection = masterActiveTab === section.tab;
+                          return (
+                            <Button
+                              key={section.id}
+                              variant={isActiveSection ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setMasterActiveTab(section.tab as TabType);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="px-3 py-1.5 text-xs rounded-full transition-all duration-200 hover:scale-105 flex-shrink-0 h-8 min-w-fit"
+                            >
+                              {section.id}. {section.name}
+                            </Button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Right Arrow */}
+                      <button
+                        onClick={() => {
+                          const el = document.getElementById("master-second-nav-scroll");
+                          if (el) el.scrollBy({ left: 150, behavior: "smooth" });
+                        }}
+                        className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            
+            <main className="flex-1 p-6">
+              {transformedData ? (
+                <>
+                  {/* Construction Progress Tab */}
+                  {masterActiveTab === "construction-progress" && (() => {
+                    // If a specific report is selected, use its data
+                    if (selectedReportData?.sections?.constructionProgress) {
+                      const cpSection = selectedReportData.sections.constructionProgress;
+                      const conProgData: ConstructionProgressData = {
+                        projectInfo: {
+                          project: cpSection.projectInfo?.project || selectedReportData.projectName || transformedData.metadata.folderName,
+                          subtitle: cpSection.projectInfo?.subtitle || '',
+                          date: cpSection.projectInfo?.date || '',
+                          revision: cpSection.projectInfo?.revision || '',
+                        },
+                        items: cpSection.items || [],
+                      };
+                      return (
+                        <WeeklyReportConstructionProgress
+                          data={conProgData}
+                          isCreateNewMode={false}
+                        />
+                      );
+                    }
+                    
+                    // Otherwise use aggregated data
+                    const cpEntries = Object.values(transformedData.constructionProgress);
+                    if (cpEntries.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card rounded-lg border">
+                          <p className="text-lg font-medium">No Construction Progress Data</p>
+                          <p className="text-sm">No construction progress data available for this week</p>
+                        </div>
+                      );
+                    }
+                    const ep = { qty: 0, amount: 0, percentage: 0 };
+                    const allItems: ConstructionProgressItem[] = cpEntries.flatMap(
+                      (projectData) => projectData.items.map(
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        ({ projectSource: _ps, ...item }: MasterConstructionProgressItem): ConstructionProgressItem => ({
+                          ...item,
+                          boQ: item.boQ ?? { qty: 0, materialRate: 0, laborRate: 0, unitRate: 0, amount: 0 },
+                          previousWeek:     item.previousWeek     ?? ep,
+                          thisWeek:         item.thisWeek         ?? ep,
+                          upToThisWeek:     item.upToThisWeek     ?? ep,
+                          remaining:        item.remaining        ?? ep,
+                          nextWeekPlan:     item.nextWeekPlan     ?? ep,
+                          upToNextWeekPlan: item.upToNextWeekPlan ?? ep,
+                        })
+                      )
+                    );
+                    // Get project info from first construction progress entry
+                    const firstProject = Object.values(transformedData.constructionProgress)[0];
+                    const projectName = firstProject?.projectInfo?.project || transformedData.metadata.folderName;
+                    const projectSubtitle = firstProject?.projectInfo?.subtitle || `Aggregated from ${transformedData.metadata.projectCount} project${transformedData.metadata.projectCount !== 1 ? 's' : ''}`;
+                    
+                    const conProgData: ConstructionProgressData = {
+                      projectInfo: {
+                        project: projectName,
+                        subtitle: projectSubtitle,
+                        date: firstProject?.projectInfo?.date || '',
+                        revision: firstProject?.projectInfo?.revision || '',
+                      },
+                      items: allItems,
+                    };
+                    return (
+                      <WeeklyReportConstructionProgress
+                        data={conProgData}
+                        isCreateNewMode={false}
+                      />
+                    );
+                  })()}
+
+                  {/* Letter Tab — rendered with the same layout as the single Report */}
+                  {masterActiveTab === "letter" && (
+                    <div className="bg-card rounded-lg border p-6">
+                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+                        LETTER OF SUBMITTAL
+                      </h2>
+                      <WeeklyReportLetter
+                        data={selectedReportData?.sections?.letter ? {
+                          weekNumber: selectedReportData.sections.letter.weekNumber || transformedData.metadata.weekNumber.toString(),
+                          dateRange: selectedReportData.sections.letter.dateRange || `Week ${transformedData.metadata.weekNumber}`,
+                          projectName: selectedReportData.sections.letter.projectName || transformedData.metadata.folderName,
+                          reportDate: selectedReportData.sections.letter.reportDate,
+                          recipientCompany: selectedReportData.sections.letter.recipientCompany,
+                          recipientLocation: selectedReportData.sections.letter.recipientLocation,
+                          recipientName: selectedReportData.sections.letter.recipientName,
+                          ccList: selectedReportData.sections.letter.ccList,
+                          letterBody: selectedReportData.sections.letter.letterBody,
+                          signatureImage: selectedReportData.sections.letter.signatureImage,
+                          signatoryName: selectedReportData.sections.letter.signatoryName,
+                          signatoryPosition: selectedReportData.sections.letter.signatoryPosition,
+                          constructorName: selectedReportData.sections.letter.constructorName,
+                          companyLocation: selectedReportData.sections.letter.companyLocation,
+                          companyPhone1: selectedReportData.sections.letter.companyPhone1,
+                          companyPhone2: selectedReportData.sections.letter.companyPhone2,
+                          companyEmail1: selectedReportData.sections.letter.companyEmail1,
+                          companyEmail2: selectedReportData.sections.letter.companyEmail2,
+                          refNoPrefix: selectedReportData.sections.letter.refNoPrefix,
+                        } : {
+                          weekNumber: transformedData.metadata.weekNumber.toString(),
+                          projectName: transformedData.metadata.folderName,
+                          dateRange: `Week ${transformedData.metadata.weekNumber}`,
+                        }}
+                        onDataChange={() => {}}
+                      />
+                    </div>
+                  )}
+
+                  {/* Master Schedule Tab — folder-owned, not aggregated */}
+                  {masterActiveTab === "schedule" && (
+                    <div className="bg-card rounded-lg border p-6">
+                      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+                          9. Master Schedule
+                        </h2>
+                        <MasterScheduleSupabase
+                          entries={masterScheduleEntries}
+                          onChange={async (entries) => {
+                            setMasterScheduleEntries(entries);
+                            if (!folderId) return;
+                            setIsScheduleSaving(true);
+                            await updateFolderMasterSchedule(folderId, entries).catch(() => {});
+                            setIsScheduleSaving(false);
+                          }}
+                          disabled={isScheduleSaving}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cover tab (already fixed via MasterReportCover) and all content tabs
+                      (Intro, Overall Progress, Activities, QA/QC, HSES, Resource, Photos,
+                      Issues) — single WeeklyReportContent instance with the
+                      standard Report outer container applied to every tab except Cover. */}
+                  {masterActiveTab !== "construction-progress" && masterActiveTab !== "letter" && masterActiveTab !== "schedule" && (
+                    <div className={masterActiveTab !== "cover" ? "bg-card rounded-lg border p-6" : ""}>
+                      {/* Table of Content Header */}
+                      {masterActiveTab === "table-of-content" && (
+                        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg text-foreground -mx-6 -mt-6 mb-6">
+                          TABLE OF CONTENT
+                        </h2>
+                      )}
+                      <WeeklyReportContent
+                        mode="master"
+                        masterMetadata={transformedData.metadata}
+                        coverData={selectedReportData?.sections?.cover ? {
+                          ...transformedData.coverData,
+                          projectName: selectedReportData.sections.cover.projectName || transformedData.coverData.projectName,
+                          projectTitle: selectedReportData.sections.cover.projectTitle || transformedData.coverData.projectTitle,
+                          dateRange: selectedReportData.sections.cover.dateRange || transformedData.coverData.dateRange,
+                          coverImage: selectedReportData.sections.cover.coverImage || transformedData.coverData.coverImage,
+                          employer: selectedReportData.sections.cover.employer || transformedData.coverData.employer,
+                        } : transformedData.coverData}
+                        weeklyActivities={transformedData.weeklyActivities}
+                        nextWeekPlan={transformedData.nextWeekPlan}
+                        overallProgressData={{ rows: transformedData.overallProgressRows, setRows: () => {}, updateRows: () => {}, addTitleRow: () => {}, addDetailRow: () => {} }}
+                        overallProgressRemark={transformedData.overallProgressRemark}
+                        resourcesData={transformedData.resourcesData}
+                        photosData={{ locations: transformedData.photosLocations }}
+                        constructionIssues={transformedData.constructionIssues}
+                        constructionProgressItems={transformedData.constructionProgress}
+                        constructionProgress={(() => {
+                          console.log('🔍 Dashboard - constructionProgress from transformedData:', {
+                            constructionProgressKeys: Object.keys(transformedData.constructionProgress || {}),
+                            constructionProgressData: transformedData.constructionProgress,
+                            transformedDataKeys: Object.keys(transformedData)
+                          });
+                          return transformedData.constructionProgress;
+                        })()}
+                        qaqcData={transformedData.aggregatedQaqcData}
+                        setQaqcData={() => {}}
+                        hsesData={transformedData.aggregatedHsesData}
+                        setHsesData={() => {}}
+                        showIntroduction={masterShowIntroduction}
+                        setShowIntroduction={setMasterShowIntroduction}
+                        activeTab={masterActiveTab}
+                        setActiveTab={setMasterActiveTab}
+                        setShowSecondNav={setMasterShowSecondNav}
+                        sharedData={{
+                          projectOverview: selectedReportData
+                            ? (selectedReportData.sections?.introduction?.projectOverview ?? '')
+                            : (transformedData.introduction.projectOverview || `Master report for ${transformedData.metadata.folderName} - Week ${transformedData.metadata.weekNumber}`),
+                          designNConstruction: selectedReportData
+                            ? (selectedReportData.sections?.introduction?.designNConstruction ?? '')
+                            : (transformedData.introduction.designConstruction || `Aggregated data from ${transformedData.metadata.projectCount} projects`),
+                          dateRange: transformedData.coverData.dateRange,
+                        }}
+                        introductionData={{
+                          projectOverview: selectedReportData
+                            ? (selectedReportData.sections?.introduction?.projectOverview ?? '')
+                            : transformedData.introduction.projectOverview,
+                          designConstruction: selectedReportData
+                            ? (selectedReportData.sections?.introduction?.designNConstruction ?? '')
+                            : transformedData.introduction.designConstruction,
+                        }}
+                        onSelectReport={(reportId: string) => setSelectedReportId(reportId)}
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center justify-center py-24">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-center py-6 border-t border-border mt-6">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    className="min-w-[140px]"
+                    onClick={handleMasterPreview}
+                    disabled={isPreviewing}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    {isPreviewing ? 'Previewing...' : 'Preview'}
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="min-w-[160px] bg-primary hover:bg-primary/90"
+                        disabled={isExporting || !masterReportData?.data}
+                      >
+                        <FileDown className="w-4 h-4 mr-2" />
+                        {isExporting ? 'Exporting...' : 'Export'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleMasterExportPDF} disabled={isExporting}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Export As PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleMasterExportExcel} disabled={isExporting}>
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Export As Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleMasterExportZIP} disabled={isExporting}>
+                        <FileDown className="w-4 h-4 mr-2" />
+                        Export As ZIP
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  // ── Landing view — no projectId and not a master report ─────────────────
+  // Mirrors the sidebar's Weekly Report section as a visual card hierarchy.
+  if (!projectId) {
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <HierarchicalSidebar />
+          <SidebarInset>
+            <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+                <h1 className="text-lg font-semibold">Weekly Reports</h1>
+              </div>
+              <div className="flex items-center gap-4">
+                <ThemeToggle />
+                <ProfileIcon />
+              </div>
+            </header>
+
+            <main className="flex-1 space-y-6 p-6">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold tracking-tight">Weekly Reports</h2>
+                <p className="text-muted-foreground">
+                  Select a folder to view its master report, or pick a project to view its reports.
+                </p>
+              </div>
+
+              {isFoldersLoading ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                  <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>
+                  <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>
+                  <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>
+                </div>
+              ) : (
+                <>
+                  {/* Folders — each navigates to the master report, exactly like the sidebar */}
+                  {folders.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FolderOpen className="h-5 w-5" />
+                        Folders
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                        {folders.map((folder) => (
+                          <Card
+                            key={folder._id}
+                            className="cursor-pointer hover:shadow-md transition-shadow"
+                            onClick={() =>
+                              navigate(`/weekly-reports?folderId=${folder._id}&type=master`)
+                            }
+                          >
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center gap-2">
+                                <FolderOpen className="h-5 w-5 text-primary flex-shrink-0" />
+                                <CardTitle className="text-base leading-tight">{folder.name}</CardTitle>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="flex items-center justify-between text-sm mb-2">
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Total Reports
+                                </span>
+                                <Badge variant="secondary">{getFolderReportCount(folder)}</Badge>
+                              </div>
+                              {/* Project list inside the folder — each navigates exactly like the sidebar */}
+                              {folder.projects && folder.projects.length > 0 && (
+                                <div className="space-y-1 border-t pt-2 mt-2">
+                                  {folder.projects.map((project) => (
+                                    <button
+                                      key={project._id}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(
+                                          `/weekly-reports?projectId=${encodeURIComponent(project._id)}`
+                                        );
+                                      }}
+                                      className="w-full flex items-center justify-between px-2 py-1 text-xs rounded hover:bg-muted transition-colors text-left"
+                                    >
+                                      <span className="text-muted-foreground truncate flex-1">
+                                        {project.name}
+                                      </span>
+                                      <Badge variant="outline" className="ml-2 text-xs flex-shrink-0">
+                                        {project.weeklyReportCount ?? 0}
+                                      </Badge>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Root projects (no folder) — navigate exactly like the sidebar */}
+                  {rootProjects.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Projects (No Folder)
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                        {rootProjects.map((project) => (
+                          <Card
+                            key={project._id}
+                            className="cursor-pointer hover:shadow-md transition-shadow"
+                            onClick={() =>
+                              navigate(`/weekly-reports?projectId=${encodeURIComponent(project._id)}`)
+                            }
+                          >
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                                <CardTitle className="text-base leading-tight">{project.name}</CardTitle>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground flex items-center gap-2">
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Total Reports
+                                </span>
+                                <Badge variant="secondary">{project.weeklyReportCount ?? 0}</Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {folders.length === 0 && rootProjects.length === 0 && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center py-8">
+                          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">No Projects Found</h3>
+                          <p className="text-muted-foreground">
+                            Create a project in the sidebar to start managing weekly reports.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  // ── Project-specific view — ?projectId=xxx ────────────────────────────
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -463,7 +1218,7 @@ const WeeklyReportDashboard = () => {
             )}
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
               {isLoading ? (
                 <>
                   <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>

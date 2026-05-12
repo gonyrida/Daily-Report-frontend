@@ -10,10 +10,11 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
 
   // Add a new entry (with slots format)
   const addEntry = () => {
+    const currentEntries = section.entries || [];
     onUpdate({
       ...section,
       entries: [
-        ...section.entries,
+        ...currentEntries,
         {
           id: crypto.randomUUID(),
           slots: [
@@ -26,11 +27,13 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
   };
 
   const updateEntry = (updatedEntry: any) => {
-    onUpdate({ ...section, entries: section.entries.map((e: any) => (e.id === updatedEntry.id ? updatedEntry : e)) });
+    const currentEntries = section.entries || [];
+    onUpdate({ ...section, entries: currentEntries.map((e: any) => (e.id === updatedEntry.id ? updatedEntry : e)) });
   };
 
   const deleteEntry = (id: string) => {
-    onUpdate({ ...section, entries: section.entries.filter((e: any) => e.id !== id) });
+    const currentEntries = section.entries || [];
+    onUpdate({ ...section, entries: currentEntries.filter((e: any) => e.id !== id) });
   };
 
   const handleDelete = () => {
@@ -69,7 +72,8 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
     let remaining = [...allowed];
 
     // Ensure all entries have slots (migrate from images/footers if necessary)
-    const entries = section.entries.map((e: any) => {
+    const currentEntries = section.entries || [];
+    const entries = currentEntries.map((e: any) => {
       if (e.slots && Array.isArray(e.slots)) return { ...e, slots: e.slots.map((s: any) => ({ ...s })) };
       // migrate old format
       const s1 = { id: crypto.randomUUID(), image: e.images?.image1 ?? null, caption: e.footers?.[0] ?? "" };
@@ -183,7 +187,7 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
       </div>
 
       <div className="p-6">
-        {section.entries.length > 0 ? (
+        {section.entries && section.entries.length > 0 ? (
           <div className="space-y-6">
             {section.entries.map((entry: any, index: number) => (
               <div key={entry.id} className="relative">
@@ -197,7 +201,6 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
             <p className="text-sm">No entries yet. Add your entry below first.</p>
           </div>
         )}
-
       </div>
     </div>
   );

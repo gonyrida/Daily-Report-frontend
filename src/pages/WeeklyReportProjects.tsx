@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import HierarchicalSidebar from "@/components/HierarchicalSidebar";
@@ -33,12 +32,13 @@ import {
   FileText,
   Clock,
   MoreVertical,
-  User
+  User,
+  BarChart3,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ProfileIcon from "@/components/ProfileIcon";
-import { getRecentReports, getCompanyReports } from "@/integrations/reportsApi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,204 +46,162 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { projectEvents } from '@/utils/eventEmitter';
-import { getProjects, createProject, updateProject, deleteProject, Project } from "@/integrations/projectsApi";
-import { apiGet } from '@/lib/apiFetch';
+import { projectEvents, folderEvents } from "@/utils/eventEmitter";
+import { createProject, updateProject, deleteProject, type Project } from "@/integrations/projectsApi";
+import { getFoldersWithProjects, type Folder } from "@/integrations/foldersApi";
+import { apiGet } from "@/lib/apiFetch";
 
 const WeeklyReportProjects: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const folderId = searchParams.get("folderId");
   const { toast } = useToast();
-  
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+
+  // ── Data ──────────────────────────────────────────────────────────────
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [rootProjects, setRootProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ── UI ────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddProject, setShowAddProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+
+  // ── Project CRUD state ────────────────────────────────────────────────
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editProjectName, setEditProjectName] = useState("");
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [renameConfirmOpen, setRenameConfirmOpen] = useState(false);
-  const [renameData, setRenameData] = useState<{ oldName: string; newName: string } | null>(null);
+  const [renameData, setRenameData] = useState<{
+    id: string;
+    oldName: string;
+    newName: string;
+  } | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const loadProjects = useCallback(async () => {
+  // ── Data loading ──────────────────────────────────────────────────────
+  const loadFoldersWithProjects = useCallback(async () => {
     try {
       setIsLoading(true);
-      
-      // Fetch projects from API
-      const response = await getProjects();
-      
+      const response = await getFoldersWithProjects();
       if (response.success) {
-        // Transform API data to match component needs
-        const transformedProjects = (response.data as Project[]).map((project: Project) => ({
-          ...project,
-          // Add lastReportId for compatibility (will be populated by reports later)
-          lastReportId: undefined,
-        }));
-        
-        setProjects(transformedProjects);
-        setFilteredProjects(transformedProjects);
-      } else {
-        console.error("Failed to load projects:", response.error);
-        toast({
-          title: "Error",
-          description: response.error || "Failed to load projects",
-          variant: "destructive",
-        });
+        setFolders(response.data as Folder[]);
+        setRootProjects(response.rootProjects ?? []);
       }
     } catch (error) {
-      console.error("Failed to load projects:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load projects",
-        variant: "destructive",
-      });
+      console.error("Failed to load data:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
-  // Get current user info on mount
+  useEffect(() => {
+    loadFoldersWithProjects();
+  }, [loadFoldersWithProjects]);
+
+  // Reactive refresh when sidebar mutates folders/projects
+  useEffect(() => {
+    const handleChange = () => loadFoldersWithProjects();
+    folderEvents.on("folderCreated", handleChange);
+    folderEvents.on("folderUpdated", handleChange);
+    folderEvents.on("folderDeleted", handleChange);
+    projectEvents.on("projectAdded", handleChange);
+    projectEvents.on("projectUpdated", handleChange);
+    projectEvents.on("projectDeleted", handleChange);
+    return () => {
+      folderEvents.off("folderCreated", handleChange);
+      folderEvents.off("folderUpdated", handleChange);
+      folderEvents.off("folderDeleted", handleChange);
+      projectEvents.off("projectAdded", handleChange);
+      projectEvents.off("projectUpdated", handleChange);
+      projectEvents.off("projectDeleted", handleChange);
+    };
+  }, [loadFoldersWithProjects]);
+
   useEffect(() => {
     const getUserInfo = async () => {
       try {
-        const response = await apiGet('/auth/profile');
+        const response = await apiGet("/auth/profile");
         const data = await response.json();
-        
         if (data.success && data.user?._id) {
-          console.log("DEBUG: Setting currentUserId to:", data.user._id);
-          setCurrentUserId(data.user._id);  // ← Use _id instead of userId
+          setCurrentUserId(data.user._id);
         }
       } catch (error) {
-        console.error('Failed to get user info:', error);
+        console.error("Failed to get user info:", error);
       }
     };
-    
     getUserInfo();
   }, []);
 
-  useEffect(() => {
-    loadProjects();
-  }, []); // Changed from [loadProjects] to []
+  // ── Derived state ─────────────────────────────────────────────────────
+  const currentFolder = folderId
+    ? (folders.find((f) => f._id === folderId) ?? null)
+    : null;
 
-  // Filter projects based on search query
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const filtered = projects.filter(project => 
-        project.name.toLowerCase().includes(query)
-      );
-      setFilteredProjects(filtered);
-    } else {
-      setFilteredProjects(projects);
+  const folderProjects = currentFolder?.projects ?? [];
+
+  const getFolderReportCount = (folder: Folder): number => {
+    if (folder.projects && folder.projects.length > 0) {
+      return folder.projects.reduce((sum, p) => sum + (p.weeklyReportCount ?? 0), 0);
     }
-  }, [projects, searchQuery]);
-
-  // Wrap event handlers with useCallback
-  const handleProjectDeleted = useCallback(({ projectName }: { projectName: string }) => {
-    setProjects(currentProjects => currentProjects.filter(p => p.name !== projectName));
-    setFilteredProjects(currentProjects => currentProjects.filter(p => p.name !== projectName));
-    
-    toast({
-      title: "Project Synced",
-      description: `${projectName} removed from sidebar.`,
-    });
-  }, []);
-  const handleProjectAdded = useCallback(({ projectName }: { projectName: string }) => {
-    loadProjects();
-    
-    toast({
-      title: "Project Synced", 
-      description: `${projectName} added from sidebar.`,
-    });
-  }, [loadProjects]);
-  const handleProjectUpdated = useCallback(({ oldName, newName }: { oldName: string, newName: string }) => {
-    setProjects(currentProjects => currentProjects.map(p => 
-      p.name === oldName ? { ...p, name: newName } : p
-    ));
-    setFilteredProjects(currentProjects => currentProjects.map(p => 
-      p.name === oldName ? { ...p, name: newName } : p
-    ));
-    
-    toast({
-      title: "Project Synced",
-      description: `Project renamed from ${oldName} to ${newName}.`,
-    });
-  }, []);
-  useEffect(() => {
-    // Subscribe to events
-    projectEvents.on('projectDeleted', handleProjectDeleted);
-    projectEvents.on('projectAdded', handleProjectAdded);
-    projectEvents.on('projectUpdated', handleProjectUpdated);
-    // Cleanup on unmount
-    return () => {
-      projectEvents.off('projectDeleted', handleProjectDeleted);
-      projectEvents.off('projectAdded', handleProjectAdded);
-      projectEvents.off('projectUpdated', handleProjectUpdated);
-    };
-  }, [handleProjectDeleted, handleProjectAdded, handleProjectUpdated]);
-
-  // Helper function to get current user ID from user context
-  const getCurrentUserId = () => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return user.id || user.userId;
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
-    return null;
+    return folder.weeklyReportCount ?? folder.reportCount ?? 0;
   };
 
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+  // Filtered lists
+  const filteredFolders = folders.filter((f) =>
+    f.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredRootProjects = rootProjects.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredFolderProjects = folderProjects.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+  const findProject = (projectName: string): Project | undefined => {
+    for (const folder of folders) {
+      const p = folder.projects?.find((p) => p.name === projectName);
+      if (p) return p;
+    }
+    return rootProjects.find((p) => p.name === projectName);
+  };
+
+  // ── CRUD handlers ─────────────────────────────────────────────────────
   const handleAddProject = async () => {
-    if (newProjectName.trim()) {
-      try {
-        const response = await createProject(newProjectName.trim());
-        
-        if (response.success) {
-          // Refresh projects list
-          await loadProjects();
-          
-          // Navigate to weekly report with the new project
-          navigate(`/weekly-reports?project=${encodeURIComponent(newProjectName.trim())}`);
-          setNewProjectName("");
-          setShowAddProject(false);
-          
-          toast({
-            title: "Project Created",
-            description: `${newProjectName.trim()} has been created.`,
-          });
-          
-          // Emit event to sidebar
-          projectEvents.emit('projectAdded', { 
-            projectName: (response.data as Project).name,
-            createdBy: (response.data as Project).createdBy,
-            createdByName: (response.data as Project).createdByName
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: response.error || "Failed to create project",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error('Error creating project:', error);
+    const name = newProjectName.trim();
+    if (!name) return;
+    try {
+      const response = await createProject(name, folderId ?? undefined);
+      if (response.success) {
+        await loadFoldersWithProjects();
+        setNewProjectName("");
+        setShowAddProject(false);
+        const created = response.data as Project;
+        toast({ title: "Project Created", description: `${created.name} created.` });
+        projectEvents.emit("projectAdded", {
+          projectName: created.name,
+          createdBy: created.createdBy,
+          createdByName: created.createdByName,
+        });
+        // Navigate exactly like the sidebar
+        navigate(`/weekly-reports?projectId=${encodeURIComponent(created._id)}`);
+      } else {
         toast({
           title: "Error",
-          description: "Failed to create project",
+          description: response.error ?? "Failed to create project",
           variant: "destructive",
         });
       }
+    } catch {
+      toast({ title: "Error", description: "Failed to create project", variant: "destructive" });
     }
-  };
-
-  const handleProjectClick = (projectName: string) => {
-    navigate(`/weekly-reports?project=${encodeURIComponent(projectName)}`);
   };
 
   const handleEditProject = (projectName: string) => {
@@ -252,69 +210,46 @@ const WeeklyReportProjects: React.FC = () => {
   };
 
   const handleSaveEdit = () => {
-    if (editProjectName.trim() && editProjectName.trim() !== editingProject) {
-      console.log('🔧 Setting rename data and opening dialog');
-      setRenameData({
-        oldName: editingProject,
-        newName: editProjectName.trim()
-      });
-      setRenameConfirmOpen(true);
-    } else {
-      console.log('🔧 Clearing edit state');
+    const oldName = editingProject;
+    const newName = editProjectName.trim();
+    if (!oldName || !newName || newName === oldName) {
       setEditingProject(null);
       setEditProjectName("");
+      return;
+    }
+    const project = findProject(oldName);
+    if (project) {
+      setRenameData({ id: project._id, oldName, newName });
+      setRenameConfirmOpen(true);
     }
   };
 
   const confirmRename = async () => {
-    if (renameData) {
-      try {
-        // Find the project to get its ID
-        const project = projects.find(p => p.name === renameData.oldName);
-        if (!project) {
-          toast({
-            title: "Error",
-            description: "Project not found",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const response = await updateProject(project._id, renameData.newName);
-        
-        if (response.success) {
-          // Refresh projects list
-          await loadProjects();
-          
-          // Emit event to sidebar
-          projectEvents.emit('projectUpdated', { 
-            oldName: renameData.oldName, 
-            newName: renameData.newName 
-          });
-          
-          toast({
-            title: "Project Updated",
-            description: `Project renamed to "${renameData.newName}".`,
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: response.error || "Failed to update project",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error('Error updating project:', error);
+    if (!renameData) return;
+    try {
+      const response = await updateProject(renameData.id, renameData.newName);
+      if (response.success) {
+        await loadFoldersWithProjects();
+        projectEvents.emit("projectUpdated", {
+          oldName: renameData.oldName,
+          newName: renameData.newName,
+          projectId: renameData.id,
+        });
+        toast({ title: "Project Updated", description: `Renamed to "${renameData.newName}".` });
+      } else {
         toast({
           title: "Error",
-          description: "Failed to update project",
+          description: response.error ?? "Failed to rename project",
           variant: "destructive",
         });
       }
+    } catch {
+      toast({ title: "Error", description: "Failed to rename project", variant: "destructive" });
     }
-    
     setRenameConfirmOpen(false);
     setRenameData(null);
+    setEditingProject(null);
+    setEditProjectName("");
   };
 
   const handleCancelEdit = () => {
@@ -323,451 +258,552 @@ const WeeklyReportProjects: React.FC = () => {
   };
 
   const handleDeleteProject = async (projectName: string) => {
+    const project = findProject(projectName);
+    if (!project) return;
     try {
-      // Find the project to get its ID
-      const project = projects.find(p => p.name === projectName);
-      if (!project) {
-        toast({
-          title: "Error",
-          description: "Project not found",
-          variant: "destructive",
-        });
-        return;
-      }
-
       const response = await deleteProject(project._id);
-      
       if (response.success) {
-        // Refresh projects list
-        await loadProjects();
-        
-        // Emit event to sidebar
-        projectEvents.emit('projectDeleted', { projectName });
-        
-        toast({
-          title: "Project Deleted",
-          description: `${projectName} has been deleted.`,
-        });
+        await loadFoldersWithProjects();
+        projectEvents.emit("projectDeleted", { projectName });
+        toast({ title: "Project Deleted", description: `${projectName} deleted.` });
       } else {
         toast({
           title: "Error",
-          description: response.error || "Failed to delete project",
+          description: response.error ?? "Failed to delete project",
           variant: "destructive",
         });
       }
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete project",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error", description: "Failed to delete project", variant: "destructive" });
     }
   };
 
-  const handleDuplicateProject = (projectName: string) => {
-    const duplicateName = `${projectName} Copy`;
-    let finalName = duplicateName;
+  const handleDuplicateProject = async (projectName: string, projectFolderId?: string) => {
+    const base = `${projectName} Copy`;
+    let finalName = base;
     let counter = 1;
-    
-    while (projects.find(p => p.name === finalName)) {
-      finalName = `${duplicateName} ${counter}`;
-      counter++;
+    const allNames = [
+      ...folders.flatMap((f) => f.projects?.map((p) => p.name) ?? []),
+      ...rootProjects.map((p) => p.name),
+    ];
+    while (allNames.includes(finalName)) {
+      finalName = `${base} ${counter++}`;
     }
-    
-    // Save to sessionStorage
-    const localProjects = sessionStorage.getItem('localProjects') || '[]';
-    const parsedLocalProjects = JSON.parse(localProjects);
-    const updatedLocalProjects = [...parsedLocalProjects, finalName];
-    sessionStorage.setItem('localProjects', JSON.stringify(updatedLocalProjects));
-    
-    toast({
-      title: "Project Duplicated",
-      description: `${finalName} has been created.`,
-    });
-    
-    navigate(`/weekly-reports?project=${encodeURIComponent(finalName)}`);
+    try {
+      const response = await createProject(finalName, projectFolderId);
+      if (response.success) {
+        await loadFoldersWithProjects();
+        toast({ title: "Project Duplicated", description: `${finalName} created.` });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to duplicate project", variant: "destructive" });
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
+  // ── Project card (reused in both folder detail and root projects) ──────
+  const renderProjectCard = (project: Project) => (
+    <Card
+      key={project._id}
+      className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.01] group"
+      onClick={() =>
+        navigate(`/weekly-reports?projectId=${encodeURIComponent(project._id)}`)
+      }
+    >
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors flex-shrink-0">
+              <FolderOpen className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              {editingProject === project.name ? (
+                <Input
+                  value={editProjectName}
+                  onChange={(e) => setEditProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSaveEdit();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleCancelEdit();
+                    }
+                  }}
+                  className="h-6 text-sm"
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <CardTitle className="text-base leading-tight truncate">
+                  {project.name}
+                </CardTitle>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {editingProject === project.name ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }}
+                >
+                  ✓
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => { e.stopPropagation(); handleCancelEdit(); }}
+                >
+                  ×
+                </Button>
+              </>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDuplicateProject(project.name, project.folderId);
+                    }}
+                  >
+                    <Copy className="h-3 w-3 mr-2" />
+                    Duplicate
+                  </DropdownMenuItem>
+                  {project.createdBy === currentUserId && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditProject(project.name);
+                        }}
+                      >
+                        <Edit className="h-3 w-3 mr-2" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Trash2 className="h-3 w-3 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Permanently delete "{project.name}" and{" "}
+                              <strong>ALL its reports.</strong> This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProject(project.name);
+                              }}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              Total Reports
+            </span>
+            <Badge variant="secondary">{project.weeklyReportCount ?? 0}</Badge>
+          </div>
+          {project.lastWeeklyReportDate && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                Last Report
+              </span>
+              <span className="text-xs font-medium">{formatDate(project.lastWeeklyReportDate)}</span>
+            </div>
+          )}
+          {project.createdByName && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5" />
+                Created By
+              </span>
+              <span className="text-xs font-medium">
+                {project.createdBy === currentUserId ? "You" : project.createdByName}
+              </span>
+            </div>
+          )}
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/weekly-reports?projectId=${encodeURIComponent(project._id)}`);
+              }}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Open Project
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
-  if (isLoading) {
-    return (
+  // ── Single return — all views share sidebar + shell ───────────────────
+  return (
+    <>
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
           <HierarchicalSidebar />
+
           <SidebarInset>
-            <div className="flex items-center justify-center min-h-screen">
-              <div className="text-muted-foreground">Loading projects...</div>
-            </div>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
-    );
-  }
-
-  return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <HierarchicalSidebar />
-
-        <SidebarInset>
-          {/* Header */}
-          <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              <h1 className="text-lg font-semibold">Weekly Report Projects</h1>
-            </div>
-
-            <div className="flex items-center gap-4">
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 w-64"
-                />
+            {/* Shared header */}
+            <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+                <h1 className="text-lg font-semibold">Weekly Report Projects</h1>
               </div>
-              
-              {/* Theme Toggle */}
-              <ThemeToggle />
-              
-              <ProfileIcon />
-            </div>
-          </header>
-
-          {/* Main Content */}
-          <main className="flex-1 space-y-6 p-6">
-            <div className="space-y-6">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold tracking-tight">Weekly Report Projects</h2>
-                  <p className="text-muted-foreground">
-                    Manage your weekly report projects and access their reports
-                  </p>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={folderId ? "Search projects..." : "Search folders..."}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 w-64"
+                  />
                 </div>
+                <ThemeToggle />
+                <ProfileIcon />
               </div>
+            </header>
 
-              {filteredProjects.length > 0 && (
-                <Button onClick={() => setShowAddProject(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Project
-                </Button>
-              )}
-
-              {/* Add Project Input */}
-              {showAddProject && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Enter project name..."
-                        value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleAddProject();
-                          } else if (e.key === 'Escape') {
-                            setShowAddProject(false);
-                            setNewProjectName("");
-                          }
-                        }}
-                        className="flex-1"
-                        autoFocus
-                      />
-                      <Button onClick={handleAddProject}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create
-                      </Button>
-                      <Button variant="outline" onClick={() => {
-                        setShowAddProject(false);
-                        setNewProjectName("");
-                      }}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Projects Grid */}
-              {filteredProjects.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredProjects.map((project) => (
-                    <Card 
-                      key={project.name}
-                      className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] group"
-                      onClick={() => handleProjectClick(project.name)}
+            <main className="flex-1 p-6">
+              {isLoading ? (
+                // ── Loading ──────────────────────────────────────────────
+                <div className="flex items-center justify-center py-24">
+                  <div className="text-muted-foreground">Loading projects...</div>
+                </div>
+              ) : folderId ? (
+                // ── Folder detail view — ?folderId=xxx ───────────────────
+                // Shows Master Report card + project cards inside the folder.
+                // Mirrors what the sidebar shows when a folder is expanded.
+                <div className="space-y-6">
+                  {/* Breadcrumb — back to folder landing */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <button
+                      onClick={() => navigate("/weekly-report-projects")}
+                      className="hover:text-foreground transition-colors"
                     >
-                      <CardHeader className="pb-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
-                              <FolderOpen className="h-6 w-6" />
-                            </div>
-                            <div className="flex-1">
-                              {editingProject === project.name ? (
-                                <Input
-                                  value={editProjectName}
-                                  onChange={(e) => setEditProjectName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleSaveEdit();
-                                    } else if (e.key === 'Escape') {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleCancelEdit();
-                                    }
-                                  }}
-                                  className="h-6 text-sm"
-                                  autoFocus
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              ) : (
-                                <CardTitle className="text-xl truncate">{project.name}</CardTitle>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {editingProject === project.name ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSaveEdit();
-                                  }}
-                                >
-                                  ✓
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCancelEdit();
-                                  }}
-                                >
-                                  ×
-                                </Button>
-                              </>
-                            ) : (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <MoreVertical className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-32">
-                                  {/* Show Duplicate to everyone */}
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDuplicateProject(project.name);
-                                  }}>
-                                    <Copy className="h-3 w-3 mr-2" />
-                                    Duplicate
-                                  </DropdownMenuItem>
-                                  
-                                  {/* Only show Edit/Delete to project creator */}
-                                  {project.createdBy === currentUserId && (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditProject(project.name);
-                                      }}>
-                                        <Edit className="h-3 w-3 mr-2" />
-                                        Rename
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <DropdownMenuItem 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setProjectToDelete(project.name);
-                                            }}
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            onSelect={(e) => {
-                                              e.preventDefault();
-                                              setDeleteConfirmOpen(true);
-                                            }}
-                                          >
-                                            <Trash2 className="h-3 w-3 mr-2" />
-                                            Delete
-                                          </DropdownMenuItem>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>
-                                              Are you sure you want to delete this project?
-                                            </AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              This action will permanently delete "{project.name}" and <strong>ALL its reports.</strong> This cannot be undone.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel onClick={(e) => {
-                                              e.stopPropagation();
-                                              setDeleteConfirmOpen(false);
-                                            }}>
-                                              Cancel
-                                            </AlertDialogCancel>
-                                            <AlertDialogAction 
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteProject(project.name);
-                                                setDeleteConfirmOpen(false);
-                                              }}
-                                              className="bg-red-600 hover:bg-red-700"
-                                            >
-                                              Delete
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              Total Reports
-                            </span>
-                            <Badge variant="secondary" className="font-semibold">
-                              {project.reportCount}
-                            </Badge>
-                          </div>
-                          
-                          {project.lastReportDate && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                <Clock className="h-4 w-4" />
-                                Last Report
-                              </span>
-                              <span className="text-sm font-medium">
-                                {formatDate(project.lastReportDate)}
-                              </span>
-                            </div>
-                          )}
-                          
-                          {/* Project Creator */}
-                          {project.createdByName && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                Created By
-                              </span>
-                              <span className="text-sm font-medium">
-                                {(() => {
-                                  const currentUserId = getCurrentUserId();
-                                  const isCurrentUser = project.createdBy === currentUserId || project.createdBy === currentUserId;
-                                  return isCurrentUser ? 'You' : project.createdByName;
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                          
-                          <div className="pt-2">
-                            <Button 
-                              variant="outline" 
-                              className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleProjectClick(project.name);
-                              }}
-                            >
-                              <Calendar className="h-4 w-4 mr-2" />
-                              Open Project
-                            </Button>
-                          </div>
+                      Weekly Reports
+                    </button>
+                    <span>/</span>
+                    <span className="text-foreground font-medium">
+                      {currentFolder?.name ?? "Loading..."}
+                    </span>
+                  </div>
+
+                  {/* Title row */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold tracking-tight">
+                        {currentFolder?.name ?? "Folder"}
+                      </h2>
+                      <p className="text-muted-foreground">
+                        Projects and reports inside this folder
+                      </p>
+                    </div>
+                    <Button onClick={() => setShowAddProject(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Project
+                    </Button>
+                  </div>
+
+                  {/* Add project input */}
+                  {showAddProject && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Enter project name..."
+                            value={newProjectName}
+                            onChange={(e) => setNewProjectName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleAddProject();
+                              else if (e.key === "Escape") {
+                                setShowAddProject(false);
+                                setNewProjectName("");
+                              }
+                            }}
+                            className="flex-1"
+                            autoFocus
+                          />
+                          <Button onClick={handleAddProject}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowAddProject(false);
+                              setNewProjectName("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  )}
+
+                  {/* Master Report card — navigates exactly like the sidebar */}
+                  {currentFolder && (
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.01] group border-primary/30 bg-primary/5"
+                      onClick={() =>
+                        navigate(`/weekly-reports?folderId=${folderId}&type=master`)
+                      }
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-primary/20 text-primary group-hover:bg-primary/30 transition-colors">
+                              <BarChart3 className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-base">📊 Master Report</CardTitle>
+                              <p className="text-sm text-muted-foreground">
+                                Aggregated report for all projects in {currentFolder.name}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground flex items-center gap-1.5">
+                            <FileText className="h-3.5 w-3.5" />
+                            Total Reports
+                          </span>
+                          <Badge variant="secondary">{getFolderReportCount(currentFolder)}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Project cards */}
+                  {filteredFolderProjects.length > 0 ? (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                      {filteredFolderProjects.map(renderProjectCard)}
+                    </div>
+                  ) : (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center py-8">
+                          <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">
+                            {searchQuery.trim() ? "No projects found" : "No projects in this folder"}
+                          </h3>
+                          <p className="text-muted-foreground mb-4">
+                            {searchQuery.trim()
+                              ? "Try adjusting your search terms"
+                              : "Add a project to get started"}
+                          </p>
+                          {!searchQuery.trim() && (
+                            <Button onClick={() => setShowAddProject(true)}>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add First Project
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               ) : (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-center py-8">
-                      <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">
-                        {searchQuery.trim() ? "No projects found" : "No projects yet"}
+                // ── Folder landing view (no params) ──────────────────────
+                // Mirrors the sidebar's Weekly Report section hierarchy:
+                // Folders first, then root projects (no folder).
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold tracking-tight">Weekly Reports</h2>
+                    <p className="text-muted-foreground">
+                      Select a folder to view its projects and reports
+                    </p>
+                  </div>
+
+                  {/* Folder cards — click navigates into folder detail */}
+                  {filteredFolders.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FolderOpen className="h-5 w-5" />
+                        Folders
                       </h3>
-                      <p className="text-muted-foreground mb-4">
-                        {searchQuery.trim() 
-                          ? "Try adjusting your search terms"
-                          : "Create your first project to start managing weekly reports"
-                        }
-                      </p>
-                      {!searchQuery.trim() && (
-                        <Button onClick={() => setShowAddProject(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create First Project
-                        </Button>
-                      )}
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                        {filteredFolders.map((folder) => (
+                          <Card
+                            key={folder._id}
+                            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.01] group"
+                            onClick={() =>
+                              navigate(`/weekly-report-projects?folderId=${folder._id}`)
+                            }
+                          >
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                                    <FolderOpen className="h-5 w-5" />
+                                  </div>
+                                  <CardTitle className="text-base leading-tight">
+                                    {folder.name}
+                                  </CardTitle>
+                                </div>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground flex items-center gap-1.5">
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Total Reports
+                                  </span>
+                                  <Badge variant="secondary">
+                                    {getFolderReportCount(folder)}
+                                  </Badge>
+                                </div>
+                                {folder.projects && folder.projects.length > 0 && (
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground flex items-center gap-1.5">
+                                      <FolderOpen className="h-3.5 w-3.5" />
+                                      Projects
+                                    </span>
+                                    <Badge variant="outline">{folder.projects.length}</Badge>
+                                  </div>
+                                )}
+                                {folder.lastWeeklyReportDate && (
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground flex items-center gap-1.5">
+                                      <Clock className="h-3.5 w-3.5" />
+                                      Last Report
+                                    </span>
+                                    <span className="text-xs font-medium">
+                                      {formatDate(folder.lastWeeklyReportDate)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  )}
+
+                  {/* Root project cards — navigate directly to project reports */}
+                  {filteredRootProjects.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Projects (No Folder)
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                        {filteredRootProjects.map(renderProjectCard)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {filteredFolders.length === 0 && filteredRootProjects.length === 0 && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center py-8">
+                          <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">
+                            {searchQuery.trim() ? "No results found" : "No projects yet"}
+                          </h3>
+                          <p className="text-muted-foreground">
+                            {searchQuery.trim()
+                              ? "Try adjusting your search terms"
+                              : "Create a folder or project in the sidebar to get started"}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               )}
-            </div>
-          </main>
-        </SidebarInset>
-      </div>
-      {/* Rename Confirmation Dialog */}
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+
+      {/* Rename confirmation — shared across both views */}
       <AlertDialog open={renameConfirmOpen} onOpenChange={setRenameConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Rename Project
-            </AlertDialogTitle>
+            <AlertDialogTitle>Rename Project</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to rename "{renameData?.oldName}" to "{renameData?.newName}"? This action <strong>will rename all reports</strong> inside to match the new project name.
+              Are you sure you want to rename "{renameData?.oldName}" to "
+              {renameData?.newName}"? This will{" "}
+              <strong>rename all reports</strong> inside to match the new project name.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setRenameConfirmOpen(false);
-              setRenameData(null);
-              setEditingProject(null);
-              setEditProjectName("");
-            }}>
+            <AlertDialogCancel
+              onClick={() => {
+                setRenameConfirmOpen(false);
+                setRenameData(null);
+                setEditingProject(null);
+                setEditProjectName("");
+              }}
+            >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRename}>
-              Confirm Rename
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmRename}>Confirm Rename</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </SidebarProvider>
+    </>
   );
 };
 

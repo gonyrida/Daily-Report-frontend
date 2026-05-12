@@ -18,4 +18,5 @@ export interface ActivitiesProps {
   setNextWeekPlan?: (rows: ActivityRow[]) => void;
   reportId?: string; // NEW: Report ID for bulk import API
   constructionProgressItems?: import('@/types/constructionProgress').ConstructionProgressItem[]; // NEW: Construction progress data
+  mode?: 'single' | 'master'; // NEW: Master mode support
 }
