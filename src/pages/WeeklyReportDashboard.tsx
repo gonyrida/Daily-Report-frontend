@@ -234,6 +234,15 @@ const WeeklyReportDashboard = () => {
   const [rootProjects, setRootProjects] = useState<Project[]>([]);
   const [isFoldersLoading, setIsFoldersLoading] = useState(true);
 
+  // Master report state — must live at the top level (Rules of Hooks)
+  const [masterActiveTab, setMasterActiveTab] = useState<TabType>('table-of-content');
+  const [masterShowSecondNav, setMasterShowSecondNav] = useState(false);
+  const [masterShowIntroduction, setMasterShowIntroduction] = useState(false);
+  const [masterScheduleEntries, setMasterScheduleEntries] = useState<MasterScheduleEntry[]>([]);
+  const [isScheduleSaving, setIsScheduleSaving] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [selectedReportData, setSelectedReportData] = useState<WeeklyReport | null>(null);
+
   const getCurrentUserId = useCallback(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
@@ -283,6 +292,15 @@ const WeeklyReportDashboard = () => {
       projectEvents.off('projectDeleted', handleChange);
     };
   }, [loadFoldersWithProjects]);
+
+  useEffect(() => {
+    if (!folderId) return;
+    getFolderMasterSchedule(folderId).then((result) => {
+      if (result.success && Array.isArray(result.data)) {
+        setMasterScheduleEntries(result.data);
+      }
+    });
+  }, [folderId]);
 
   // Parallel data fetching with React Query
   const currentUserId = getCurrentUserId();
@@ -476,6 +494,18 @@ const WeeklyReportDashboard = () => {
     refetchOnWindowFocus: true,
   });
 
+  const { data: selectedReportQueryData } = useQuery({
+    queryKey: ['selectedReport', selectedReportId],
+    queryFn: () => selectedReportId ? getWeeklyReportById(selectedReportId) : Promise.resolve(null),
+    enabled: !!selectedReportId && reportType === 'master',
+  });
+
+  useEffect(() => {
+    if (selectedReportQueryData?.data) {
+      setSelectedReportData(selectedReportQueryData.data);
+    }
+  }, [selectedReportQueryData]);
+
   const handleMasterPreview = async () => {
     const reportData = masterReportData?.data;
     if (!reportData) return;
@@ -536,42 +566,6 @@ const WeeklyReportDashboard = () => {
     const transformedData = masterReportData?.data
       ? transformMasterToReportData(masterReportData.data)
       : null;
-
-    // Tab state for master report
-    const [masterActiveTab, setMasterActiveTab] = useState<TabType>('table-of-content');
-    const [masterShowSecondNav, setMasterShowSecondNav] = useState(false);
-    const [masterShowIntroduction, setMasterShowIntroduction] = useState(false);
-
-    // Master schedule state (folder-owned, not aggregated)
-    const [masterScheduleEntries, setMasterScheduleEntries] = useState<MasterScheduleEntry[]>([]);
-    const [isScheduleSaving, setIsScheduleSaving] = useState(false);
-
-    React.useEffect(() => {
-      if (!folderId) return;
-      getFolderMasterSchedule(folderId).then((result) => {
-        if (result.success && Array.isArray(result.data)) {
-          setMasterScheduleEntries(result.data);
-        }
-      });
-    }, [folderId]);
-    
-    // Selected report state for displaying specific report data in Cover/Letter/Construction tabs
-    const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-    const [selectedReportData, setSelectedReportData] = useState<WeeklyReport | null>(null);
-    
-    // Fetch selected report data when reportId changes
-    const { data: selectedReportQueryData } = useQuery({
-      queryKey: ['selectedReport', selectedReportId],
-      queryFn: () => selectedReportId ? getWeeklyReportById(selectedReportId) : Promise.resolve(null),
-      enabled: !!selectedReportId && reportType === 'master',
-    });
-    
-    // Update selectedReportData when query data changes
-    React.useEffect(() => {
-      if (selectedReportQueryData?.data) {
-        setSelectedReportData(selectedReportQueryData.data);
-      }
-    }, [selectedReportQueryData]);
 
     return (
       <SidebarProvider>
@@ -1218,7 +1212,7 @@ const WeeklyReportDashboard = () => {
             )}
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+            {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
               {isLoading ? (
                 <>
                   <Card><CardContent className="pt-6"><SummaryCardSkeleton /></CardContent></Card>
@@ -1282,7 +1276,7 @@ const WeeklyReportDashboard = () => {
                   </Card>
                 </>
               )}
-            </div>
+            </div> */}
 
             {/* Create New Report Button - Show when there are submitted reports (for all users) */}
             {(weeklyReports.filter(r => r.status === 'submitted').length > 0 || filteredCompanyReports.filter(r => r.status === 'submitted' || r.status === 'approved').length > 0) && (
