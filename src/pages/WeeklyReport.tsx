@@ -2113,9 +2113,12 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         ...transformHSEToExcelFormat(hsesData),
         ...transformResourcesToExcelFormat(resourcesData),
         sitePhotoCaptions: (() => {
-          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          // photosData.locations is the live state updated by SitePhotos on every edit.
+          // siteActivitiesSections is only set on report load and goes stale after edits.
+          const photoSections = photosData?.locations || siteActivitiesSections;
+          if (!photoSections || photoSections.length === 0) return [];
           const result: any[] = [];
-          siteActivitiesSections.forEach((section: any) => {
+          photoSections.forEach((section: any) => {
             if (section.entries && section.entries.length > 0) {
               section.entries.forEach((entry: any) => {
                 if (entry.slots && entry.slots.length > 0) {
@@ -2126,8 +2129,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                       siteLocation: section.title || 'Site Location',
                       caption1: slot1?.caption || '',
                       caption2: slot2?.caption || '',
-                      image1: slot1?.image,
-                      image2: slot2?.image,
+                      image1: slot1?.image || undefined,
+                      image2: slot2?.image || undefined,
                     });
                   }
                 }
@@ -2252,9 +2255,12 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         ...transformHSEToExcelFormat(hsesData),
         ...transformResourcesToExcelFormat(resourcesData),
         sitePhotoCaptions: (() => {
-          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          // photosData.locations is the live state updated by SitePhotos on every edit.
+          // siteActivitiesSections is only set on report load and goes stale after edits.
+          const photoSections = photosData?.locations || siteActivitiesSections;
+          if (!photoSections || photoSections.length === 0) return [];
           const result: any[] = [];
-          siteActivitiesSections.forEach((section: any) => {
+          photoSections.forEach((section: any) => {
             if (section.entries && section.entries.length > 0) {
               section.entries.forEach((entry: any) => {
                 if (entry.slots && entry.slots.length > 0) {
@@ -2265,8 +2271,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                       siteLocation: section.title || 'Site Location',
                       caption1: slot1?.caption || '',
                       caption2: slot2?.caption || '',
-                      image1: slot1?.image,
-                      image2: slot2?.image,
+                      image1: slot1?.image || undefined,
+                      image2: slot2?.image || undefined,
                     });
                   }
                 }
@@ -2388,9 +2394,12 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         ...transformHSEToExcelFormat(hsesData),
         // Add site photos if available - transform ReferenceSection format to SitePhotoEntry format
         sitePhotoCaptions: (() => {
-          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          // photosData.locations is the live state updated by SitePhotos on every edit.
+          // siteActivitiesSections is only set on report load and goes stale after edits.
+          const photoSections = photosData?.locations || siteActivitiesSections;
+          if (!photoSections || photoSections.length === 0) return [];
           const result: any[] = [];
-          siteActivitiesSections.forEach(section => {
+          photoSections.forEach((section: any) => {
             if (section.entries && section.entries.length > 0) {
               section.entries.forEach((entry: any) => {
                 if (entry.slots && entry.slots.length > 0) {
@@ -2402,8 +2411,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                       siteLocation: section.title || 'Site Location',
                       caption1: slot1?.caption || '',
                       caption2: slot2?.caption || '',
-                      image1: slot1?.image,
-                      image2: slot2?.image,
+                      image1: slot1?.image || undefined,
+                      image2: slot2?.image || undefined,
                     });
                   }
                 }

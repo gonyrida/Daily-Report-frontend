@@ -512,20 +512,17 @@ export async function buildWeeklyReportExportData(input: MapperInput): Promise<W
     hseFirstAid: input.hseFirstAid,
     hseOtherConcerns: input.hseOtherConcerns,
     hsePhotoReferences: (() => {
-      // Better caching: Update cache when we have valid data, use cache when data is empty
       const currentHsePhotoRefs = input.hsePhotoReferences;
-      const hasValidData = currentHsePhotoRefs && (
-        (currentHsePhotoRefs.hseToolboxMeeting && currentHsePhotoRefs.hseToolboxMeeting.length > 0) ||
-        (currentHsePhotoRefs.hseActivityPhotos && currentHsePhotoRefs.hseActivityPhotos.length > 0)
-      );
 
-      // Update cache when we have valid data
-      if (hasValidData) {
+      // Fall back to cache only when hsePhotoReferences was not provided at all (undefined).
+      // If it was explicitly provided — even as empty arrays — always use the current value so
+      // deletions and clears are reflected in the export rather than serving stale cached images.
+      const dataToUse = currentHsePhotoRefs !== undefined ? currentHsePhotoRefs : cachedHSEPhotoReferences;
+
+      // Keep cache current with the latest explicitly-provided value.
+      if (currentHsePhotoRefs !== undefined) {
         cachedHSEPhotoReferences = currentHsePhotoRefs;
       }
-
-      // Use cached data if current data is empty and we have cached data
-      const dataToUse = (!hasValidData && cachedHSEPhotoReferences) ? cachedHSEPhotoReferences : currentHsePhotoRefs;
 
       return {
         hseToolboxMeeting: referenceSectionsToPhotoEntries(dataToUse?.hseToolboxMeeting ?? []),
