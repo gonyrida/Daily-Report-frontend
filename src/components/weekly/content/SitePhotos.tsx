@@ -141,7 +141,7 @@ const SitePhotos: React.FC<SitePhotosProps> = ({
       const endDate = parseDate(endDateStr);
 
       if (reportId) {
-        const result = await updateReportImages(reportId, { maxImagesPerReport: 2 });
+        const result = await updateReportImages(reportId, { maxImagesPerReport: Infinity });
         if (result.success && result.data) {
           onChange?.(result.data.sections?.photos);
         }
@@ -149,7 +149,7 @@ const SitePhotos: React.FC<SitePhotosProps> = ({
         const projectIdentifier = sharedData.projectId || sharedData.projectName;
         const result = await previewAggregatedImages(projectIdentifier, startDate, endDate, {
           useProjectId: !!sharedData.projectId,
-          maxImagesPerReport: 2,
+          maxImagesPerReport: Infinity,
         });
         if (result.success && result.data) {
           onChange?.(
