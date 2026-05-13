@@ -1,6 +1,7 @@
 import { Plus, Trash2, X, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiDelete } from "@/lib/apiFetch";
 
 import {
   Select,
@@ -63,8 +64,9 @@ interface ResourceTableProps {
   setRows: (rows: ResourceRow[] | ((prev: ResourceRow[]) => ResourceRow[])) => void;
   showUnit?: boolean;
   useDropdown?: boolean;
-  dropdownOptions?: string[];
-  unitOptions?: string[];
+  dropdownOptions?: { id: string; name: string }[];
+  unitOptions?: { id: string; name: string }[];
+  optionsFor?: string;
   inputNumberOnly?: boolean;
   showAddButtons?: boolean;
   addTitleRow?: () => void;
@@ -89,6 +91,7 @@ interface ResourceTableProps {
   descriptionUnitMap?: Record<string, string>;
   titleInput?: boolean;
   onTitleChange?: (title: string) => void;
+  onOptionDeleted?: () => void;
 }
 
 const ResourceTable = ({
@@ -100,6 +103,7 @@ const ResourceTable = ({
   useDropdown = false,
   dropdownOptions = [],
   unitOptions = [],
+  optionsFor,
   inputNumberOnly = false,
   showAddButtons = false,
   addTitleRow,
@@ -111,7 +115,8 @@ const ResourceTable = ({
   enableDragDrop = false,
   descriptionUnitMap,
   titleInput = false,
-  onTitleChange
+  onTitleChange,
+  onOptionDeleted
 }: ResourceTableProps) => {
   const [draggedRow, setDraggedRow] = useState<ResourceRow | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -224,6 +229,15 @@ const ResourceTable = ({
       }
     }
   }, [rows, dropdownOptions]);
+
+  const handleRemoveOption = async (optFor, id) => {
+    try {
+      const response = await apiDelete(`/daily-reports/dropdown-options/${optFor}/${id}`);
+      if (onOptionDeleted) await onOptionDeleted();
+    } catch (error) {
+      console.error("Error removing option:", error);
+    }
+  }
 
   return (
     <div className="section-card overflow-hidden animate-fade-in">
@@ -347,7 +361,7 @@ const ResourceTable = ({
             ) : (
               rows.map((row) => {
                 const filteredOptions = dropdownOptions.filter((option) =>
-                  option
+                  option.name
                     .toLowerCase()
                     .includes((row.searchTerm || "").toLowerCase()),
                 );
@@ -401,8 +415,9 @@ const ResourceTable = ({
                     {/* Description / Dropdown */}
                     <td className="px-1 py-2 max-w-0 w-full overflow-hidden">
                       {useDropdown && dropdownOptions.length > 0 ? (() => {
-                        const allOptions = row.description && !dropdownOptions.includes(row.description) 
-                          ? [...dropdownOptions, row.description] 
+                        const dropdownOptionLabels = dropdownOptions.map(opt => opt.name);
+                        const allOptions = row.description && !dropdownOptionLabels.includes(row.description) 
+                          ? [...dropdownOptions, {id: row.description.toLowerCase, name: row.description}] 
                           : dropdownOptions;
 
                         return !row.isCustomInput ? (
@@ -441,17 +456,32 @@ const ResourceTable = ({
                                   />
                                 </div>
                                 {allOptions.filter(option => 
-                                  option.toLowerCase().includes((row.searchTerm || "").toLowerCase())
+                                  option.name.toLowerCase().includes((row.searchTerm || "").toLowerCase())
                                 ).map((option, index) => (
                                   <SelectItem
-                                    key={`${title}-opt-${option}-${index}`}
-                                    value={option}
+                                    key={`${title}-opt-${option.name}-${index}`}
+                                    value={option.name}
                                     className="p-0 px-4"
                                   >
-                                    <div 
-                                      className="truncate whitespace-nowrap overflow-hidden text-ellipsis px-2 py-1.5"
-                                    >
-                                      {option}
+                                    <div className="flex items-center min-w-[500px] group">
+                                      {/* Label Part - flex-grow pushes everything else to the right */}
+                                      <div className="truncate whitespace-nowrap overflow-hidden text-ellipsis px-2 py-1.5">
+                                        {option.name}
+                                      </div>
+
+                                      {/* Trash Bin Button - Far Right */}
+                                      <button
+                                        type="button"
+                                        onPointerUp={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          console.log("Deleting:", option);
+                                          handleRemoveOption(optionsFor, option.id);
+                                        }}
+                                        className="ml-auto pointer-events-auto relative z-20 pointer-events-auto flex-shrink-0 p-2 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
                                     </div>
                                   </SelectItem>
                                 ))}
@@ -516,8 +546,9 @@ const ResourceTable = ({
                     {showUnit && (
                       <td className="px-1 py-2 ">
                         {unitOptions.length > 0 ? (() => {
-                          const allUnitOptions = row.unit && row.unit !== "" && !unitOptions.includes(row.unit) 
-                            ? [...unitOptions, row.unit] 
+                          const unitOptionLabels = unitOptions.map(u => u.name);
+                          const allUnitOptions = row.unit && row.unit !== "" && !unitOptionLabels.includes(row.unit) 
+                            ? [...unitOptions, {id: row.unit.toLowerCase(), name: row.unit}] 
                             : unitOptions;
                             
                           return !row.isCustomUnitInput ? ( // Use the new flag
@@ -543,10 +574,27 @@ const ResourceTable = ({
                               <SelectContent>
                                 {allUnitOptions.map((unit, index) => (
                                   <SelectItem
-                                    key={`${title}-unit-${unit}-${index}`}
-                                    value={unit}
+                                    key={`${title}-unit-${unit.name}-${index}`}
+                                    value={unit.name}
                                   >
-                                    {unit}
+                                    <div className="flex items-center min-w-[120px] group">
+                                      <div className="truncate whitespace-nowrap overflow-hidden text-ellipsis px-2">
+                                        {unit.name}
+                                      </div>
+                                      
+                                      <button
+                                        type="button"
+                                        onPointerUp={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          console.log("Deleting:", unit);
+                                          handleRemoveOption("unit", unit.id);
+                                        }}
+                                        className="ml-auto pointer-events-auto relative z-20 pointer-events-auto flex-shrink-0 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </SelectItem>
                                 ))}
                                 <SelectItem

@@ -1,16 +1,26 @@
 import { Users, Wrench,Trash2, GripVertical } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
-import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
 import { useState, useEffect } from "react";
 import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { apiDelete } from "@/lib/apiFetch";
 
 interface ManagementTeamGroupProps {
   managementTeam: ResourceRow[];
-  setManagementTeam: (rows: ResourceRow[]) => void;
+  setManagementTeam: (rows: ResourceRow[] | ((prev: ResourceRow[]) => ResourceRow[])) => void;
   mepTeam: ResourceRow[];
-  setMepTeam: (rows: ResourceRow[]) => void;
+  setMepTeam: (rows: ResourceRow[] | ((prev: ResourceRow[]) => ResourceRow[])) => void;
   onValueChange?: (value: string) => void;
   sectionTitle?: string;
+  managementOptions?: { id: string; name: string }[];
+  mepTeamOptions?: { id: string; name: string }[];
+  onOptionDeleted?: () => void;
 }
 
 const ManagementTeamGroup = ({
@@ -19,7 +29,10 @@ const ManagementTeamGroup = ({
   mepTeam,
   setMepTeam,
   onValueChange,
-  sectionTitle = "Management Team"
+  sectionTitle = "Management Team",
+  managementOptions = [],
+  mepTeamOptions = [],
+  onOptionDeleted
 }: ManagementTeamGroupProps) => {
 
   useEffect(() => {
@@ -62,6 +75,72 @@ const ManagementTeamGroup = ({
 
   const handleDragEnd = () => {
     setDraggedRow(null);
+  };
+
+  const handleRemoveOption = async (team, optFor, id) => {
+    try {
+      const response = await apiDelete(`/daily-reports/dropdown-options/${optFor}/${id}`);
+      if (onOptionDeleted) await onOptionDeleted();
+    } catch (error) {
+      console.error("Error removing option:", error);
+    }
+  }
+
+  const updateRow = (
+    team: string,
+    id: string,
+    field,
+    value: string | number,
+  ) => {
+    if (team === "mgmt") {
+      setManagementTeam((currentRows) =>
+        currentRows.map((row) => {
+          if (row.id === id) {
+            if (field === "description" && value === "__custom__") {
+              return { ...row, description: "", isCustomInput: true };
+            }
+            if (field === "isCustomUnitInput") {
+              return { ...row, isCustomUnitInput: value === "true" };
+            }
+            if (field === "isCustomInput") {
+              return { ...row, isCustomInput: value === "true" };
+            }
+            const updatedRow = { ...row, [field]: value };
+            if (field === "prev" || field === "today") {
+              const prev = field === "prev" ? Number(value) || 0 : row.prev;
+              const today = field === "today" ? Number(value) || 0 : row.today;
+              updatedRow.accumulated = prev + today;
+            }
+            return updatedRow;
+          }
+          return row;
+        }),
+      );
+    } else {
+      setMepTeam((currentRows) =>
+        currentRows.map((row) => {
+          if (row.id === id) {
+            if (field === "description" && value === "__custom__") {
+              return { ...row, description: "", isCustomInput: true };
+            }
+            if (field === "isCustomUnitInput") {
+              return { ...row, isCustomUnitInput: value === "true" };
+            }
+            if (field === "isCustomInput") {
+              return { ...row, isCustomInput: value === "true" };
+            }
+            const updatedRow = { ...row, [field]: value };
+            if (field === "prev" || field === "today") {
+              const prev = field === "prev" ? Number(value) || 0 : row.prev;
+              const today = field === "today" ? Number(value) || 0 : row.today;
+              updatedRow.accumulated = prev + today;
+            }
+            return updatedRow;
+          }
+          return row;
+        }),
+      );
+    }
   };
 
   return (
@@ -153,20 +232,23 @@ const ManagementTeamGroup = ({
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          {MANAGEMENT_OPTIONS.length > 0 ? (() => {
+                          {managementOptions.length > 0 ? (() => {
                             // 1. Create a temporary list that includes the current custom value
                             // This ensures that even after typing, the "Dropdown" view can show it.
-                            const isInOptions = MANAGEMENT_OPTIONS.includes(row.description);
+                            const managementOptionLabels = managementOptions.map(opt => opt.name);
+                            const isInOptions = managementOptionLabels.includes(row.description);
+                            const allMgmtOptions = row.description && !managementOptionLabels.includes(row.description) 
+                              ? [...managementOptions, {id: row.description.toLowerCase, name: row.description}] 
+                              : managementOptions;
 
                             // Check if THIS specific row is being edited
                             const isEditing = editingId === row.id;
 
                             return !isEditing ? (
-                              <select
-                                value={row.description}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (value === "__custom__") {
+                              <Select 
+                                value={row.description} 
+                                onValueChange={(val) => {
+                                  if (val === "__custom__") {
                                     setEditingId(row.id); // Trigger Edit Mode
                                     // Clear the field for a fresh start
                                     setManagementTeam(managementTeam.map((r) =>
@@ -175,29 +257,60 @@ const ManagementTeamGroup = ({
                                   } else {
                                     setManagementTeam(
                                       managementTeam.map((r) =>
-                                        r.id === row.id ? { ...r, description: value } : r
+                                        r.id === row.id ? { ...r, description: val } : r
                                       )
                                     );
                                   }
                                 }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
-                                title={row.description}
                               >
-                                <option value="">Select position...</option>
+                                <SelectTrigger 
+                                  className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                  title={row.description}
+                                >
+                                  <SelectValue placeholder="Select position..." />
+                                </SelectTrigger>
+                                
+                                <SelectContent className="w-full">
+                                  {/* TODO LATER: Input loss focus first time typing but works fine the second time */}
+                                  {/* <div className="p-2">
+                                    <Input
+                                      placeholder="Search..."
+                                      value={row.searchTerm || ""}
+                                      onChange={(e) => 
+                                        updateRow("mgmt", row.id, "searchTerm", e.target.value)
+                                      }
+                                      className="h-8 w-full"
+                                    />
+                                  </div> */}
+                                  {allMgmtOptions.filter(opt =>
+                                    opt.name.toLowerCase().includes((row.searchTerm || "").toLowerCase())
+                                  ).map((option) => (
+                                    <SelectItem key={option.id.toString()} value={option.name} className="p-0 px-4">
+                                      <div className="flex items-center min-w-[300px] group">
+                                        <div className="truncate whitespace-nowrap overflow-hidden text-ellipsis px-2 py-1.5">
+                                          {option.name}
+                                        </div>
 
-                                {/* 3. If the current value is custom, we must render it as an option 
-                                so the <select> has something to display! */}
-                                {!isInOptions && row.description !== "" && (
-                                  <option value={row.description}>{row.description}</option>
-                                )}
-
-                                {MANAGEMENT_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                                <option value="__custom__">+ Custom Entry</option>
-                              </select>
+                                        <button
+                                          type="button"
+                                          onPointerUp={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log("Deleting:", option);
+                                            handleRemoveOption("mgmt", "role", option.id)
+                                          }}
+                                          className="ml-auto flex-shrink-0 p-2 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem value="__custom__" className="text-primary font-medium">
+                                    + Custom Entry
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : (
                               <div className="flex items-center gap-1">
                                 <input
@@ -225,7 +338,7 @@ const ManagementTeamGroup = ({
                                     setManagementTeam(
                                       managementTeam.map((r) =>
                                         r.id === row.id
-                                          ? { ...r, description: MANAGEMENT_OPTIONS[0] || "" }
+                                          ? { ...r, description: managementOptions[0].name || "" }
                                           : r
                                       )
                                     )
@@ -381,15 +494,15 @@ const ManagementTeamGroup = ({
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          {MEP_TEAM_OPTIONS.length > 0 ? (() => {
-                            const isInOptions = MEP_TEAM_OPTIONS.includes(row.description);
+                          {mepTeamOptions.length > 0 ? (() => {
+                            const mepTeamOptionLabels = mepTeamOptions.map(opt => opt.name)
+                            const isInOptions = mepTeamOptionLabels.includes(row.description);
                             const isEditing = editingId === row.id;
                             return !isEditing ? (
-                              <select
-                                value={row.description}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (value === "__custom__") {
+                              <Select 
+                                value={row.description} 
+                                onValueChange={(val) => {
+                                  if (val === "__custom__") {
                                     setEditingId(row.id); // Trigger Edit Mode
                                     // Clear the field for a fresh start
                                     setMepTeam(mepTeam.map((r) =>
@@ -398,29 +511,47 @@ const ManagementTeamGroup = ({
                                   } else {
                                     setMepTeam(
                                       mepTeam.map((r) =>
-                                        r.id === row.id ? { ...r, description: value } : r
+                                        r.id === row.id ? { ...r, description: val } : r
                                       )
                                     );
                                   }
                                 }}
-                                className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
-                                title={row.description}
                               >
-                                <option value="">Select position...</option>
+                                <SelectTrigger 
+                                  className="w-full border-0 bg-transparent focus:ring-1 focus:ring-primary rounded px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                  title={row.description}
+                                >
+                                  <SelectValue placeholder="Select position..." />
+                                </SelectTrigger>
+                                
+                                <SelectContent className="w-full">
+                                  {mepTeamOptions.map((option) => (
+                                    <SelectItem key={option.name} value={option.name} className="p-0 px-4">
+                                      <div className="flex items-center min-w-[300px] group">
+                                        <div className="truncate whitespace-nowrap overflow-hidden text-ellipsis px-2 py-1.5">
+                                          {option.name}
+                                        </div>
 
-                                {/* 3. If the current value is custom, we must render it as an option 
-                                so the <select> has something to display! */}
-                                {!isInOptions && row.description !== "" && (
-                                  <option value={row.description}>{row.description}</option>
-                                )}
-
-                                {MEP_TEAM_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                                <option value="__custom__">+ Custom Entry</option>
-                              </select>
+                                        <button
+                                          type="button"
+                                          onPointerUp={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log("Deleting:", option);
+                                            handleRemoveOption("mep", "role", option.id)
+                                          }}
+                                          className="ml-auto flex-shrink-0 p-2 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem value="__custom__" className="text-primary font-medium">
+                                    + Custom Entry
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : (
                               <div className="flex items-center gap-1">
                                 <input
@@ -448,7 +579,7 @@ const ManagementTeamGroup = ({
                                     setMepTeam(
                                       mepTeam.map((r) =>
                                         r.id === row.id
-                                          ? { ...r, description: MEP_TEAM_OPTIONS[0] || "" }
+                                          ? { ...r, description: mepTeamOptions[0].name || "" }
                                           : r
                                       )
                                     )

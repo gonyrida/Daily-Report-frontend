@@ -1138,7 +1138,7 @@ const PurchaseRequestForm: React.FC<PurchaseRequestFormProps> = ({
 											</Button>
 											<Button 
 												type="button" 
-												variant="outline" 
+												variant="destructive" 
 												size="sm"
 												onClick={handleRemoveSelected}
 												disabled={selectedItems.length === 0}

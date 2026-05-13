@@ -1173,7 +1173,7 @@ const PurchaseRequest = ({onRefresh}) => {
                             >
                               {loadingRequests ? 'Refreshing...' : 'Refresh'}
                             </Button>
-                            {profile.role === "admin" && (
+                            {profile?.role === "admin" && (
                               <Button
                                 variant='destructive'
                                 onClick={() => setShowDeletionModal(true)}

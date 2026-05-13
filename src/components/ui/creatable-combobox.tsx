@@ -89,7 +89,7 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
             value={inputValue}
             onValueChange={setInputValue}
           />
-          <CommandList>
+          {/* <CommandList>
             <CommandEmpty className="flex flex-col items-center justify-center p-2">
               <p className="text-sm text-muted-foreground mb-2">No results found.</p>
               {onCreate && inputValue.trim() && (
@@ -99,7 +99,6 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
                   className="w-full text-xs"
                   onClick={() => handleCreate(inputValue)}
                 >
-                  {/* <Plus className="mr-2 h-3 w-3" /> */}
                   Create "{inputValue.trim()}"
                 </Button>
               )}
@@ -120,6 +119,37 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
                       value === option.value ? "opacity-100" : "opacity-0"
                     )}
                   />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList> */}
+          <CommandList>
+            {/* Show the "Create" button if the input doesn't exactly match any existing option */}
+            {onCreate && inputValue.trim() && !localOptions.some(opt => opt.label.toLowerCase() === inputValue.trim().toLowerCase()) && (
+              <div 
+                className="flex items-center px-2 py-1.5 cursor-pointer hover:bg-accent rounded-sm"
+                onClick={() => handleCreate(inputValue)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="text-sm">Create "{inputValue}"</span>
+              </div>
+            )}
+
+            <CommandEmpty>No results found.</CommandEmpty>
+            
+            <CommandGroup>
+              {localOptions.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  // Force the value to be the label so the internal search matches correctly
+                  value={option.label} 
+                  onSelect={() => {
+                    onChange(option.value)
+                    setOpen(false)
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === option.value ? "opacity-100" : "opacity-0")} />
                   {option.label}
                 </CommandItem>
               ))}
