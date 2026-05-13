@@ -21,7 +21,14 @@ const Introduction = ({
   const [localDesignConstruction, setLocalDesignConstruction] = useState(designConstruction);
   const [localDesignList, setLocalDesignList] = useState<string[]>(designList);
 
-  
+  // Sync local state with prop changes (for master report mode when selecting different reports)
+  useEffect(() => {
+    setLocalProjectOverview(projectOverview);
+  }, [projectOverview]);
+
+  useEffect(() => {
+    setLocalDesignConstruction(designConstruction);
+  }, [designConstruction]);
 
   // Use project logo from Cover tab
   const coverImageUrl = projectLogo;

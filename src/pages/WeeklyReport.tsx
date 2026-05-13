@@ -25,8 +25,7 @@ import { ConstructionProgressData } from "@/types/constructionProgress";
 import { computeAllAmounts } from "@/utils/calculationEngine";
 import { UploadCloud } from "lucide-react";
 import { getProjectById } from "@/integrations/projectsApi";
-import { convertScheduleEntriesToSupabase, uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
-import { MasterScheduleSupabase } from '@/components/weekly/MasterScheduleSupabase';
+import { uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
 import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
 import { transformResourcesToExcelFormat, transformHSEToExcelFormat } from "@/utils/resourceDataTransform";
@@ -155,7 +154,6 @@ const WeeklyReport = () => {
     | "resource"
     | "photos"
     | "issues"
-    | "schedule"
   >("construction-progress");
 
 
@@ -184,7 +182,6 @@ const WeeklyReport = () => {
     { id: 6, name: "Resources", href: "#resources-status" },
     { id: 7, name: "Photos", href: "#site-activity-photos" },
     { id: 8, name: "Issues", href: "#construction-issue" },
-    { id: 9, name: "Schedule", href: "#master-schedule" },
   ];
 
   // Shared data state between tabs
@@ -235,13 +232,7 @@ const WeeklyReport = () => {
   // Construction Progress hook - use this as the single source of truth
   const constructionProgressHook = useConstructionProgress({ reportId: currentReportId });
 
-  // Schedule sections state
-  const [scheduleSections, setScheduleSections] = useState([
-    { id: crypto.randomUUID(), title: "Master Schedule", entries: [] }
-  ]);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
-  const [isDragOver, setIsDragOver] = useState(false);
 
   // Save, Preview, Export states
   const [isSaving, setIsSaving] = useState(false);
@@ -294,9 +285,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
   // NEW: Add Issues state to WeeklyReport page (like other sections)
   const [issuesData, setIssuesData] = useState<any>(null);
-
-  // NEW: Add Schedule state to WeeklyReport page (like other sections)
-  const [scheduleData, setScheduleData] = useState<any>(null);
 
   // NEW: Add Resources state to WeeklyReport page (for rolling total logic)
   const [resourcesData, setResourcesData] = useState<any>(null);
@@ -379,31 +367,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     }
   }, [constructionProgressHook.constructionData?.projectInfo?.project, sharedData.projectName]);
 
-  // Load master schedule data when reportId changes or component mounts
-  useEffect(() => {
-    const loadMasterSchedule = async () => {
-      if (currentReportId) {
-        try {
-          const response = await getWeeklyReportById(currentReportId);
-          if (response.success && response.data) {
-            const report = response.data;
-            if (report.sections?.masterSchedule) {
-              setScheduleSections([{
-                id: crypto.randomUUID(),
-                title: "Master Schedule",
-                entries: report.sections.masterSchedule
-              }]);
-            }
-          }
-        } catch (error) {
-          console.error('Error loading master schedule:', error);
-        }
-      }
-    };
-
-    loadMasterSchedule();
-  }, [currentReportId]); // Reload when currentReportId changes
-
   // Load existing report data when reportId is present
   useEffect(() => {
     const loadExistingReport = async () => {
@@ -473,14 +436,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               setNextWeekPlan([]);
             }
 
-            // Load master schedule data
-            if (report.sections?.masterSchedule) {
-              setScheduleSections([{
-                id: crypto.randomUUID(),
-                title: "Master Schedule",
-                entries: report.sections.masterSchedule
-              }]);
-            }
             // Load QAQC data using transform function (no API call)
             if (report.sections?.qaqcStatus) {
                 const transformedQaqcData = transformQaqcData(report.sections.qaqcStatus, [
@@ -555,8 +510,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               // Also update the siteActivitiesSections to match loaded data
               if (report.sections.photos.locations) {
                 const convertedSections = report.sections.photos.locations.map(location => ({
-                  id: crypto.randomUUID(),
-                  title: location.location,
+                  id: location.id || crypto.randomUUID(),
+                  title: location.title || 'Site Activity Photos',
                   entries: location.entries || []
                 }));
                 setSiteActivitiesSections(convertedSections);
@@ -585,34 +540,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               // Create empty Issues structure if none exists
               setIssuesData([]);
               issuesHook.setIssuesData([{ id: crypto.randomUUID(), issueNumber: 1, location: "", problem: "", actionBy: "", photo: null }]);
-            }
-
-            // Load Schedule data
-            if (report.sections?.masterSchedule) {
-              setScheduleData(report.sections.masterSchedule);
-              // Also update the scheduleSections state to match loaded data
-              if (report.sections.masterSchedule.length > 0) {
-                const convertedSchedule = report.sections.masterSchedule.map(item => ({
-                  id: item.id,
-                  type: item.type,
-                  file: item.fileData ? new File([item.fileData], item.fileName || "file") : null,
-                  caption: item.caption || item.fileName || "",
-                  supabaseUrl: item.supabaseUrl,
-                  supabasePath: item.supabasePath,
-                  fileName: item.fileName,
-                  fileSize: item.fileSize,
-                  fileType: item.fileType,
-                  convertedImages: item.convertedImages
-                }));
-                setScheduleSections([{
-                  id: crypto.randomUUID(),
-                  title: "Master Schedule",
-                  entries: convertedSchedule
-                }]);
-              }
-            } else {
-              // Create empty Schedule structure if none exists
-              setScheduleData([]);
             }
 
             // Load Resources data (without rolling total - for viewing existing report)
@@ -789,13 +716,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             }
           }
         } catch (error) {
-          console.error('🔍 FRONTEND Error loading report:', error);
-          console.error('🔍 FRONTEND Error details:', {
-            message: error.message,
-            stack: error.stack,
-            currentReportId,
-            timestamp: new Date().toISOString()
-          });
+          console.error('Error loading report:', error);
           toast({
             title: "Error",
             description: "Failed to load existing report.",
@@ -1372,10 +1293,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         locations: []
       };
 
-      if (siteActivitiesSections && siteActivitiesSections.length > 0) {
+      // Use photosData instead of siteActivitiesSections (photosData is what SitePhotos component updates)
+      const photoSections = photosData?.locations || siteActivitiesSections || [];
+
+      if (photoSections && photoSections.length > 0) {
         // Convert frontend format to backend format with base64 images
         const locations = await Promise.all(
-          siteActivitiesSections.map(async (section) => {
+          photoSections.map(async (section) => {
             const convertedEntries = await Promise.all(
               (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
@@ -1395,7 +1319,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               })
             );
             return {
-              location: section.title,
+              id: section.id || `location-${Date.now()}`,
+              title: section.title || 'Site Activity Photos',
               entries: convertedEntries
             };
           })
@@ -1408,30 +1333,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Convert Issues data to backend format
       let issuesDataForSave = [];
-
-      // Convert Schedule data to backend format using Supabase
-      let scheduleDataForSave = [];
-
-      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
-        // Filter out empty entries before conversion
-        const validEntries = scheduleSections[0].entries.filter(entry =>
-          entry.title || entry.file || entry.fileName || entry.supabaseUrl
-        );
-
-        if (validEntries.length > 0) {
-          // Convert entries to Supabase URLs
-          scheduleDataForSave = await convertScheduleEntriesToSupabase(
-            validEntries,
-            currentReportId || 'temp-report-id'
-          );
-
-          // Remove file objects that shouldn't be sent to backend
-          scheduleDataForSave = scheduleDataForSave.map(entry => {
-            const { file, ...entryWithoutFile } = entry;
-            return entryWithoutFile;
-          });
-        }
-      }
 
       if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
         // Convert frontend format to backend format with base64 images
@@ -1461,6 +1362,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Collect all form data
       reportData = {
+        projectId: sharedData.projectId || projectId || '',
         projectName: sharedData.projectName || 'Default Project',
         weekNumber: parseInt(sharedData.weekNumber) || 1,
         startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
@@ -1519,8 +1421,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           photos: photosDataForSave,
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
-          // NEW: Add Schedule section to save payload
-          masterSchedule: scheduleDataForSave,
           // NEW: Add Construction Progress section to save payload with rolling total logic for submitted reports
           constructionProgress: (() => {
             const data = constructionProgressHook.constructionData;
@@ -1786,10 +1686,13 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         locations: []
       };
 
-      if (siteActivitiesSections && siteActivitiesSections.length > 0) {
+      // Use photosData instead of siteActivitiesSections (photosData is what SitePhotos component updates)
+      const photoSections = photosData?.locations || siteActivitiesSections || [];
+
+      if (photoSections && photoSections.length > 0) {
         // Convert frontend format to backend format with base64 images
         const locations = await Promise.all(
-          siteActivitiesSections.map(async (section) => {
+          photoSections.map(async (section) => {
             const convertedEntries = await Promise.all(
               (section.entries || []).map(async (entry) => {
                 const convertedSlots = await Promise.all(
@@ -1809,7 +1712,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               })
             );
             return {
-              location: section.title,
+              id: section.id || `location-${Date.now()}`,
+              title: section.title || 'Site Activity Photos',
               entries: convertedEntries
             };
           })
@@ -1822,30 +1726,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Convert Issues data to backend format
       let issuesDataForSave = [];
-
-      // Convert Schedule data to backend format using Supabase
-      let scheduleDataForSave = [];
-
-      if (scheduleSections && scheduleSections.length > 0 && scheduleSections[0].entries && scheduleSections[0].entries.length > 0) {
-        // Filter out empty entries before conversion
-        const validEntries = scheduleSections[0].entries.filter(entry =>
-          entry.title || entry.file || entry.fileName || entry.supabaseUrl
-        );
-
-        if (validEntries.length > 0) {
-          // Convert entries to Supabase URLs
-          scheduleDataForSave = await convertScheduleEntriesToSupabase(
-            validEntries,
-            currentReportId || 'temp-report-id'
-          );
-
-          // Remove file objects that shouldn't be sent to backend
-          scheduleDataForSave = scheduleDataForSave.map(entry => {
-            const { file, ...entryWithoutFile } = entry;
-            return entryWithoutFile;
-          });
-        }
-      }
 
       if (issuesHook.issuesData && issuesHook.issuesData.length > 0) {
         // Convert frontend format to backend format with base64 images
@@ -1875,6 +1755,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
       // Collect all form data
       reportData = {
+        projectId: sharedData.projectId || projectId || '',
         projectName: sharedData.projectName || 'Default Project',
         weekNumber: parseInt(sharedData.weekNumber) || 1,
         startDate: new Date().toISOString().split('T')[0], // Convert to YYYY-MM-DD format
@@ -1934,8 +1815,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           photos: photosDataForSave,
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
-          // NEW: Add Schedule section to save payload
-          masterSchedule: scheduleDataForSave,
           // NEW: Add Construction Progress section to save payload
           // For drafts: save data as-is without rolling total logic
           // For submitted reports: apply rolling total logic (copy upToThisWeek to previousWeek and reset This Week)
@@ -2058,31 +1937,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       }
     } catch (error) {
       console.error('Save error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-
-      // Log specific validation errors
-      if (error.message && error.message.includes('Validation failed')) {
-        console.error('Validation error - checking data structure...');
-
-        // Check each section for potential issues
-        if (reportData.sections?.masterSchedule) {
-          // Validate each master schedule entry
-          reportData.sections.masterSchedule.forEach((entry, index) => {
-            if (!entry.id) console.error(`Entry ${index}: Missing id`);
-            if (!entry.type) console.error(`Entry ${index}: Missing type`);
-            if (!entry.title) console.error(`Entry ${index}: Missing title`);
-            if (!entry.date) console.error(`Entry ${index}: Missing date`);
-            if (!entry.fileName) console.error(`Entry ${index}: Missing fileName`);
-          });
-        }
-
-        // Check other required fields
-        if (!reportData.projectName) console.error('Missing projectName');
-        if (!reportData.weekNumber) console.error('Missing weekNumber');
-        if (!reportData.startDate) console.error('Missing startDate');
-        if (!reportData.endDate) console.error('Missing endDate');
-      }
-
       // Re-throw the error for the calling function to handle
       throw error;
     }
@@ -2169,13 +2023,128 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
   const handlePreview = async () => {
     setIsPreviewing(true);
     try {
-      // TODO: Implement preview functionality
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate preview
+      const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.pdf`;
+
+      const issuesWithBase64Photos = await Promise.all(
+        issuesHook.issuesData.map(async (issue) => {
+          let photo: string | undefined;
+          if (issue.photo instanceof File) {
+            photo = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(issue.photo as File);
+            });
+          } else if (typeof issue.photo === 'string') {
+            photo = issue.photo;
+          }
+          return { ...issue, photo };
+        })
+      );
+
+      const dateParts = sharedData.dateRange?.split(' ~ ') || [];
+      const exportData = await buildWeeklyReportExportData({
+        coverData: {
+          weekNumber: sharedData.weekNumber,
+          reportDateFrom: dateParts[0],
+          reportDateTo: dateParts[1],
+          projectTitle: sharedData.projectName,
+          employer: sharedData.employer || 'Client Name',
+          contractor: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+          coverImage: sharedData.coverImage,
+          clientLogo: sharedData.clientLogo,
+          signatureImage: sharedData.signatureImage || '/cacpm_logo.png',
+          refNo: `${sharedData.refNoPrefix}-${sharedData.weekNumber}`,
+          letterDate: new Date().toISOString().split('T')[0],
+          projectManager: sharedData.signatoryName || 'Project Manager',
+          companyLocation: sharedData.companyLocation || 'Phnom Penh, Cambodia',
+          companyPhone1: sharedData.companyPhone1 || '+855 23 123 456',
+          companyPhone2: sharedData.companyPhone2 || '+855 23 789 012',
+          companyEmail1: sharedData.companyEmail1 || 'info@cacpm.com',
+          companyEmail2: sharedData.companyEmail2,
+          recipientCompany: sharedData.recipientCompany || sharedData.employer || 'Client Organization',
+          recipientLocation: sharedData.recipientLocation || 'Phnom Penh, Cambodia',
+          toName: sharedData.recipientName || 'Project Manager',
+          attName: sharedData.recipientName || 'Project Manager',
+          ccLines: sharedData.ccList || [],
+        },
+        projectOverview: sharedData.projectOverview || '',
+        designConstruction: sharedData.designNConstruction || '',
+        designList: [],
+        overallProgress: formatRowsWithDisplayIndex((sharedData as any).overallProgress || overallProgressHook.rows),
+        overallProgressRemark: (sharedData as any).overallProgressRemark || overallProgressRemark,
+        constructionProgress: (constructionProgressHook.constructionData?.items || []) as any,
+        conProgressProject: sharedData.projectName,
+        conProgressDate: dateParts[0],
+        nwdpItems: (() => {
+          const constructionItems = constructionProgressHook.constructionData?.items || [];
+          const weeklySource = mergeConstructionIntoActivityRows(constructionItems, weeklyActivities || [], 'weekly');
+          const nextSource = mergeConstructionIntoActivityRows(constructionItems, nextWeekPlan || [], 'next');
+          return weeklySource.map((weekRow, i) => ({
+            sourceId: weekRow.displayId || weekRow.sourceId || '',
+            id: weekRow.displayId || weekRow.sourceId || '',
+            workDoneLabel: weekRow.description,
+            workDonePct: weekRow.percent,
+            nextWeekLabel: nextSource[i]?.description,
+            nextWeekPct: nextSource[i]?.percent,
+            indentLevel: weekRow.indentLevel ?? 0,
+          })).filter(item =>
+            item.workDoneLabel !== undefined || item.nextWeekLabel !== undefined
+          );
+        })(),
+        constructionIssues: issuesWithBase64Photos.map((issue, i) => ({
+          number: i + 1,
+          siteLocation: issue.location,
+          problemDescription: issue.problem,
+          actionBy: issue.actionBy,
+          photo: issue.photo,
+        })),
+        qaqcSections: qaqcData ? Object.entries(qaqcData).map(([key, value]: [string, any]) => {
+          const isBackendFormat = value && typeof value === 'object' && !Array.isArray(value) && 'items' in value;
+          const rawItems = isBackendFormat ? (value.items || []) : (Array.isArray(value) ? value : []);
+          const items = rawItems.map((item: any) => ({
+            ...item,
+            dateResponse: item.dateResponse || item.dateResponded || '',
+          }));
+          const comments = isBackendFormat
+            ? (value.comments || '')
+            : (Array.isArray(value) && value.length > 0 ? value[0]?.comment || '' : '');
+          return { sectionTitle: key, items, comments };
+        }) : [],
+        ...transformHSEToExcelFormat(hsesData),
+        ...transformResourcesToExcelFormat(resourcesData),
+        sitePhotoCaptions: (() => {
+          if (!siteActivitiesSections || siteActivitiesSections.length === 0) return [];
+          const result: any[] = [];
+          siteActivitiesSections.forEach((section: any) => {
+            if (section.entries && section.entries.length > 0) {
+              section.entries.forEach((entry: any) => {
+                if (entry.slots && entry.slots.length > 0) {
+                  for (let i = 0; i < entry.slots.length; i += 2) {
+                    const slot1 = entry.slots[i];
+                    const slot2 = entry.slots[i + 1];
+                    result.push({
+                      siteLocation: section.title || 'Site Location',
+                      caption1: slot1?.caption || '',
+                      caption2: slot2?.caption || '',
+                      image1: slot1?.image,
+                      image2: slot2?.image,
+                    });
+                  }
+                }
+              });
+            }
+          });
+          return result;
+        })(),
+      });
+
+      await exportWeeklyReportToPdf(exportData, filename, 'preview');
       toast({
-        title: "Preview Generated",
-        description: "Weekly report preview is ready.",
+        title: "Preview Opened",
+        description: "Weekly report preview opened in a new tab.",
       });
     } catch (error) {
+      console.error('Preview error:', error);
       toast({
         title: "Preview Failed",
         description: "Could not generate preview. Please try again.",
@@ -2208,14 +2177,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         })
       );
 
-      // Debug resources data before export
-      console.log("[WeeklyReport Export] resourcesData:", resourcesData);
-      console.log("[WeeklyReport Export] manPower keys:", resourcesData?.manPower ? Object.keys(resourcesData.manPower) : 'null');
-      console.log("[WeeklyReport Export] managementTeam:", resourcesData?.manPower?.managementTeam);
-      console.log("[WeeklyReport Export] workingTeamInterior:", resourcesData?.manPower?.workingTeamInterior);
-      console.log("[WeeklyReport Export] workingTeamMEP:", resourcesData?.manPower?.workingTeamMEP);
       const transformedResources = transformResourcesToExcelFormat(resourcesData);
-      console.log("[WeeklyReport Export] transformedResources:", transformedResources);
 
       // Create export data with converted photos
       const dateParts = sharedData.dateRange?.split(' ~ ') || [];
@@ -2313,14 +2275,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
-        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
-          type: e.type,
-          supabaseUrl: e.supabaseUrl,
-          caption: e.caption,
-          fileName: e.fileName,
-          fileType: e.fileType,
-          convertedImages: e.convertedImages,
-        })),
       });
 
       await exportWeeklyReportToPdf(exportData, filename);
@@ -2347,21 +2301,12 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
       // Generate filename with project name and week number
       const filename = `WeeklyReport_${sharedData.projectName?.replace(/\s+/g, '_') || 'Project'}_W${sharedData.weekNumber || 'XX'}.xlsx`;
 
-      // Validate required data before processing
-      if (!sharedData.weekNumber) {
-        console.warn('Week number is missing, using default');
-      }
-      if (!sharedData.projectName) {
-        console.warn('Project name is missing, using default');
-      }
-
       // Convert File objects to base64 for construction issues with error handling
       const issuesWithBase64Photos = await Promise.all(
         issuesHook.issuesData.map(async (issue, index) => {
           try {
             let photo: string | undefined;
             if (issue.photo instanceof File) {
-              console.log(`Converting photo ${index + 1} to base64...`);
               photo = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => {
@@ -2375,10 +2320,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                 reader.onerror = () => reject(new Error('FileReader error'));
                 reader.readAsDataURL(issue.photo as File);
               });
-              console.log(`Photo ${index + 1} converted successfully`);
             } else if (typeof issue.photo === 'string') {
               photo = issue.photo;
-              console.log(`Photo ${index + 1} is already a string`);
             }
             return { ...issue, photo };
           } catch (photoError) {
@@ -2469,14 +2412,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           });
           return result;
         })(),
-        masterSchedule: (scheduleSections?.[0]?.entries ?? []).map((e: any) => ({
-          type: e.type,
-          supabaseUrl: e.supabaseUrl,
-          caption: e.caption,
-          fileName: e.fileName,
-          fileType: e.fileType,
-          convertedImages: e.convertedImages,
-        })),
         // Pass actual QAQC data — handles both formats:
         // 1. Backend format (after user edits): { ncr: { items: [...], comments: '...' }, ... }
         // 2. Frontend TableData format (after DB load): { '4.1': [rows], ... }
@@ -2494,11 +2429,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
         }) : [],
       });
 
-
-      // Validate export data
-      if (!exportData.weekNumber) {
-        console.warn('Week number is still missing in export data');
-      }
 
       // Export to Excel using ExcelJS
       await exportWeeklyReportToExcel(exportData, filename);
@@ -2535,7 +2465,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             variant="outline"
             size="sm"
             onClick={() => {
-              console.log('Retrying Excel export...');
               handleExportExcel();
             }}
           >
@@ -2566,81 +2495,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
     } finally {
       setIsExporting(false);
     }
-  };
-
-  // Schedule upload functionality
-  const handleScheduleUpload = (files: FileList | null) => {
-    if (!files) return;
-    const validFiles = Array.from(files).filter((f) =>
-      f.type.startsWith("image/") || f.type === "application/pdf"
-    );
-    if (validFiles.length === 0) {
-      toast({ description: "No valid image or PDF files selected." });
-      return;
-    }
-
-    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-    const allowed = validFiles.filter((f) => f.size <= MAX_SIZE);
-    const rejectedCount = validFiles.length - allowed.length;
-
-    if (allowed.length === 0) {
-      toast({ description: "All selected files exceed the 10MB limit and were rejected." });
-      return;
-    }
-
-    // Create new entries for uploaded files (1 file per entry for full width display)
-    const newEntries: any[] = [];
-    for (const file of allowed) {
-      newEntries.push({
-        id: crypto.randomUUID(),
-        file: file,
-        type: file.type.startsWith("image/") ? "image" : "pdf",
-        caption: ""
-      });
-    }
-
-    // Update the first schedule section with new entries
-    const updatedSections = [...scheduleSections];
-    updatedSections[0] = {
-      ...updatedSections[0],
-      entries: [...updatedSections[0].entries, ...newEntries]
-    };
-    setScheduleSections(updatedSections);
-
-    toast({
-      title: `${allowed.length} schedule file(s) uploaded`,
-      description: `${newEntries.length} new entr${newEntries.length !== 1 ? "ies" : "y"} created.${rejectedCount ? ` ${rejectedCount} file(s) were too large and skipped.` : ""}`,
-    });
-
-    // Clear input
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const onScheduleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleScheduleUpload(e.target.files);
-    e.currentTarget.value = "";
-  };
-
-  // Drag and drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const files = e.dataTransfer.files;
-    handleScheduleUpload(files);
   };
 
   // Pre-compute overallProgress data to prevent race condition
@@ -2797,8 +2651,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               activeTab === "qaqc-status" ||
               activeTab === "resource" ||
               activeTab === "photos" ||
-              activeTab === "issues" ||
-              activeTab === "schedule") &&
+              activeTab === "issues") &&
               showSecondNav && (
                 <div className="w-full px-2 sm:px-4 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
                   <div className="relative flex items-center gap-1">
@@ -2848,8 +2701,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                           (section.id === 5 && activeTab === "hses") ||
                           (section.id === 6 && activeTab === "resource") ||
                           (section.id === 7 && activeTab === "photos") ||
-                          (section.id === 8 && activeTab === "issues") ||
-                          (section.id === 9 && activeTab === "schedule");
+                          (section.id === 8 && activeTab === "issues");
 
                         return (
                           <Button
@@ -2894,11 +2746,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                               } else if (section.id === 8) {
                                 setShowIntroduction(false);
                                 setActiveTab("issues");
-                                setShowSecondNav(true);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              } else if (section.id === 9) {
-                                setShowIntroduction(false);
-                                setActiveTab("schedule");
                                 setShowSecondNav(true);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               } else {
@@ -3007,8 +2854,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={overallProgressHook.setRows}
-                    overallProgressRemark={overallProgressRemark}          // ← ADD
-                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
+                    overallProgressRemark={overallProgressRemark}
+                    setOverallProgressRemark={setOverallProgressRemark}
                     reportId={currentReportId}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}
@@ -3021,6 +2868,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     onClearQaqcData={handleClearQaqcData}
                     onClearHsesData={handleClearHsesData}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3044,6 +2893,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     nextWeekPlan={nextWeekPlan}
                     setNextWeekPlan={setNextWeekPlan}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3063,13 +2914,15 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setSharedData={setSharedData}
                     overallProgressData={overallProgressHook}
                     setOverallProgressData={(rows) => overallProgressHook.setRows(rows)}
-                    overallProgressRemark={overallProgressRemark}          // ← ADD
-                    setOverallProgressRemark={setOverallProgressRemark}    // ← ADD
+                    overallProgressRemark={overallProgressRemark}
+                    setOverallProgressRemark={setOverallProgressRemark}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     weeklyActivities={weeklyActivities}
                     setWeeklyActivities={setWeeklyActivities}
                     nextWeekPlan={nextWeekPlan}
                     setNextWeekPlan={setNextWeekPlan}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3096,6 +2949,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setQaqcData={setQaqcData}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     onClearQaqcData={(fn) => { clearQaqcDataRef.current = fn; }}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3122,6 +2977,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setHsesData={setHsesData}
                     constructionProgressItems={constructionProgressHook.constructionData?.items ?? []}
                     onClearHsesData={(fn) => { clearHsesDataRef.current = fn; }}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3146,6 +3003,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     setNextWeekPlan={setNextWeekPlan}
                     resourcesData={resourcesData}
                     setResourcesData={setResourcesData}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
                   />
                 </div>
               </>
@@ -3154,46 +3013,19 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             {activeTab === "photos" && (
               <>
                 <div className="bg-card rounded-lg border p-6">
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">7. {siteActivitiesTitle}</h2>
-                      <Button
-                        onClick={() => {
-                          const newSection = {
-                            id: crypto.randomUUID(),
-                            title: `Photo Section ${siteActivitiesSections.length + 1}`,
-                            entries: []
-                          };
-                          setSiteActivitiesSections([...siteActivitiesSections, newSection]);
-                        }}
-                        className="flex items-center gap-2"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        Add Section
-                      </Button>
-                    </div>
-                    <ReferenceSection
-                      sections={siteActivitiesSections}
-                      setSections={setSiteActivitiesSections}
-                      onExportReference={() => { }}
-                      isExporting={isExportingSiteActivities}
-                      tableTitle={siteActivitiesTitle}
-                      setTableTitle={setSiteActivitiesTitle}
-                      hideTitle={false}
-                    />
-                  </div>
+                  <WeeklyReportContent
+                    showIntroduction={showIntroduction}
+                    setShowIntroduction={setShowIntroduction}
+                    projectLogo={sharedData.coverImage}
+                    setActiveTab={setActiveTab}
+                    setShowSecondNav={setShowSecondNav}
+                    activeTab={activeTab}
+                    sharedData={sharedData}
+                    setSharedData={setSharedData}
+                    reportId={currentReportId}
+                    photosData={photosData}
+                    setPhotosData={setPhotosData}
+                  />
                 </div>
               </>
             )}
@@ -3249,32 +3081,6 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               </>
             )}
 
-            {activeTab === "schedule" && (
-              <>
-                <div className="bg-card rounded-lg border p-6">
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                    <div className="mb-6">
-                      <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">9. Master Schedule</h2>
-                    </div>
-
-                    {/* New Supabase Master Schedule Component */}
-                    <MasterScheduleSupabase
-                      entries={scheduleSections[0].entries}
-                      onChange={(entries) => {
-                        const updatedSections = [...scheduleSections];
-                        updatedSections[0] = {
-                          ...updatedSections[0],
-                          entries: entries
-                        };
-                        setScheduleSections(updatedSections);
-                      }}
-                      reportId={currentReportId || undefined}
-                      disabled={isSaving}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
           </main>
 
           {/* Action Buttons */}

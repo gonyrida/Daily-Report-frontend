@@ -14,7 +14,8 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
   handleInputChange: passedHandleInputChange,
   removeSubRow: passedRemoveSubRow,
   monthYearDisplay: passedMonthYearDisplay,
-  dates: passedDates
+  dates: passedDates,
+  showUnit = false
 }) => {
   const [localSections, setLocalSections] = useState<Section[]>(passedSections || [
     {
@@ -69,7 +70,7 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
       const sectionsJson = JSON.stringify(passedSections);
       
       if (hasData && sectionsJson !== prevSectionsRef.current) {
-        console.log('🔄 ResourceTableComponent syncing passedSections:', passedSections);
+        // console.log('🔄 ResourceTableComponent syncing passedSections:', passedSections);
         setLocalSections(passedSections);
         prevSectionsRef.current = sectionsJson;
       }
@@ -164,25 +165,18 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
     let totalThisWeek = 0;
 
     sections.forEach(section => {
-      // Calculate totals for Previous Week and daily data
       section.subRows.forEach(subRow => {
-        const prevWeekValue = parseFloat(subRow.previousWeek) || 0;
-        totalPreviousWeek += prevWeekValue;
-        
-        // Calculate This Week as sum of all daily data
-        let weekSum = 0;
-        subRow.dailyData.forEach(dayValue => {
-          weekSum += parseFloat(dayValue) || 0;
-        });
-        totalThisWeek += weekSum;
+        totalPreviousWeek += parseFloat(subRow.previousWeek) || 0;
+        // Sum thisWeek directly — for manpower thisWeek == sum(dailyData) so the
+        // result is identical, but for materials thisWeek is set independently
+        // while daily columns are blank, so we must use thisWeek here.
+        totalThisWeek += parseFloat(subRow.thisWeek) || 0;
       });
     });
 
-    // Set the calculated totals
+    grandTotal.dailyData = ["", "", "", "", "", "", ""]; // Keep empty for date range columns
     grandTotal.previousWeek = totalPreviousWeek.toString();
     grandTotal.thisWeek = totalThisWeek.toString();
-    
-    // Auto-calculate Up to This Week as Previous Week + This Week
     grandTotal.upToThisWeek = (totalPreviousWeek + totalThisWeek).toString();
 
     return grandTotal;
@@ -191,7 +185,9 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
   // Transform data to new payload structure when needed
   const transformToNewPayload = (): Resources => {
     const dateRange = sharedData?.dateRange || "";
-    return transformResourceDataToNewPayload(sections, dateRange);
+    // For backward compatibility, pass empty arrays for material and machinery sections
+    // since this component doesn't have access to them directly
+    return transformResourceDataToNewPayload(sections, dateRange, [], []);
   };
 
   // Expose the transformed data through a callback or global state
@@ -215,6 +211,15 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
             >
               Description
             </th>
+            {showUnit && (
+              <th
+                rowSpan={3}
+                className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
+                style={{ verticalAlign: "middle" }}
+              >
+                Unit
+              </th>
+            )}
             <th
               colSpan={7}
               className="border border-border bg-blue-100 dark:bg-blue-900/30 px-4 py-2 text-center font-semibold"
@@ -293,6 +298,19 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
                       placeholder="Enter description"
                     />
                   </td>
+                  {showUnit && (
+                    <td className="border border-border px-4 py-2 text-center">
+                      <input
+                        type="text"
+                        value={row.unit || ''}
+                        onChange={(e) =>
+                          handleInputChange(sectionIndex, rowIndex, "unit", e.target.value)
+                        }
+                        className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
+                        placeholder="Unit"
+                      />
+                    </td>
+                  )}
                   {row.dailyData.map((value, dayIndex) => (
                     <td
                       key={dayIndex}
@@ -358,6 +376,11 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
             <td className="border border-border px-4 py-2 bg-blue-50 dark:bg-blue-900/20 font-bold">
               {getGrandTotal().description}
             </td>
+            {showUnit && (
+              <td className="border border-border px-4 py-2 bg-blue-50 dark:bg-blue-900/20 font-bold text-center">
+                -
+              </td>
+            )}
             {getGrandTotal().dailyData.map((value, dayIndex) => (
               <td
                 key={dayIndex}

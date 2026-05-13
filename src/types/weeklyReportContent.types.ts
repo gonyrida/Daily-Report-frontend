@@ -1,12 +1,19 @@
 import { ActivityRow } from "./activity.types";
 import { ConstructionProgressItem } from "./constructionProgress";
+import { MasterReportMetadata } from "@/utils/masterReportTransform";
+import { MasterReportCoverData, MasterConstructionProgressItem } from "@/types/masterReport.types";
 
 export interface Section {
   id: string;
   title: string;
 }
 
-export type TabType = "cover" | "letter" | "table-of-content" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
+export type TabType = "construction-progress" | "cover" | "letter" | "table-of-content" | "introduction" | "overall-progress" | "activities" | "qaqc-status" | "hses" | "resource" | "photos" | "issues" | "schedule";
+
+/**
+ * Mode for WeeklyReportContent - 'single' for individual reports, 'master' for aggregated folder view
+ */
+export type WeeklyReportMode = 'single' | 'master';
 
 export interface WeeklyReportContentProps {
   showIntroduction?: boolean;
@@ -34,6 +41,33 @@ export interface WeeklyReportContentProps {
   onClearQaqcData?: (clearFn: () => void) => void;
   onClearHsesData?: (clearFn: () => void) => void;
   constructionProgressItems?: ConstructionProgressItem[];
+  constructionProgress?: Record<string, {
+    projectInfo: {
+      project: string;
+      subtitle: string;
+      date: string;
+      revision: string;
+    };
+    items: MasterConstructionProgressItem[];
+  }>;
   resourcesData?: any;
   setResourcesData?: (resourcesData: any) => void;
+  photosData?: any;
+  setPhotosData?: (photosData: any) => void;
+  
+  // NEW: Master mode support
+  mode?: WeeklyReportMode;
+  masterMetadata?: MasterReportMetadata;
+  coverData?: MasterReportCoverData;
+  constructionIssues?: any[];
+  setConstructionIssues?: (issues: any[]) => void;
+  
+  // Introduction data for master report
+  introductionData?: {
+    projectOverview: string;
+    designConstruction: string;
+  };
+  
+  // Callback when a specific report is selected from Cover tab
+  onSelectReport?: (reportId: string) => void;
 }

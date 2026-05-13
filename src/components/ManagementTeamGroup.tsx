@@ -1,13 +1,16 @@
 import { Users, Wrench,Trash2, GripVertical } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import { MANAGEMENT_OPTIONS, MEP_TEAM_OPTIONS } from "./ResourcesSection";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Input } from "./ui/input";
 
 interface ManagementTeamGroupProps {
   managementTeam: ResourceRow[];
   setManagementTeam: (rows: ResourceRow[]) => void;
   mepTeam: ResourceRow[];
   setMepTeam: (rows: ResourceRow[]) => void;
+  onValueChange?: (value: string) => void;
+  sectionTitle?: string;
 }
 
 const ManagementTeamGroup = ({
@@ -15,11 +18,23 @@ const ManagementTeamGroup = ({
   setManagementTeam,
   mepTeam,
   setMepTeam,
+  onValueChange,
+  sectionTitle = "Management Team"
 }: ManagementTeamGroupProps) => {
+
+  useEffect(() => {
+    // Sync local section title state with prop
+    if (sectionTitle) {
+      setMgTeamTitle(sectionTitle);
+    }
+  }, [sectionTitle]);
 
   // This tracks which row is currently showing the text input
   const [editingId, setEditingId] = useState(null);
   const [draggedRow, setDraggedRow] = useState<{type: 'management' | 'mep', row: ResourceRow, index: number} | null>(null);
+
+  // Section title state
+  const [mgTeamTitle, setMgTeamTitle] = useState(sectionTitle);
 
   const handleDragStart = (e: React.DragEvent, row: ResourceRow, index: number, type: 'management' | 'mep') => {
     setDraggedRow({ type, row, index });
@@ -55,7 +70,16 @@ const ManagementTeamGroup = ({
       <div className="bg-table-header px-4 py-3 border-b border-table-border">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-foreground">Management Team</h3>
+          <Input 
+            type="text"
+            value={mgTeamTitle}
+            placeholder="Enter section title..."
+            className="w-full h-10"
+            onChange={(e) => {
+              onValueChange(e.target.value)
+              setMgTeamTitle(e.target.value)
+            }}
+          />
         </div>
       </div>
 

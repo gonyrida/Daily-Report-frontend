@@ -5,7 +5,14 @@ import Activities from "./content/Activities";
 import { QaqcStatusNew } from "./content/QaqcStatusNew";
 import Hses from "./content/Hses";
 import Resource from "./content/Resource";
-import { Section, TabType, WeeklyReportContentProps } from "@/types/weeklyReportContent.types";
+import SitePhotos from "./content/SitePhotos";
+import ConstructionIssue from "./content/ConstructionIssue";
+import MasterReportBanner from "./MasterReportBanner";
+import MasterReportCover from "./MasterReportCover";
+import MasterOverallProgress from "./MasterOverallProgress";
+import MasterQaqcSection from "./MasterQaqcSection";
+import { Section, TabType, WeeklyReportContentProps, WeeklyReportMode } from "@/types/weeklyReportContent.types";
+import { DEFAULT_MASTER_COVER_IMAGES } from "@/utils/imageUtils";
 import { QAQC_SECTIONS } from "@/constants/qaqcSections";
 import { useActivities } from "@/hooks/useActivities";
 import { useConstructionIssue } from "@/hooks/useConstructionIssue";
@@ -45,8 +52,19 @@ const WeeklyReportContent: React.FC<WeeklyReportContentProps> = ({
   onClearQaqcData,
   onClearHsesData,
   constructionProgressItems,
+  constructionProgress,
   resourcesData,
-  setResourcesData
+  setResourcesData,
+  photosData,
+  setPhotosData,
+  // NEW: Master mode props
+  mode = 'single',
+  masterMetadata,
+  coverData,
+  constructionIssues,
+  setConstructionIssues,
+  introductionData,
+  onSelectReport
 }) => {
   const [internalShowIntroduction, setInternalShowIntroduction] =
     useState(false);
@@ -111,9 +129,11 @@ useEffect(() => {
     );
 
     // Avoid pointless state update if nothing changed.
+    // IMPORTANT: Must check isDeleted too — Phase 1 tombstoning changes isDeleted
+    // while keeping the same id, so id-only comparison would incorrectly skip the update.
     if (
       merged.length === prev.length &&
-      merged.every((r, i) => r.id === prev[i]?.id)
+      merged.every((r, i) => r.id === prev[i]?.id && r.isDeleted === prev[i]?.isDeleted)
     ) {
       return prev;
     }
@@ -158,6 +178,10 @@ useEffect(() => {
   const currentSetWeeklyActivities = externalSetWeeklyActivities || setWeeklyActivities;
   const currentNextWeekPlan = externalNextWeekPlan || nextWeekPlan;
   const currentSetNextWeekPlan = externalSetNextWeekPlan || setNextWeekPlan;
+
+  // Master mode detection
+  const isMasterMode = mode === 'master';
+  const isEditable = !isMasterMode; // Disable editing in master mode
 
   // Initialize all hooks at parent level
   const constructionIssueHook = useConstructionIssue(reportId || '');
@@ -328,18 +352,14 @@ useEffect(() => {
   // Expose clearQaqcData function to parent for successful submit cleanup
   useEffect(() => {
     if (onClearQaqcData) {
-      onClearQaqcData(() => {
-        console.log('QAQC data cleared');
-      });
+      onClearQaqcData(() => {});
     }
   }, [onClearQaqcData]);
 
   // Expose clearHsesData function to parent for successful submit cleanup
   useEffect(() => {
     if (onClearHsesData) {
-      onClearHsesData(() => {
-        console.log('HSES data cleared');
-      });
+      onClearHsesData(() => {});
     }
   }, [onClearHsesData]);
 
@@ -350,29 +370,6 @@ useEffect(() => {
     if (setShowSecondNav) setShowSecondNav(true);
   };
 
-  // Log QAQC data when tab is clicked
-  useEffect(() => {
-    if (activeTab === "qaqc-status") {
-      console.log("🔍 QAQC TAB CLICKED - Data Debug:");
-      console.log("  - qaqcData (from parent/DB):", qaqcData);
-      console.log("  - qaqcApiHook.tableData:", qaqcApiHook.tableData);
-      console.log("  - qaqcData keys:", qaqcData ? Object.keys(qaqcData) : "null");
-      console.log("  - Has database data?:", qaqcData && Object.keys(qaqcData).length > 0);
-
-      // Detailed inspection of first section
-      if (qaqcData && qaqcData['4.1']) {
-        console.log("  - Section 4.1 rows:", qaqcData['4.1']);
-        console.log("  - First row code:", qaqcData['4.1'][0]?.code);
-        console.log("  - First row description:", qaqcData['4.1'][0]?.description?.substring(0, 30));
-      }
-
-      // Check if data appears to be from database
-      const hasAnyRows = qaqcApiHook.tableData && Object.values(qaqcApiHook.tableData).some(
-        (rows: any) => rows && rows.length > 0 && rows.some((r: any) => r.code || r.description)
-      );
-      console.log("  - Table has row data?:", hasAnyRows);
-    }
-  }, [activeTab, qaqcData, qaqcApiHook.tableData]);
 
   if (showIntroduction) {
     return (
@@ -420,6 +417,50 @@ useEffect(() => {
   // Render all tabs but hide inactive ones with display:none to prevent remounting
   return (
     <div className="space-y-0">
+      {/* Master Report Banner - shown only in master mode */}
+      {isMasterMode && masterMetadata && (
+        <MasterReportBanner metadata={masterMetadata} />
+      )}
+      
+      {/* Cover Tab - only shown in master mode */}
+      {isMasterMode && activeTab === "cover" && masterMetadata && (
+        <div className="bg-card">
+          <MasterReportCover 
+            coverData={coverData || {
+              projectName: masterMetadata.folderName,
+              reportTitle: `Master Weekly Report - Week ${masterMetadata.weekNumber}`,
+              weekNumber: masterMetadata.weekNumber.toString(),
+              dateRange: `Week ${masterMetadata.weekNumber}`,
+              coverImage: DEFAULT_MASTER_COVER_IMAGES.placeholder,
+              clientLogo: '',
+              projectTitle: masterMetadata.folderName,
+              employer: 'Multiple Clients',
+              contractorName: 'Cambodian Advanced Construction Project Management (CACPM) Co., Ltd',
+            }}
+            onSelectReport={onSelectReport}
+          />
+        </div>
+      )}
+
+      {/* Introduction Tab - only shown in master mode */}
+      {isMasterMode && activeTab === "introduction" && (
+        <div className="bg-card p-3">
+          <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
+            1. INTRODUCTION
+          </h2>
+          <Introduction 
+            projectLogo={coverData?.coverImage || projectLogo}
+            projectOverview={introductionData?.projectOverview ?? sharedData?.projectOverview ?? ""}
+            setProjectOverview={() => {}}
+            designConstruction={introductionData?.designConstruction ?? sharedData?.designNConstruction ?? ""}
+            setDesignConstruction={() => {}}
+            handleTextChange={() => {}}
+            handleTabKey={() => {}}
+            handleBold={() => {}}
+          />
+        </div>
+      )}
+      
       {/* Activities Tab */}
       <div style={{ display: activeTab === "activities" ? "block" : "none" }} className="bg-card p-3">
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
@@ -427,11 +468,12 @@ useEffect(() => {
         </h2>
         <Activities 
           weeklyActivities={currentWeeklyActivities}
-          setWeeklyActivities={currentSetWeeklyActivities}
+          setWeeklyActivities={isEditable ? currentSetWeeklyActivities : undefined}
           nextWeekPlan={currentNextWeekPlan}
-          setNextWeekPlan={currentSetNextWeekPlan}
+          setNextWeekPlan={isEditable ? currentSetNextWeekPlan : undefined}
           reportId={reportId}
-          constructionProgressItems={constructionProgressItems}
+          constructionProgressItems={mode === 'master' ? Object.values(constructionProgress || {}).flatMap(cp => cp.items) : constructionProgressItems}
+          mode={mode}
         />
       </div>
 
@@ -448,55 +490,59 @@ useEffect(() => {
             📝 Load Example Data
           </button> */}
         {/* </div> */}
-        <QaqcStatusNew 
-          sections={qaqcApiHook.filteredSections}
-          tableData={qaqcApiHook.tableData}
-          setTableData={(dataOrUpdater) => {
-            // Resolve functional updater before syncing to parent
-            const data = typeof dataOrUpdater === 'function'
-              ? dataOrUpdater(qaqcApiHook.tableData)
-              : dataOrUpdater;
+        {isMasterMode ? (
+          <MasterQaqcSection qaqcData={qaqcData || {}} />
+        ) : (
+          <QaqcStatusNew 
+            sections={qaqcApiHook.filteredSections}
+            tableData={qaqcApiHook.tableData}
+            setTableData={(dataOrUpdater) => {
+              // Resolve functional updater before syncing to parent
+              const data = typeof dataOrUpdater === 'function'
+                ? dataOrUpdater(qaqcApiHook.tableData)
+                : dataOrUpdater;
 
-            // Update hook state (tableData lives in useQaqcApi)
-            qaqcApiHook.setTableData(data);
+              // Update hook state (tableData lives in useQaqcApi)
+              qaqcApiHook.setTableData(data);
 
-            // Transform to backend format and sync to parent
-            if (!setQaqcData) return;
+              // Transform to backend format and sync to parent
+              if (!setQaqcData) return;
 
-            const backendData: any = {};
-            const sectionIdMap: Record<string, string> = {
-              "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
-              "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
-              "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
-            };
+              const backendData: any = {};
+              const sectionIdMap: Record<string, string> = {
+                "4.1": "ncr", "4.2": "car", "4.3": "scar", "4.4": "pmsi",
+                "4.5": "csi", "4.6": "ir", "4.7": "mfa", "4.8": "rfi",
+                "4.9": "rfa", "4.10": "fcr", "4.11": "vo", "4.12": "tr", "4.13": "mir"
+              };
 
-            Object.entries(data).forEach(([sectionId, rows]) => {
-              const backendKey = sectionIdMap[sectionId];
-              if (backendKey) {
-                const nonEmptyRows = Array.isArray(rows) ? rows.filter(row =>
-                  row.code.trim() || row.description.trim() || row.status.trim() ||
-                  row.dateResponse.trim() || row.comment.trim()
-                ) : [];
+              Object.entries(data).forEach(([sectionId, rows]) => {
+                const backendKey = sectionIdMap[sectionId];
+                if (backendKey) {
+                  const nonEmptyRows = Array.isArray(rows) ? rows.filter(row =>
+                    row.code.trim() || row.description.trim() || row.status.trim() ||
+                    row.dateResponse.trim() || row.comment.trim()
+                  ) : [];
 
-                backendData[backendKey] = {
-                  items: nonEmptyRows.map(row => ({
-                    code: row.code,
-                    description: row.description,
-                    status: row.status,
-                    dateResponded: row.dateResponse
-                  })),
-                  comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
-                };
+                  backendData[backendKey] = {
+                    items: nonEmptyRows.map(row => ({
+                      code: row.code,
+                      description: row.description,
+                      status: row.status,
+                      dateResponded: row.dateResponse
+                    })),
+                    comments: nonEmptyRows.map(row => row.comment).filter(comment => comment.trim()).join('\n\n---\n\n') || ""
+                  };
+                }
+              });
+
+              if (Object.keys(backendData).length > 0) {
+                setQaqcData(backendData);
               }
-            });
-
-            if (Object.keys(backendData).length > 0) {
-              setQaqcData(backendData);
-            }
-          }}
-          weeklyReportId={reportId}
-          initialQaqcData={qaqcData}
-        />
+            }}
+            weeklyReportId={reportId}
+            initialQaqcData={qaqcData}
+          />
+        )}
       </div>
 
       {/* HSES Tab */}
@@ -516,6 +562,8 @@ useEffect(() => {
           isEditing={true}
           data={currentHsesData}
           onChange={setHsesData}
+          sharedData={sharedData}
+          reportId={reportId}
         />
       </div>
 
@@ -547,9 +595,14 @@ useEffect(() => {
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           7. SITE ACTIVITY PHOTOS
         </h2>
-        <div className="text-center py-12 text-muted-foreground">
-          Site activity photos content will be displayed here.
-        </div>
+        <SitePhotos
+          data={photosData}
+          onChange={setPhotosData}
+          isEditing={true}
+          reportId={reportId}
+          sharedData={sharedData}
+          isMasterMode={isMasterMode}
+        />
       </div>
 
       {/* Issues Tab */}
@@ -557,19 +610,30 @@ useEffect(() => {
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           8. CONSTRUCTION ISSUE
         </h2>
-        <div className="text-center py-12 text-muted-foreground">
-          Construction issues will be displayed here.
-        </div>
-      </div>
-
-      {/* Schedule Tab */}
-      <div style={{ display: activeTab === "schedule" ? "block" : "none" }} className="bg-card p-3">
-        <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
-          9. MASTER SCHEDULE
-        </h2>
-        <div className="text-center py-12 text-muted-foreground">
-          Master schedule content will be displayed here.
-        </div>
+        {isMasterMode ? (
+          constructionIssues && constructionIssues.length > 0 ? (
+            <div className="px-2">
+              {constructionIssues.map((issue) => (
+                <ConstructionIssue
+                  key={issue.id}
+                  issueNumber={issue.issueNumber}
+                  location={issue.location}
+                  problem={issue.problem}
+                  actionBy={issue.actionBy}
+                  photo={issue.photo}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground italic">
+              No construction issues reported across all projects for this week.
+            </div>
+          )
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            Construction issues will be displayed here.
+          </div>
+        )}
       </div>
 
       {/* Overall Progress Tab */}
@@ -577,16 +641,39 @@ useEffect(() => {
         <h2 className="text-lg font-semibold px-6 py-3 bg-muted dark:bg-muted border-b rounded-t-lg mb-3 text-foreground">
           2. OVERALL PROGRESS OF THIS WEEK AND NEXT WEEK
         </h2>
-        <OverallProgress
-          rows={visibleOverallRows}
-          setRows={setOverallRowsFromTable}
-          updateRows={setOverallRowsFromTable}
-          addTitleRow={() => {}}
-          addDetailRow={() => {}}
-          descriptionsReadOnly={false}
-          remark={overallProgressRemark}
-          setRemark={setOverallProgressRemark}
-        />
+        {isMasterMode && masterMetadata && constructionProgress ? (
+          <MasterOverallProgress
+            masterReport={{
+              type: 'master',
+              folder: {
+                _id: masterMetadata.folderId || '',
+                name: masterMetadata.folderName || '',
+              },
+              weekNumber: masterMetadata.weekNumber,
+              reports: [],
+              aggregated: {
+                activities: { weeklyActivities: [], nextWeekPlan: [] },
+                manpower: { managementTotal: masterMetadata.totalManpower || 0, workingInteriorTotal: 0, workingMEPTotal: 0, grandTotal: masterMetadata.totalManpower || 0 },
+                photos: {},
+                progress: { weighted: masterMetadata.weightedProgress || 0, perProject: {} },
+                issues: [],
+                constructionProgress: constructionProgress,
+              },
+            }}
+          />
+        ) : (
+          <OverallProgress
+            rows={visibleOverallRows}
+            setRows={isEditable ? setOverallRowsFromTable : undefined}
+            updateRows={isEditable ? setOverallRowsFromTable : undefined}
+            addTitleRow={() => {}}
+            addDetailRow={() => {}}
+            descriptionsReadOnly={!isEditable}
+            remark={overallProgressRemark}
+            setRemark={isEditable ? setOverallProgressRemark : undefined}
+            mode={mode}
+          />
+        )}
       </div>
 
       {/* Table of Content Tab */}
@@ -676,11 +763,6 @@ useEffect(() => {
             <li className="text-primary dark:text-primary">
               <a href="#issues" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("issues"); if (setShowSecondNav) setShowSecondNav(true); }}>
                 CONSTRUCTION ISSUE
-              </a>
-            </li>
-            <li className="text-primary dark:text-primary">
-              <a href="#schedule" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("schedule"); if (setShowSecondNav) setShowSecondNav(true); }}>
-                MASTER SCHEDULE
               </a>
             </li>
           </ol>

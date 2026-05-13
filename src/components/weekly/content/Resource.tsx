@@ -80,7 +80,6 @@ const Resource: React.FC<{
     const memoizedDates = useMemo(() => {
       if (sharedData?.dateRange) {
         const { dates } = generateWeekDates(sharedData.dateRange);
-        console.log('🔍 getDates useMemo:', { dateRange: sharedData.dateRange, generatedDates: dates });
         return dates;
       }
       return ["-", "-", "-", "-", "-", "-", "-"]; // default fallback - 7 days
@@ -100,7 +99,12 @@ const Resource: React.FC<{
     // Get transformed payload for backend API calls
     const getTransformedResources = (): Resources => {
       if (sections) {
-        return transformResourceDataToNewPayload(sections, sharedData?.dateRange);
+        return transformResourceDataToNewPayload(
+          sections, 
+          sharedData?.dateRange,
+          materialSections,
+          machinerySections
+        );
       }
       // Return empty structure if no sections
       return {
@@ -136,12 +140,36 @@ const Resource: React.FC<{
     // Handle initialResourcesData prop - convert to sections format when data is loaded
     // Only run once and don't overwrite aggregated data
     React.useEffect(() => {
-      if (
+      // Process data if we have initial data but no sections yet, or if we haven't applied initial data yet
+      const shouldProcessData = (
         initialResourcesData?.manPower && 
         setSections && 
-        !hasAppliedInitialData.current &&
-        !useAggregatedData
-      ) {
+        !useAggregatedData &&
+        (
+          !hasAppliedInitialData.current || 
+          sections?.length === 0 || 
+          materialSections?.[0]?.subRows?.length === 0 || 
+          machinerySections?.[0]?.subRows?.length === 0
+        )
+      );
+
+      if (shouldProcessData) {
+        
+        // Transform and set manpower sections if available
+        if (initialResourcesData.manPower) {
+          const transformedManpower = transformBackendToFrontendFormat(initialResourcesData.manPower);
+          setSections(transformedManpower);
+        }
+
+        // Transform and set materials sections if available
+        if (initialResourcesData.material) {
+          const transformedMaterials = transformMaterialsToFrontendFormat(initialResourcesData.material);
+          setMaterialSections([{
+            title: "",
+            subtitle: "",
+            subRows: transformedMaterials
+          }]);
+        }
         
         // Also transform and set machinery sections if available
         if (initialResourcesData.machinery) {
@@ -159,12 +187,6 @@ const Resource: React.FC<{
 
     // Handle manpower aggregation
     const handleAggregateManpower = async () => {
-      console.log('🔍 Aggregating for:', {
-        projectName: sharedData?.projectName,
-        dateRange: sharedData?.dateRange,
-        projectId: sharedData?.projectId
-      });
-
       if (
         !sharedData?.dateRange || 
         (!sharedData?.projectId && (!sharedData?.projectName || sharedData.projectName === "Default Project Name"))
@@ -181,13 +203,6 @@ const Resource: React.FC<{
         const dateRangeStr = sharedData.dateRange.trim().replace(/\s*~\s*/, '~');
         const [startDateStr, endDateStr] = dateRangeStr.split('~');
 
-        console.log('🔍 Date parsing:', {
-          original: sharedData.dateRange,
-          cleaned: dateRangeStr,
-          startDateStr,
-          endDateStr
-        });
-
         // Convert "DD-MMM-YY" to "YYYY-MM-DD" format
         const parseDate = (dateStr: string) => {
           const cleanDateStr = dateStr.trim();
@@ -203,18 +218,6 @@ const Resource: React.FC<{
         const startDate = parseDate(startDateStr);
         const endDate = parseDate(endDateStr);
 
-        console.log('🔍 Parsed dates:', { startDate, endDate });
-
-
-        // Always use aggregateManpower with date parameters
-        console.log('🔍 Calling aggregateManpower with:', {
-          projectName: sharedData.projectName,
-          startDate,
-          endDate,
-          projectId: sharedData.projectId,
-          reportId: reportId || 'none'
-        });
-        
         const result = await aggregateManpower(
           (sharedData.projectName || '').trim(),  // Trim whitespace/tabs
           startDate,
@@ -227,21 +230,14 @@ const Resource: React.FC<{
         );
 
         if (result.success && result.data) {
-          console.log('✅ Aggregation success - raw data:', result.data);
-          
           // Transform manpower data - keep local to prevent parent state conflict
           if (result.data.manPower) {
-            console.log('🔍 Transforming manPower:', result.data.manPower);
             const transformedSections = transformBackendToFrontendFormat(result.data.manPower);
-            console.log('✅ Transformed sections:', transformedSections);
             setAggregatedSections(transformedSections);
             setUseAggregatedData(true);
             // NOTE: Don't call setSections(transformedSections) - it triggers parent re-render and overwrites data
-            console.log('✅ State updated - useAggregatedData: true, sections count:', transformedSections.length);
-          } else {
-            console.log('⚠️ No manPower data in result');
           }
-          
+
           // Transform and set materials data
           if (result.data.material) {
             const transformedMaterials = transformMaterialsToFrontendFormat(result.data.material);
@@ -275,7 +271,6 @@ const Resource: React.FC<{
               machinery: result.data.machinery || []
             };
             onResourcesChange(newResources);
-            console.log('✅ Notified parent with aggregated resources');
           }
           
         } else {
@@ -333,6 +328,7 @@ const Resource: React.FC<{
             monthYearDisplay={monthYearDisplay || getDateDisplay()}
             dates={dates && dates.length > 0 && dates[0] !== "-" ? dates : getDates()}
             showTitles={true}
+            showUnit={false}
           />
         </div>
         <div id="section-6.3">
@@ -346,6 +342,7 @@ const Resource: React.FC<{
             monthYearDisplay={monthYearDisplay || getDateDisplay()}
             dates={dates && dates.length > 0 && dates[0] !== "-" ? dates : getDates()}
             showTitles={true}
+            showUnit={false}
           />
         </div>
       </div>

@@ -8,6 +8,6 @@ export function createHSESections() {
 
 export function createHSEActivityPhotoSections() {
   return [
-    createReferenceSection("HSE Activity Photo")
+    createReferenceSection("HSE Activity Photos")
   ];
 }

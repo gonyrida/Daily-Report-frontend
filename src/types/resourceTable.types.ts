@@ -1,5 +1,6 @@
 export interface SubRow {
   description: string;
+  unit?: string; // Optional unit field for materials
   dailyData: string[];
   previousWeek: string;
   thisWeek: string;
@@ -21,4 +22,5 @@ export interface ResourceTableComponentProps {
   removeSubRow?: any;
   monthYearDisplay?: string;
   dates?: string[];
+  showUnit?: boolean; // Add prop to show unit column for materials
 }

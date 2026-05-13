@@ -90,6 +90,7 @@ const Activities = (props: ActivitiesProps) => {
   };
   
   // Use local or props
+  // In master mode, use construction progress data for proper ID display, fallback to transformed activities
   const weeklyActivities = weeklyRows;
   const nextWeekPlan = nextRows;
 

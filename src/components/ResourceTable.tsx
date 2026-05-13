@@ -60,7 +60,7 @@ interface ResourceTableProps {
   title: string;
   icon: React.ReactNode;
   rows: ResourceRow[];
-  setRows: (rows: ResourceRow[]) => void;
+  setRows: (rows: ResourceRow[] | ((prev: ResourceRow[]) => ResourceRow[])) => void;
   showUnit?: boolean;
   useDropdown?: boolean;
   dropdownOptions?: string[];
@@ -86,6 +86,9 @@ interface ResourceTableProps {
   ) => void;
   unitNumberOnly?: boolean;
   enableDragDrop?: boolean;
+  descriptionUnitMap?: Record<string, string>;
+  titleInput?: boolean;
+  onTitleChange?: (title: string) => void;
 }
 
 const ResourceTable = ({
@@ -106,9 +109,21 @@ const ResourceTable = ({
   customUpdateRow,
   unitNumberOnly = false,
   enableDragDrop = false,
+  descriptionUnitMap,
+  titleInput = false,
+  onTitleChange
 }: ResourceTableProps) => {
   const [draggedRow, setDraggedRow] = useState<ResourceRow | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Section title state if titleInput is enabled
+  const [sectionTitle, setSectionTitle] = useState(title);
+
+  useEffect(() => {
+    if (title) {
+      setSectionTitle(title);
+    }
+  }, [title]) 
 
   const addRow = () => {
     const newRow: ResourceRow = {
@@ -168,8 +183,8 @@ const ResourceTable = ({
     if (customUpdateRow) {
       customUpdateRow(id, field, value);
     } else {
-      setRows(
-        rows.map((row) => {
+      setRows((currentRows) =>
+        currentRows.map((row) => {
           if (row.id === id) {
             if (field === "description" && value === "__custom__") {
               return { ...row, description: "", isCustomInput: true };
@@ -216,7 +231,20 @@ const ResourceTable = ({
       <div className="bg-card dark:bg-card px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           {icon}
-          <h3 className="font-semibold text-foreground">{title}</h3>
+          {titleInput ? (
+            <Input
+              type="text"
+              value={sectionTitle}
+              placeholder="Enter section title..."
+              className="w-full h-10"
+              onChange={(e) => {
+                onTitleChange?.(e.target.value);
+                setSectionTitle(e.target.value);
+              }}
+            />
+          ) : (
+            <h3 className="font-semibold text-foreground">{sectionTitle}</h3>
+          )}
         </div>
         {showAddButtons ? (
           <div className="flex gap-2">
@@ -385,7 +413,9 @@ const ResourceTable = ({
                                 if (value === "__custom__") {
                                   updateRow(row.id, "isCustomInput", "true");
                                 } else {
-                                  updateRow(row.id, "description", value);
+                                  const unit = descriptionUnitMap?.[value];
+                                  const updatedRow = { ...row, description: value, ...(unit && { unit }) };
+                                  setRows(rows.map(r => r.id === row.id ? updatedRow : r));
                                 }
                               }}
                             >
@@ -395,7 +425,7 @@ const ResourceTable = ({
                               >
                                 <SelectValue placeholder="Select..." className="min-w-[200px]" />
                               </SelectTrigger>
-                              <SelectContent className="w-[32%]">
+                              <SelectContent className="w-full">
                                 <div className="p-2">
                                   <Input
                                     placeholder="Search..."

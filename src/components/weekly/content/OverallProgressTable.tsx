@@ -18,6 +18,7 @@ interface OverallProgressTableProps {
   descriptionsReadOnly?: boolean;
   remark?: string;
   setRemark?: (remark: string) => void;
+  mode?: 'single' | 'master'; // NEW: Master mode support
 }
 
 export default function OverallProgressTable({
@@ -29,7 +30,9 @@ export default function OverallProgressTable({
   descriptionsReadOnly = false,
   remark = "",
   setRemark,
+  mode = 'single',
 }: OverallProgressTableProps) {
+  const isMasterMode = mode === 'master';
   const displayRows = rows || [];
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);

@@ -12,7 +12,9 @@ export interface Project {
   createdBy: string;
   createdByName: string;
   reportCount: number;
+  weeklyReportCount?: number;  // Count of weekly reports only (for Master Report)
   lastReportDate?: string;
+  lastWeeklyReportDate?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

@@ -402,12 +402,22 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   const isProjectActive = (projectId: string, reportType: 'daily' | 'weekly') => {
     const searchParams = new URLSearchParams(location.search);
     const currentProjectId = searchParams.get('projectId');
-    
+
     if (reportType === 'daily') {
       return isActive('/dashboard') && currentProjectId === projectId;
     } else {
       return isActive('/weekly-reports') && currentProjectId === projectId;
     }
+  };
+
+  // Returns true when the master report for a specific folder is the active page
+  const isMasterActive = (folderId: string) => {
+    const searchParams = new URLSearchParams(location.search);
+    return (
+      isActive('/weekly-reports') &&
+      searchParams.get('folderId') === folderId &&
+      searchParams.get('type') === 'master'
+    );
   };
 
   // Load folders with projects on mount
@@ -419,24 +429,28 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const currentProjectId = searchParams.get('projectId');
-    
+    const currentFolderId  = searchParams.get('folderId');
+    const reportType       = searchParams.get('type');
+    const isWeeklyReports  = location.pathname === '/weekly-reports' || location.pathname.startsWith('/weekly-reports?');
+    const isDashboard      = location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard?');
+
+    // Auto-expand folder containing the active project
     if (currentProjectId && folders.length > 0) {
-      // Find which folder contains the current project
-      const containingFolder = folders.find(folder => 
+      const containingFolder = folders.find(folder =>
         folder.projects?.some(project => project._id === currentProjectId)
       );
-      
       if (containingFolder) {
-        // Expand the appropriate folder based on current page
-        const isDashboard = location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard?');
-        const isWeeklyReports = location.pathname === '/weekly-reports' || location.pathname.startsWith('/weekly-reports?');
-        
         if (isDashboard) {
           setExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
         } else if (isWeeklyReports) {
           setWeeklyExpandedFolders(prev => ({ ...prev, [containingFolder._id]: true }));
         }
       }
+    }
+
+    // Auto-expand folder when the master report for that folder is active
+    if (currentFolderId && reportType === 'master' && isWeeklyReports) {
+      setWeeklyExpandedFolders(prev => ({ ...prev, [currentFolderId]: true }));
     }
   }, [location.search, folders, location.pathname]);
 
@@ -707,7 +721,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
   return (
     <>
-      <Sidebar className={className}>
+      <Sidebar className={`${className} bg-sidebar text-sidebar-foreground`}>
         {/* Logo Section */}
         <SidebarHeader className="border-b border-sidebar-border">
           <div 
@@ -719,7 +733,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-lg">Report System</span>
-              <span className="text-xs text-muted-foreground">CACPM</span>
+              <span className="text-xs opacity-80">CACPM</span>
             </div>
           </div>
         </SidebarHeader>
@@ -734,13 +748,13 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                     <div className="flex items-center justify-between w-full px-2 py-2">
                       <span className="text-sm font-medium">View Mode</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">All</span>
+                        <span className="text-xs opacity-80">All</span>
                         <Switch
                           checked={viewMode === 'admin'}
                           onCheckedChange={(checked) => setViewMode(checked ? 'admin' : 'all')}
                           className="scale-75"
                         />
-                        <span className="text-xs text-muted-foreground">Admin Only</span>
+                        <span className="text-xs opacity-80">Admin Only</span>
                       </div>
                     </div>
                   </SidebarMenuItem>
@@ -836,7 +850,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                               </span>
                               <div className="flex items-center gap-1">
                                 <div
-                                  className="h-5 w-5 p-0 hover:bg-primary/10 hover:text-primary flex items-center justify-center rounded cursor-pointer"
+                                  className="h-5 w-5 p-0 hover:bg-sidebar-accent hover:text-sidebar-foreground flex items-center justify-center rounded cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (!dailyReportOpen) {
@@ -893,7 +907,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="w-full justify-start pl-2 text-xs text-muted-foreground hover:text-foreground"
+                                  className="w-full justify-start pl-2 text-xs opacity-80 hover:text-primary-foreground"
                                   onClick={() => setShowAddFolderInput(true)}
                                 >
                                   <Plus className="h-3 w-3 mr-2" />
@@ -1126,7 +1140,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                               isActive={isProjectActive(project._id, 'daily')}
                                               className={`flex-1 text-xs cursor-pointer ${
                                                 isProjectActive(project._id, 'daily') 
-                                                  ? 'bg-blue-100 text-blue-900 font-medium' 
+                                                  ? 'bg-primary text-primary-foreground font-medium' 
                                                   : ''
                                               }`}
                                             >
@@ -1208,7 +1222,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
                                       {(!folder.projects || folder.projects.length === 0) && !showAddProjectInFolder[folder._id] && (
                                         <SidebarMenuSubItem>
-                                          <div className="px-8 py-1 text-xs text-muted-foreground italic">
+                                          <div className="px-8 py-1 text-xs opacity-80 italic">
                                             No projects in this folder
                                           </div>
                                         </SidebarMenuSubItem>
@@ -1222,7 +1236,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                           {rootProjects.length > 0 && (
                             <>
                               <SidebarMenuSubItem>
-                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                                <div className="px-2 py-1 text-xs font-medium opacity-80">
                                   (No Folder)
                                 </div>
                               </SidebarMenuSubItem>
@@ -1261,7 +1275,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                           isActive={isProjectActive(project._id, 'daily')}
                                           className={`flex-1 text-xs cursor-pointer ${
                                             isProjectActive(project._id, 'daily') 
-                                              ? 'bg-blue-100 text-blue-900 font-medium' 
+                                              ? 'bg-primary text-primary-foreground font-medium' 
                                               : ''
                                           }`}
                                         >
@@ -1344,7 +1358,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                           
                           {folders.length === 0 && rootProjects.length === 0 && !showAddFolderInput && (
                             <SidebarMenuSubItem>
-                              <div className="px-3 py-1 text-xs text-muted-foreground italic">
+                              <div className="px-3 py-1 text-xs opacity-80 italic">
                                 No projects yet. Click + to add one.
                               </div>
                             </SidebarMenuSubItem>
@@ -1384,7 +1398,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                               {/* Folder with Expand/Collapse */}
                               <SidebarMenuSubItem>
                                 <div 
-                                  className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-accent/50 rounded"
+                                  className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-sidebar-accent rounded"
                                   onClick={() => toggleWeeklyFolderExpand(folder._id)}
                                 >
                                   <div className="h-5 w-5 flex items-center justify-center">
@@ -1395,26 +1409,52 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                     )}
                                   </div>
                                   <FolderPlus className="h-3 w-3" />
-                                  <span className="text-xs font-medium text-muted-foreground">{folder.name}</span>
+                                  <span className="text-xs font-medium opacity-80">{folder.name}</span>
                                 </div>
                               </SidebarMenuSubItem>
                               
-                              {/* Projects under Folder - only show when expanded */}
-                              {weeklyExpandedFolders[folder._id] && folder.projects?.map((project) => (
-                                <SidebarMenuSubItem key={`weekly-proj-${project._id}`}>
-                                  <SidebarMenuSubButton
-                                    onClick={() => handleProjectClick(project.name, project._id, 'weekly')}
-                                    isActive={isProjectActive(project._id, 'weekly')}
-                                    className={`text-muted-foreground pl-8 ${
-                                      isProjectActive(project._id, 'weekly') 
-                                        ? 'bg-blue-100 text-blue-900 font-medium' 
-                                        : ''
-                                    }`}
-                                  >
-                                    <span className="text-xs">{project.name}</span>
-                                  </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                              ))}
+                              {/* Projects + Master Report – only show when folder is expanded */}
+                              {weeklyExpandedFolders[folder._id] && (
+                                <>
+                                  {/* 📊 Master Report item – above individual projects */}
+                                  <SidebarMenuSubItem key={`weekly-master-${folder._id}`}>
+                                    <SidebarMenuSubButton
+                                      onClick={() =>
+                                        navigate(
+                                          `/weekly-reports?folderId=${folder._id}&type=master`
+                                        )
+                                      }
+                                      isActive={isMasterActive(folder._id)}
+                                      className={`pl-8 ${
+                                        isMasterActive(folder._id)
+                                          ? 'bg-primary text-primary-foreground font-medium'
+                                          : 'opacity-80'
+                                      }`}
+                                    >
+                                      <span className="text-xs">📊 Master Report</span>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+
+                                  {/* Individual project items */}
+                                  {folder.projects?.map((project) => (
+                                    <SidebarMenuSubItem key={`weekly-proj-${project._id}`}>
+                                      <SidebarMenuSubButton
+                                        onClick={() =>
+                                          handleProjectClick(project.name, project._id, 'weekly')
+                                        }
+                                        isActive={isProjectActive(project._id, 'weekly')}
+                                        className={`pl-8 ${
+                                          isProjectActive(project._id, 'weekly')
+                                            ? 'bg-primary text-primary-foreground font-medium'
+                                            : 'opacity-80'
+                                        }`}
+                                      >
+                                        <span className="text-xs">{project.name}</span>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  ))}
+                                </>
+                              )}
                             </React.Fragment>
                           ))}
 
@@ -1422,7 +1462,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                           {rootProjects.length > 0 && (
                             <>
                               <SidebarMenuSubItem>
-                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                                <div className="px-2 py-1 text-xs font-medium opacity-80">
                                   (No Folder)
                                 </div>
                               </SidebarMenuSubItem>
@@ -1431,10 +1471,10 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                   <SidebarMenuSubButton
                                     onClick={() => handleProjectClick(project.name, project._id, 'weekly')}
                                     isActive={isProjectActive(project._id, 'weekly')}
-                                    className={`text-muted-foreground ${
+                                    className={`${
                                       isProjectActive(project._id, 'weekly') 
-                                        ? 'bg-blue-100 text-blue-900 font-medium' 
-                                        : ''
+                                        ? 'bg-primary text-primary-foreground font-medium' 
+                                        : 'opacity-80'
                                     }`}
                                   >
                                     <span className="text-xs">{project.name}</span>
@@ -1446,7 +1486,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                           
                           {folders.length === 0 && rootProjects.length === 0 && (
                             <SidebarMenuSubItem>
-                              <div className="px-3 py-1 text-xs text-muted-foreground italic">
+                              <div className="px-3 py-1 text-xs opacity-80 italic">
                                 No projects available
                               </div>
                             </SidebarMenuSubItem>
