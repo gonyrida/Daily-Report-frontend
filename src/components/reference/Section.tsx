@@ -28,7 +28,56 @@ export default function Section({ section, onUpdate, onDelete, hideTitle = false
 
   const updateEntry = (updatedEntry: any) => {
     const currentEntries = section.entries || [];
-    onUpdate({ ...section, entries: currentEntries.map((e: any) => (e.id === updatedEntry.id ? updatedEntry : e)) });
+    const originalEntry = currentEntries.find((e: any) => e.id === updatedEntry.id);
+
+    // Detect if a slot's image was cleared (image deletion)
+    const imageWasDeleted =
+      originalEntry &&
+      Array.isArray(originalEntry.slots) &&
+      Array.isArray(updatedEntry.slots) &&
+      originalEntry.slots.some((origSlot: any, i: number) => {
+        const newSlot = updatedEntry.slots[i];
+        return origSlot?.image != null && newSlot?.image == null;
+      });
+
+    if (imageWasDeleted) {
+      // Merge the updated entry into the list
+      const mergedEntries = currentEntries.map((e: any) =>
+        e.id === updatedEntry.id ? updatedEntry : e
+      );
+
+      // Collect all images in left-to-right, top-to-bottom order
+      const allImages: { image: any; caption: string }[] = [];
+      for (const entry of mergedEntries) {
+        for (const slot of entry.slots || []) {
+          if (slot.image != null) {
+            allImages.push({ image: slot.image, caption: slot.caption || "" });
+          }
+        }
+      }
+
+      // Redistribute images back into slots from the beginning
+      let imgIdx = 0;
+      const reorderedEntries = mergedEntries.map((entry: any) => ({
+        ...entry,
+        slots: (entry.slots || []).map((slot: any) => {
+          if (imgIdx < allImages.length) {
+            const img = allImages[imgIdx++];
+            return { ...slot, image: img.image, caption: img.caption };
+          }
+          return { ...slot, image: null, caption: "" };
+        }),
+      }));
+
+      onUpdate({ ...section, entries: reorderedEntries });
+    } else {
+      onUpdate({
+        ...section,
+        entries: currentEntries.map((e: any) =>
+          e.id === updatedEntry.id ? updatedEntry : e
+        ),
+      });
+    }
   };
 
   const deleteEntry = (id: string) => {
