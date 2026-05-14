@@ -21,6 +21,7 @@ import { createEmptyCarSheet } from "@/utils/carHelpers";
 import {
   createDefaultHSESections,
   createDefaultSiteActivitiesSections,
+  padLastSection,
 } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import { Button } from "@/components/ui/button";
@@ -2529,10 +2530,8 @@ const DailyReport = () => {
         );
       };
 
-      const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(
-        siteActivitiesSections
-      );
+      const processedSections = await processImages(padLastSection(referenceSections));
+      const processedSiteActivities = await processImages(padLastSection(siteActivitiesSections));
 
       // Filter CAR groups - only send non-hidden ones
       const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
@@ -2737,11 +2736,9 @@ const DailyReport = () => {
         );
       };
 
-      const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(
-        siteActivitiesSections
-      );
-
+      const processedSections = await processImages(padLastSection(referenceSections));
+      const processedSiteActivities = await processImages(padLastSection(siteActivitiesSections));
+ 
       // Filter CAR groups - only send non-hidden ones
       const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
         !g.hiddenAfterSubmission
@@ -2913,10 +2910,8 @@ const DailyReport = () => {
         );
       };
 
-      const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(
-        siteActivitiesSections
-      );
+      const processedSections = await processImages(padLastSection(referenceSections));
+      const processedSiteActivities = await processImages(padLastSection(siteActivitiesSections));
 
       // Filter CAR groups - only send non-hidden ones
       const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
