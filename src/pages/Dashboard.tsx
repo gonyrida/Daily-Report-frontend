@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   SidebarInset,
@@ -36,6 +36,8 @@ import {
   Trash2,
   Building2,
   User,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LogoutButton from "@/components/LogoutButton";
@@ -44,6 +46,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAllUserReports, createNewReport, createBlankReport, getRecentReports, deleteReport, getCompanyReports } from "@/integrations/reportsApi";
 import { getProjectById } from "@/integrations/projectsApi";
 import { projectEvents } from '@/utils/eventEmitter';
+import { groupReportsByWeek, getCurrentWeekBucketIndex } from '@/utils/weekPagination';
 
 interface Report {
   _id: string;
@@ -84,6 +87,8 @@ const Dashboard = () => {
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "submitted">("all");
   const [activeTab, setActiveTab] = useState<'personal' | 'company'>('personal');
   const [currentProjectName, setCurrentProjectName] = useState<string>("");
+  const [personalWeekIndex, setPersonalWeekIndex] = useState(0);
+  const [companyWeekIndex, setCompanyWeekIndex] = useState(0);
 
   // Helper function for unified project matching
   const matchesProject = (report: Report, projectId: string | null, projectName: string) => {
@@ -233,6 +238,39 @@ const Dashboard = () => {
 
     setFilteredCompanyReports(filtered);
   }, [companyReports, searchQuery, filterStatus, projectId, currentProjectName, folderId]);
+
+  // ── Weekly pagination buckets ─────────────────────────────────────────────
+  const personalWeekBuckets = useMemo(
+    () => groupReportsByWeek(filteredReports, r => r.reportDate),
+    [filteredReports]
+  );
+  const companyWeekBuckets = useMemo(
+    () => groupReportsByWeek(filteredCompanyReports, r => r.reportDate),
+    [filteredCompanyReports]
+  );
+
+  useEffect(() => {
+    setPersonalWeekIndex(getCurrentWeekBucketIndex(personalWeekBuckets));
+  }, [personalWeekBuckets]);
+
+  useEffect(() => {
+    setCompanyWeekIndex(getCurrentWeekBucketIndex(companyWeekBuckets));
+  }, [companyWeekBuckets]);
+
+  const currentPersonalReports = useMemo(
+    () =>
+      (personalWeekBuckets[personalWeekIndex]?.reports ?? [])
+        .slice()
+        .sort((a, b) => new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime()),
+    [personalWeekBuckets, personalWeekIndex]
+  );
+  const currentCompanyReports = useMemo(
+    () =>
+      (companyWeekBuckets[companyWeekIndex]?.reports ?? [])
+        .slice()
+        .sort((a, b) => new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime()),
+    [companyWeekBuckets, companyWeekIndex]
+  );
 
   // Helper function to get current user ID from user context
   // No localStorage needed - user info comes from authentication context
@@ -651,149 +689,181 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 {(activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length) > 0 ? (
-                  <div className="space-y-3">
-                    {(activeTab === 'personal' ? filteredReports : filteredCompanyReports).map((report) => (
-                      <div
-                        key={report._id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => handleOpenReport(report._id)}
+                  <>
+                    {/* Week Pagination Navigation */}
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => activeTab === 'personal'
+                          ? setPersonalWeekIndex(prev => Math.max(0, prev - 1))
+                          : setCompanyWeekIndex(prev => Math.max(0, prev - 1))
+                        }
+                        disabled={activeTab === 'personal' ? personalWeekIndex <= 0 : companyWeekIndex <= 0}
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{currentProjectName || report.projectName}</h4>
-                            {report.folderName && !folderId && (
-                              <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                <span>📁</span>
-                                {report.folderName}
-                              </Badge>
-                            )}
-                            {getStatusBadge(report.status)}
-                            {new Date(report.updatedAt).getTime() > Date.now() - 5 * 60 * 1000 && (
-                              <Badge variant="outline" className="text-blue-600 border-blue-600">
-                                Recently edited
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(report.reportDate).toLocaleDateString()}
-                            </span>
-                            {/* User Info - Only show in Company tab */}
-                            {activeTab === 'company' && report.userId && (
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {(() => {
-                                  const currentUserId = getCurrentUserId();
-                                  const isCurrentUser = report.userId._id === currentUserId || report.userId === currentUserId;
-                                  
-                                  return isCurrentUser ? 'You' : `${report.userId.firstName} ${report.userId.lastName}`;
-                                })()}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatLastUpdated(report.updatedAt)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {/* Check if current user is the owner */}
-                          {(() => {
-                            const currentUserId = getCurrentUserId();
-                            
-                            // For "My Reports" tab, assume ownership (since these are user's own reports)
-                            // For "Project Reports" tab, check actual ownership
-                            const isOwner = activeTab === 'personal' || report.userId?._id === currentUserId || report.userId === currentUserId;
-                            
-                            return (
-                              <>
-                                {/* Edit/Open Button - Only for owners */}
-                                {isOwner && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenReport(report._id);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    Edit
-                                  </Button>
-                                )}
-                                
-                                {/* Delete Button - Only for owners */}
-                                {isOwner && (
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm"
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                        Delete
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>
-                                          Are you sure you want to delete this report?
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          This action will permanently delete the report "{report.projectName}" and all its data. This cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction 
-                                          onClick={(e) => {
-                                            console.log("🔥 ALERT ACTION: Clicked! report._id:", report._id);
-                                            handleDeleteReport(report._id, e);
-                                          }}
-                                          className="bg-red-600 hover:bg-red-700"
-                                        >
-                                          Delete Report
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                )}
-
-                                {/* View Button for non-owners in Project Reports only */}
-                                {!isOwner && activeTab === 'company' && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenReport(report._id);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    View
-                                  </Button>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>
+                          {activeTab === 'personal'
+                            ? personalWeekBuckets[personalWeekIndex]?.label
+                            : companyWeekBuckets[companyWeekIndex]?.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(activeTab === 'personal' ? currentPersonalReports : currentCompanyReports).length}{' '}
+                          {(activeTab === 'personal' ? currentPersonalReports : currentCompanyReports).length === 1 ? 'report' : 'reports'})
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => activeTab === 'personal'
+                          ? setPersonalWeekIndex(prev => Math.min(personalWeekBuckets.length - 1, prev + 1))
+                          : setCompanyWeekIndex(prev => Math.min(companyWeekBuckets.length - 1, prev + 1))
+                        }
+                        disabled={activeTab === 'personal'
+                          ? personalWeekIndex >= personalWeekBuckets.length - 1
+                          : companyWeekIndex >= companyWeekBuckets.length - 1}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(activeTab === 'personal' ? currentPersonalReports : currentCompanyReports).map((report) => (
+                        <div
+                          key={report._id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => handleOpenReport(report._id)}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium">{currentProjectName || report.projectName}</h4>
+                              {report.folderName && !folderId && (
+                                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                  <span>📁</span>
+                                  {report.folderName}
+                                </Badge>
+                              )}
+                              {getStatusBadge(report.status)}
+                              {new Date(report.updatedAt).getTime() > Date.now() - 5 * 60 * 1000 && (
+                                <Badge variant="outline" className="text-blue-600 border-blue-600">
+                                  Recently edited
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(report.reportDate).toLocaleDateString()}
+                              </span>
+                              {activeTab === 'company' && report.userId && (
+                                <span className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {(() => {
+                                    const currentUserId = getCurrentUserId();
+                                    const isCurrentUser = report.userId._id === currentUserId || report.userId === currentUserId;
+                                    return isCurrentUser ? 'You' : `${report.userId.firstName} ${report.userId.lastName}`;
+                                  })()}
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatLastUpdated(report.updatedAt)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {(() => {
+                              const currentUserId = getCurrentUserId();
+                              const isOwner = activeTab === 'personal' || report.userId?._id === currentUserId || report.userId === currentUserId;
+                              return (
+                                <>
+                                  {isOwner && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenReport(report._id);
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-1" />
+                                      Edit
+                                    </Button>
+                                  )}
+                                  {isOwner && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-1" />
+                                          Delete
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>
+                                            Are you sure you want to delete this report?
+                                          </AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            This action will permanently delete the report "{report.projectName}" and all its data. This cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={(e) => {
+                                              console.log("🔥 ALERT ACTION: Clicked! report._id:", report._id);
+                                              handleDeleteReport(report._id, e);
+                                            }}
+                                            className="bg-red-600 hover:bg-red-700"
+                                          >
+                                            Delete Report
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
+                                  {!isOwner && activeTab === 'company' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenReport(report._id);
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-1" />
+                                      View
+                                    </Button>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12">
                     <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">
-                      {currentProjectName 
-                        ? `No Reports for ${currentProjectName}` 
+                      {currentProjectName
+                        ? `No Reports for ${currentProjectName}`
                         : 'No Reports Found'
                       }
                     </h3>
                     <p className="text-muted-foreground text-center mb-4">
-                      {currentProjectName 
+                      {currentProjectName
                         ? `No reports found for ${currentProjectName}. Create your first report for this project.`
                         : 'Create your first report to get started.'
                       }
