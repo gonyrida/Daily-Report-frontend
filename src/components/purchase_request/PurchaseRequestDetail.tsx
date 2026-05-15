@@ -151,6 +151,20 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
     }
   }, [selectedRequest])
 
+  const amountInWords = () => {
+    const total = selectedRequest.grandTotal || '0';
+    
+    if (isNaN(total)) return 'Zero Dollars';
+    
+    const dollars = Math.floor(total);
+    const cents = Math.round((total - dollars) * 100);
+    
+    const wordResult = numberToWords(dollars);
+    const centsStr = cents.toString().padStart(2, '0');
+    
+    return `${wordResult} and ${centsStr}/100 Dollars`;
+  }
+
   const handleExport = async (mode: 'excel' | 'pdf') => {
     setIsExporting(true);
     const purposesList = structuredClone(prSummaryData.summary.materialsActual);
@@ -160,6 +174,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
       if (mode === 'excel') {
         await exportPurchaseRequestExcel({
           ...selectedRequest,
+          amountInWords: amountInWords(),
           requestDate: new Date(selectedRequest.requestDate).toISOString().split('T')[0],
           ...prSummaryData,
           summary: {
@@ -170,6 +185,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
       } else {
         await exportPurchaseRequestPDF({
           ...selectedRequest,
+          amountInWords: amountInWords(),
           requestDate: new Date(selectedRequest.requestDate).toISOString().split('T')[0],
           ...prSummaryData,
           summary: {
@@ -193,6 +209,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
     try {
       const url = await exportPurchaseRequestPDF({
         ...selectedRequest,
+        amountInWords: amountInWords(),
         requestDate: new Date(selectedRequest.requestDate).toISOString().split('T')[0],
         ...prSummaryData,
         summary: {
@@ -329,7 +346,7 @@ const PurchaseRequestDetail: React.FC<PurchaseRequestDetailProps> = ({
                   </div>
                   <div>
                     <label className="text-sm font-medium text-green-700">Due Date</label>
-                    <p className="text-sm">{new Date(selectedRequest.dueDate).toLocaleString()}</p>
+                    <p className="text-sm">{new Date(selectedRequest.dueDate).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>

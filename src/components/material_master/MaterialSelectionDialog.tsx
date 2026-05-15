@@ -282,7 +282,7 @@ export default function MaterialSelectionDialog({
                 </div>
               ) : (
                 <table className="w-full border-collapse border">
-                  <thead className="bg-muted/50 sticky top-0">
+                  <thead className="bg-background sticky top-0">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left">
                         <Checkbox

@@ -24,7 +24,8 @@ import {
   Edit,
   MoreHorizontal,
   Eye,
-  EyeOff
+  EyeOff,
+  Trash
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -39,8 +40,9 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import HierarchicalSidebar from '@/components/HierarchicalSidebar';
-import { apiGet, apiPost, apiPut } from '@/lib/apiFetch';
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/apiFetch';
 import { Label } from "@/components/ui/label";
+import ConfirmationModal from '../purchase_request/ConfirmationModal';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -54,6 +56,19 @@ const UserManagement = () => {
   const [isCreatingUser, setIsCreatingUser] = useState(false); // Status for loading state
   const [editingUser, setEditingUser] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [currentUser, setCurrentUser] = useState({
+    id: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    position: '',
+    department: '',
+    password: '',
+    orgLevel: undefined,
+    role: 'user'
+  });
 
   // Pagination state
   const [pagination, setPagination] = useState({
@@ -239,6 +254,25 @@ const UserManagement = () => {
     }
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    setIsDeletingUser(true)
+    let response;
+    let result;
+    try {
+      response = await apiDelete(`/admin/users/${userId}`);
+      result = await response.json();
+      
+      if (result.success) {
+        toast({ title: "Success", description: "User deleted successfully" });
+        fetchUsers();
+      }
+    } catch (error) {
+      toast({ title: "Error", description: result.message || "Failed to delete user" });
+    } finally {
+      setIsDeletingUser(false)
+    }
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -371,7 +405,7 @@ const UserManagement = () => {
                           </td>
                           <td className="p-4 align-middle">
                             <Badge variant="outline" className="text-xs">
-                              {user.orgLevel || 'N/A'}
+                              {user.orgLevel.toString() || 'N/A'}
                             </Badge>
                           </td>
                           <td className="p-4 align-middle">
@@ -392,10 +426,25 @@ const UserManagement = () => {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                   </DropdownMenuItem>
-                                  {/* <DropdownMenuItem>
-                                    <Mail className="mr-2 h-4 w-4" />
-                                    Resend Verification
-                                  </DropdownMenuItem> */}
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      setShowDeleteConfirm(true);
+                                      setCurrentUser({
+                                        id: user._id,
+                                        firstName: user.firstName,
+                                        lastName: user.lastName,
+                                        email: user.email,
+                                        position: user.position,
+                                        department: user.department,
+                                        password: '',
+                                        orgLevel: user.orgLevel,
+                                        role: user.role
+                                      });
+                                    }}
+                                  >
+                                    <Trash className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
@@ -453,6 +502,20 @@ const UserManagement = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Delete User Confirmation Modal */}
+            <ConfirmationModal
+              isOpen={showDeleteConfirm}
+              onClose={() => setShowDeleteConfirm(false)}
+              onConfirm={() => {
+                setShowDeleteConfirm(false);
+                handleDeleteUser(currentUser.id);
+              }}
+              title="Confirm Deletion"
+              message={`Are you sure you want to delete ${currentUser.firstName} ${currentUser.lastName} ?`}
+              confirmText="Delete Request"
+              isLoading={isDeletingUser}
+            />
 
             {/* Add User Dialog */}
             <Dialog 

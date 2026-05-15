@@ -1,6 +1,5 @@
 import { Wrench } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
-import { INTERIOR_TEAM_OPTIONS } from "./ResourcesSection";
 import { useState, useEffect } from "react";
 
 interface SiteWorkingTeamGroupProps {
@@ -8,13 +7,17 @@ interface SiteWorkingTeamGroupProps {
   setInteriorTeam: (rows: ResourceRow[]) => void;
   onValueChange?: (value: string) => void;
   sectionTitle?: string;
+  interiorTeamOptions?: { id: string; name: string }[];
+  onRefresh?: () => void;
 }
 
 const SiteWorkingTeamGroup = ({
   interiorTeam,
   setInteriorTeam,
   onValueChange,
-  sectionTitle = "Site Team"
+  sectionTitle = "Site Team",
+  interiorTeamOptions = [],
+  onRefresh
 }: SiteWorkingTeamGroupProps) => {
   // Section title state
   const [localSectionTitle, setLocalSectionTitle] = useState(sectionTitle);
@@ -33,11 +36,13 @@ const SiteWorkingTeamGroup = ({
       rows={interiorTeam}
       setRows={setInteriorTeam}
       useDropdown={true}
-      dropdownOptions={INTERIOR_TEAM_OPTIONS}
+      dropdownOptions={interiorTeamOptions}
+      optionsFor="role"
       inputNumberOnly={true}
       enableDragDrop={true}
       titleInput={true}
       onTitleChange={(title) => onValueChange?.(title.trim() ? title : localSectionTitle)}
+      onOptionDeleted={onRefresh}
     />
   );
 };

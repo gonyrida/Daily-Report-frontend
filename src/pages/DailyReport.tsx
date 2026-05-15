@@ -21,6 +21,7 @@ import { createEmptyCarSheet } from "@/utils/carHelpers";
 import {
   createDefaultHSESections,
   createDefaultSiteActivitiesSections,
+  padLastSection,
 } from "@/utils/referenceHelpers";
 import FileNameDialog from "@/components/FileNameDialog";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { apiGet } from "@/lib/apiFetch";
+import { apiGet, apiPost } from "@/lib/apiFetch";
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -2417,6 +2418,24 @@ const DailyReport = () => {
 
       // Save to database (keeps status as "draft")
       await saveReportToDB(cleanedData);
+
+      // Extract all roles and filter only unique roles
+      const allRolesUsed = Array.from(new Set([
+        ...cleanedData.managementTeam.map((r) => ({type: "management", name: r.description})),
+        ...cleanedData.workingTeamInterior.map((r) => ({type: "working", name: r.description})),
+        ...cleanedData.workingTeamMEP.map((r) => ({type: "working", name: r.description})),
+      ]));
+      // Extract all items and its unit
+      const allItemsUsed = [
+        ...cleanedData.materials.map((r) => ({type: "material", name: r.description, unit: r.unit})),
+        ...cleanedData.machinery.map((r) => ({type: "equipment", name: r.description, unit: r.unit}))
+      ];
+
+      await apiPost(`/daily-reports/dropdown-options`, {
+        items: allItemsUsed,
+        roles: allRolesUsed
+      });
+
       // ADD THIS: Update local status
       setReportStatus("draft");
 
@@ -2511,10 +2530,8 @@ const DailyReport = () => {
         );
       };
 
-      const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(
-        siteActivitiesSections
-      );
+      const processedSections = await processImages(padLastSection(referenceSections));
+      const processedSiteActivities = await processImages(padLastSection(siteActivitiesSections));
 
       // Filter CAR groups - only send non-hidden ones
       const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
@@ -2719,11 +2736,9 @@ const DailyReport = () => {
         );
       };
 
-      const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(
-        siteActivitiesSections
-      );
-
+      const processedSections = await processImages(padLastSection(referenceSections));
+      const processedSiteActivities = await processImages(padLastSection(siteActivitiesSections));
+ 
       // Filter CAR groups - only send non-hidden ones
       const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
         !g.hiddenAfterSubmission
@@ -2895,10 +2910,8 @@ const DailyReport = () => {
         );
       };
 
-      const processedSections = await processImages(referenceSections);
-      const processedSiteActivities = await processImages(
-        siteActivitiesSections
-      );
+      const processedSections = await processImages(padLastSection(referenceSections));
+      const processedSiteActivities = await processImages(padLastSection(siteActivitiesSections));
 
       // Filter CAR groups - only send non-hidden ones
       const visibleCarGroups = (carSheet.photo_groups || []).filter((g: any) => 
@@ -3451,6 +3464,23 @@ const DailyReport = () => {
       };
 
       await saveReportToDB(reportDataWithSubmit);  // 🚀 Single API call
+
+      // Extract all roles and filter only unique roles
+      const allRolesUsed = Array.from(new Set([
+        ...cleanedData.managementTeam.map((r) => ({type: "management", name: r.description})),
+        ...cleanedData.workingTeamInterior.map((r) => ({type: "working", name: r.description})),
+        ...cleanedData.workingTeamMEP.map((r) => ({type: "working", name: r.description})),
+      ]));
+      // Extract all items and its unit
+      const allItemsUsed = [
+        ...cleanedData.materials.map((r) => ({type: "material", name: r.description, unit: r.unit})),
+        ...cleanedData.machinery.map((r) => ({type: "equipment", name: r.description, unit: r.unit}))
+      ];
+
+      await apiPost(`/daily-reports/dropdown-options`, {
+        items: allItemsUsed,
+        roles: allRolesUsed
+      });
 
       // ADD THIS: Update local status
       setReportStatus("submitted");

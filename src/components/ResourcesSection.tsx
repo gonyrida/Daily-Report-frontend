@@ -2,7 +2,8 @@ import { Users, Package, Truck } from "lucide-react";
 import ResourceTable, { ResourceRow } from "./ResourceTable";
 import SiteWorkingTeamGroup from "./SiteWorkingTeamGroup";
 import ManagementTeamGroup from "./ManagementTeamGroup";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useDropdownOptions, DropdownData } from "../hooks/useDropdownOptions";
 
 interface ResourcesSectionProps {
   managementTeam: ResourceRow[];
@@ -20,212 +21,53 @@ interface ResourcesSectionProps {
   secondSectionTitle?: string;
   setSecondSectionTitle?: (title: string) => void;
 }
-// add more options as needed
-export const MANAGEMENT_OPTIONS = [
-  "Project Manager",
-  "Construction Manager",
-  "Site Engineer",
-  "Architecture",
-  "QS Engineer",
-  "MEP Engineer",
-];
 
-const WORKING_TEAM_OPTIONS = [
-  "Site Manager",
-  "Site Engineer",
-  "MEP Engineer",
-  "Foreman",
-  "Skill Workers",
-  "MEP Workers",
-  "General Workers",
-];
+// Helper function to transform API data to component-friendly formats
+const transformApiData = (apiData: DropdownData | null) => {
+  if (!apiData) {
+    return {
+      managementOptions: [],
+      interiorTeamOptions: [],
+      mepTeamOptions: [],
+      materialOptions: [],
+      materialUnitMap: {},
+      machineryOptions: [],
+      machineryUnitMap: {},
+      unitOptions: []
+    };
+  }
 
-export const INTERIOR_TEAM_OPTIONS = [
-  "Site Manager",
-  "Site Engineer",
-  "Foreman",
-  "Skill Workers",
-  "General Workers",
-  "MEP Workers",
-];
+  // Create option arrays (just the names)
+  const managementOptions = apiData.roles.management.map(r => ({id: r.id, name: r.name}));
+  const workingRoles = apiData.roles.working.map(r => ({id: r.id, name: r.name}));
+  const interiorTeamOptions = workingRoles;
+  const mepTeamOptions = workingRoles;
 
-export const MEP_TEAM_OPTIONS = [
-  "Site Manager",
-  "Site Engineer",
-  "Foreman",
-  "Skill Workers",
-  "General Workers",
-  "MEP Workers",
-];
+  const materialOptions = apiData.items.material.map(i => ({id: i.id, name: i.name}));
+  const machineryOptions = apiData.items.equipment.map(i => ({id: i.id, name: i.name}));
+  const unitOptions = apiData.units.map(u => ({id: u.id, name: u.name}));
 
-const MACHINERY_OPTIONS = [
-  "Air Compressor",
-  "Angle Grinder",
-  "Auto Level Machine",
-  "Bar Bending Machine",
-  "Bulldozer",
-  "Cargo Crane",
-  "Concrete Cutting Machine",
-  "Concrete Finished",
-  "Concrete Mixer",
-  "Concrete Mixer Car",
-  "Concrete Pump",
-  "Concrete Vibrator",
-  "Container",
-  "Electric Drill",
-  "Electric Hammer",
-  "Excavator",
-  "Generator",
-  "Jackhammer",
-  "Material Hoist",
-  "Mobile Crane",
-  "Plate Compactor",
-  "Power Cable",
-  "Power Trowel",
-  "Pump Car",
-  "Rammer",
-  "Rebar Cutting Machine",
-  "Roller",
-  "Scaffolding",
-  "Total Level",
-  "Total Station",
-  "Truck",
-  "Water Pump",
-  "Welding Machine"
-];
+  // Create unit maps (name -> unit)
+  const materialUnitMap: Record<string, string> = {};
+  apiData.items.material.forEach(item => {
+    materialUnitMap[item.name] = item.unit;
+  });
 
-const MATERIAL_OPTIONS = [
-  "1 Gang 1 Way Switch",
-  "2 Gang 2 Way Switch",
-  "3 Gang 2 Way Switch",
-  "Aggregates",
-  "Air Conditioner Wall Mount 2.5HP",
-  "Audio Cable",
-  "Brick",
-  "Cement",
-  "Copper Pipe",
-  "Double Data Socket",
-  "Double Socket",
-  "Electrical Conduit 20mm",
-  "Electrical Conduit 25mm",
-  "Electrical Wire",
-  "Electrical Wire 1Cx1.5mm²",
-  "Electrical Wire 1Cx2.5mm²",
-  "Electricity Tape",
-  "Fiber Optic HDMI",
-  "Flexible Conduit 20mm",
-  "Flexible Conduit 25mm",
-  "Floor Tile F6608",
-  "HDMI Socket",
-  "HDPE Pipe",
-  "Insulation Copper Pipe",
-  "LED Panel Light 300x600mm 40W 6500K",
-  "MCB 1P 10A 6kA",
-  "MCB 1P 20A 6kA",
-  "MCB 2P 50A 6kA",
-  "MCB 2P 63A 6kA",
-  "Outdoor Unit Support",
-  "Paint",
-  "PVC Drain Pipe Class 8.5",
-  "PVC Pipe",
-  "RCBO 1P+N 20A 30mA 4.5kA",
-  "Rebar D14",
-  "Rebar DB10",
-  "Rebar DB16",
-  "Rebar R6",
-  "Rebar R8",
-  "Sand",
-  "Scaffolding",
-  "Skim Coat",
-  "Surface Electrical Box",
-  "Tile",
-  "UTP CAT6 Cable (DATA)"
-];
+  const machineryUnitMap: Record<string, string> = {};
+  apiData.items.equipment.forEach(item => {
+    machineryUnitMap[item.name] = item.unit;
+  });
 
-const Units = ["Pack", "PCS", "EA", "Box", "m", "m2", "m3", "kg", "ton", "length", "set", "roll"];
-
-export const MATERIAL_UNIT_MAP: Record<string, string> = {
-  "1 Gang 1 Way Switch": "PCS",
-  "2 Gang 2 Way Switch": "PCS",
-  "3 Gang 2 Way Switch": "PCS",
-  "Aggregates": "m3",
-  "Air Conditioner Wall Mount 2.5HP": "set",
-  "Audio Cable": "roll",
-  "Brick": "PCS",
-  "Cement": "Pack",
-  "Copper Pipe": "roll",
-  "Double Data Socket": "PCS",
-  "Double Socket": "PCS",
-  "Electrical Conduit 20mm": "PCS",
-  "Electrical Conduit 25mm": "PCS",
-  "Electrical Wire": "roll",
-  "Electrical Wire 1Cx1.5mm²": "roll",
-  "Electrical Wire 1Cx2.5mm²": "roll",
-  "Electricity Tape": "roll",
-  "Fiber Optic HDMI": "roll",
-  "Flexible Conduit 20mm": "roll",
-  "Flexible Conduit 25mm": "roll",
-  "Floor Tile F6608": "Pack",
-  "HDMI Socket": "PCS",
-  "HDPE Pipe": "m",
-  "Insulation Copper Pipe": "PCS",
-  "LED Panel Light 300x600mm 40W 6500K": "PCS",
-  "MCB 1P 10A 6kA": "PCS",
-  "MCB 1P 20A 6kA": "PCS",
-  "MCB 2P 50A 6kA": "PCS",
-  "MCB 2P 63A 6kA": "PCS",
-  "Outdoor Unit Support": "set",
-  "Paint": "kg",
-  "PVC Drain Pipe Class 8.5": "m",
-  "PVC Pipe": "m",
-  "RCBO 1P+N 20A 30mA 4.5kA": "PCS",
-  "Rebar D14": "kg",
-  "Rebar DB10": "kg",
-  "Rebar DB16": "kg",
-  "Rebar R6": "kg",
-  "Rebar R8": "kg",
-  "Sand": "m3",
-  "Scaffolding": "set",
-  "Skim Coat": "Pack",
-  "Surface Electrical Box": "PCS",
-  "Tile": "m2",
-  "UTP CAT6 Cable (DATA)": "roll",
-};
-
-export const MACHINERY_UNIT_MAP: Record<string, string> = {
-  "Air Compressor": "EA",
-  "Angle Grinder": "EA",
-  "Auto Level Machine": "EA",
-  "Bar Bending Machine": "EA",
-  "Bulldozer": "EA",
-  "Cargo Crane": "EA",
-  "Concrete Cutting Machine": "EA",
-  "Concrete Finished": "EA",
-  "Concrete Mixer": "EA",
-  "Concrete Mixer Car": "EA",
-  "Concrete Pump": "EA",
-  "Concrete Vibrator": "EA",
-  "Container": "EA",
-  "Electric Drill": "EA",
-  "Electric Hammer": "EA",
-  "Excavator": "EA",
-  "Generator": "EA",
-  "Jackhammer": "EA",
-  "Material Hoist": "EA",
-  "Mobile Crane": "EA",
-  "Plate Compactor": "EA",
-  "Power Cable": "roll",
-  "Power Trowel": "EA",
-  "Pump Car": "EA",
-  "Rammer": "EA",
-  "Rebar Cutting Machine": "EA",
-  "Roller": "EA",
-  "Scaffolding": "set",
-  "Total Level": "EA",
-  "Total Station": "EA",
-  "Truck": "EA",
-  "Water Pump": "EA",
-  "Welding Machine": "EA",
+  return {
+    managementOptions,
+    interiorTeamOptions,
+    mepTeamOptions,
+    materialOptions,
+    materialUnitMap,
+    machineryOptions,
+    machineryUnitMap,
+    unitOptions
+  };
 };
 
 const ResourcesSection = ({
@@ -244,6 +86,25 @@ const ResourcesSection = ({
   secondSectionTitle,
   setSecondSectionTitle
 }: ResourcesSectionProps) => {
+  // Fetch dropdown data from API
+  const { data: dropdownData, loading, error, refetch } = useDropdownOptions();
+
+  // Transform API data
+  const {
+    managementOptions,
+    interiorTeamOptions,
+    mepTeamOptions,
+    materialOptions,
+    materialUnitMap,
+    machineryOptions,
+    machineryUnitMap,
+    unitOptions
+  } = transformApiData(dropdownData);
+
+  const handleRefresh = async () => {
+    await refetch(); // This updates 'data', which flows back down to children
+  };
+
   useEffect(() => {
     // Sync local section title states with props
     if (firstSectionTitle) {
@@ -253,6 +114,47 @@ const ResourcesSection = ({
       setSecondSectionTitle(secondSectionTitle);
     }
   }, [firstSectionTitle, secondSectionTitle]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+          <div className="w-1 h-5 bg-accent rounded-full" />
+          Manpower
+        </h2>
+        <div className="animate-pulse space-y-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-32 bg-gray-200 rounded"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+          <div className="w-1 h-5 bg-accent rounded-full" />
+          Manpower
+        </h2>
+        <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-red-700 font-medium">Failed to load options</p>
+          <p className="text-red-600 text-sm">{error}</p>
+          <button
+            onClick={refetch}
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Main render
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
@@ -270,6 +172,9 @@ const ResourcesSection = ({
           onValueChange={(value) => 
             value.trim() ? setFirstSectionTitle?.(value) : setFirstSectionTitle?.("Management Team")
           }
+          managementOptions={managementOptions}
+          mepTeamOptions={mepTeamOptions}
+          onOptionDeleted={handleRefresh}
         />
         
         <SiteWorkingTeamGroup
@@ -279,6 +184,8 @@ const ResourcesSection = ({
           onValueChange={(value) =>
             value.trim() ? setSecondSectionTitle?.(value) : setSecondSectionTitle?.("Site Team")
           }
+          interiorTeamOptions={interiorTeamOptions}
+          onRefresh={handleRefresh}
         />
 
         <ResourceTable
@@ -287,12 +194,14 @@ const ResourcesSection = ({
           rows={materials}
           setRows={setMaterials}
           useDropdown={true}
-          dropdownOptions={MATERIAL_OPTIONS}
+          dropdownOptions={materialOptions}
+          optionsFor="item"
           showUnit
-          unitOptions={Units}
+          unitOptions={unitOptions}
           inputNumberOnly={true}
-          descriptionUnitMap={MATERIAL_UNIT_MAP}
+          descriptionUnitMap={materialUnitMap}
           enableDragDrop={true}
+          onOptionDeleted={handleRefresh}
         />
 
         <ResourceTable
@@ -301,12 +210,14 @@ const ResourcesSection = ({
           rows={machinery}
           setRows={setMachinery}
           useDropdown={true}
-          dropdownOptions={MACHINERY_OPTIONS}
+          dropdownOptions={machineryOptions}
+          optionsFor="item"
           showUnit
-          unitOptions={Units}
-          descriptionUnitMap={MACHINERY_UNIT_MAP}
+          unitOptions={unitOptions}
+          descriptionUnitMap={machineryUnitMap}
           inputNumberOnly={true}
           enableDragDrop={true}
+          onOptionDeleted={handleRefresh}
         />
       </div>
     </div>
