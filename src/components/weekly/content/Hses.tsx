@@ -50,7 +50,7 @@ const Hses: React.FC<HsesProps & {
 
       if (reportId) {
         // Saved report: Update directly in database
-        const result = await updateReportImages(reportId, { maxImagesPerReport: 2 });
+        const result = await updateReportImages(reportId, { maxImagesPerReport: Infinity });
         
         if (result.success && result.data) {
           const newHsesData = {
@@ -69,7 +69,7 @@ const Hses: React.FC<HsesProps & {
           projectIdentifier,
           startDate,
           endDate,
-          { useProjectId: !!sharedData.projectId, maxImagesPerReport: 2 }
+          { useProjectId: !!sharedData.projectId, maxImagesPerReport: Infinity }
         );
 
         if (result.success && result.data) {
