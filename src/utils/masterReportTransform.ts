@@ -1,7 +1,7 @@
 // src/utils/masterReportTransform.ts
 // Transform MasterWeeklyReport data into WeeklyReportContentProps format
 
-import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData, MasterHses, MasterQaqcSection } from '@/types/masterReport.types';
+import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData, MasterHses, MasterQaqcSection, MasterAggregated } from '@/types/masterReport.types';
 import { ActivityRow } from '@/types/activity.types';
 import { ProgressRow } from '@/types/progress.types';
 import { Resources } from '@/types/resources.types';
@@ -47,6 +47,60 @@ function calculateIndentLevel(id: string): { level: number; displayId: string } 
   return { level: 1, displayId: trimmed };
 }
 import { selectMasterCoverImage, ReportWithCover, isValidCoverImage, constructImageUrl, DEFAULT_MASTER_COVER_IMAGES } from '@/utils/imageUtils';
+
+// ── Stable display-ID assignment ─────────────────────────────────────────────
+//
+// Rules:
+//  1. Groups are ordered by their report's submittedAt (earliest first).
+//  2. Each unique (reportKey, topLevelId) pair is assigned the next sequential
+//     integer once — assignment never changes after first encounter.
+//  3. Only the first segment of an ID is replaced.
+//     "5.3.8"  →  "1.3.8"   (not "1.1.1")
+//  4. Items without an id are passed through unchanged.
+
+type CPProjectEntry = MasterAggregated['constructionProgress'][string];
+type CPProjectMap   = Record<string, CPProjectEntry>;
+
+function extractTopLevel(id: string): string {
+  const dot = id.indexOf('.');
+  return dot === -1 ? id : id.slice(0, dot);
+}
+
+function replaceFirstSegment(id: string, first: string): string {
+  const dot = id.indexOf('.');
+  return dot === -1 ? first : first + id.slice(dot);
+}
+
+export function assignMasterDisplayIds(cpByProject: CPProjectMap): CPProjectMap {
+  // Sort project entries: earliest submittedAt first; fall back to entry order.
+  const sorted = Object.entries(cpByProject).sort(([, a], [, b]) => {
+    const ta = a.submittedAt ? new Date(a.submittedAt as string).getTime() : Infinity;
+    const tb = b.submittedAt ? new Date(b.submittedAt as string).getTime() : Infinity;
+    return ta - tb;
+  });
+
+  let counter = 1;
+  // key: `${reportKey}:::${topLevel}` → assigned display integer
+  const assigned = new Map<string, number>();
+  const result: CPProjectMap = {};
+
+  for (const [projectName, data] of sorted) {
+    const reportKey = data.reportId ?? projectName;
+
+    const remappedItems = data.items.map(item => {
+      if (!item.id) return item;
+      const top    = extractTopLevel(item.id);
+      const mapKey = `${reportKey}:::${top}`;
+      if (!assigned.has(mapKey)) assigned.set(mapKey, counter++);
+      return { ...item, displayId: replaceFirstSegment(item.id, String(assigned.get(mapKey))) };
+    });
+
+    result[projectName] = { ...data, items: remappedItems };
+  }
+
+  return result;
+}
+
 /**
  * Construction Issue interface matching WeeklyReport.tsx usage
  */
@@ -459,7 +513,7 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
     resourcesData,
     photosLocations,
     constructionIssues,
-    constructionProgress: aggregated.constructionProgress || {},
+    constructionProgress: assignMasterDisplayIds(aggregated.constructionProgress || {}),
     metadata,
     coverData,
     letterData,
