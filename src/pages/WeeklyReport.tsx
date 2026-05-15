@@ -27,6 +27,8 @@ import { UploadCloud } from "lucide-react";
 import { getProjectById } from "@/integrations/projectsApi";
 import { uploadHSEPhotoReferencesToSupabase } from '@/utils/weeklyReportSupabase';
 import WeeklyReportConstructionProgress from "@/components/weekly/WeeklyReportConstructionProgress";
+import { MasterScheduleSupabase } from "@/components/weekly/MasterScheduleSupabase";
+import type { MasterScheduleEntry } from "@/types/weeklyReport.types";
 import { buildWeeklyReportExportData } from "@/lib/Weeklyreportexcelmapper";
 import { transformResourcesToExcelFormat, transformHSEToExcelFormat } from "@/utils/resourceDataTransform";
 import { exportWeeklyReportToExcel } from "@/lib/weeklyreportexcel";
@@ -154,6 +156,7 @@ const WeeklyReport = () => {
     | "resource"
     | "photos"
     | "issues"
+    | "schedule"
   >("construction-progress");
 
 
@@ -182,6 +185,7 @@ const WeeklyReport = () => {
     { id: 6, name: "Resources", href: "#resources-status" },
     { id: 7, name: "Photos", href: "#site-activity-photos" },
     { id: 8, name: "Issues", href: "#construction-issue" },
+    { id: 9, name: "Schedule", href: "#master-schedule" },
   ];
 
   // Shared data state between tabs
@@ -285,6 +289,10 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
 
   // NEW: Add Issues state to WeeklyReport page (like other sections)
   const [issuesData, setIssuesData] = useState<any>(null);
+
+  // Schedule section state
+  const [masterScheduleData, setMasterScheduleData] = useState<MasterScheduleEntry[]>([]);
+  const [scheduleNotes, setScheduleNotes] = useState<string>('');
 
   // NEW: Add Resources state to WeeklyReport page (for rolling total logic)
   const [resourcesData, setResourcesData] = useState<any>(null);
@@ -558,6 +566,10 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                 machinery: []
               });
             }
+
+            // Load Master Schedule and Notes data
+            setMasterScheduleData(report.sections?.masterSchedule || []);
+            setScheduleNotes(report.sections?.scheduleNotes || '');
 
             // Load Construction Progress data
             if (report.sections?.constructionProgress) {
@@ -1421,6 +1433,9 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           photos: photosDataForSave,
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
+          // Schedule section
+          masterSchedule: masterScheduleData,
+          scheduleNotes: scheduleNotes,
           // NEW: Add Construction Progress section to save payload with rolling total logic for submitted reports
           constructionProgress: (() => {
             const data = constructionProgressHook.constructionData;
@@ -1815,6 +1830,9 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
           photos: photosDataForSave,
           // NEW: Add Issues section to save payload (from state like other sections)
           constructionIssues: issuesDataForSave,
+          // Schedule section
+          masterSchedule: masterScheduleData,
+          scheduleNotes: scheduleNotes,
           // NEW: Add Construction Progress section to save payload
           // For drafts: save data as-is without rolling total logic
           // For submitted reports: apply rolling total logic (copy upToThisWeek to previousWeek and reset This Week)
@@ -2660,7 +2678,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               activeTab === "qaqc-status" ||
               activeTab === "resource" ||
               activeTab === "photos" ||
-              activeTab === "issues") &&
+              activeTab === "issues" ||
+              activeTab === "schedule") &&
               showSecondNav && (
                 <div className="w-full px-2 sm:px-4 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
                   <div className="relative flex items-center gap-1">
@@ -2710,7 +2729,8 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                           (section.id === 5 && activeTab === "hses") ||
                           (section.id === 6 && activeTab === "resource") ||
                           (section.id === 7 && activeTab === "photos") ||
-                          (section.id === 8 && activeTab === "issues");
+                          (section.id === 8 && activeTab === "issues") ||
+                          (section.id === 9 && activeTab === "schedule");
 
                         return (
                           <Button
@@ -2757,6 +2777,11 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                                 setActiveTab("issues");
                                 setShowSecondNav(true);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
+                              } else if (section.id === 9) {
+                                setShowIntroduction(false);
+                                setActiveTab("schedule");
+                                setShowSecondNav(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
                               } else {
                                 setShowIntroduction(false);
                                 setActiveTab("table-of-content");
@@ -2795,9 +2820,9 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
             {/* Main Content */}
             <main className="w-full px-4 sm:px-6 pt-4 pb-6 flex flex-col">
                     {/* Implementation Notice Banner */}
-                    <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold">
+                    {/* <div className="bg-red-500 text-white px-4 py-3 rounded-lg text-center font-semibold">
                       This page is still implement
-                    </div>
+                    </div> */}
 
                     {/* Read-Only Banner */}
               {isReadOnly && (
@@ -3088,6 +3113,30 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                   </div>
                 </div>
               </>
+            )}
+
+            {activeTab === "schedule" && (
+              <div className="bg-card rounded-lg border p-6 space-y-6">
+                <h2 className="text-lg font-semibold px-6 py-3 bg-muted border-b rounded-t-lg text-foreground -mx-6 -mt-6">
+                  Master Schedule
+                </h2>
+                <MasterScheduleSupabase
+                  entries={masterScheduleData}
+                  onChange={setMasterScheduleData}
+                  reportId={currentReportId || undefined}
+                  disabled={isReadOnly}
+                />
+                <div className="space-y-2 pt-2 border-t">
+                  <h3 className="text-base font-semibold text-foreground">Notes</h3>
+                  <textarea
+                    className="w-full min-h-[140px] p-3 border rounded-lg text-sm bg-background text-foreground resize-y focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                    placeholder="Add notes, comments, or updates related to the schedule…"
+                    value={scheduleNotes}
+                    onChange={(e) => setScheduleNotes(e.target.value)}
+                    disabled={isReadOnly}
+                  />
+                </div>
+              </div>
             )}
 
           </main>
