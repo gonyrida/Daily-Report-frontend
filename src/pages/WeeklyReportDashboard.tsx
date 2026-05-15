@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -41,6 +41,8 @@ import {
   FileDown,
   FileSpreadsheet,
   FolderOpen,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -482,6 +484,55 @@ const WeeklyReportDashboard = () => {
     }
     return folder.weeklyReportCount || folder.reportCount || 0;
   };
+
+  // ── Simple page-based pagination (10 reports per page, sorted by startDate desc) ──
+  const WEEKLY_PAGE_SIZE = 10;
+
+  const [weeklyPersonalPage, setWeeklyPersonalPage] = useState(1);
+  const [weeklyCompanyPage, setWeeklyCompanyPage] = useState(1);
+
+  // Reset to page 1 when the filtered set changes (search/filter applied)
+  useEffect(() => { setWeeklyPersonalPage(1); }, [filteredReports]);
+  useEffect(() => { setWeeklyCompanyPage(1); }, [filteredCompanyReports]);
+
+  const sortedPersonalReports = useMemo(
+    () =>
+      [...filteredReports].sort((a, b) => {
+        const aTime = a.startDate ? new Date(a.startDate).getTime() : 0;
+        const bTime = b.startDate ? new Date(b.startDate).getTime() : 0;
+        return bTime - aTime; // newest first
+      }),
+    [filteredReports]
+  );
+
+  const sortedCompanyReports = useMemo(
+    () =>
+      [...filteredCompanyReports].sort((a, b) => {
+        const aTime = a.startDate ? new Date(a.startDate).getTime() : 0;
+        const bTime = b.startDate ? new Date(b.startDate).getTime() : 0;
+        return bTime - aTime; // newest first
+      }),
+    [filteredCompanyReports]
+  );
+
+  const personalTotalPages = Math.max(1, Math.ceil(sortedPersonalReports.length / WEEKLY_PAGE_SIZE));
+  const companyTotalPages  = Math.max(1, Math.ceil(sortedCompanyReports.length  / WEEKLY_PAGE_SIZE));
+
+  const pagedPersonalReports = useMemo(
+    () => sortedPersonalReports.slice(
+      (weeklyPersonalPage - 1) * WEEKLY_PAGE_SIZE,
+      weeklyPersonalPage * WEEKLY_PAGE_SIZE
+    ),
+    [sortedPersonalReports, weeklyPersonalPage]
+  );
+
+  const pagedCompanyReports = useMemo(
+    () => sortedCompanyReports.slice(
+      (weeklyCompanyPage - 1) * WEEKLY_PAGE_SIZE,
+      weeklyCompanyPage * WEEKLY_PAGE_SIZE
+    ),
+    [sortedCompanyReports, weeklyCompanyPage]
+  );
 
   // ── Master Report mode ──────────────────────────────────────────────────
   // When ?folderId=xxx&type=master is present, render the folder-level
@@ -1366,12 +1417,9 @@ const WeeklyReportDashboard = () => {
                   isLoading ? (
                     <WeeklyReportSkeleton />
                   ) : filteredReports.length > 0 ? (
-                    <div className="space-y-3">
-                      {filteredReports.map((report) => {
-                        const currentUserId = getCurrentUserId();
-                        const isOwner = true; // In personal tab, user is always owner
-                        const userName = report.userId ? `${report.userId.firstName} ${report.userId.lastName}` : 'Unknown';
-                        return (
+                    <>
+                      <div className="space-y-3">
+                        {pagedPersonalReports.map((report) => (
                           <div
                             key={report._id || report.id}
                             className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
@@ -1394,8 +1442,8 @@ const WeeklyReportDashboard = () => {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1405,11 +1453,10 @@ const WeeklyReportDashboard = () => {
                                 <Edit className="h-4 w-4 mr-1" />
                                 Edit
                               </Button>
-                              
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
+                                  <Button
+                                    variant="ghost"
                                     size="sm"
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                     onClick={(e) => e.stopPropagation()}
@@ -1427,7 +1474,7 @@ const WeeklyReportDashboard = () => {
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction 
+                                    <AlertDialogAction
                                       onClick={(e) => handleDeleteReport(report._id || report.id, e)}
                                       className="bg-red-600 hover:bg-red-700"
                                     >
@@ -1438,21 +1485,47 @@ const WeeklyReportDashboard = () => {
                               </AlertDialog>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        ))}
+                      </div>
+
+                      {personalTotalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWeeklyPersonalPage(p => Math.max(1, p - 1))}
+                            disabled={weeklyPersonalPage <= 1}
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Previous
+                          </Button>
+                          <span className="text-sm text-muted-foreground">
+                            Page {weeklyPersonalPage} of {personalTotalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWeeklyPersonalPage(p => Math.min(personalTotalPages, p + 1))}
+                            disabled={weeklyPersonalPage >= personalTotalPages}
+                          >
+                            Next
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-12">
                       <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold mb-2">
-                        {projectDisplayName 
-                          ? `No Reports for ${projectDisplayName}` 
+                        {projectDisplayName
+                          ? `No Reports for ${projectDisplayName}`
                           : 'No Reports Found'
                         }
                       </h3>
                       <p className="text-muted-foreground text-center mb-4">
-                        {projectDisplayName 
-                          ? `No weekly reports found for ${projectDisplayName}. Create your first report for this project.` 
+                        {projectDisplayName
+                          ? `No weekly reports found for ${projectDisplayName}. Create your first report for this project.`
                           : 'Create your first weekly report to get started.'
                         }
                       </p>
@@ -1468,66 +1541,94 @@ const WeeklyReportDashboard = () => {
                   isLoadingCompany ? (
                     <WeeklyReportSkeleton />
                   ) : filteredCompanyReports.length > 0 ? (
-                    <div className="space-y-3">
-                      {filteredCompanyReports.map((report) => {
-                        const currentUserId = getCurrentUserId();
-                        const isOwner = report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId);
-                        const userName = report.userId ? `${report.userId.firstName} ${report.userId.lastName}` : 'Unknown';
-                        return (
-                          <div
-                            key={report._id || report.id}
-                            className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() => handleOpenReport(report._id || report.id)}
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium">{projectDisplayName}</h4>
-                                {getStatusBadge(report.status)}
-                                <Badge variant="outline" className="text-xs">
-                                  <User className="h-3 w-3 mr-1" />
-                                  {userName}
-                                </Badge>
-                                {!isOwner && (
-                                  <Badge variant="secondary" className="text-xs ml-2">
-                                    <Eye className="h-3 w-3 mr-1" />
-                                    View Only
+                    <>
+                      <div className="space-y-3">
+                        {pagedCompanyReports.map((report) => {
+                          const currentUserId = getCurrentUserId();
+                          const isOwner = report.userId && (report.userId._id === currentUserId || report.userId.id === currentUserId);
+                          const userName = report.userId ? `${report.userId.firstName} ${report.userId.lastName}` : 'Unknown';
+                          return (
+                            <div
+                              key={report._id || report.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                              onClick={() => handleOpenReport(report._id || report.id)}
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium">{projectDisplayName}</h4>
+                                  {getStatusBadge(report.status)}
+                                  <Badge variant="outline" className="text-xs">
+                                    <User className="h-3 w-3 mr-1" />
+                                    {userName}
                                   </Badge>
-                                )}
+                                  {!isOwner && (
+                                    <Badge variant="secondary" className="text-xs ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {report.sections?.cover?.dateRange || `${formatDateRange(report.startDate)} - ${formatDateRange(report.endDate)}`}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {new Date(report.updatedAt).toLocaleDateString()}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {report.sections?.cover?.dateRange || `${formatDateRange(report.startDate)} - ${formatDateRange(report.endDate)}`}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {new Date(report.updatedAt).toLocaleDateString()}
-                                </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenReport(report._id || report.id);
+                                  }}
+                                >
+                                  <FileText className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenReport(report._id || report.id);
-                                }}
-                              >
-                                <FileText className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+
+                      {companyTotalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWeeklyCompanyPage(p => Math.max(1, p - 1))}
+                            disabled={weeklyCompanyPage <= 1}
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Previous
+                          </Button>
+                          <span className="text-sm text-muted-foreground">
+                            Page {weeklyCompanyPage} of {companyTotalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWeeklyCompanyPage(p => Math.min(companyTotalPages, p + 1))}
+                            disabled={weeklyCompanyPage >= companyTotalPages}
+                          >
+                            Next
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-12">
                       <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold mb-2">
-                        {projectDisplayName 
-                          ? `No Company Reports for ${projectDisplayName}` 
+                        {projectDisplayName
+                          ? `No Company Reports for ${projectDisplayName}`
                           : 'No Company Reports Found'
                         }
                       </h3>
