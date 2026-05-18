@@ -101,7 +101,7 @@ const MasterReportConstructionProgress: React.FC<MasterReportConstructionProgres
                     className={`border-b transition-colors duration-150 ${isDark ? 'border-slate-700/30 hover:bg-slate-700/20' : 'border-blue-50 hover:bg-blue-50/30'}`}
                   >
                     <td className={`px-4 py-3 text-center font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {item.id || index + 1}
+                      {item.displayId ?? item.id ?? index + 1}
                     </td>
                     <td className={`px-4 py-3 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                       {item.scopeOfWorks || '-'}

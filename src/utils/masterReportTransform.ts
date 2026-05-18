@@ -1,7 +1,7 @@
 // src/utils/masterReportTransform.ts
 // Transform MasterWeeklyReport data into WeeklyReportContentProps format
 
-import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData, MasterHses, MasterQaqcSection } from '@/types/masterReport.types';
+import { MasterWeeklyReport, MasterActivityItem, MasterIssueItem, PhotoLocation, MasterConstructionProgressItem, MasterReportCoverData, MasterHses, MasterQaqcSection, MasterAggregated } from '@/types/masterReport.types';
 import { ActivityRow } from '@/types/activity.types';
 import { ProgressRow } from '@/types/progress.types';
 import { Resources } from '@/types/resources.types';
@@ -47,6 +47,139 @@ function calculateIndentLevel(id: string): { level: number; displayId: string } 
   return { level: 1, displayId: trimmed };
 }
 import { selectMasterCoverImage, ReportWithCover, isValidCoverImage, constructImageUrl, DEFAULT_MASTER_COVER_IMAGES } from '@/utils/imageUtils';
+
+// ── Stable display-ID assignment ─────────────────────────────────────────────
+//
+// Mode A — Normal numeric sort (no duplicate top-level IDs across reports):
+//   All top-level IDs are collected globally, sorted numerically, then mapped
+//   to 1, 2, 3, … Only the first segment of each item ID is replaced.
+//   "5.3.8" with rank 2  →  "2.3.8"   (NOT "2.1.1")
+//   Items within each project group are re-ordered by their new display ID.
+//
+// Mode B — Submission-order sort (duplicate top-level IDs detected):
+//   Reports are ordered earliest-submittedAt first.  Each unique
+//   (reportKey, topLevel) pair is assigned the next sequential integer once;
+//   that assignment is stable — new reports append, existing ones never shift.
+
+type CPProjectEntry = MasterAggregated['constructionProgress'][string];
+type CPProjectMap   = Record<string, CPProjectEntry>;
+
+function extractTopLevel(id: string): string {
+  const dot = id.indexOf('.');
+  return dot === -1 ? id : id.slice(0, dot);
+}
+
+function replaceFirstSegment(id: string, first: string): string {
+  const dot = id.indexOf('.');
+  return dot === -1 ? first : first + id.slice(dot);
+}
+
+// Segment-by-segment numeric comparator: "1.2.10" sorts before "1.2.9" is FALSE
+// (10 > 9 numerically, so "1.2.10" comes after "1.2.9" — correct).
+function compareIdSegments(a: string, b: string): number {
+  const pa = a.split('.');
+  const pb = b.split('.');
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const sa = pa[i] ?? '';
+    const sb = pb[i] ?? '';
+    if (sa === sb) continue;
+    const na = parseFloat(sa);
+    const nb = parseFloat(sb);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return sa.localeCompare(sb);
+  }
+  return 0;
+}
+
+// Returns true if any top-level ID string appears in more than one report.
+function hasDuplicateTopLevels(cpByProject: CPProjectMap): boolean {
+  const seenGlobal = new Set<string>();
+  for (const data of Object.values(cpByProject)) {
+    // Deduplicate within this report first (a report can legitimately have
+    // multiple items sharing a top-level, e.g. "3" and "3.1" both have top "3").
+    const reportTops = new Set(
+      data.items.filter(i => !!i.id).map(i => extractTopLevel(i.id))
+    );
+    for (const top of reportTops) {
+      if (seenGlobal.has(top)) return true;
+      seenGlobal.add(top);
+    }
+  }
+  return false;
+}
+
+// Mode A: sort all items numerically, renumber top-levels globally.
+function assignBySortedOrder(cpByProject: CPProjectMap): CPProjectMap {
+  // Collect every unique top-level ID across all reports.
+  const allTopLevels = new Set<string>();
+  for (const data of Object.values(cpByProject)) {
+    for (const item of data.items) {
+      if (item.id) allTopLevels.add(extractTopLevel(item.id));
+    }
+  }
+
+  // Sort: numeric-first, then locale-compare for roman/alpha IDs.
+  const sortedTops = Array.from(allTopLevels).sort((a, b) => {
+    const na = parseFloat(a), nb = parseFloat(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.localeCompare(b);
+  });
+
+  // Global map: original top-level string → sequential display integer.
+  const topMap = new Map(sortedTops.map((top, i) => [top, i + 1]));
+
+  const result: CPProjectMap = {};
+  for (const [projectName, data] of Object.entries(cpByProject)) {
+    const remappedItems = data.items
+      .map(item => {
+        if (!item.id) return item;
+        const n = topMap.get(extractTopLevel(item.id));
+        if (n === undefined) return item;
+        return { ...item, displayId: replaceFirstSegment(item.id, String(n)) };
+      })
+      // Re-sort within project so hierarchy displays in correct order.
+      .sort((a, b) =>
+        compareIdSegments(a.displayId ?? a.id ?? '', b.displayId ?? b.id ?? '')
+      );
+    result[projectName] = { ...data, items: remappedItems };
+  }
+  return result;
+}
+
+// Mode B: submission-order assignment — first-submitted report gets first IDs.
+function assignBySubmissionOrder(cpByProject: CPProjectMap): CPProjectMap {
+  const sorted = Object.entries(cpByProject).sort(([, a], [, b]) => {
+    const ta = a.submittedAt ? new Date(a.submittedAt as string).getTime() : Infinity;
+    const tb = b.submittedAt ? new Date(b.submittedAt as string).getTime() : Infinity;
+    return ta - tb;
+  });
+
+  let counter = 1;
+  // key: `${reportKey}:::${topLevel}` → assigned display integer (written once, never changed)
+  const assigned = new Map<string, number>();
+  const result: CPProjectMap = {};
+
+  for (const [projectName, data] of sorted) {
+    const reportKey = data.reportId ?? projectName;
+    const remappedItems = data.items.map(item => {
+      if (!item.id) return item;
+      const top    = extractTopLevel(item.id);
+      const mapKey = `${reportKey}:::${top}`;
+      if (!assigned.has(mapKey)) assigned.set(mapKey, counter++);
+      return { ...item, displayId: replaceFirstSegment(item.id, String(assigned.get(mapKey))) };
+    });
+    result[projectName] = { ...data, items: remappedItems };
+  }
+  return result;
+}
+
+export function assignMasterDisplayIds(cpByProject: CPProjectMap): CPProjectMap {
+  if (Object.keys(cpByProject).length === 0) return cpByProject;
+  return hasDuplicateTopLevels(cpByProject)
+    ? assignBySubmissionOrder(cpByProject)
+    : assignBySortedOrder(cpByProject);
+}
+
 /**
  * Construction Issue interface matching WeeklyReport.tsx usage
  */
@@ -459,7 +592,7 @@ export const transformMasterToReportData = (master: MasterWeeklyReport & { avail
     resourcesData,
     photosLocations,
     constructionIssues,
-    constructionProgress: aggregated.constructionProgress || {},
+    constructionProgress: assignMasterDisplayIds(aggregated.constructionProgress || {}),
     metadata,
     coverData,
     letterData,

@@ -154,6 +154,8 @@ export interface MasterProjectSummary {
 //    and adds projectSource, so we extend that type directly.
 export interface MasterConstructionProgressItem extends ConstructionProgressItem {
   projectSource: string;
+  /** Stable display ID computed by assignMasterDisplayIds() in the frontend transform. */
+  displayId?: string;
 }
 
 // ── Aggregated QAQC item (single entry from any project) ──────────────────
@@ -261,6 +263,10 @@ export interface MasterAggregated {
       revision: string;
     };
     items: MasterConstructionProgressItem[];
+    /** Source report ID — used by assignMasterDisplayIds() to scope top-level numbering. */
+    reportId?: string;
+    /** Report submission timestamp — used to sort groups into stable display order. */
+    submittedAt?: string | Date | null;
   }>;
   /** QAQC items aggregated from all project reports, keyed by section (ncr, car, …) */
   qaqcStatus?: Record<string, MasterQaqcSection>;
