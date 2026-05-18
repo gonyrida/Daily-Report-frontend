@@ -1263,7 +1263,7 @@ const PurchaseRequest = ({onRefresh}) => {
                           <table className="w-full border-collapse border">
                             <thead>
                               <tr className="bg-muted">
-                                {profile.role === "admin" && (
+                                {profile?.role === "admin" && (
                                   <th className="text-left p-3 font-medium">
                                     <input
                                       type="checkbox"

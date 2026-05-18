@@ -520,7 +520,11 @@ const UserManagement = () => {
             {/* Add User Dialog */}
             <Dialog 
               open={showAddUser}
-              onOpenChange={setShowAddUser}
+              onOpenChange={(setShowAddUser) => {
+                if (!setShowAddUser) {
+                  handleCloseModal();
+                }
+              }}
             >
               <DialogContent className="max-h-[95vh] overflow-y-auto">
                 <DialogHeader>

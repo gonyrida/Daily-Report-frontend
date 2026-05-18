@@ -104,6 +104,7 @@ const MaterialActualCost = ({
 				baseReports[existingIndex] = {
 					...currentFormData,
           no : !currentFormData.no ? summary.project.counter + 1 : currentFormData.no,
+          status: mode === 'revise' ? 'pending' : currentFormData.status,
 					isEditable: true
 				};
 			} else if (mode === 'create') {
@@ -198,7 +199,10 @@ const MaterialActualCost = ({
                         <p title={report.requestDescription || 'No description available'}>{report.requestDescription || 'No description available'}</p>
                       )}
                     </td>
-                    <td className="text-center p-2 text-sm font-medium">
+                    <td className={`text-center p-2 text-sm font-medium ${
+                      report.status === 'rejected' ? 'bg-red-100 text-red-800 line-through' :
+                      'text-bg'
+                    }`}>
                       ${isEditable ? getCurrentRequestTotal().toLocaleString() : (report.grandTotal?.toLocaleString() || '0')}
                     </td>
                     <td className="text-center p-2 text-sm font-medium">
@@ -223,7 +227,8 @@ const MaterialActualCost = ({
         
         {/* TOTAL Section */}
         <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-700">
-          <div className="text-right">
+          {/* Comment out the total display for now as it is currently not needed by user's feedback */}
+          {/* <div className="text-right">
             <p className="text-sm text-green-600 dark:text-green-300 mb-1">
               Including {unifiedReports.length} request{unifiedReports.length !== 1 ? 's' : ''}
             </p>
@@ -234,7 +239,25 @@ const MaterialActualCost = ({
                 return sum + reportTotal;
               }, 0).toLocaleString()}
             </p>
-          </div>
+          </div> */}
+          <p className='text-red-800 dark:text-red-300'>
+            Rejected Requests Total: ${unifiedReports.filter(r => r.status === 'rejected').reduce((sum, report) => sum + (report.grandTotal || 0), 0).toLocaleString()}
+          </p>
+          <p className='text-yellow-800 dark:text-yellow-300'>
+            Pending Requests Total: ${unifiedReports.filter(r => r.status === 'pending' || r.status === 'unknown' || r.status === 'draft').reduce((sum, report) => {
+              const isCurrent = report._id === currentFormData?._id || report.isNew;
+              const reportTotal = isCurrent ? getCurrentRequestTotal() : (report.grandTotal || 0);
+              return sum + reportTotal;
+          }, 0).toLocaleString()}</p>
+          <p className='text-green-800 dark:text-green-300'>
+            Approved Requests Total: ${unifiedReports.filter(r => r.status === 'approved').reduce((sum, report) => sum + (report.grandTotal || 0), 0).toLocaleString()}
+          </p>
+          <p className='text-bg'>
+            Total (Exclude Rejected): ${unifiedReports.filter(r => r.status !== 'rejected').reduce((sum, report) => {
+              const isCurrent = report._id === currentFormData?._id || report.isNew;
+              const reportTotal = isCurrent ? getCurrentRequestTotal() : (report.grandTotal || 0);
+              return sum + reportTotal;
+          }, 0).toLocaleString()}</p>
         </div>
 
         {/* Budget Analysis Table */}
