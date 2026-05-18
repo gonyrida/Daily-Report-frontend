@@ -142,6 +142,11 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
 
   const dayNames = DAY_NAMES;
 
+  // Helper function to format values: display "-" instead of "0" or empty string
+  const formatValue = (value: string): string => {
+    return value === "0" || value === "" ? "-" : value;
+  };
+
   useEffect(() => {
     if (sharedData?.dateRange) {
       const { monthYearDisplay: newMonthYearDisplay, dates: newDates } = generateWeekDates(sharedData.dateRange);
@@ -318,13 +323,13 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
                     >
                       <input
                         type="text"
-                        value={value}
+                        value={formatValue(value)}
                         onChange={(e) =>
                           handleInputChange(
                             sectionIndex,
                             rowIndex,
                             "dailyData",
-                            e.target.value,
+                            e.target.value === "-" ? "" : e.target.value,
                             dayIndex,
                           )
                         }
@@ -336,9 +341,9 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
                   <td className="border border-border px-4 py-2 text-center">
                     <input
                       type="text"
-                      value={row.previousWeek}
+                      value={formatValue(row.previousWeek)}
                       onChange={(e) =>
-                        handleInputChange(sectionIndex, rowIndex, "previousWeek", e.target.value)
+                        handleInputChange(sectionIndex, rowIndex, "previousWeek", e.target.value === "-" ? "0" : e.target.value)
                       }
                       className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                       placeholder="0"
@@ -347,9 +352,9 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
                   <td className="border border-border px-4 py-2 text-center">
                     <input
                       type="text"
-                      value={row.thisWeek}
+                      value={formatValue(row.thisWeek)}
                       onChange={(e) =>
-                        handleInputChange(sectionIndex, rowIndex, "thisWeek", e.target.value)
+                        handleInputChange(sectionIndex, rowIndex, "thisWeek", e.target.value === "-" ? "0" : e.target.value)
                       }
                       className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                       placeholder="0"
@@ -358,9 +363,9 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
                   <td className="border border-border px-4 py-2 text-center">
                     <input
                       type="text"
-                      value={row.upToThisWeek}
+                      value={formatValue(row.upToThisWeek)}
                       onChange={(e) =>
-                        handleInputChange(sectionIndex, rowIndex, "upToThisWeek", e.target.value)
+                        handleInputChange(sectionIndex, rowIndex, "upToThisWeek", e.target.value === "-" ? "0" : e.target.value)
                       }
                       className="w-full text-center px-2 py-1 border-none outline-none bg-transparent dark:bg-card"
                       placeholder="0"
@@ -390,13 +395,13 @@ const ResourceTableComponent: React.FC<ResourceTableComponentProps> = ({
               </td>
             ))}
             <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
-              {getGrandTotal().previousWeek}
+              {formatValue(getGrandTotal().previousWeek)}
             </td>
             <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
-              {getGrandTotal().thisWeek}
+              {formatValue(getGrandTotal().thisWeek)}
             </td>
             <td className="border border-border px-4 py-2 text-center bg-blue-50 dark:bg-blue-900/20 font-bold">
-              {getGrandTotal().upToThisWeek}
+              {formatValue(getGrandTotal().upToThisWeek)}
             </td>
           </tr>
         </tbody>
