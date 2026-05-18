@@ -78,7 +78,7 @@ const Dashboard = () => {
   const folderId = searchParams.get('folder');
   const folderName = searchParams.get('folderName');
   const [companyReports, setCompanyReports] = useState([]);
-  const [filteredCompanyReports, setFilteredCompanyReports] = useState([]); // ← ADD THIS
+  const [filteredCompanyReports, setFilteredCompanyReports] = useState([]);
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
@@ -89,6 +89,8 @@ const Dashboard = () => {
   const [currentProjectName, setCurrentProjectName] = useState<string>("");
   const [personalWeekIndex, setPersonalWeekIndex] = useState(0);
   const [companyWeekIndex, setCompanyWeekIndex] = useState(0);
+  const [personalTotal, setPersonalTotal] = useState(0);
+  const [companyTotal, setCompanyTotal] = useState(0);
 
   // Helper function for unified project matching
   const matchesProject = (report: Report, projectId: string | null, projectName: string) => {
@@ -125,9 +127,9 @@ const Dashboard = () => {
     const handleProjectUpdated = async ({ projectId: updatedId, newName }: any) => {
       if (updatedId === projectId) {
         setCurrentProjectName(newName);
-        // Also refresh reports since their projectName may have been updated server-side
-        const userReports = await getRecentReports(50, undefined, projectId || undefined);
+        const userReports = await getRecentReports(0, undefined, projectId || undefined);
         setReports(userReports.data || []);
+        setPersonalTotal(userReports.pagination?.total ?? 0);
       }
     };
     
@@ -140,15 +142,11 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchReports = async () => {
       try {
-       
-        
-        // Use new getRecentReports API - fetch reports with projectId filter if available
-        const userReports = await getRecentReports(50, undefined, projectId || undefined);
-        
-        
-        
+        // limit=0 fetches all reports for this user (no cap)
+        const userReports = await getRecentReports(0, undefined, projectId || undefined);
         setReports(userReports.data || []);
         setFilteredReports(userReports.data || []);
+        setPersonalTotal(userReports.pagination?.total ?? 0);
       } catch (error) {
         console.error("❌ DEBUG DASHBOARD: Failed to fetch reports:", error);
         toast({
@@ -294,14 +292,14 @@ const Dashboard = () => {
   };
 
   const fetchCompanyReports = async (
-    page: number = 1,
     search: string = ""
   ) => {
     try {
       setIsLoadingCompany(true);
-      // ADD PROJECT FILTER - Pass both project name (for display) and projectId (for reliable lookup)
-      const response = await getCompanyReports(page, 20, search, currentProjectName, projectId || undefined);
+      // limit=0 fetches all company reports without a hard cap
+      const response = await getCompanyReports(1, 0, search, currentProjectName, projectId || undefined);
       setCompanyReports(response.reports || []);
+      setCompanyTotal(response.pagination?.total ?? 0);
     } catch (error) {
       console.error("Failed to fetch company reports:", error);
       toast({
@@ -357,14 +355,11 @@ const Dashboard = () => {
         description: "The report has been deleted successfully",
       });
       
-      // Refresh the reports list
-      console.log("🔥 DASHBOARD: Refreshing reports list...");
-      const userReports = await getRecentReports(50, undefined, projectId || undefined);
+      const userReports = await getRecentReports(0, undefined, projectId || undefined);
       setReports(userReports.data || []);
       setFilteredReports(userReports.data || []);
-      // Always refresh company reports to keep counts in sync
+      setPersonalTotal(userReports.pagination?.total ?? 0);
       await fetchCompanyReports();
-      console.log("🔥 DASHBOARD: Reports list refreshed");
     } catch (error) {
       console.error("🔥 DASHBOARD: Delete error:", error);
       toast({
@@ -657,7 +652,9 @@ const Dashboard = () => {
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
-                    Recent Documents ({activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length})
+                    Recent Documents ({activeTab === 'personal' ? filteredReports.length : filteredCompanyReports.length}
+                    {activeTab === 'personal' && personalTotal > filteredReports.length ? ` of ${personalTotal}` : ''}
+                    {activeTab === 'company' && companyTotal > filteredCompanyReports.length ? ` of ${companyTotal}` : ''})
                   </div>
                   {/* Filter Buttons - Only show in Personal tab */}
                   {activeTab === 'personal' && (
@@ -714,6 +711,10 @@ const Dashboard = () => {
                         <span className="text-xs text-muted-foreground">
                           ({(activeTab === 'personal' ? currentPersonalReports : currentCompanyReports).length}{' '}
                           {(activeTab === 'personal' ? currentPersonalReports : currentCompanyReports).length === 1 ? 'report' : 'reports'})
+                          {' · Week '}
+                          {(activeTab === 'personal' ? personalWeekIndex : companyWeekIndex) + 1}
+                          {' of '}
+                          {activeTab === 'personal' ? personalWeekBuckets.length : companyWeekBuckets.length}
                         </span>
                       </div>
                       <Button
