@@ -2682,14 +2682,14 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
               activeTab === "schedule") &&
               showSecondNav && (
                 <div className="w-full px-2 sm:px-4 py-3 sticky top-16 z-50 bg-background/95 backdrop-blur-sm border-b shadow-sm">
-                  <div className="relative flex items-center gap-1">
+                  <div className="relative flex items-center justify-center">
                     {/* Left Arrow */}
                     <button
                       onClick={() => {
                         const el = document.getElementById("second-nav-scroll");
                         if (el) el.scrollBy({ left: -150, behavior: "smooth" });
                       }}
-                      className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                      className="absolute left-0 flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="m15 18-6-6 6-6" />
@@ -2699,7 +2699,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                     {/* Scrollable Tab Row - hides scrollbar, supports mouse drag + touch */}
                     <div
                       id="second-nav-scroll"
-                      className="flex flex-row items-center gap-1.5 overflow-x-auto overflow-y-hidden flex-1"
+                      className="flex flex-row items-center justify-center gap-1.5 overflow-x-auto overflow-y-hidden px-10"
                       style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                       onMouseDown={(e) => {
                         const el = e.currentTarget;
@@ -2807,7 +2807,7 @@ const [overallProgressRemark, setOverallProgressRemark] = useState<string>("");
                         const el = document.getElementById("second-nav-scroll");
                         if (el) el.scrollBy({ left: 150, behavior: "smooth" });
                       }}
-                      className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
+                      className="absolute right-0 flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-full border bg-background shadow-sm hover:bg-muted transition-colors"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="m9 18 6-6-6-6" />

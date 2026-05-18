@@ -721,7 +721,18 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
 
   return (
     <>
-      <Sidebar className={`${className} bg-sidebar text-sidebar-foreground`}>
+      <Sidebar 
+        className={`${className} bg-sidebar text-sidebar-foreground`}
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
+      >
+        <style>{`
+          [data-sidebar]::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
         {/* Logo Section */}
         <SidebarHeader className="border-b border-sidebar-border">
           <div 

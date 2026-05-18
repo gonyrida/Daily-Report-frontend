@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Trash2, Plus, ArrowUpToLine, ArrowDownToLine, UploadCloud, Download } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
 
 // Import extracted modules
 import {
@@ -30,6 +31,7 @@ import { Button } from "../ui/button";
 const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgressProps> = ({
   data, onDataChange, reportId, isCreateNewMode = false, readOnly = false
 }) => {
+  const { effectiveTheme } = useTheme();
   const [searchTerm, setSearchTerm] = useState("");
   const [editingCell, setEditingCell] = useState<EditableCell | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -148,12 +150,36 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
       item.nextWeekPlan.percentage > 100 ||
       item.upToNextWeekPlan.percentage > 100;
 
-    if (hasOver100Percentage) return 'bg-red-100';
+    if (hasOver100Percentage) return effectiveTheme === 'dark' ? 'bg-red-900/30' : 'bg-red-100';
 
     // Custom override
-    if (rowBackgrounds[rowIndex]) return rowBackgrounds[rowIndex];
+    if (rowBackgrounds[rowIndex]) {
+      // Map light mode colors to dark mode equivalents
+      const darkModeMap: Record<string, string> = {
+        'bg-white': 'bg-slate-800',
+        'bg-gray-100': 'bg-slate-700',
+        'bg-blue-50': 'bg-slate-800',
+        'bg-green-50': 'bg-slate-800',
+        'bg-yellow-50': 'bg-slate-800',
+        'bg-red-50': 'bg-slate-800',
+        'bg-purple-50': 'bg-slate-800',
+        'bg-orange-50': 'bg-slate-800',
+      };
+      return effectiveTheme === 'dark' ? (darkModeMap[rowBackgrounds[rowIndex]] || rowBackgrounds[rowIndex]) : rowBackgrounds[rowIndex];
+    }
 
-    // Default by type
+    // Default by type with dark mode support
+    if (effectiveTheme === 'dark') {
+      switch (type) {
+        case 'roman': return 'bg-slate-700/50';
+        case 'level1': return 'bg-slate-600/50';
+        case 'level2': return 'bg-slate-700/30';
+        case 'level3': return 'bg-slate-800/50';
+        case 'alpha': return 'bg-slate-800';
+        default: return 'bg-slate-800';
+      }
+    }
+
     switch (type) {
       case 'roman': return 'bg-[#D0CECE]';
       case 'level1': return 'bg-[#ACB9CA]';
@@ -165,7 +191,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
   };
 
   // Memoize getRowBg to prevent unnecessary re-renders
-  const memoizedGetRowBg = useMemo(() => getRowBg, [rowBackgrounds]);
+  const memoizedGetRowBg = useMemo(() => getRowBg, [rowBackgrounds, effectiveTheme]);
 
   // ── Cell Editing ──
   const ALL_COLUMNS = [
@@ -568,32 +594,32 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
 
   // ── Render ──
   return (
-    <div className="flex flex-col bg-blue-50 font-sans text-slate-900">
+    <div className={`flex flex-col font-sans ${effectiveTheme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-blue-50 text-slate-900'}`}>
       <div className="p-6 lg:px-12 flex flex-col">
 
         {/* Project Info */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 flex-shrink-0">
+        <div className={`rounded-xl shadow-sm p-6 mb-6 flex-shrink-0 ${effectiveTheme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border border-slate-200'}`}>
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project</p>
-              <input type="text" className="w-full text-slate-800 font-semibold bg-transparent border-slate-300 focus:border-primary focus:outline-none"
+              <p className={`text-xs font-bold uppercase tracking-wider ${effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>Project</p>
+              <input type="text" className={`w-full font-semibold bg-transparent focus:outline-none ${effectiveTheme === 'dark' ? 'text-slate-100 border-slate-600 focus:border-blue-400' : 'text-slate-800 border-slate-300 focus:border-primary'}`}
                 value={localProjectInfo.project} onChange={(e) => handleProjectInfoChange('project', e.target.value)} />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subtitle</p>
-              <input type="text" className="w-full text-slate-600 bg-transparent border-slate-300 focus:border-primary focus:outline-none"
+              <p className={`text-xs font-bold uppercase tracking-wider ${effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>Subtitle</p>
+              <input type="text" className={`w-full bg-transparent focus:outline-none ${effectiveTheme === 'dark' ? 'text-slate-300 border-slate-600 focus:border-blue-400' : 'text-slate-600 border-slate-300 focus:border-primary'}`}
                 value={localProjectInfo.subtitle} onChange={(e) => handleProjectInfoChange('subtitle', e.target.value)} />
             </div>
           </div>
           <div className="flex justify-between items-center mt-6">
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</p>
-              <input type="date" className="text-slate-800 bg-transparent cursor-pointer"
+              <p className={`text-xs font-bold uppercase tracking-wider ${effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>Date</p>
+              <input type="date" className={`bg-transparent cursor-pointer ${effectiveTheme === 'dark' ? 'text-slate-100' : 'text-slate-800'}`}
                 value={localProjectInfo.date} onChange={(e) => handleProjectInfoChange('date', e.target.value)} />
             </div>
             <div className="text-right">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Revision</p>
-              <input type="text" className="text-center text-xs font-medium bg-primary/10 text-primary rounded px-2.5 py-0.5 border border-primary/20 focus:outline-none"
+              <p className={`text-xs font-bold uppercase tracking-wider ${effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>Revision</p>
+              <input type="text" className={`text-center text-xs font-medium rounded px-2.5 py-0.5 border focus:outline-none ${effectiveTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-primary/10 text-primary border-primary/20'}`}
                 value={localProjectInfo.revision} onChange={(e) => handleProjectInfoChange('revision', e.target.value)} />
             </div>
           </div>
@@ -602,7 +628,7 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
         {/* Toolbar */}
         <div className="flex flex-col md:flex-row gap-4 mb-4 flex-shrink-0">
           <input
-            className="flex-1 pr-10 pl-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent outline-none"
+            className={`flex-1 pr-10 pl-4 py-2.5 rounded-lg focus:ring-2 focus:border-transparent outline-none ${effectiveTheme === 'dark' ? 'bg-slate-800 border-slate-600 focus:ring-blue-500 text-slate-100 placeholder:text-slate-400' : 'bg-white border border-slate-200 focus:ring-[#1e3a8a]'}`}
             placeholder="Search scope of works or description..."
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -644,11 +670,11 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
         {/* Row Action Dropdown */}
         {activeDropdown !== null && dropdownPosition && (
           <div
-            className="fixed-dropdown fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] min-w-[160px]"
+            className={`fixed-dropdown fixed rounded-lg shadow-lg z-[9999] min-w-[160px] ${effectiveTheme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}
             style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
           >
-            <div className="px-3 py-2 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-600 mb-2">Background Color</p>
+            <div className={`px-3 py-2 border-b ${effectiveTheme === 'dark' ? 'border-slate-700' : 'border-gray-100'}`}>
+              <p className={`text-xs font-semibold mb-2 ${effectiveTheme === 'dark' ? 'text-slate-300' : 'text-gray-600'}`}>Background Color</p>
               <div className="grid grid-cols-4 gap-1">
                 {backgroundColorOptions.map(c => (
                   <button key={c.value} onClick={() => { setRowBackgrounds(p => ({ ...p, [activeDropdown]: c.value })); setActiveDropdown(null); }}
@@ -656,21 +682,21 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                 ))}
               </div>
             </div>
-            <div className="border-b border-gray-100">
+            <div className={`border-b ${effectiveTheme === 'dark' ? 'border-slate-700' : 'border-gray-100'}`}>
               <button
                 onClick={() => activeDropdown !== null && openInsertModal(activeDropdown, 'before')}
-                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${effectiveTheme === 'dark' ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'}`}
               >
-                <ArrowUpToLine size={14} className="text-slate-400" /> Insert row above
+                <ArrowUpToLine size={14} className={effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'} /> Insert row above
               </button>
               <button
                 onClick={() => activeDropdown !== null && openInsertModal(activeDropdown, 'after')}
-                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${effectiveTheme === 'dark' ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'}`}
               >
-                <ArrowDownToLine size={14} className="text-slate-400" /> Insert row below
+                <ArrowDownToLine size={14} className={effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'} /> Insert row below
               </button>
             </div>
-            <div className="border-b border-gray-100">
+            <div className={`border-b ${effectiveTheme === 'dark' ? 'border-slate-700' : 'border-gray-100'}`}>
               <button
                 onClick={() => {
                   if (activeDropdown === null) return;
@@ -686,15 +712,15 @@ const WeeklyReportConstructionProgress: React.FC<WeeklyReportConstructionProgres
                   if (onDataChange) onDataChange({ ...currentData, items: computed, projectInfo: currentData?.projectInfo || { project: '', subtitle: '', date: '', revision: '' } });
                   setActiveDropdown(null);
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${effectiveTheme === 'dark' ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'}`}
               >
-                <span className="font-bold text-slate-500 text-xs w-3.5">B</span>
-                {activeDropdown !== null && filteredItems[activeDropdown]?.isBold ? 'Remove bold' : 'Bold row'} <span className="ml-auto text-sm text-slate-400">Ctrl+B</span>
+                <span className={`font-bold text-xs w-3.5 ${effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>B</span>
+                {activeDropdown !== null && filteredItems[activeDropdown]?.isBold ? 'Remove bold' : 'Bold row'} <span className={`ml-auto text-sm ${effectiveTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>Ctrl+B</span>
               </button>
             </div>
             <button
               onClick={() => deleteRow(activeDropdown)}
-              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${effectiveTheme === 'dark' ? 'text-red-400 hover:bg-red-900/20' : 'text-red-600 hover:bg-red-50'}`}
             >
               <Trash2 size={14} /> Delete Row
             </button>

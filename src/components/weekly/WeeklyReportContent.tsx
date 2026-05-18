@@ -749,11 +749,24 @@ useEffect(() => {
               <a href="#hses" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); }}>
                 HEALTH, SAFETY, ENVIRONMENTAL & SECURITY (HSES)
               </a>
+              <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
+                <li className="text-primary dark:text-primary"><a href="#hses-training" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-5.1")?.scrollIntoView({ behavior: "smooth" }), 100); }}>HSES Training / Introduction / Toolbox Meeting</a></li>
+                <li className="text-primary dark:text-primary"><a href="#hses-inspection" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-5.2")?.scrollIntoView({ behavior: "smooth" }), 100); }}>HSES Inspection / Audit / Heavy Equipment / Hand&Power Tool Checklist</a></li>
+                <li className="text-primary dark:text-primary"><a href="#hses-permit" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-5.3")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Permit to Work</a></li>
+                <li className="text-primary dark:text-primary"><a href="#hses-incident" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-5.4")?.scrollIntoView({ behavior: "smooth" }), 100); }}>First Aid / Accident / Incident / Near Miss / Fatalities (if Any)</a></li>
+                <li className="text-primary dark:text-primary"><a href="#hses-activities" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-5.5")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Other HSES Activities Concerns</a></li>
+                <li className="text-primary dark:text-primary"><a href="#hses-photos" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("hses"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-5.6")?.scrollIntoView({ behavior: "smooth" }), 100); }}>HSES Photo Reference</a></li>
+              </ol>
             </li>
             <li className="text-primary dark:text-primary">
               <a href="#resource" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("resource"); if (setShowSecondNav) setShowSecondNav(true); }}>
                 RESOURCES STATUS
               </a>
+              <ol className="list-decimal list-outside ml-6 mt-2 space-y-1">
+                <li className="text-primary dark:text-primary"><a href="#manpower" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("resource"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-6.1")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Manpower Status</a></li>
+                <li className="text-primary dark:text-primary"><a href="#material" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("resource"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-6.2")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Material Delivery Status</a></li>
+                <li className="text-primary dark:text-primary"><a href="#machinery" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("resource"); if (setShowSecondNav) setShowSecondNav(true); setTimeout(() => document.getElementById("section-6.3")?.scrollIntoView({ behavior: "smooth" }), 100); }}>Machinery / Equipment Status</a></li>
+              </ol>
             </li>
             <li className="text-primary dark:text-primary">
               <a href="#photos" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("photos"); if (setShowSecondNav) setShowSecondNav(true); }}>
@@ -763,6 +776,11 @@ useEffect(() => {
             <li className="text-primary dark:text-primary">
               <a href="#issues" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("issues"); if (setShowSecondNav) setShowSecondNav(true); }}>
                 CONSTRUCTION ISSUE
+              </a>
+            </li>
+            <li className="text-primary dark:text-primary">
+              <a href="#master-schedule" className="text-primary dark:text-primary hover:underline" onClick={(e) => { e.preventDefault(); if (setActiveTab) setActiveTab("master-schedule"); if (setShowSecondNav) setShowSecondNav(true); }}>
+                MASTER SCHEDULE
               </a>
             </li>
           </ol>
