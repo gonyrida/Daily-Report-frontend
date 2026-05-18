@@ -149,7 +149,7 @@ const MasterMaterials = ({ onRefresh }: MasterMaterialsProps) => {
 					<CardTitle className="text-xl font-semibold">Material Items</CardTitle>
 
 					<div className="flex gap-2">
-						{profile.role !== 'user' && (
+						{profile.role === 'admin' && (
 							<>
 								<Button
 									variant="default"
