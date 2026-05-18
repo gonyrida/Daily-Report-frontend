@@ -417,21 +417,18 @@ const PendingApprovalsTab = ({
 
 							{/* Sub-Project Filter */}
 							<div className="flex items-center gap-2">
-								<span className="text-sm text-muted-foreground">Sub-Project:</span>
+								<span className="text-sm text-muted-foreground">Project:</span>
 								<Select value={projectFilter || "__all__"} onValueChange={setProjectFilter}>
 									<SelectTrigger className="w-[160px]">
-										<SelectValue placeholder="All Sub Projects" />
+										<SelectValue placeholder="All Projects" />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="__all__">All Sub Projects</SelectItem>
-										{PRProjects?.flatMap((project) => 
-											project.subProjects?.map((subProject) => (
-												<SelectItem key={subProject._id} value={subProject.name}>
-													{subProject.name}
-												</SelectItem>
-											)) || []
-										)
-										}
+										<SelectItem value="__all__">All Projects</SelectItem>
+                      {PRProjects.flatMap((project) => (
+                        <SelectItem key={project._id} value={project.projectCode}>
+                          {project.projectCode}
+                        </SelectItem>
+                      )) || []}
 									</SelectContent>
 								</Select>
 							</div>

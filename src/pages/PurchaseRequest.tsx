@@ -866,7 +866,7 @@ const PurchaseRequest = ({onRefresh}) => {
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                           <CardTitle>My Purchase Requests</CardTitle>
                           <div className="flex flex-col sm:flex-row gap-2">
-                            {/* Project Filter (SubProjects) */}
+                            {/* Project Filter */}
                             <Select
                               value={projectFilter || "__all__"}
                               onValueChange={(value) => {
@@ -879,13 +879,11 @@ const PurchaseRequest = ({onRefresh}) => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__all__">All Projects</SelectItem>
-                                {PRProjects.flatMap((project) => 
-                                  project.subProjects?.map((subProject) => (
-                                    <SelectItem key={subProject._id} value={subProject.name}>
-                                      {subProject.name}
-                                    </SelectItem>
-                                  )) || []
-                                )}
+                                {PRProjects.flatMap((project) => (
+                                  <SelectItem key={project._id} value={project.projectCode}>
+                                    {project.projectCode}
+                                  </SelectItem>
+                                )) || []}
                               </SelectContent>
                             </Select>
 
@@ -1200,7 +1198,7 @@ const PurchaseRequest = ({onRefresh}) => {
                               </Select>
                             </div>
 
-                            {/* Sub-Project Filter */}
+                            {/* Project Filter */}
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-muted-foreground">Project:</span>
                               <Select value={allProjectFilter} onValueChange={setAllProjectFilter}>
@@ -1209,13 +1207,11 @@ const PurchaseRequest = ({onRefresh}) => {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="__all__">All Projects</SelectItem>
-                                  {PRProjects.flatMap((project) => 
-                                    project.subProjects?.map((subProject) => (
-                                      <SelectItem key={subProject._id} value={subProject.name}>
-                                        {subProject.name}
-                                      </SelectItem>
-                                    )) || []
-                                  )}
+                                  {PRProjects.flatMap((project) => (
+                                    <SelectItem key={project._id} value={project.projectCode}>
+                                      {project.projectCode}
+                                    </SelectItem>
+                                  )) || []}
                                 </SelectContent>
                               </Select>
                             </div>
