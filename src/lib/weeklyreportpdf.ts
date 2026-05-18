@@ -44,8 +44,6 @@ const loadImg = async (src?: string): Promise<string | undefined> => {
 const SEC_FILL   = "#9BC2E6"; // Section banner fill (light blue)
 const TBL_HDR    = "#A6A6A6"; // Table column header (grey)
 const TBL_ALT    = "#F2F2F2"; // Alternate table row
-const GRP_FILL   = "#D9E1F2"; // Group header row (resources manpower)
-const TOTAL_FILL = "#E2EFDA"; // Total row fill (light green)
 const LTR_FILL   = "#2F75B5"; // Letter page header
 const QAQC_FILL  = "#DCE6F1"; // QAQC sub-section title fill
 const LOC_FILL   = "#D6DCE4"; // Site photo location banner
@@ -911,241 +909,221 @@ function buildResources(data: WeeklyReportExportData): any[] {
   const dates = data.weekDates?.length === 7 ? data.weekDates : Array(7).fill("");
   const weekLabel = (dates[0] && dates[6]) ? `Day ${dates[0]}–${dates[6]}` : "This Week";
 
-  // Ensure arrays exist (fallback to empty if undefined)
-  const manpowerRows = data.manpowerRows ?? [];
-  const materialRows = data.materialRows ?? [];
+  // Match Excel color tokens exactly
+  const RES_HDR   = "#BDD7EE"; // Excel HEADER_FILL (blue-grey header cells)
+  const GRP_FILL_C = "#D9E1F2"; // Excel group-header rows (I./II./III.)
+  const TOT_FILL_C = "#E2EFDA"; // Excel Grand Total / Total rows (light green)
+  const fSize = 9;
+
+  const manpowerRows  = data.manpowerRows  ?? [];
+  const materialRows  = data.materialRows  ?? [];
   const equipmentRows = data.equipmentRows ?? [];
 
-  // Helper to get daily array from various field names (like Excel)
   const pickDailyArray = (row: any): any[] => {
-    if (Array.isArray(row?.dailyData)) return row.dailyData;
+    if (Array.isArray(row?.dailyData))   return row.dailyData;
     if (Array.isArray(row?.dailyCounts)) return row.dailyCounts;
-    if (Array.isArray(row?.daily)) return row.daily;
-    if (Array.isArray(row?.days)) return row.days;
+    if (Array.isArray(row?.daily))       return row.daily;
+    if (Array.isArray(row?.days))        return row.days;
     return [];
   };
 
-  // Helper to check if row is a group header
   const isGroupHeaderRow = (row: any): boolean => {
     if (row?.isGroupHeader === true) return true;
     const desc = String(row?.description ?? "").trim();
     return /^[IVXLCDM]+\.\s/i.test(desc);
   };
 
-  // Helper to create header rows array (to be combined with data in single table)
-  const createHeaderRows = (weekLabelText: string, prevLabel: string, thisLabel: string, uptoLabel: string): any[] => {
-    const hdrFill = SEC_FILL;
-    const fontSize = 9;
+  // Header cell — all header cells share these base properties
+  const H = (text: string, extra: any = {}): any => ({
+    text,
+    bold: true,
+    fontSize: fSize,
+    fillColor: RES_HDR,
+    alignment: "center",
+    margin: [2, 3, 2, 3],
+    ...extra,
+  });
 
-    return [
-      // Row 1: Main headers
-      [
-        { text: "Description", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        { text: weekLabelText, bold: true, fontSize, fillColor: hdrFill, alignment: "center", colSpan: 7 },
-        "", "", "", "", "",
-        { text: prevLabel, bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        { text: thisLabel, bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        { text: uptoLabel, bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-      ],
-      // Row 2: Day labels
-      [
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        ...DAY_LABELS.map(d => ({ text: d, bold: true, fontSize, fillColor: hdrFill, alignment: "center" })),
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-      ],
-      // Row 3: Dates
-      [
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        ...dates.map(dt => ({ text: dt, bold: true, fontSize, fillColor: hdrFill, alignment: "center" })),
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-        { text: "", bold: true, fontSize, fillColor: hdrFill, alignment: "center" },
-      ],
-    ];
+  // 3-row merged header that exactly matches the Excel layout:
+  //   Row 1 — "Description" (rowSpan:3) | weekLabel (colSpan:7) | Prev/This/Upto (rowSpan:3 each)
+  //   Row 2 — {} placeholder | Fri Sat Sun Mon Tue Wed Thu | {} {} {}
+  //   Row 3 — {} placeholder | date0..date6               | {} {} {}
+  const buildHeader = (prevLabel: string, thisLabel: string, uptoLabel: string): any[][] => [
+    [
+      H("Description", { rowSpan: 3 }),
+      H(weekLabel, { colSpan: 7 }), {}, {}, {}, {}, {}, {},
+      H(prevLabel,  { rowSpan: 3 }),
+      H(thisLabel,  { rowSpan: 3 }),
+      H(uptoLabel,  { rowSpan: 3 }),
+    ],
+    [
+      {},
+      ...DAY_LABELS.map(d => H(d)),
+      {}, {}, {},
+    ],
+    [
+      {},
+      ...dates.map((dt: string) => H(dt)),
+      {}, {}, {},
+    ],
+  ];
+
+  // 11-column layout: Description | Fri..Thu (7) | Prev | This | Upto
+  const TABLE_WIDTHS = ["*", 26, 26, 26, 26, 26, 26, 26, 44, 44, 52];
+  const tableLayout = {
+    hLineWidth: () => 0.5,
+    vLineWidth: () => 0.5,
+    hLineColor: () => "#000000",
+    vLineColor: () => "#000000",
   };
 
+  // Shared total calculator: reads .text from already-built data rows
+  const calcTotal = (rows: any[], indices: number[], colIdx: number): number =>
+    indices.reduce((sum, ri) => {
+      const val = parseFloat(String(rows[ri]?.[colIdx]?.text ?? "0"));
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+
   // ═══════════════════════════════════════════════════════════════════════
-  // 6.1 Manpower Status - SINGLE CONTINUOUS TABLE
+  // 6.1 Manpower Status
   // ═══════════════════════════════════════════════════════════════════════
   items.push(subHdr("6.1  Manpower Status", 0));
 
-  const mpHeaderRows = createHeaderRows(weekLabel, "Previous\nWeek", "This\nWeek", "Up to\nThis Week");
+  const mpHeader   = buildHeader("Previous\nWeek", "This\nWeek", "Up to\nThis Week");
   const mpDataRows: any[] = [];
-  let mpItemNo = 0;
   const mpDataIndices: number[] = [];
+  let mpItemNo = 0;
 
   manpowerRows.forEach(row => {
     if (isGroupHeaderRow(row)) {
       mpItemNo = 0;
+      // Group header spans all 11 columns with blue fill
       mpDataRows.push([
-        { text: s(row.description), bold: true, fillColor: GRP_FILL, colSpan: 11, fontSize: 9 },
-        ...Array(10).fill(null),
+        {
+          text: s(row.description), bold: true, fontSize: fSize,
+          fillColor: GRP_FILL_C, colSpan: 11, alignment: "left", margin: [4, 3, 2, 3],
+        },
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
       ]);
     } else {
       mpItemNo++;
-      const rowIndex = mpDataRows.length;
-      mpDataIndices.push(rowIndex);
-      const dc = pickDailyArray(row);
+      const dc  = pickDailyArray(row);
+      const idx = mpDataRows.length;
+      mpDataIndices.push(idx);
       mpDataRows.push([
-        { text: `${mpItemNo}. ${s(row.description)}`, fontSize: 9 },
-        ...dc.slice(0, 7).map((v: any) => ({ text: s(v), align: "center" as const, fontSize: 9 })),
-        { text: s(row.previousWeek), align: "center", fontSize: 9 },
-        { text: s(row.thisWeek), align: "center", fontSize: 9 },
-        { text: s(row.upToThisWeek), align: "center", fontSize: 9 },
+        { text: `${mpItemNo}. ${s(row.description)}`, fontSize: fSize, alignment: "left", margin: [2, 2, 2, 2] },
+        ...Array.from({ length: 7 }, (_, i) => ({
+          text: s(dc[i] ?? ""), fontSize: fSize, alignment: "center",
+        })),
+        { text: s(row.previousWeek),  fontSize: fSize, alignment: "center" },
+        { text: s(row.thisWeek),      fontSize: fSize, alignment: "center" },
+        { text: s(row.upToThisWeek),  fontSize: fSize, alignment: "center" },
       ]);
     }
   });
 
   if (mpDataRows.length === 0) {
-    mpDataRows.push([{ text: "", colSpan: 11, align: "center" as const, fontSize: 9 }, ...Array(10).fill(null)]);
+    mpDataRows.push([{ text: "", colSpan: 11, fontSize: fSize }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
   }
 
-  // Add total row
-  const calcMpTotal = (colIndex: number): number => {
-    return mpDataIndices.reduce((sum, idx) => {
-      const val = parseFloat(mpDataRows[idx][colIndex]?.text || "0");
-      return sum + (isNaN(val) ? 0 : val);
-    }, 0);
-  };
-
+  // Grand Total — blank daily cells, values only in last 3 summary columns
   mpDataRows.push([
-    { text: "Grand Total", bold: true, fillColor: TOTAL_FILL, fontSize: 9 },
-    ...Array(7).fill({ text: "", fillColor: TOTAL_FILL, align: "center" as const, fontSize: 9 }),
-    { text: String(calcMpTotal(8)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
-    { text: String(calcMpTotal(9)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
-    { text: String(calcMpTotal(10)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
+    { text: "Grand Total", bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "left", margin: [2, 2, 2, 2] },
+    ...Array.from({ length: 7 }, () => ({ text: "", fontSize: fSize, fillColor: TOT_FILL_C })),
+    { text: String(calcTotal(mpDataRows, mpDataIndices, 8)),  bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
+    { text: String(calcTotal(mpDataRows, mpDataIndices, 9)),  bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
+    { text: String(calcTotal(mpDataRows, mpDataIndices, 10)), bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
   ]);
 
-  // SINGLE TABLE: Headers + Data + Total
   items.push({
-    table: {
-      widths: ["*", 26, 26, 26, 26, 26, 26, 26, 44, 44, 52],
-      body: [...mpHeaderRows, ...mpDataRows],
-    },
-    layout: {
-      hLineWidth: () => 0.5,
-      vLineWidth: () => 0.5,
-      hLineColor: () => "#000000",
-      vLineColor: () => "#000000",
-    },
+    table: { headerRows: 3, widths: TABLE_WIDTHS, body: [...mpHeader, ...mpDataRows] },
+    layout: tableLayout,
     margin: [0, 0, 0, 10],
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 6.2 Material Delivery Status - SINGLE CONTINUOUS TABLE
+  // 6.2 Material Delivery Status
   // ═══════════════════════════════════════════════════════════════════════
   items.push(subHdr("6.2  Material Delivery Status"));
 
-  const matHeaderRows = createHeaderRows(weekLabel, "Previous", "This\nPeriod", "Accumulate");
+  const matHeader   = buildHeader("Previous", "This\nPeriod", "Accumulate");
   const matDataRows: any[] = [];
   const matDataIndices: number[] = [];
 
   materialRows.forEach(row => {
-    const rowIndex = matDataRows.length;
-    matDataIndices.push(rowIndex);
-    const dd = pickDailyArray(row);
+    const idx = matDataRows.length;
+    matDataIndices.push(idx);
+    const dd   = pickDailyArray(row);
     const desc = row.unit ? `${s(row.description)} (${s(row.unit)})` : s(row.description);
     matDataRows.push([
-      { text: desc, fontSize: 9 },
-      ...dd.slice(0, 7).map((v: any) => ({ text: s(v), align: "center" as const, fontSize: 9 })),
-      { text: s(row.previous), align: "center", fontSize: 9 },
-      { text: s(row.thisPeriod), align: "center", fontSize: 9 },
-      { text: s(row.accumulate), align: "center", fontSize: 9 },
+      { text: desc, fontSize: fSize, alignment: "left", margin: [2, 2, 2, 2] },
+      ...Array.from({ length: 7 }, (_, i) => ({
+        text: s(dd[i] ?? ""), fontSize: fSize, alignment: "center",
+      })),
+      { text: s(row.previous),   fontSize: fSize, alignment: "center" },
+      { text: s(row.thisPeriod), fontSize: fSize, alignment: "center" },
+      { text: s(row.accumulate), fontSize: fSize, alignment: "center" },
     ]);
   });
 
   if (matDataRows.length === 0) {
-    matDataRows.push([{ text: "", colSpan: 11, align: "center" as const, fontSize: 9 }, ...Array(10).fill(null)]);
+    matDataRows.push([{ text: "", colSpan: 11, fontSize: fSize }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
   }
 
-  // Add total row
-  const calcMatTotal = (colIndex: number): number => {
-    return matDataIndices.reduce((sum, idx) => {
-      const val = parseFloat(matDataRows[idx][colIndex]?.text || "0");
-      return sum + (isNaN(val) ? 0 : val);
-    }, 0);
-  };
-
   matDataRows.push([
-    { text: "Total", bold: true, fillColor: TOTAL_FILL, fontSize: 9 },
-    ...Array(7).fill({ text: "", fillColor: TOTAL_FILL, align: "center" as const, fontSize: 9 }),
-    { text: String(calcMatTotal(8)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
-    { text: String(calcMatTotal(9)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
-    { text: String(calcMatTotal(10)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
+    { text: "Total", bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "left", margin: [2, 2, 2, 2] },
+    ...Array.from({ length: 7 }, () => ({ text: "", fontSize: fSize, fillColor: TOT_FILL_C })),
+    { text: String(calcTotal(matDataRows, matDataIndices, 8)),  bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
+    { text: String(calcTotal(matDataRows, matDataIndices, 9)),  bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
+    { text: String(calcTotal(matDataRows, matDataIndices, 10)), bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
   ]);
 
-  // SINGLE TABLE: Headers + Data + Total
   items.push({
-    table: {
-      widths: ["*", 26, 26, 26, 26, 26, 26, 26, 44, 44, 52],
-      body: [...matHeaderRows, ...matDataRows],
-    },
-    layout: {
-      hLineWidth: () => 0.5,
-      vLineWidth: () => 0.5,
-      hLineColor: () => "#000000",
-      vLineColor: () => "#000000",
-    },
+    table: { headerRows: 3, widths: TABLE_WIDTHS, body: [...matHeader, ...matDataRows] },
+    layout: tableLayout,
     margin: [0, 0, 0, 10],
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 6.3 Machinery / Equipment Status - SINGLE CONTINUOUS TABLE
+  // 6.3 Machinery / Equipment Status
   // ═══════════════════════════════════════════════════════════════════════
   items.push(subHdr("6.3  Machinery / Equipment Status"));
 
-  const eqHeaderRows = createHeaderRows(weekLabel, "Previous", "This\nPeriod", "Accumulate");
+  const eqHeader   = buildHeader("Previous", "This\nPeriod", "Accumulate");
   const eqDataRows: any[] = [];
   const eqDataIndices: number[] = [];
 
   equipmentRows.forEach(row => {
-    const rowIndex = eqDataRows.length;
-    eqDataIndices.push(rowIndex);
-    const dd = pickDailyArray(row);
+    const idx = eqDataRows.length;
+    eqDataIndices.push(idx);
+    const dd   = pickDailyArray(row);
     const desc = row.unit ? `${s(row.description)} (${s(row.unit)})` : s(row.description);
     eqDataRows.push([
-      { text: desc, fontSize: 9 },
-      ...dd.slice(0, 7).map((v: any) => ({ text: s(v), align: "center" as const, fontSize: 9 })),
-      { text: s(row.previous), align: "center", fontSize: 9 },
-      { text: s(row.thisPeriod), align: "center", fontSize: 9 },
-      { text: s(row.accumulate), align: "center", fontSize: 9 },
+      { text: desc, fontSize: fSize, alignment: "left", margin: [2, 2, 2, 2] },
+      ...Array.from({ length: 7 }, (_, i) => ({
+        text: s(dd[i] ?? ""), fontSize: fSize, alignment: "center",
+      })),
+      { text: s(row.previous),   fontSize: fSize, alignment: "center" },
+      { text: s(row.thisPeriod), fontSize: fSize, alignment: "center" },
+      { text: s(row.accumulate), fontSize: fSize, alignment: "center" },
     ]);
   });
 
   if (eqDataRows.length === 0) {
-    eqDataRows.push([{ text: "", colSpan: 11, align: "center" as const, fontSize: 9 }, ...Array(10).fill(null)]);
+    eqDataRows.push([{ text: "", colSpan: 11, fontSize: fSize }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
   }
 
-  // Add total row
-  const calcEqTotal = (colIndex: number): number => {
-    return eqDataIndices.reduce((sum, idx) => {
-      const val = parseFloat(eqDataRows[idx][colIndex]?.text || "0");
-      return sum + (isNaN(val) ? 0 : val);
-    }, 0);
-  };
-
   eqDataRows.push([
-    { text: "Total", bold: true, fillColor: TOTAL_FILL, fontSize: 9 },
-    ...Array(7).fill({ text: "", fillColor: TOTAL_FILL, align: "center" as const, fontSize: 9 }),
-    { text: String(calcEqTotal(8)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
-    { text: String(calcEqTotal(9)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
-    { text: String(calcEqTotal(10)), bold: true, fillColor: TOTAL_FILL, align: "center", fontSize: 9 },
+    { text: "Total", bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "left", margin: [2, 2, 2, 2] },
+    ...Array.from({ length: 7 }, () => ({ text: "", fontSize: fSize, fillColor: TOT_FILL_C })),
+    { text: String(calcTotal(eqDataRows, eqDataIndices, 8)),  bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
+    { text: String(calcTotal(eqDataRows, eqDataIndices, 9)),  bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
+    { text: String(calcTotal(eqDataRows, eqDataIndices, 10)), bold: true, fontSize: fSize, fillColor: TOT_FILL_C, alignment: "center" },
   ]);
 
-  // SINGLE TABLE: Headers + Data + Total
   items.push({
-    table: {
-      widths: ["*", 26, 26, 26, 26, 26, 26, 26, 44, 44, 52],
-      body: [...eqHeaderRows, ...eqDataRows],
-    },
-    layout: {
-      hLineWidth: () => 0.5,
-      vLineWidth: () => 0.5,
-      hLineColor: () => "#000000",
-      vLineColor: () => "#000000",
-    },
+    table: { headerRows: 3, widths: TABLE_WIDTHS, body: [...eqHeader, ...eqDataRows] },
+    layout: tableLayout,
     margin: [0, 0, 0, 10],
   });
 
