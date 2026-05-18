@@ -486,26 +486,40 @@ export const autoSaveReport = async (reportId: string, partialData: any) => {
   return result;
 };
 
-export const getRecentReports = async (limit: number = 20, status?: string, projectId?: string) => {
-
+export const getRecentReports = async (
+  limit: number = 0,
+  status?: string,
+  projectId?: string,
+  page: number = 1
+) => {
   const params = new URLSearchParams();
-  if (limit) params.append('limit', limit.toString());
+  params.append('limit', limit.toString());
+  params.append('page', page.toString());
   if (status) params.append('status', status);
   if (projectId) params.append('projectId', projectId);
 
   const response = await apiGet(`${API_ENDPOINTS.DAILY_REPORTS.BASE}/recent?${params.toString()}`);
 
-
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ message: "Failed to fetch recent reports" }));
-    console.error("🔒 GET RECENT REPORTS: Failed:", error);
     throw new Error(error.message || "Failed to fetch recent reports");
   }
 
-  const result = await response.json();
-  return result;
+  return response.json() as Promise<{
+    success: boolean;
+    data: any[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+    message: string;
+  }>;
 };
 
 export const generateCombinedPDF = async (
@@ -638,7 +652,7 @@ export const getReportsByLocation = async (location?: string) => {
 
 export const getCompanyReports = async (
   page: number = 1,
-  limit: number = 20,
+  limit: number = 0,
   search: string = "",
   projectFilter?: string,
   projectId?: string
