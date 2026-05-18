@@ -81,18 +81,27 @@ const dataBarCell = (
   if (restW <= 0) return { text: label, fontSize: fz, alignment: "center", fillColor: barColor };
 
   return {
-    table: {
-      widths: [barW, restW],
-      body: [[
-        { text: "", fillColor: barColor, border: [false, false, false, false] },
-        { text: label, fontSize: fz, alignment: "right", border: [false, false, false, false], margin: [0, 1, 0, 0] },
-      ]],
-    },
-    layout: {
-      defaultBorder: false,
-      paddingLeft: () => 0, paddingRight: () => 0,
-      paddingTop: () => 0, paddingBottom: () => 0,
-    },
+    stack: [
+      {
+        canvas: [
+          {
+            type: "rect",
+            x: 0,
+            y: 0,
+            w: barW,
+            h: 12,
+            color: barColor,
+          },
+        ],
+      },
+      {
+        text: label,
+        fontSize: fz,
+        alignment: "center",
+        margin: [0, -10, 0, 0],
+      },
+    ],
+    margin: [0, 0, 0, 0],
   };
 };
 
