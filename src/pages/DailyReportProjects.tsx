@@ -695,40 +695,42 @@ const DailyReportProjects: React.FC = () => {
                         onClick={() => navigate(`/dashboard?projectId=${encodeURIComponent(project._id)}`)}
                       >
                         <CardHeader className="pb-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                          <div className="flex items-center justify-between min-w-0 gap-4">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors shrink-0">
                                 <FolderOpen className="h-6 w-6" />
                               </div>
-                              <div className="flex-1">
-                                <CardTitle className="text-xl truncate">{project.name}</CardTitle>
+                              <div className="flex-1 min-w-0">
+                                <CardTitle className="text-xl truncate block">{project.name}</CardTitle>
                               </div>
                             </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                  <MoreVertical className="h-3 w-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-32">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicateProject(project.name); }}>
-                                  <Copy className="h-3 w-3 mr-2" /> Duplicate
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProject(project.name); }}>
-                                  <Edit className="h-3 w-3 mr-2" /> Rename
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMoveProjectDialog(project); }}>
-                                  <FolderInput className="h-3 w-3 mr-2" /> Move
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => { e.stopPropagation(); setProjectToDelete(project.name); setDeleteConfirmOpen(true); }}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="h-3 w-3 mr-2" /> Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {project.createdBy === currentUserId && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                    <MoreVertical className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-32">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicateProject(project.name); }}>
+                                    <Copy className="h-3 w-3 mr-2" /> Duplicate
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProject(project.name); }}>
+                                    <Edit className="h-3 w-3 mr-2" /> Rename
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMoveProjectDialog(project); }}>
+                                    <FolderInput className="h-3 w-3 mr-2" /> Move
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={(e) => { e.stopPropagation(); setProjectToDelete(project.name); setDeleteConfirmOpen(true); }}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-3 w-3 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -788,40 +790,42 @@ const DailyReportProjects: React.FC = () => {
                         onClick={() => navigate(`/dashboard?project=${encodeURIComponent(project.name)}`)}
                       >
                         <CardHeader className="pb-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                          <div className="flex items-center justify-between min-w-0 gap-4">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors shrink-0">
                                 <FolderOpen className="h-6 w-6" />
                               </div>
-                              <div className="flex-1">
-                                <CardTitle className="text-xl truncate">{project.name}</CardTitle>
+                              <div className="flex-1 min-w-0">
+                                <CardTitle className="text-xl truncate block">{project.name}</CardTitle>
                               </div>
                             </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                  <MoreVertical className="h-3 w-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-32">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicateProject(project.name); }}>
-                                  <Copy className="h-3 w-3 mr-2" /> Duplicate
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProject(project.name); }}>
-                                  <Edit className="h-3 w-3 mr-2" /> Rename
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMoveProjectDialog(project); }}>
-                                  <FolderInput className="h-3 w-3 mr-2" /> Move
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => { e.stopPropagation(); setProjectToDelete(project.name); setDeleteConfirmOpen(true); }}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="h-3 w-3 mr-2" /> Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {project.createdBy === currentUserId && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                    <MoreVertical className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-32">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicateProject(project.name); }}>
+                                    <Copy className="h-3 w-3 mr-2" /> Duplicate
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProject(project.name); }}>
+                                    <Edit className="h-3 w-3 mr-2" /> Rename
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMoveProjectDialog(project); }}>
+                                    <FolderInput className="h-3 w-3 mr-2" /> Move
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={(e) => { e.stopPropagation(); setProjectToDelete(project.name); setDeleteConfirmOpen(true); }}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-3 w-3 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </CardHeader>
                         <CardContent>

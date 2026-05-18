@@ -1033,50 +1033,54 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                                 <Plus className="h-3 w-3 mr-2" />
                                                 Add Project
                                               </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => handleEditFolder(folder)}>
-                                                <Edit className="h-3 w-3 mr-2" />
-                                                Rename
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                  <DropdownMenuItem 
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setFolderToDelete(folder._id);
-                                                    }}
-                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                    onSelect={(e) => {
-                                                      e.preventDefault();
-                                                      setDeleteFolderConfirmOpen(true);
-                                                    }}
-                                                  >
-                                                    <Trash2 className="h-3 w-3 mr-2" />
-                                                    Delete
+                                              {folder.createdBy === currentUserId && (
+                                                <>
+                                                  <DropdownMenuItem onClick={() => handleEditFolder(folder)}>
+                                                    <Edit className="h-3 w-3 mr-2" />
+                                                    Rename
                                                   </DropdownMenuItem>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                  <AlertDialogHeader>
-                                                    <AlertDialogTitle>
-                                                      Delete Folder?
-                                                    </AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                      This will delete "{folder.name}". Projects will be moved to root.
-                                                    </AlertDialogDescription>
-                                                  </AlertDialogHeader>
-                                                  <AlertDialogFooter>
-                                                    <AlertDialogCancel onClick={() => setDeleteFolderConfirmOpen(false)}>
-                                                      Cancel
-                                                    </AlertDialogCancel>
-                                                    <AlertDialogAction 
-                                                      onClick={() => handleDeleteFolder(folder._id)}
-                                                      className="bg-red-600 hover:bg-red-700"
-                                                    >
-                                                      Delete
-                                                    </AlertDialogAction>
-                                                  </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                              </AlertDialog>
+                                                  <DropdownMenuSeparator />
+                                                  <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                      <DropdownMenuItem 
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setFolderToDelete(folder._id);
+                                                        }}
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        onSelect={(e) => {
+                                                          e.preventDefault();
+                                                          setDeleteFolderConfirmOpen(true);
+                                                        }}
+                                                      >
+                                                        <Trash2 className="h-3 w-3 mr-2" />
+                                                        Delete
+                                                      </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                      <AlertDialogHeader>
+                                                        <AlertDialogTitle>
+                                                          Delete Folder?
+                                                        </AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                          This will delete "{folder.name}". Projects will be moved to root.
+                                                        </AlertDialogDescription>
+                                                      </AlertDialogHeader>
+                                                      <AlertDialogFooter>
+                                                        <AlertDialogCancel onClick={() => setDeleteFolderConfirmOpen(false)}>
+                                                          Cancel
+                                                        </AlertDialogCancel>
+                                                        <AlertDialogAction 
+                                                          onClick={() => handleDeleteFolder(folder._id)}
+                                                          className="bg-red-600 hover:bg-red-700"
+                                                        >
+                                                          Delete
+                                                        </AlertDialogAction>
+                                                      </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                  </AlertDialog>
+                                                </>
+                                              )}
                                             </DropdownMenuContent>
                                           </DropdownMenu>
                                         </>
