@@ -74,12 +74,6 @@ import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getProjectById } from "@/integrations/projectsApi";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { apiGet, apiPost } from "@/lib/apiFetch";
 
 // Local Storage helpers (for offline drafts)
@@ -270,28 +264,6 @@ const initializeCleanReportState = (
     projectLogo: "",
   };
 };
-
-//Comment out checkIfProjectHasReports because it is currently not being used
-// FIXED: Use existing API endpoint instead of non-existent APIs
-// const checkIfProjectHasReports = async (
-//   projectName: string
-// ): Promise<boolean> => {
-//   try {
-//     // Use existing API endpoint that actually exists
-//     const response = await apiGet("/daily-reports/company");
-//     if (!response.ok) return false;
-
-//     const apiResponse = await response.json();
-//     const allReports = apiResponse.reports || apiResponse.data || [];
-//     const projectReports = allReports.filter(
-//       (report) => report.projectName === projectName
-//     );
-//     return projectReports.length > 0;
-//   } catch (error) {
-//     console.error("Failed to check project reports:", error);
-//     return false;
-//   }
-// };
 
 // FIXED: Use projectId to fetch reports
 const loadMostRecentReportForProject = async (
@@ -2584,30 +2556,6 @@ const DailyReport = () => {
         projectLogo: processedLogo,
       };
 
-      // console.log(
-      //   "🔍 FRONTEND: About to save data with HSE sections:",
-      //   basicCleanedData.hse_ref
-      //     ? "YES (" + basicCleanedData.hse_ref.length + " sections)"
-      //     : "NO"
-      // );
-
-      //Comment out Saving functionality because it is not needed for combined export
-      // Save to database
-      // try {
-      //   console.log("🔍 FRONTEND: About to save to DB");
-      //   await saveReportToDB(basicCleanedData); // Save basic data without large images
-      //   console.log("🔍 FRONTEND: Save completed successfully");
-      // } catch (error) {
-      //   console.error("🔍 FRONTEND: Save failed:", error);
-      //   // Don't proceed with export if save failed
-      //   throw new Error("Database save failed");
-      // }
-
-      // DEBUG: Confirm save completed
-      // console.log(
-      //   "DEBUG FRONTEND: Save to DB completed successfully, proceeding with export"
-      // );
-
       const reportPayload = {
         projectName,
         location,
@@ -3501,53 +3449,6 @@ const DailyReport = () => {
       // Step 3: Clear localStorage after successful submission
       localStorage.removeItem(dateKey(reportDate));
 
-      //Comment ouy Step 4 as it is currently not being used
-      // Step 4: Prepare next day's data (Running Total / Carry-Forward)
-      // const nextDay = new Date(reportDate!.getTime() + 86400000);
-      // const carryForwardData = {
-      //   projectName: cleanedData.projectName,
-      //   reportDate: nextDay.toISOString(),
-      //   weatherAM: "",
-      //   weatherPM: "",
-      //   tempAM: "",
-      //   tempPM: "",
-      //   activityToday: "",
-      //   workPlanNextDay: "",
-      //   managementTeam: cleanedData.managementTeam.map((r) => ({
-      //     ...r,
-      //     prev: r.accumulated, // ✅ Carry forward accumulated to prev
-      //     today: 0,
-      //     accumulated: r.accumulated,
-      //   })),
-      //   workingTeamInterior: cleanedData.workingTeamInterior.map((r) => ({
-      //     ...r,
-      //     prev: r.accumulated,
-      //     today: 0,
-      //     accumulated: r.accumulated,
-      //   })),
-      //   workingTeamMEP: cleanedData.workingTeamMEP.map((r) => ({
-      //     ...r,
-      //     prev: r.accumulated,
-      //     today: 0,
-      //     accumulated: r.accumulated,
-      //   })),
-      //   materials: cleanedData.materials.map((r) => ({
-      //     ...r,
-      //     prev: r.accumulated,
-      //     today: 0,
-      //     accumulated: r.accumulated,
-      //   })),
-      //   machinery: cleanedData.machinery.map((r) => ({
-      //     ...r,
-      //     prev: r.accumulated,
-      //     today: 0,
-      //     accumulated: r.accumulated,
-      //   })),
-      // };
-
-      // Save next day's template locally
-      // saveDraftLocally(nextDay, carryForwardData);
-
       toast({
         title: "Report Submitted",
         description:
@@ -3827,19 +3728,6 @@ const DailyReport = () => {
                   <div className="mt-6 pt-6 border-t border-muted-foreground/20">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
-                        {/* Export combined:{" "}
-                        <span className="font-medium text-foreground">
-                          Report
-                        </span>{" "}
-                        = Sheet 1,{" "}
-                        <span className="font-medium text-foreground">
-                          Reference
-                        </span>{" "}
-                        = Sheet 2,{" "}
-                        <span className="font-medium text-foreground">
-                          Corrective Action Request
-                        </span>{" "}
-                        = Sheet 3 */}
                       </div>
                       <div className="flex items-center gap-3">
                         {/* ADD THIS: Simple Save Button */}
@@ -3930,12 +3818,6 @@ const DailyReport = () => {
                               <FileSpreadsheet className="w-4 h-4 mr-2" />
                               Export As Excel
                             </DropdownMenuItem>
-                            {/* DISABLED: Export Combined Docs - commented out
-                            <DropdownMenuItem>
-                              <FileType className="w-4 h-4 mr-2" />
-                              Export Combined Docs (Word)
-                            </DropdownMenuItem>
-                            */}
                             <DropdownMenuItem
                               onClick={handleExportCombinedZIP}
                               disabled={isExportingCombined}

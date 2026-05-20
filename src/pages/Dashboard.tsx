@@ -525,7 +525,7 @@ const Dashboard = () => {
             {currentProjectName && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                 <button 
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/daily-report-projects')}
                   className="hover:text-foreground transition-colors"
                 >
                   Dashboard
@@ -547,62 +547,6 @@ const Dashboard = () => {
               </div>
             )}
 
-            {/* Summary Cards */}
-            {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Today's Report
-                  </CardTitle>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-2xl font-bold">
-                        {new Date().toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">Status:</span>
-                        {getStatusBadge(getTodayReportStatus() || "not-started")}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    This Week
-                  </CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{weeklyTotal}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Reports submitted
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Last Submitted
-                  </CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {lastSubmitted ? new Date(lastSubmitted.submittedAt || lastSubmitted.updatedAt).toLocaleDateString() : "None"}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Most recent submission
-                  </p>
-                </CardContent>
-              </Card>
-            </div> */}
             {/* Tabs */}
             <div className="mb-6">
               <div className="border-b border-gray-200">

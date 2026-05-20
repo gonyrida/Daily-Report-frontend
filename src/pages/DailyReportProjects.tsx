@@ -52,15 +52,6 @@ import { getFoldersWithProjects, createFolder, Folder } from "@/integrations/fol
 import { apiGet } from '@/lib/apiFetch';
 import { FolderInput } from "lucide-react";
 
-// interface Project {
-//   name: string;
-//   reportCount: number;
-//   lastReportDate?: string;
-//   lastReportId?: string;
-//   createdBy?: string;        // User ID who created project
-//   createdByName?: string;   // User's name for display
-// }
-
 const DailyReportProjects: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -582,13 +573,6 @@ const DailyReportProjects: React.FC = () => {
                 </div>
               </div>
 
-              {/* {filteredProjects.length > 0 && (
-                <Button onClick={() => setShowAddProject(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Project
-                </Button>
-              )} */}
-
               {/* Add Project Input */}
               {showAddProject && (
                 <Card>
@@ -761,7 +745,7 @@ const DailyReportProjects: React.FC = () => {
                               </div>
                             )}
                             <div className="pt-2">
-                              <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/dashboard?project=${encodeURIComponent(project.name)}&folder=${encodeURIComponent(folder._id)}&folderName=${encodeURIComponent(folder.name)}`); }}>
+                              <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/dashboard?projectId=${encodeURIComponent(project._id)}`); }}>
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Open Project
                               </Button>
@@ -787,7 +771,7 @@ const DailyReportProjects: React.FC = () => {
                       <Card 
                         key={project._id}
                         className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] group"
-                        onClick={() => navigate(`/dashboard?project=${encodeURIComponent(project.name)}`)}
+                        onClick={() => navigate(`/dashboard?projectId=${encodeURIComponent(project._id)}`)}
                       >
                         <CardHeader className="pb-4">
                           <div className="flex items-center justify-between min-w-0 gap-4">
@@ -856,7 +840,7 @@ const DailyReportProjects: React.FC = () => {
                               </div>
                             )}
                             <div className="pt-2">
-                              <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/dashboard?project=${encodeURIComponent(project.name)}`); }}>
+                              <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/dashboard?projectId=${encodeURIComponent(project._id)}`); }}>
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Open Project
                               </Button>
