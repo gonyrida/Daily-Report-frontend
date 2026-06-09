@@ -1,6 +1,7 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Trash2, Calendar, Upload, X, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { fetchAuthenticatedImage } from "@/services/dailyReportImageService";
 
 interface Props {
   group: any;
@@ -27,6 +28,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const beforeFileInputRef = useRef<HTMLInputElement>(null);
   const afterFileInputRef = useRef<HTMLInputElement>(null);
+  const [imagesArr, setImagesArr] = useState<[]>([]);
 
   const handleImageUpload = (file: File, slotIndex: number) => {
     const images = [...(group.images || [null, null])];
@@ -68,6 +70,34 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
     onUpdate({ ...group, date: e.target.value });
   };
 
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        if (!group.images?.[0] || group.images?.[1]) return; // Prevent fetching empty paths
+        
+        const blob_1 = await fetchAuthenticatedImage(group.images?.[0]);
+        const blob_2 = await fetchAuthenticatedImage(group.images?.[1]);
+        console.log("This is blob_1 in car: ", blob_1)
+        console.log("This is blob_2 in car: ", blob_2)
+
+        if (!blob_1 && !blob_2) {
+          setImagesArr([group.images?.[0], group.images?.[1]]);
+          console.log("This is first imagesArr: ", imagesArr)
+        } else {
+          setImagesArr([blob_1, blob_2]);
+          console.log("This is second imagesArr: ", imagesArr)
+        }
+      } catch (error) {
+        console.error('Error loading protected image:', error);
+      }
+    };
+
+    loadImage();
+  }, [group.images?.[0], group.images?.[1]])
+
+  console.log("This is imagePreviewSrc [0]: ", imagePreviewSrc(group.images?.[0]))
+  console.log("This is imagesArr [0]: ", imagesArr[0])
+  
   return (
     <motion.div ref={containerRef} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-slate-200/60 dark:border-slate-700/60 ${isTopLinked ? "rounded-t-none border-t-0 -mt-px" : ""} ${isBottomLinked ? "rounded-b-none border-b-0" : ""}`}>
       {/* Modern header */}
@@ -135,7 +165,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
           >
             {imagePreviewSrc(group.images?.[0]) ? (
               <div className="relative w-full h-full">
-                <img src={imagePreviewSrc(group.images?.[0])} alt="Before image" className="w-full h-full object-cover" />
+                <img src={imagePreviewSrc(imagesArr[0])} alt="Before image" className="w-full h-full object-cover" />
                 <button
                   onClick={() => removeImage(0)}
                   className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
@@ -195,7 +225,7 @@ export default function CarGroupCard({ group, index, total, onUpdate, onRemove, 
           >
             {imagePreviewSrc(group.images?.[1]) ? (
               <div className="relative w-full h-full">
-                <img src={imagePreviewSrc(group.images?.[1])} alt="After image" className="w-full h-full object-cover" />
+                <img src={imagePreviewSrc(imagesArr[1])} alt="After image" className="w-full h-full object-cover" />
                 <button
                   onClick={() => removeImage(1)}
                   className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600 "

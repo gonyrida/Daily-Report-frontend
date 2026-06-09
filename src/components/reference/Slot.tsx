@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Image, Trash2, Plus } from "lucide-react";
 import { useSlotLogic } from "@/hooks/useSlotLogic";
+import { fetchAuthenticatedImage } from "@/services/dailyReportImageService";
 
 interface Props {
   slot: any;
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteSlot, onBulkUpload, showCaption = true }: Props) {
+  const [imageSrc, setImageSrc] = useState<string>("")
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     
@@ -35,6 +37,27 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
 
   const logic = useSlotLogic(slot, entryId, onUpdateSlot, onBulkUpload);
 
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        if (!logic.imageUrl) return; // Prevent fetching empty paths
+        
+        const result = await fetchAuthenticatedImage(logic.imageUrl);
+        console.log("This is resutl: ", result)
+
+        if (!result) {
+          setImageSrc(logic.imageUrl);
+        } else {
+          setImageSrc(result); // Fixed syntax typo
+        }
+      } catch (error) {
+        console.error('Error loading protected image:', error);
+      }
+    };
+
+    loadImage();
+  }, [logic.imageUrl])
+
   return (
     <div className="flex flex-col relative">
       <div
@@ -50,7 +73,7 @@ export default function Slot({ slot, entryId, slotIndex, onUpdateSlot, onDeleteS
       >
         {logic.imageUrl ? (
           <div className="relative w-full h-full group">
-            <img src={logic.imageUrl} alt={`Preview`} className="w-full h-full object-cover rounded-2xl" />
+            <img src={imageSrc} alt={`Preview`} className="w-full h-full object-cover rounded-2xl" />
             <button
               type="button"
               onClick={(e) => {

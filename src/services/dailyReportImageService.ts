@@ -1,7 +1,11 @@
 // src/services/dailyReportImageService.ts
 // Service for handling daily report image operations with backend APIs
 
-import { API_BASE_URL } from '@/config/api';
+import { 
+  API_BASE_URL,
+  API_ENDPOINTS,
+} from '@/config/api';
+import { apiGet } from '@/lib/apiFetch';
 
 export interface ImageMetadata {
   supabaseUrl?: string;
@@ -277,3 +281,57 @@ export const filterImagesNeedingUpload = (images: ImageMetadata[]): Array<{ file
       caption: img.caption || 'Image'
     }));
 };
+
+export const uploadFileToServer = async (file: File, uploadType: string) => {
+  if (!file) {
+    throw new Error('Frontend Service Error: No raw file object supplied for network upload.');
+  }
+
+  // Pack the asset and context string into standard browser FormData
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('type', uploadType);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DAILY_REPORTS.BASE}/upload`, {
+      method: 'POST',
+      body: formData, // Passing the FormData object directly
+      credentials: 'include' // Ensure cookies are sent for authentication
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || `Server responded with network status code ${response.status}`);
+    }
+
+    if (data && data.success) {
+      return data.url; // Returns the exact string path (e.g., "/public/projects/logos/xyz.png")
+    } else {
+      throw new Error(data.message || 'The asset server rejected the file transmission processing.');
+    }
+
+  } catch (error) {
+    console.error('[FRONTEND NATIVE FETCH EXCEPTION]:', error);
+    throw new Error(error.message || 'Network Communication Failure: Unable to upload media file.');
+  }
+}
+
+export const fetchAuthenticatedImage = async (relativePath: string) => {
+  try {
+    // const response = await fetch(relativePath);
+    const response = await apiGet(relativePath)
+
+    if (!response.ok) throw new Error('Failed to fetch protected asset');
+
+    // 1. Extract the raw binary image stream as a Blob object
+    const imageBlob = await response.blob();
+    // 2. Generate a temporary, local-only browser object URL
+    const localBlobUrl = URL.createObjectURL(imageBlob);
+
+    return localBlobUrl; // e.g., "blob:http://localhost:3000/a1b2c3d4..."
+  } catch (error) {
+    console.error('Error loading protected image:', error);
+    return ""; // Fallback image if unauthorized
+  }
+}

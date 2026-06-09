@@ -1148,86 +1148,115 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
                                       {folder.projects?.map((project) => (
                                         <SidebarMenuSubItem key={project._id}>
                                           <div className="flex items-center justify-between w-full pl-8 pr-2 py-1 group">
-                                            <SidebarMenuSubButton
-                                              onClick={() => handleProjectClick(project.name, project._id, 'daily')}
-                                              isActive={isProjectActive(project._id, 'daily')}
-                                              className={`flex-1 text-xs cursor-pointer ${
-                                                isProjectActive(project._id, 'daily') 
-                                                  ? 'bg-primary text-primary-foreground font-medium' 
-                                                  : ''
-                                              }`}
-                                            >
-                                              {project.name}
-                                            </SidebarMenuSubButton>
-                                            {project.createdBy === currentUserId && (
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                  >
-                                                    <MoreVertical className="h-3 w-3" />
-                                                  </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-32">
-                                                  <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
-                                                    <Edit className="h-3 w-3 mr-2" />
-                                                    Rename
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
-                                                    <Copy className="h-3 w-3 mr-2" />
-                                                    Duplicate
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem onClick={() => openMoveProjectDialog(project)}>
-                                                    <FolderInput className="h-3 w-3 mr-2" />
-                                                    Move to Folder
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuSeparator />
-                                                  <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                      <DropdownMenuItem 
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          setProjectToDelete(project.name);
-                                                        }}
-                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                        onSelect={(e) => {
-                                                          e.preventDefault();
-                                                          setDeleteConfirmOpen(true);
-                                                        }}
+                                            {editingProject === project.name ? (
+                                              <div className="flex items-center gap-1 flex-1">
+                                                <Input
+                                                  value={editProjectName}
+                                                  onChange={(e) => setEditProjectName(e.target.value)}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                      e.preventDefault();
+                                                      handleSaveEdit();
+                                                    } else if (e.key === 'Escape') {
+                                                      handleCancelEdit();
+                                                    }
+                                                  }}
+                                                  className="h-6 text-xs flex-1"
+                                                  autoFocus
+                                                />
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-5 w-5 p-0"
+                                                  onClick={handleCancelEdit}
+                                                >
+                                                  ×
+                                                </Button>
+                                              </div>
+                                            ) : (
+                                              <>
+                                                <SidebarMenuSubButton
+                                                  onClick={() => handleProjectClick(project.name, project._id, 'daily')}
+                                                  isActive={isProjectActive(project._id, 'daily')}
+                                                  className={`flex-1 text-xs cursor-pointer ${
+                                                    isProjectActive(project._id, 'daily') 
+                                                      ? 'bg-primary text-primary-foreground font-medium' 
+                                                      : ''
+                                                  }`}
+                                                >
+                                                  {project.name}
+                                                </SidebarMenuSubButton>
+                                                {project.createdBy === currentUserId && (
+                                                  <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                                       >
-                                                        <Trash2 className="h-3 w-3 mr-2" />
-                                                        Delete
+                                                        <MoreVertical className="h-3 w-3" />
+                                                      </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-32">
+                                                      <DropdownMenuItem onClick={() => handleEditProject(project.name)}>
+                                                        <Edit className="h-3 w-3 mr-2" />
+                                                        Rename
                                                       </DropdownMenuItem>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                      <AlertDialogHeader>
-                                                        <AlertDialogTitle>
-                                                          Delete Project?
-                                                        </AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                          This will delete "{project.name}" and ALL its reports.
-                                                        </AlertDialogDescription>
-                                                      </AlertDialogHeader>
-                                                      <AlertDialogFooter>
-                                                        <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>
-                                                          Cancel
-                                                        </AlertDialogCancel>
-                                                        <AlertDialogAction 
-                                                          onClick={() => {
-                                                            console.log("🔥 SIDEBAR ALERT: Delete clicked for project:", project.name);
-                                                            handleDeleteProject(project.name);
-                                                          }}
-                                                          className="bg-red-600 hover:bg-red-700"
-                                                        >
-                                                          Delete
-                                                        </AlertDialogAction>
-                                                      </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                  </AlertDialog>
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
+                                                      <DropdownMenuItem onClick={() => handleDuplicateProject(project.name)}>
+                                                        <Copy className="h-3 w-3 mr-2" />
+                                                        Duplicate
+                                                      </DropdownMenuItem>
+                                                      <DropdownMenuItem onClick={() => openMoveProjectDialog(project)}>
+                                                        <FolderInput className="h-3 w-3 mr-2" />
+                                                        Move to Folder
+                                                      </DropdownMenuItem>
+                                                      <DropdownMenuSeparator />
+                                                      <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                          <DropdownMenuItem 
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              setProjectToDelete(project.name);
+                                                            }}
+                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            onSelect={(e) => {
+                                                              e.preventDefault();
+                                                              setDeleteConfirmOpen(true);
+                                                            }}
+                                                          >
+                                                            <Trash2 className="h-3 w-3 mr-2" />
+                                                            Delete
+                                                          </DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                          <AlertDialogHeader>
+                                                            <AlertDialogTitle>
+                                                              Delete Project?
+                                                            </AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                              This will delete "{project.name}" and ALL its reports.
+                                                            </AlertDialogDescription>
+                                                          </AlertDialogHeader>
+                                                          <AlertDialogFooter>
+                                                            <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>
+                                                              Cancel
+                                                            </AlertDialogCancel>
+                                                            <AlertDialogAction 
+                                                              onClick={() => {
+                                                                console.log("🔥 SIDEBAR ALERT: Delete clicked for project:", project.name);
+                                                                handleDeleteProject(project.name);
+                                                              }}
+                                                              className="bg-red-600 hover:bg-red-700"
+                                                            >
+                                                              Delete
+                                                            </AlertDialogAction>
+                                                          </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                      </AlertDialog>
+                                                    </DropdownMenuContent>
+                                                  </DropdownMenu>
+                                                )}
+                                              </>
                                             )}
                                           </div>
                                         </SidebarMenuSubItem>
@@ -1566,7 +1595,7 @@ const HierarchicalSidebar: React.FC<HierarchicalSidebarProps> = ({ className }) 
           <AlertDialogHeader>
             <AlertDialogTitle>Rename Project</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to rename "{renameData?.oldName}" to "{renameData?.newName}"? This action <strong>will rename all reports</strong> inside to match the new project name.
+              Are you sure you want to rename "{renameData?.oldName}" to "{renameData?.newName}"?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

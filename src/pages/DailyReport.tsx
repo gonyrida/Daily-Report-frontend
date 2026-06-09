@@ -70,11 +70,15 @@ import {
   deleteReport,
   autoSaveReport,
 } from "@/integrations/reportsApi";
-import { API_ENDPOINTS, PYTHON_API_BASE_URL } from "@/config/api";
+import { API_ENDPOINTS, PYTHON_API_BASE_URL, STATIC_BASE_URL } from "@/config/api";
 import { pythonApiPost } from "../lib/pythonApiFetch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getProjectById } from "@/integrations/projectsApi";
 import { apiGet, apiPost } from "@/lib/apiFetch";
+import { preparePayloadFiles, formatPayloadImages } from "@/lib/fileUploadUtils";
+import { set } from "date-fns";
+import { format } from "path";
+import { ConstructionProgressTable } from "@/components/weekly/ConstructionProgressTable";
 
 // Local Storage helpers (for offline drafts)
 const STORAGE_PREFIX = "daily-report:";
@@ -117,6 +121,7 @@ interface Section {
 }
 
 interface ReportData {
+  reportId?: string;
   projectId?: string;
   projectName: string;
   reportDate: string | null;
@@ -591,6 +596,7 @@ const DailyReport = () => {
   // Helper to get current report data
   const getReportData = useCallback(
     (): ReportData => ({
+      reportId: reportIdFromUrl,
       projectId: projectId || undefined,
       projectName,
       location,
@@ -616,6 +622,7 @@ const DailyReport = () => {
       projectLogo,
     }),
     [
+      reportIdFromUrl,
       projectId,
       projectName,
       location,
@@ -720,7 +727,7 @@ const DailyReport = () => {
         
         // Load most recent report for this specific project AND location
         const locationRecentReport = await loadMostRecentReportForProjectAndLocation(
-          projectName,
+          projectId,
           newLocation
         );
 
@@ -3333,62 +3340,26 @@ const DailyReport = () => {
     try {
       // Prepare report data and clean empty rows
       const rawData = getReportData();
-
-      // Process images directly in referenceSections (like captions!)
-      const processedReferenceSections = await processImagesInReferenceSections(
-        rawData.referenceSections
-      );
-      const processedSiteActivitiesSections =
-        await processImagesInReferenceSections(rawData.siteActivitiesSections);
-      const siteRefData = convertToSiteRefFormat(
-        processedSiteActivitiesSections
-      );
-
-      // ADD toImageUrl function:
-      const toImageUrl = async (img: unknown): Promise<string | null> => {
-        if (!img) return null;
-
-        if (typeof img === "string") {
-          return img;
-        }
-
-        if (img instanceof File) {
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(img);
-          });
-        }
-
-        return null;
-      };
+      console.log("rawData: ", rawData);
+      const triedCleanedData = await preparePayloadFiles(rawData);
+      console.log("triedCleanedData: ", triedCleanedData);
 
       // ADD CAR PROCESSING:
-      const processedCar = await Promise.all(
-        (rawData.carSheet.photo_groups || []).map(async (g: any) => {
-          // Check if group is complete (has both before and after images)
-          const isComplete = g.images?.[0] && g.images?.[1];
-          
-          return {
-            ...g,
-            // Mark complete groups as hidden after submission
-            hiddenAfterSubmission: isComplete ? true : (g.hiddenAfterSubmission || false),
-            images: await Promise.all(
-              (g.images || []).map(async (img: any) => {
-                if (img && typeof img === "object" && img instanceof File) {
-                  return await toImageUrl(img);
-                }
-                return img;
-              })
-            ),
-          };
-        })
-      );
+      const processedCar = (triedCleanedData.carSheet.photo_groups || []).map((g: any) => {
+        // Check if group is complete (has both before and after images)
+        const isComplete = g.images?.[0] && g.images?.[1];
+
+        return {
+          ...g,
+          // Mark complete groups as hidden after submission
+          hiddenAfterSubmission: isComplete ? true : (g.hiddenAfterSubmission || false),
+        };
+      });
 
       // REPLACE cleanedData (lines 2987-2994):
       const cleanedData = {
         ...rawData,
+        projectLogo: triedCleanedData.projectLogo,
         firstSectionTitle: firstSectionTitle,
         managementTeam: cleanResourceRows(rawData.managementTeam),
         secondSectionTitle: secondSectionTitle,
@@ -3397,21 +3368,26 @@ const DailyReport = () => {
         materials: cleanResourceRows(rawData.materials),
         machinery: cleanResourceRows(rawData.machinery),
         // ADD PROCESSED DATA:
-        referenceSections: processedReferenceSections,
-        site_ref: siteRefData,
+        referenceSections: triedCleanedData.referenceSections,
+        site_ref: triedCleanedData.siteActivitiesSections,
         carSheet: {
-          ...rawData.carSheet,
-          photo_groups: processedCar,
-        },
+          ...triedCleanedData.carSheet,
+          photo_groups: processedCar
+        }
       };
 
       // NEW CODE (single API call):
-      const reportDataWithSubmit = {
+      let reportDataWithSubmit = {
         ...cleanedData,
         submitImmediately: true  // 🚀 Add this flag
       };
 
       await saveReportToDB(reportDataWithSubmit);  // 🚀 Single API call
+      // Reformat images path to valid url before resetting the images section states
+      // reportDataWithSubmit = formatPayloadImages(reportDataWithSubmit, STATIC_BASE_URL);
+      setReferenceSections(reportDataWithSubmit.referenceSections)
+      setSiteActivitiesSections(convertFromSiteRefFormat(reportDataWithSubmit.site_ref))
+      setCarSheet(reportDataWithSubmit.carSheet)
 
       // Extract all roles and filter only unique roles
       const allRolesUsed = Array.from(new Set([
@@ -3433,19 +3409,6 @@ const DailyReport = () => {
       // ADD THIS: Update local status
       setReportStatus("submitted");
       
-      // Update local CAR state to reflect hidden completed rows
-      const updatedCarSheet = {
-        ...rawData.carSheet,
-        photo_groups: rawData.carSheet.photo_groups.map((g: any) => {
-          const isComplete = g.images?.[0] && g.images?.[1];
-          return {
-            ...g,
-            hiddenAfterSubmission: isComplete ? true : (g.hiddenAfterSubmission || false),
-          };
-        })
-      };
-      setCarSheet(updatedCarSheet);
-
       // Step 3: Clear localStorage after successful submission
       localStorage.removeItem(dateKey(reportDate));
 
